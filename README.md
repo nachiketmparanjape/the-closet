@@ -31,6 +31,11 @@ is recorded as an ADR in the project notes.
 
 Pull requests get a temporary preview URL so changes can be reviewed before merge.
 
+> **Note:** CI deploys Hosting only. If you change `firestore.rules` or
+> `storage.rules`, publish them separately with a reviewed manual deploy
+> (`firebase deploy --only firestore:rules,storage`) — security rules are
+> never auto-published by the pipeline on purpose.
+
 ## Security notes
 
 - The Firebase client config in `public/index.html` is public by design.
