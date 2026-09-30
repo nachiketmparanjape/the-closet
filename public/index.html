@@ -82,6 +82,13 @@
     .primary svg { width: 18px; height: 18px; }
     .secondary { min-height: 44px; border: 1px solid var(--line-strong); background: var(--paper); border-radius: 5px; padding: 0 16px; font-weight: 600; cursor: pointer; }
     .secondary:hover { border-color: var(--ink); }
+    .danger { min-height: 44px; border: 1px solid #b3261e; background: transparent; color: #b3261e; border-radius: 5px; padding: 0 16px; font-weight: 600; cursor: pointer; }
+    .danger:hover { background: #b3261e; color: #fff; }
+    .danger:disabled { cursor: not-allowed; opacity: .48; }
+    .item-photo { width: 100%; max-height: 320px; object-fit: cover; border-radius: 6px; margin-bottom: 16px; background: var(--line); display: block; }
+    .hint { font-size: 13px; color: var(--accent-dark); margin: 2px 0 0; }
+    .detail-actions { justify-content: flex-start; }
+    .detail-actions .danger { margin-right: auto; }
 
     .utility { display: grid; grid-template-columns: minmax(210px, 1fr) auto; gap: 18px; align-items: center; padding: 20px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
     .search { position: relative; max-width: 460px; }
@@ -330,11 +337,50 @@ service firebase.storage {
           </div>
         </div>
         <div class="progress" id="progress" hidden aria-label="Upload progress"><span></span></div>
+        <p class="hint" id="suggestHint" hidden></p>
         <div class="form-actions">
           <button class="secondary" id="uploadCancel" type="button">Cancel</button>
           <button class="primary" id="uploadSubmit" type="submit">Upload piece</button>
         </div>
       </form>
+    </section>
+  </div>
+
+  <div class="overlay" id="itemOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="itemTitle">
+    <section class="modal">
+      <div class="modal-head">
+        <h2 id="itemTitle">Piece</h2>
+        <button class="icon-button" id="itemClose" type="button" aria-label="Close piece details">×</button>
+      </div>
+      <div class="modal-body">
+        <img class="item-photo" id="itemPhoto" alt="Wardrobe piece" />
+        <div class="field">
+          <label for="itemNameInput">Item name</label>
+          <input id="itemNameInput" maxlength="80" />
+        </div>
+        <div class="form-row">
+          <div class="field">
+            <label for="itemCategoryInput">Category</label>
+            <select id="itemCategoryInput">
+              <option value="Tops">Tops</option>
+              <option value="Bottoms">Bottoms</option>
+              <option value="Outerwear">Outerwear</option>
+              <option value="Shoes">Shoes</option>
+              <option value="Accessories">Accessories</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="itemColorInput">Color</label>
+            <input id="itemColorInput" type="color" />
+          </div>
+        </div>
+        <div class="form-actions detail-actions">
+          <button class="danger" id="itemDelete" type="button">Delete</button>
+          <button class="secondary" id="itemCancel" type="button">Cancel</button>
+          <button class="primary" id="itemSave" type="button">Save changes</button>
+        </div>
+      </div>
     </section>
   </div>
 
@@ -382,6 +428,16 @@ service firebase.storage {
       var uploadForm = document.getElementById("uploadForm");
       var progress = document.getElementById("progress");
       var uploadSubmit = document.getElementById("uploadSubmit");
+      var suggestHint = document.getElementById("suggestHint");
+      var itemOverlay = document.getElementById("itemOverlay");
+      var itemPhoto = document.getElementById("itemPhoto");
+      var itemTitle = document.getElementById("itemTitle");
+      var itemNameInput = document.getElementById("itemNameInput");
+      var itemCategoryInput = document.getElementById("itemCategoryInput");
+      var itemColorInput = document.getElementById("itemColorInput");
+      var itemSave = document.getElementById("itemSave");
+      var itemDelete = document.getElementById("itemDelete");
+      var activeItem = null;
 
       function openOverlay(el) {
         el.hidden = false;
@@ -471,8 +527,72 @@ service firebase.storage {
         details.appendChild(meta);
         article.appendChild(imageWrap);
         article.appendChild(details);
+        article.style.cursor = "pointer";
+        article.setAttribute("role", "button");
+        article.setAttribute("tabindex", "0");
+        article.setAttribute("aria-label", "View and edit " + (item.name || "wardrobe item"));
+        article.addEventListener("click", function () { openItem(item); });
+        article.addEventListener("keydown", function (event) {
+          if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openItem(item); }
+        });
         return article;
       }
+
+      function openItem(item) {
+        activeItem = item;
+        itemTitle.textContent = item.name || "Untitled piece";
+        itemPhoto.src = item.imageUrl;
+        itemPhoto.alt = item.name || "Wardrobe item";
+        itemNameInput.value = item.name || "";
+        itemCategoryInput.value = item.category || "Other";
+        itemColorInput.value = /^#[0-9a-f]{6}$/i.test(item.color || "") ? item.color : "#5c6673";
+        itemSave.disabled = false;
+        itemDelete.disabled = false;
+        openOverlay(itemOverlay);
+      }
+
+      function closeItem() {
+        activeItem = null;
+        closeOverlay(itemOverlay);
+      }
+
+      function itemDocRef() {
+        return db.collection("users").doc(currentUser.uid).collection("items").doc(activeItem.id);
+      }
+
+      document.getElementById("itemClose").addEventListener("click", closeItem);
+      document.getElementById("itemCancel").addEventListener("click", closeItem);
+
+      itemSave.addEventListener("click", function () {
+        if (!activeItem || !currentUser) return;
+        itemSave.disabled = true;
+        itemDocRef().update({
+          name: itemNameInput.value.trim(),
+          category: itemCategoryInput.value,
+          color: itemColorInput.value
+        }).then(function () {
+          showToast("Piece updated.");
+          closeItem();
+        }).catch(function (error) {
+          itemSave.disabled = false;
+          showToast(error.message || "Could not save changes.");
+        });
+      });
+
+      itemDelete.addEventListener("click", function () {
+        if (!activeItem || !currentUser) return;
+        if (!window.confirm("Delete " + (activeItem.name || "this piece") + "? This removes the photo too.")) return;
+        itemDelete.disabled = true;
+        var storagePath = activeItem.storagePath;
+        itemDocRef().delete().then(function () {
+          if (storagePath) { storage.ref().child(storagePath).delete().catch(function () {}); }
+          showToast("Piece deleted.");
+          closeItem();
+        }).catch(function (error) {
+          itemDelete.disabled = false;
+          showToast(error.message || "Could not delete this piece.");
+        });
+      });
 
       function renderGallery() {
         var query = searchInput.value.trim().toLowerCase();
@@ -537,12 +657,13 @@ service firebase.storage {
       document.getElementById("addButton").addEventListener("click", beginAdd);
       document.getElementById("emptyAddButton").addEventListener("click", beginAdd);
 
-      [setupOverlay, uploadOverlay].forEach(function (overlay) {
+      [setupOverlay, uploadOverlay, itemOverlay].forEach(function (overlay) {
         overlay.addEventListener("click", function (event) { if (event.target === overlay) closeOverlay(overlay); });
       });
       document.addEventListener("keydown", function (event) {
         if (event.key === "Escape") {
-          if (!uploadOverlay.hidden) closeOverlay(uploadOverlay);
+          if (!itemOverlay.hidden) closeItem();
+          else if (!uploadOverlay.hidden) closeOverlay(uploadOverlay);
           else if (!setupOverlay.hidden) closeOverlay(setupOverlay);
         }
       });
@@ -565,6 +686,103 @@ service firebase.storage {
             window.setTimeout(function () { button.textContent = "Copy"; }, 1600);
           }).catch(function () { showToast("Select the rules and copy them manually."); });
         });
+      });
+
+      // PC-3: auto-suggest tags from the photo, on-device. Color comes from a
+      // center-crop average; category from a small pre-trained image model.
+      // Both only pre-fill the form — the user confirms before uploading.
+      var CATEGORY_KEYWORDS = [
+        ["Tops", ["jersey", "sweater", "cardigan", "tee", "t-shirt", "shirt", "blouse", "tank", "hoodie", "polo", "turtleneck", "maillot"]],
+        ["Bottoms", ["jean", "trouser", "pant", "shorts", "skirt", "khaki", "culotte"]],
+        ["Outerwear", ["jacket", "coat", "parka", "blazer", "suit", "windbreaker", "cloak", "poncho", "overcoat", "trench"]],
+        ["Shoes", ["sneaker", "shoe", "boot", "sandal", "loafer", "pump", "cleat", "footwear"]],
+        ["Accessories", ["hat", "cap", "beanie", "beret", "scarf", "glove", "belt", "watch", "sunglass", "handbag", "backpack", "tie", "purse", "wallet", "umbrella", "sock"]]
+      ];
+      var tagModelPromise = null;
+
+      function loadScript(src) {
+        return new Promise(function (resolve, reject) {
+          var s = document.createElement("script");
+          s.src = src;
+          s.onload = function () { resolve(); };
+          s.onerror = function () { reject(new Error("script failed")); };
+          document.head.appendChild(s);
+        });
+      }
+
+      function ensureTagModel() {
+        if (!tagModelPromise) {
+          tagModelPromise = loadScript("https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js")
+            .then(function () { return loadScript("https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1/dist/mobilenet.min.js"); })
+            .then(function () { return window.mobilenet.load(); })
+            .catch(function () { tagModelPromise = null; return null; });
+        }
+        return tagModelPromise;
+      }
+
+      function guessCategory(predictions) {
+        for (var i = 0; i < predictions.length; i++) {
+          var label = String(predictions[i].className || "").toLowerCase();
+          for (var c = 0; c < CATEGORY_KEYWORDS.length; c++) {
+            var keywords = CATEGORY_KEYWORDS[c][1];
+            for (var k = 0; k < keywords.length; k++) {
+              if (label.indexOf(keywords[k]) !== -1) return CATEGORY_KEYWORDS[c][0];
+            }
+          }
+        }
+        return null;
+      }
+
+      function dominantColor(img) {
+        var size = 48;
+        var canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        var ctx = canvas.getContext("2d");
+        var sw = img.naturalWidth * 0.6;
+        var sh = img.naturalHeight * 0.6;
+        ctx.drawImage(img, (img.naturalWidth - sw) / 2, (img.naturalHeight - sh) / 2, sw, sh, 0, 0, size, size);
+        var data = ctx.getImageData(0, 0, size, size).data;
+        var r = 0, g = 0, b = 0, n = 0;
+        for (var i = 0; i < data.length; i += 4) {
+          if (data[i + 3] < 128) continue;
+          r += data[i]; g += data[i + 1]; b += data[i + 2]; n++;
+        }
+        if (!n) return null;
+        r = Math.round(r / n); g = Math.round(g / n); b = Math.round(b / n);
+        return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+      }
+
+      document.getElementById("photoInput").addEventListener("change", function () {
+        var file = this.files[0];
+        suggestHint.hidden = true;
+        if (!file || file.type.indexOf("image/") !== 0) return;
+        var url = URL.createObjectURL(file);
+        var img = new Image();
+        img.onload = function () {
+          try {
+            var color = dominantColor(img);
+            if (color) {
+              document.getElementById("colorInput").value = color;
+              suggestHint.textContent = "✨ Suggested from your photo — check before uploading.";
+              suggestHint.hidden = false;
+            }
+          } catch (e) {}
+          ensureTagModel().then(function (model) {
+            if (!model) return;
+            return model.classify(img).then(function (predictions) {
+              var category = guessCategory(predictions);
+              if (category) {
+                document.getElementById("categoryInput").value = category;
+                suggestHint.textContent = "✨ Suggested category: " + category + " — check before uploading.";
+                suggestHint.hidden = false;
+              }
+            }).catch(function () {});
+          });
+          URL.revokeObjectURL(url);
+        };
+        img.onerror = function () { URL.revokeObjectURL(url); };
+        img.src = url;
       });
 
       uploadForm.addEventListener("submit", function (event) {
@@ -603,6 +821,7 @@ service firebase.storage {
           }).then(function () {
             uploadForm.reset();
             document.getElementById("colorInput").value = "#5c6673";
+            suggestHint.hidden = true;
             bar.style.width = "0";
             progress.hidden = true;
             uploadSubmit.disabled = false;
