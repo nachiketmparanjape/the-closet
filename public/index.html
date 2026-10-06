@@ -916,13 +916,26 @@ service firebase.storage {
         var sh = img.naturalHeight * 0.6;
         ctx.drawImage(img, (img.naturalWidth - sw) / 2, (img.naturalHeight - sh) / 2, sw, sh, 0, 0, size, size);
         var data = ctx.getImageData(0, 0, size, size).data;
-        var r = 0, g = 0, b = 0, n = 0;
-        for (var i = 0; i < data.length; i += 4) {
-          if (data[i + 3] < 128) continue;
-          r += data[i]; g += data[i + 1]; b += data[i + 2]; n++;
+        // Most frequent quantized color (mode), not the average — an average
+        // turns a navy/white striped shirt muddy gray. Near-white pixels are
+        // skipped as likely background, unless that's all there is.
+        function mode(skipWhite) {
+          var counts = {}, best = -1, bestN = 0;
+          for (var i = 0; i < data.length; i += 4) {
+            if (data[i + 3] < 128) continue;
+            var r = data[i], g = data[i + 1], b = data[i + 2];
+            if (skipWhite && r > 240 && g > 240 && b > 240) continue;
+            var key = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4);
+            var n = (counts[key] || 0) + 1;
+            counts[key] = n;
+            if (n > bestN) { bestN = n; best = key; }
+          }
+          return best;
         }
-        if (!n) return null;
-        r = Math.round(r / n); g = Math.round(g / n); b = Math.round(b / n);
+        var best = mode(true);
+        if (best < 0) best = mode(false);
+        if (best < 0) return null;
+        var r = ((best >> 8) & 15) * 17, g = ((best >> 4) & 15) * 17, b = (best & 15) * 17;
         return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
       }
 
