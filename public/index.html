@@ -96,7 +96,7 @@
     .thumb-strip .thumb-wrap img { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; cursor: pointer; border: 2px solid transparent; display: block; }
     .thumb-strip .thumb-wrap img.active { border-color: var(--ink); }
     .thumb-del { position: absolute; top: -8px; right: -8px; width: 22px; height: 22px; border-radius: 50%; background: #b3261e; color: #fff; border: none; font-size: 14px; line-height: 1; cursor: pointer; padding: 0; }
-    .photo-manage { margin: 0 0 16px; }
+    .photo-manage { margin: 0 0 16px; display: flex; gap: 8px; flex-wrap: wrap; }
 
     .utility { display: grid; grid-template-columns: minmax(210px, 1fr) auto; gap: 18px; align-items: center; padding: 20px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
     .search { position: relative; max-width: 460px; }
@@ -366,6 +366,7 @@ service firebase.storage {
         <div class="thumb-strip" id="thumbStrip" hidden></div>
         <div class="photo-manage">
           <button class="secondary" id="addPhotosBtn" type="button">Add photos</button>
+          <button class="secondary" id="setCoverBtn" type="button">Set as cover</button>
           <input id="addPhotoInput" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden />
         </div>
         <div class="field">
@@ -631,6 +632,25 @@ service firebase.storage {
           showToast(error.message || "Could not delete the photo.");
         });
       }
+
+      document.getElementById("setCoverBtn").addEventListener("click", function () {
+        if (!activeItem) return;
+        var photos = itemPhotos(activeItem).slice();
+        if (photos.length < 2) { showToast("Add another photo first — there's only one."); return; }
+        var idx = -1;
+        for (var i = 0; i < photos.length; i++) {
+          if (photos[i].url === itemPhoto.src) { idx = i; break; }
+        }
+        if (idx < 0) { showToast("Tap a thumbnail to preview it first."); return; }
+        if (idx === 0) { showToast("Already the cover photo."); return; }
+        var chosen = photos.splice(idx, 1)[0];
+        photos.unshift(chosen);
+        persistPhotos(photos).then(function () {
+          showToast("Cover photo updated.");
+        }).catch(function (error) {
+          showToast(error.message || "Could not update cover photo.");
+        });
+      });
 
       document.getElementById("addPhotosBtn").addEventListener("click", function () {
         if (!activeItem) return;
