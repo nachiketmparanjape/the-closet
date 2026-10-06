@@ -92,8 +92,11 @@
     .photo-preview { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
     .photo-preview img { width: 64px; height: 64px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); }
     .thumb-strip { display: flex; gap: 8px; margin: 0 0 16px; flex-wrap: wrap; }
-    .thumb-strip img { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; cursor: pointer; border: 2px solid transparent; }
-    .thumb-strip img.active { border-color: var(--ink); }
+    .thumb-strip .thumb-wrap { position: relative; }
+    .thumb-strip .thumb-wrap img { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; cursor: pointer; border: 2px solid transparent; display: block; }
+    .thumb-strip .thumb-wrap img.active { border-color: var(--ink); }
+    .thumb-del { position: absolute; top: -8px; right: -8px; width: 22px; height: 22px; border-radius: 50%; background: #b3261e; color: #fff; border: none; font-size: 14px; line-height: 1; cursor: pointer; padding: 0; }
+    .photo-manage { margin: 0 0 16px; }
 
     .utility { display: grid; grid-template-columns: minmax(210px, 1fr) auto; gap: 18px; align-items: center; padding: 20px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
     .search { position: relative; max-width: 460px; }
@@ -361,6 +364,10 @@ service firebase.storage {
       <div class="modal-body">
         <img class="item-photo" id="itemPhoto" alt="Wardrobe piece" />
         <div class="thumb-strip" id="thumbStrip" hidden></div>
+        <div class="photo-manage">
+          <button class="secondary" id="addPhotosBtn" type="button">Add photos</button>
+          <input id="addPhotoInput" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden />
+        </div>
         <div class="field">
           <label for="itemNameInput">Item name</label>
           <input id="itemNameInput" maxlength="80" />
@@ -558,30 +565,137 @@ service firebase.storage {
         return [];
       }
 
-      function openItem(item) {
-        activeItem = item;
-        itemTitle.textContent = item.name || "Untitled piece";
-        var photos = itemPhotos(item);
+      // PC-5: manage an item's photos individually — add more (up to MAX_PHOTOS
+      // total) or delete a wrong upload. The last photo can't be deleted;
+      // delete the piece itself instead.
+      function renderThumbs() {
+        var photos = itemPhotos(activeItem);
         thumbStrip.textContent = "";
         if (photos.length > 1) {
           photos.forEach(function (p, i) {
+            var wrap = document.createElement("div");
+            wrap.className = "thumb-wrap";
             var t = document.createElement("img");
             t.src = p.url;
             t.alt = "Photo " + (i + 1) + " of " + photos.length;
-            if (i === 0) t.classList.add("active");
+            if (p.url === itemPhoto.src) t.classList.add("active");
             t.addEventListener("click", function () {
               itemPhoto.src = p.url;
               thumbStrip.querySelectorAll("img").forEach(function (x) { x.classList.remove("active"); });
               t.classList.add("active");
             });
-            thumbStrip.appendChild(t);
+            var del = document.createElement("button");
+            del.className = "thumb-del";
+            del.type = "button";
+            del.textContent = "×";
+            del.setAttribute("aria-label", "Delete photo " + (i + 1));
+            del.addEventListener("click", function () { deletePhoto(i); });
+            wrap.appendChild(t);
+            wrap.appendChild(del);
+            thumbStrip.appendChild(wrap);
           });
           thumbStrip.hidden = false;
         } else {
           thumbStrip.hidden = true;
         }
+      }
+
+      function persistPhotos(photos) {
+        return itemDocRef().update({
+          photos: photos,
+          imageUrl: photos[0].url,
+          storagePath: photos[0].storagePath
+        }).then(function () {
+          activeItem.photos = photos;
+          activeItem.imageUrl = photos[0].url;
+          activeItem.storagePath = photos[0].storagePath;
+          var stillThere = photos.some(function (p) { return p.url === itemPhoto.src; });
+          if (!stillThere) itemPhoto.src = photos[0].url;
+          renderThumbs();
+        });
+      }
+
+      function deletePhoto(idx) {
+        if (!activeItem) return;
+        var photos = itemPhotos(activeItem).slice();
+        if (photos.length <= 1) {
+          showToast("A piece needs at least one photo — delete the piece to remove it.");
+          return;
+        }
+        if (!window.confirm("Delete this photo?")) return;
+        var removed = photos.splice(idx, 1)[0];
+        persistPhotos(photos).then(function () {
+          if (removed.storagePath) { storage.ref().child(removed.storagePath).delete().catch(function () {}); }
+          showToast("Photo deleted.");
+        }).catch(function (error) {
+          showToast(error.message || "Could not delete the photo.");
+        });
+      }
+
+      document.getElementById("addPhotosBtn").addEventListener("click", function () {
+        if (!activeItem) return;
+        if (itemPhotos(activeItem).length >= MAX_PHOTOS) {
+          showToast("Already at " + MAX_PHOTOS + " photos.");
+          return;
+        }
+        document.getElementById("addPhotoInput").click();
+      });
+
+      document.getElementById("addPhotoInput").addEventListener("change", function () {
+        if (!activeItem || !currentUser) return;
+        var existing = itemPhotos(activeItem);
+        var room = MAX_PHOTOS - existing.length;
+        var files = Array.prototype.slice.call(this.files, 0, room);
+        this.value = "";
+        if (!files.length) return;
+        for (var v = 0; v < files.length; v++) {
+          if (files[v].size > 10 * 1024 * 1024) { showToast("Each image must be under 10 MB."); return; }
+          if (["image/jpeg", "image/png", "image/webp"].indexOf(files[v].type) === -1) { showToast("Use JPEG, PNG, or WebP images."); return; }
+        }
+        var addBtn = document.getElementById("addPhotosBtn");
+        addBtn.disabled = true;
+        showToast("Uploading " + files.length + (files.length === 1 ? " photo…" : " photos…"));
+        var newPhotos = [];
+        var failed = false;
+        function uploadOne(idx) {
+          if (failed) return;
+          if (idx >= files.length) {
+            persistPhotos(existing.concat(newPhotos)).then(function () {
+              addBtn.disabled = false;
+              showToast("Photo added.");
+            }).catch(function (error) {
+              newPhotos.forEach(function (p) { storage.ref().child(p.storagePath).delete().catch(function () {}); });
+              addBtn.disabled = false;
+              showToast(error.message || "Could not add photos.");
+            });
+            return;
+          }
+          var file = files[idx];
+          var safeName = Date.now() + "-" + idx + "-" + file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+          var storagePath = "users/" + currentUser.uid + "/items/" + activeItem.id + "/" + safeName;
+          var fileRef = storage.ref().child(storagePath);
+          fileRef.put(file, { contentType: file.type }).then(function () {
+            return fileRef.getDownloadURL();
+          }).then(function (url) {
+            newPhotos.push({ url: url, storagePath: storagePath });
+            uploadOne(idx + 1);
+          }).catch(function (error) {
+            failed = true;
+            newPhotos.forEach(function (p) { storage.ref().child(p.storagePath).delete().catch(function () {}); });
+            addBtn.disabled = false;
+            showToast(error.message || "Upload failed.");
+          });
+        }
+        uploadOne(0);
+      });
+
+      function openItem(item) {
+        activeItem = item;
+        itemTitle.textContent = item.name || "Untitled piece";
+        var photos = itemPhotos(item);
         itemPhoto.src = photos.length ? photos[0].url : "";
         itemPhoto.alt = item.name || "Wardrobe item";
+        renderThumbs();
         itemNameInput.value = item.name || "";
         itemCategoryInput.value = item.category || "Other";
         itemColorInput.value = /^#[0-9a-f]{6}$/i.test(item.color || "") ? item.color : "#5c6673";
