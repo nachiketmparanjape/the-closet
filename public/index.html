@@ -89,6 +89,11 @@
     .hint { font-size: 13px; color: var(--accent-dark); margin: 2px 0 0; }
     .detail-actions { justify-content: flex-start; }
     .detail-actions .danger { margin-right: auto; }
+    .photo-preview { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+    .photo-preview img { width: 64px; height: 64px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); }
+    .thumb-strip { display: flex; gap: 8px; margin: 0 0 16px; flex-wrap: wrap; }
+    .thumb-strip img { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; cursor: pointer; border: 2px solid transparent; }
+    .thumb-strip img.active { border-color: var(--ink); }
 
     .utility { display: grid; grid-template-columns: minmax(210px, 1fr) auto; gap: 18px; align-items: center; padding: 20px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
     .search { position: relative; max-width: 460px; }
@@ -312,8 +317,9 @@ service firebase.storage {
       </div>
       <form class="modal-body form-grid" id="uploadForm">
         <div class="field file-drop">
-          <label for="photoInput">Photo</label>
-          <input id="photoInput" type="file" accept="image/jpeg,image/png,image/webp" required />
+          <label for="photoInput">Photos (up to 4)</label>
+          <input id="photoInput" type="file" accept="image/jpeg,image/png,image/webp" multiple required />
+          <div class="photo-preview" id="photoPreview" hidden></div>
         </div>
         <div class="field">
           <label for="nameInput">Item name</label>
@@ -354,6 +360,7 @@ service firebase.storage {
       </div>
       <div class="modal-body">
         <img class="item-photo" id="itemPhoto" alt="Wardrobe piece" />
+        <div class="thumb-strip" id="thumbStrip" hidden></div>
         <div class="field">
           <label for="itemNameInput">Item name</label>
           <input id="itemNameInput" maxlength="80" />
@@ -429,6 +436,8 @@ service firebase.storage {
       var progress = document.getElementById("progress");
       var uploadSubmit = document.getElementById("uploadSubmit");
       var suggestHint = document.getElementById("suggestHint");
+      var photoPreview = document.getElementById("photoPreview");
+      var thumbStrip = document.getElementById("thumbStrip");
       var itemOverlay = document.getElementById("itemOverlay");
       var itemPhoto = document.getElementById("itemPhoto");
       var itemTitle = document.getElementById("itemTitle");
@@ -538,10 +547,40 @@ service firebase.storage {
         return article;
       }
 
+      // PC-4: an item can have up to MAX_PHOTOS photos. New items store a
+      // `photos` array of {url, storagePath}; `imageUrl`/`storagePath` stay as
+      // the first photo so older items and the gallery keep working.
+      var MAX_PHOTOS = 4;
+
+      function itemPhotos(item) {
+        if (item.photos && item.photos.length) return item.photos;
+        if (item.imageUrl) return [{ url: item.imageUrl, storagePath: item.storagePath || null }];
+        return [];
+      }
+
       function openItem(item) {
         activeItem = item;
         itemTitle.textContent = item.name || "Untitled piece";
-        itemPhoto.src = item.imageUrl;
+        var photos = itemPhotos(item);
+        thumbStrip.textContent = "";
+        if (photos.length > 1) {
+          photos.forEach(function (p, i) {
+            var t = document.createElement("img");
+            t.src = p.url;
+            t.alt = "Photo " + (i + 1) + " of " + photos.length;
+            if (i === 0) t.classList.add("active");
+            t.addEventListener("click", function () {
+              itemPhoto.src = p.url;
+              thumbStrip.querySelectorAll("img").forEach(function (x) { x.classList.remove("active"); });
+              t.classList.add("active");
+            });
+            thumbStrip.appendChild(t);
+          });
+          thumbStrip.hidden = false;
+        } else {
+          thumbStrip.hidden = true;
+        }
+        itemPhoto.src = photos.length ? photos[0].url : "";
         itemPhoto.alt = item.name || "Wardrobe item";
         itemNameInput.value = item.name || "";
         itemCategoryInput.value = item.category || "Other";
@@ -581,11 +620,11 @@ service firebase.storage {
 
       itemDelete.addEventListener("click", function () {
         if (!activeItem || !currentUser) return;
-        if (!window.confirm("Delete " + (activeItem.name || "this piece") + "? This removes the photo too.")) return;
+        if (!window.confirm("Delete " + (activeItem.name || "this piece") + "? This removes its photos too.")) return;
         itemDelete.disabled = true;
-        var storagePath = activeItem.storagePath;
+        var storagePaths = itemPhotos(activeItem).map(function (p) { return p.storagePath; }).filter(Boolean);
         itemDocRef().delete().then(function () {
-          if (storagePath) { storage.ref().child(storagePath).delete().catch(function () {}); }
+          storagePaths.forEach(function (sp) { storage.ref().child(sp).delete().catch(function () {}); });
           showToast("Piece deleted.");
           closeItem();
         }).catch(function (error) {
@@ -754,8 +793,26 @@ service firebase.storage {
       }
 
       document.getElementById("photoInput").addEventListener("change", function () {
-        var file = this.files[0];
+        var files = Array.prototype.slice.call(this.files, 0, MAX_PHOTOS);
         suggestHint.hidden = true;
+        photoPreview.textContent = "";
+        photoPreview.hidden = true;
+        if (!files.length) return;
+        if (this.files.length > MAX_PHOTOS) {
+          showToast("Keeping the first " + MAX_PHOTOS + " photos.");
+        }
+        files.forEach(function (file) {
+          if (file.type.indexOf("image/") !== 0) return;
+          var thumbUrl = URL.createObjectURL(file);
+          var thumb = new Image();
+          thumb.alt = "Selected photo";
+          thumb.onload = function () { URL.revokeObjectURL(thumbUrl); };
+          thumb.src = thumbUrl;
+          photoPreview.appendChild(thumb);
+        });
+        photoPreview.hidden = false;
+        // Auto-suggest runs on the first photo only (the cover).
+        var file = files[0];
         if (!file || file.type.indexOf("image/") !== 0) return;
         var url = URL.createObjectURL(file);
         var img = new Image();
@@ -788,52 +845,84 @@ service firebase.storage {
       uploadForm.addEventListener("submit", function (event) {
         event.preventDefault();
         if (!currentUser) { closeOverlay(uploadOverlay); beginAdd(); return; }
-        var file = document.getElementById("photoInput").files[0];
-        if (!file) { showToast("Choose a photo first."); return; }
-        if (file.size > 10 * 1024 * 1024) { showToast("Choose an image under 10 MB."); return; }
-        if (["image/jpeg", "image/png", "image/webp"].indexOf(file.type) === -1) { showToast("Use a JPEG, PNG, or WebP image."); return; }
+        var files = Array.prototype.slice.call(document.getElementById("photoInput").files, 0, MAX_PHOTOS);
+        if (!files.length) { showToast("Choose a photo first."); return; }
+        for (var v = 0; v < files.length; v++) {
+          if (files[v].size > 10 * 1024 * 1024) { showToast("Each image must be under 10 MB."); return; }
+          if (["image/jpeg", "image/png", "image/webp"].indexOf(files[v].type) === -1) { showToast("Use JPEG, PNG, or WebP images."); return; }
+        }
 
         var docRef = db.collection("users").doc(currentUser.uid).collection("items").doc();
-        var safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
-        var storagePath = "users/" + currentUser.uid + "/items/" + docRef.id + "/" + safeName;
-        var fileRef = storage.ref().child(storagePath);
-        var task = fileRef.put(file, { contentType: file.type });
         var bar = progress.querySelector("span");
         progress.hidden = false;
         uploadSubmit.disabled = true;
+        var photos = [];
+        var failed = false;
 
-        task.on("state_changed", function (snapshot) {
-          bar.style.width = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100) + "%";
-        }, function (error) {
+        function cleanupUploads() {
+          photos.forEach(function (p) { storage.ref().child(p.storagePath).delete().catch(function () {}); });
+        }
+
+        function failUpload(message) {
+          failed = true;
+          cleanupUploads();
           progress.hidden = true;
           uploadSubmit.disabled = false;
-          showToast(error.message || "Upload failed.");
-        }, function () {
-          task.snapshot.ref.getDownloadURL().then(function (imageUrl) {
-            return docRef.set({
-              name: document.getElementById("nameInput").value.trim(),
-              category: document.getElementById("categoryInput").value,
-              color: document.getElementById("colorInput").value,
-              imageUrl: imageUrl,
-              storagePath: storagePath,
-              createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
+          showToast(message);
+        }
+
+        function saveDoc() {
+          docRef.set({
+            name: document.getElementById("nameInput").value.trim(),
+            category: document.getElementById("categoryInput").value,
+            color: document.getElementById("colorInput").value,
+            imageUrl: photos[0].url,
+            storagePath: photos[0].storagePath,
+            photos: photos,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
           }).then(function () {
             uploadForm.reset();
             document.getElementById("colorInput").value = "#5c6673";
             suggestHint.hidden = true;
+            photoPreview.textContent = "";
+            photoPreview.hidden = true;
             bar.style.width = "0";
             progress.hidden = true;
             uploadSubmit.disabled = false;
             closeOverlay(uploadOverlay);
             showToast("Piece added to your wardrobe.");
           }).catch(function (error) {
-            fileRef.delete().catch(function () {});
+            cleanupUploads();
             progress.hidden = true;
             uploadSubmit.disabled = false;
             showToast(error.message || "Could not save this piece.");
           });
-        });
+        }
+
+        function uploadOne(idx) {
+          if (failed) return;
+          if (idx >= files.length) { saveDoc(); return; }
+          var file = files[idx];
+          var safeName = idx + "-" + file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+          var storagePath = "users/" + currentUser.uid + "/items/" + docRef.id + "/" + safeName;
+          var fileRef = storage.ref().child(storagePath);
+          var task = fileRef.put(file, { contentType: file.type });
+          task.on("state_changed", function (snapshot) {
+            var frac = (idx + snapshot.bytesTransferred / snapshot.totalBytes) / files.length;
+            bar.style.width = Math.round(frac * 100) + "%";
+          }, function (error) {
+            failUpload(error.message || "Upload failed.");
+          }, function () {
+            task.snapshot.ref.getDownloadURL().then(function (imageUrl) {
+              photos.push({ url: imageUrl, storagePath: storagePath });
+              uploadOne(idx + 1);
+            }).catch(function (error) {
+              failUpload(error.message || "Upload failed.");
+            });
+          });
+        }
+
+        uploadOne(0);
       });
 
       setStatus(null);
