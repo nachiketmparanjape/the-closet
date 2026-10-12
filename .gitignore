@@ -1,5 +1,7 @@
 # Local helper scripts (contain API client secrets) — never commit
 add-auth-domains.js
+create-deploy-sa.js
 get-rules.js
 deploy-firestore-rules.js
 .firebase/
+node_modules/
