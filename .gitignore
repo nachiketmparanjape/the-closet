@@ -5,3 +5,4 @@ get-rules.js
 deploy-firestore-rules.js
 .firebase/
 node_modules/
+firebase-debug.log
