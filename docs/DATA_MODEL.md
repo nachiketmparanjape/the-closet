@@ -77,8 +77,17 @@ founder described 2026-10-14.
 
 `pattern`, `fit`, `fabricGuess`, `formality`, `warmth` move out of the `ai`
 blob to top-level fields, pre-filled from the AI at upload and editable any
-time (same authority rule as colors). The `ai` object stays as the **raw
-cache** of the last AI analysis, extended with:
+time (same authority rule as colors). **New optional field: `brand`
+(string, null when unknown)** — the most standard apparel attribute we lack
+(every retail data model carries it: schema.org, Google Merchant Center).
+AI attempts it best-effort at upload from labels/logos; user edits or leaves
+blank. Honest scope note (2026-10-14): brand helps filtering and
+brand-preference matching, not outfit harmony — it won't move recommendation
+quality. Added for organization and future-proofing at ~zero cost: optional,
+no migration (absent = unknown), prompt change batches with the next
+function deploy.
+
+The `ai` object stays as the **raw cache** of the last AI analysis, extended with:
 
 ```js
 ai: {
