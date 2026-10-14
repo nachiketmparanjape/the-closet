@@ -34,6 +34,14 @@ and diagnosis resumes; the fix becomes its own cut.
 
 ## Ideas (untriaged)
 
+- **View-aware AI descriptions:** the AI assumes the cover photo shows the
+  front — founder uploaded a back-print tee 2026-10-14 and got "print on
+  the front". Small fidelity detail, not a broken flow (and the description
+  text isn't directly editable yet — only the name is). Proper fix: prompt
+  must not assert front/back unless visible cues exist, plus make
+  description/attributes user-editable (merges with PC-8's editable
+  fields); the full fix belongs with the garment-model idea. Defer until
+  the app is more mature.
 - **PC-8: Color palette + future-proof item data model:** first-class
   `colors` array on items (AI-suggested, user-editable, provenance-tracked
   so AI re-runs never clobber user edits); promote AI attributes
