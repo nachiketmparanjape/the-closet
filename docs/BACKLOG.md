@@ -34,6 +34,16 @@ and diagnosis resumes; the fix becomes its own cut.
 
 ## Ideas (untriaged)
 
+- **Bulk upload (one photo per article):** select N photos → N items created
+  automatically, AI describes each, user reviews/edits afterwards. Matches
+  the real cataloguing behavior (photograph 50 things, curate later) instead
+  of the tedious one-at-a-time flow. Founder-proposed 2026-10-14.
+  PM notes: N photos = N `describeItem` calls (~$0.001 each — 50 photos ≈
+  $0.05; run a few in parallel with progress UI); per-item failures must not
+  block the batch (same principle as PC-7); gallery is already newest-first
+  so new items surface at top for review; bulk mode is single-photo only,
+  extra photos via PC-5's add-photos. Needs its own card (batch progress,
+  failure isolation, review path) — Sprint 3 candidate.
 - **View-aware AI descriptions:** the AI assumes the cover photo shows the
   front — founder uploaded a back-print tee 2026-10-14 and got "print on
   the front". Small fidelity detail, not a broken flow (and the description
