@@ -87,6 +87,9 @@
     .danger:disabled { cursor: not-allowed; opacity: .48; }
     .item-photo { width: 100%; max-height: 320px; object-fit: cover; border-radius: 6px; margin-bottom: 16px; background: var(--line); display: block; }
     .hint { font-size: 13px; color: var(--accent-dark); margin: 2px 0 0; }
+    .ai-suggest { font-size: 13px; margin: 6px 0 0; padding: 8px 10px; border-radius: 8px; background: var(--chip-bg, #f1f3f4); }
+    .ai-suggest .ai-desc { margin: 0 0 4px; }
+    .ai-suggest .ai-tags { margin: 0; color: var(--muted, #5f6368); font-size: 12px; }
     .detail-actions { justify-content: flex-start; }
     .detail-actions .danger { margin-right: auto; }
     .photo-preview { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
@@ -347,6 +350,10 @@ service firebase.storage {
         </div>
         <div class="progress" id="progress" hidden aria-label="Upload progress"><span></span></div>
         <p class="hint" id="suggestHint" hidden></p>
+        <div class="ai-suggest" id="aiSuggest" hidden>
+          <p class="ai-desc" id="aiDesc"></p>
+          <p class="ai-tags" id="aiTags"></p>
+        </div>
         <div class="form-actions">
           <button class="secondary" id="uploadCancel" type="button">Cancel</button>
           <button class="primary" id="uploadSubmit" type="submit">Upload piece</button>
@@ -390,6 +397,10 @@ service firebase.storage {
             <input id="itemColorInput" type="color" />
           </div>
         </div>
+        <div class="ai-suggest" id="itemAiSuggest" hidden>
+          <p class="ai-desc" id="itemAiDesc"></p>
+          <p class="ai-tags" id="itemAiTags"></p>
+        </div>
         <div class="form-actions detail-actions">
           <button class="danger" id="itemDelete" type="button">Delete</button>
           <button class="secondary" id="itemCancel" type="button">Cancel</button>
@@ -405,6 +416,7 @@ service firebase.storage {
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-storage-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-functions-compat.js"></script>
   <script>
     (function () {
       "use strict";
@@ -425,11 +437,14 @@ service firebase.storage {
       var auth = null;
       var db = null;
       var storage = null;
+      var functions = null;
       var currentUser = null;
       var allItems = [];
       var filter = "All";
       var unsubscribe = null;
       var toastTimer = null;
+      var aiSuggestion = null;   // latest describeItem result for the upload form
+      var aiRequestId = 0;       // guards against out-of-order AI responses
 
       var setupOverlay = document.getElementById("setupOverlay");
       var uploadOverlay = document.getElementById("uploadOverlay");
@@ -719,6 +734,7 @@ service firebase.storage {
         itemNameInput.value = item.name || "";
         itemCategoryInput.value = item.category || "Other";
         itemColorInput.value = /^#[0-9a-f]{6}$/i.test(item.color || "") ? item.color : "#5c6673";
+        renderItemAI(item.ai);
         itemSave.disabled = false;
         itemDelete.disabled = false;
         openOverlay(itemOverlay);
@@ -939,9 +955,84 @@ service firebase.storage {
         return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
       }
 
+      // PC-7: one AI description per upload, from the cover photo.
+      // Runs alongside the on-device suggestions; the upload never waits on it.
+      function downscaleForAI(file) {
+        return new Promise(function (resolve, reject) {
+          var url = URL.createObjectURL(file);
+          var img = new Image();
+          img.onload = function () {
+            try {
+              var maxSide = 1024;
+              var scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+              var w = Math.max(1, Math.round(img.naturalWidth * scale));
+              var h = Math.max(1, Math.round(img.naturalHeight * scale));
+              var canvas = document.createElement("canvas");
+              canvas.width = w; canvas.height = h;
+              canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+              var dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+              URL.revokeObjectURL(url);
+              resolve({ base64: dataUrl.split(",")[1], mimeType: "image/jpeg" });
+            } catch (e) { URL.revokeObjectURL(url); reject(e); }
+          };
+          img.onerror = function () { URL.revokeObjectURL(url); reject(new Error("unreadable")); };
+          img.src = url;
+        });
+      }
+
+      function renderAISuggestion(s) {
+        var box = document.getElementById("aiSuggest");
+        if (!s) { box.hidden = true; return; }
+        document.getElementById("aiDesc").textContent = "✨ " + (s.description || s.name || "");
+        var tags = [s.pattern, s.fit, s.formality, s.warmth, s.fabric_guess]
+          .filter(function (t) { return t && t !== "unknown" && t !== "other"; });
+        document.getElementById("aiTags").textContent = tags.join(" · ");
+        box.hidden = false;
+      }
+
+      function requestAIDescription(file) {
+        var box = document.getElementById("aiSuggest");
+        aiSuggestion = null;
+        if (!functions || !currentUser || !file) { box.hidden = true; return; }
+        var myId = ++aiRequestId;
+        document.getElementById("aiDesc").textContent = "✨ Asking AI for a name & details…";
+        document.getElementById("aiTags").textContent = "";
+        box.hidden = false;
+        downscaleForAI(file).then(function (img) {
+          if (myId !== aiRequestId) return null;
+          return functions.httpsCallable("describeItem")({ imageBase64: img.base64, mimeType: img.mimeType });
+        }).then(function (result) {
+          if (!result || myId !== aiRequestId) return;
+          var s = result.data || null;
+          aiSuggestion = s;
+          renderAISuggestion(s);
+          var nameInput = document.getElementById("nameInput");
+          if (s && s.name && !nameInput.value.trim()) nameInput.value = s.name;
+        }).catch(function () {
+          // AI is a bonus: whatever the on-device suggestions filled in stays.
+          if (myId !== aiRequestId) return;
+          aiSuggestion = null;
+          box.hidden = true;
+        });
+      }
+
+      // PC-7: read-only view of the cached AI description in the detail view.
+      function renderItemAI(ai) {
+        var box = document.getElementById("itemAiSuggest");
+        if (!ai || (!ai.description && !ai.name)) { box.hidden = true; return; }
+        document.getElementById("itemAiDesc").textContent = "✨ " + (ai.description || ai.name || "");
+        var tags = [ai.pattern, ai.fit, ai.formality, ai.warmth, ai.fabric_guess]
+          .filter(function (t) { return t && t !== "unknown" && t !== "other"; });
+        document.getElementById("itemAiTags").textContent = tags.join(" · ");
+        box.hidden = false;
+      }
+
       document.getElementById("photoInput").addEventListener("change", function () {
         var files = Array.prototype.slice.call(this.files, 0, MAX_PHOTOS);
         suggestHint.hidden = true;
+        aiRequestId++;
+        aiSuggestion = null;
+        document.getElementById("aiSuggest").hidden = true;
         photoPreview.textContent = "";
         photoPreview.hidden = true;
         if (!files.length) return;
@@ -961,6 +1052,7 @@ service firebase.storage {
         // Auto-suggest runs on the first photo only (the cover).
         var file = files[0];
         if (!file || file.type.indexOf("image/") !== 0) return;
+        requestAIDescription(file);
         var url = URL.createObjectURL(file);
         var img = new Image();
         img.onload = function () {
@@ -1019,7 +1111,7 @@ service firebase.storage {
         }
 
         function saveDoc() {
-          docRef.set({
+          var doc = {
             name: document.getElementById("nameInput").value.trim(),
             category: document.getElementById("categoryInput").value,
             color: document.getElementById("colorInput").value,
@@ -1027,10 +1119,14 @@ service firebase.storage {
             storagePath: photos[0].storagePath,
             photos: photos,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
-          }).then(function () {
+          };
+          if (aiSuggestion) doc.ai = aiSuggestion; // PC-7: cached AI description
+          docRef.set(doc).then(function () {
             uploadForm.reset();
             document.getElementById("colorInput").value = "#5c6673";
             suggestHint.hidden = true;
+            aiSuggestion = null;
+            document.getElementById("aiSuggest").hidden = true;
             photoPreview.textContent = "";
             photoPreview.hidden = true;
             bar.style.width = "0";
@@ -1081,6 +1177,7 @@ service firebase.storage {
           auth = firebase.auth();
           db = firebase.firestore();
           storage = firebase.storage();
+          functions = firebase.app().functions("us-central1");
           auth.onAuthStateChanged(function (user) {
             currentUser = user;
             setStatus(user);
