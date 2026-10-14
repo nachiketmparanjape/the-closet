@@ -82,6 +82,13 @@ couch) and phone testing whenever he's up to it.
   (on-device suggestions intact). The cached `ai` object is also shown
   read-only in the detail view so persistence is verifiable on-device.
   Pricing re-verified: live test used 2,515 tokens ≈ fractions of a cent.
+- **Phone test 2026-10-14 (founder):** AI worked (white anime-tee described
+  correctly), but two UI bugs: (1) AI box text invisible in dark mode
+  (white-on-white — chip set a light bg without a text color); (2) the old
+  on-device hint lingered after the AI suggestion rendered. Fixed same day
+  (`a37d410`): explicit dark text on the chip; the AI render now hides the
+  on-device hint and suppresses its narration (values still applied
+  silently; hint remains the fallback while AI loads or on failure).
 
 ### BUG-1: Diagnose the upload bounce (S — diagnosis only) — PARKED 2026-10-11
 - **Status:** Parked at the founder's call: it hasn't recurred since
