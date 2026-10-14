@@ -87,9 +87,9 @@
     .danger:disabled { cursor: not-allowed; opacity: .48; }
     .item-photo { width: 100%; max-height: 320px; object-fit: cover; border-radius: 6px; margin-bottom: 16px; background: var(--line); display: block; }
     .hint { font-size: 13px; color: var(--accent-dark); margin: 2px 0 0; }
-    .ai-suggest { font-size: 13px; margin: 6px 0 0; padding: 8px 10px; border-radius: 8px; background: var(--chip-bg, #f1f3f4); }
+    .ai-suggest { font-size: 13px; margin: 6px 0 0; padding: 8px 10px; border-radius: 8px; background: #f1f3f4; color: #202124; }
     .ai-suggest .ai-desc { margin: 0 0 4px; }
-    .ai-suggest .ai-tags { margin: 0; color: var(--muted, #5f6368); font-size: 12px; }
+    .ai-suggest .ai-tags { margin: 0; color: #5f6368; font-size: 12px; }
     .detail-actions { justify-content: flex-start; }
     .detail-actions .danger { margin-right: auto; }
     .photo-preview { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
@@ -445,6 +445,7 @@ service firebase.storage {
       var toastTimer = null;
       var aiSuggestion = null;   // latest describeItem result for the upload form
       var aiRequestId = 0;       // guards against out-of-order AI responses
+      var aiRendered = false;    // true once the AI box has rendered (it then supersedes the on-device hint)
 
       var setupOverlay = document.getElementById("setupOverlay");
       var uploadOverlay = document.getElementById("uploadOverlay");
@@ -983,6 +984,8 @@ service firebase.storage {
       function renderAISuggestion(s) {
         var box = document.getElementById("aiSuggest");
         if (!s) { box.hidden = true; return; }
+        aiRendered = true;
+        suggestHint.hidden = true; // the AI box now carries the suggestion narrative
         document.getElementById("aiDesc").textContent = "✨ " + (s.description || s.name || "");
         var tags = [s.pattern, s.fit, s.formality, s.warmth, s.fabric_guess]
           .filter(function (t) { return t && t !== "unknown" && t !== "other"; });
@@ -1032,6 +1035,7 @@ service firebase.storage {
         suggestHint.hidden = true;
         aiRequestId++;
         aiSuggestion = null;
+        aiRendered = false;
         document.getElementById("aiSuggest").hidden = true;
         photoPreview.textContent = "";
         photoPreview.hidden = true;
@@ -1060,8 +1064,10 @@ service firebase.storage {
             var color = dominantColor(img);
             if (color) {
               document.getElementById("colorInput").value = color;
-              suggestHint.textContent = "✨ Suggested from your photo — check before uploading.";
-              suggestHint.hidden = false;
+              if (!aiRendered) {
+                suggestHint.textContent = "✨ Suggested from your photo — check before uploading.";
+                suggestHint.hidden = false;
+              }
             }
           } catch (e) {}
           ensureTagModel().then(function (model) {
@@ -1070,8 +1076,10 @@ service firebase.storage {
               var category = guessCategory(predictions);
               if (category) {
                 document.getElementById("categoryInput").value = category;
-                suggestHint.textContent = "✨ Suggested category: " + category + " — check before uploading.";
-                suggestHint.hidden = false;
+                if (!aiRendered) {
+                  suggestHint.textContent = "✨ Suggested category: " + category + " — check before uploading.";
+                  suggestHint.hidden = false;
+                }
               }
             }).catch(function () {});
           });
