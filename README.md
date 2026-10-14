@@ -25,8 +25,21 @@ decision is recorded as an ADR in the project notes.
   server, no API keys, no cost.
 - **Full piece management** — edit tags/category anytime; delete a piece and
   all its photos go with it.
-- **Conversational outfit picks** — describe the occasion and weather in
-  chat and get outfit suggestions from your catalog.
+- **AI descriptions at upload** — the cover photo gets a name, description,
+  and attributes (pattern, fit, formality, warmth, colors) from a vision
+  model via a backend proxy; you confirm or edit before saving.
+
+**Coming next:** conversational outfit picks — describe the occasion and
+weather in chat and get outfit suggestions from your catalog.
+
+## Product docs
+
+The product thinking lives in [`docs/`](docs/) and evolves with the app:
+[VISION.md](docs/VISION.md) (what v1 is), [PRODUCT.md](docs/PRODUCT.md)
+(capabilities + research decisions), [DATA_MODEL.md](docs/DATA_MODEL.md)
+(the Firestore data model), [BACKLOG.md](docs/BACKLOG.md),
+[SHIPPED.md](docs/SHIPPED.md), and per-sprint plans in
+[`docs/sprints/`](docs/sprints/).
 
 **In progress:** AI-generated names and rich descriptions for each piece
 (material, pattern, formality, warmth) via a backend proxy, so suggestions
