@@ -3,6 +3,8 @@ add-auth-domains.js
 create-deploy-sa.js
 get-rules.js
 deploy-firestore-rules.js
+deploy-askstylist.js
 .firebase/
 node_modules/
 firebase-debug.log
+check-iam.js
