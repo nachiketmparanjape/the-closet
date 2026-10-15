@@ -33,3 +33,6 @@ What went live. Momentum you can see.
 
 - **PC-9: Bulk upload** — shipped 2026-10-14 via CI (`bb4a8ca`).
   Awaiting founder phone test.
+- **PC-10: Chat stylist** — shipped 2026-10-14: new `askStylist` callable
+  (us-central1, manual REST deploy) + chat UI via CI (`4c3b446`).
+  Awaiting founder phone test.

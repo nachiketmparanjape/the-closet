@@ -77,6 +77,15 @@ conscious tradeoff for the payoff: a working v1 loop by Nov 11.
   hundred items max, the whole catalogue fits in context.
 - **Constitution check:** passes — conversational recommendation *is*
   the v1 scope; integrations stay out per VISION.md.
+- **Status:** shipped 2026-10-14 — backend `askStylist` deployed to
+  us-central1 (ACTIVE, Vertex via project SA, allUsers run.invoker,
+  auth-gated) + chat UI live via CI (`4c3b446`). Awaiting founder phone
+  test. Implementation notes: text-only reasoning over the client's cached
+  item list; system prompt forbids inventing pieces; per-item grounding
+  lines (name/category/colors/pattern/fit/fabric/formality/warmth);
+  sanitize caps server-side; deploy went via direct REST (Firebase CLI
+  broken on this VM's egress, same as PC-6); IAM via run v1
+  `:getIamPolicy` GET + `:setIamPolicy` POST (v2 has no IAM methods).
 
 ## Sprint 4 seed
 
