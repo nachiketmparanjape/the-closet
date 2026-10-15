@@ -97,6 +97,15 @@
     .bulk-row .bulk-status.st-done { color: var(--accent-dark); }
     .bulk-row .bulk-status.st-failed { color: var(--danger); }
     .bulk-retry { font-size: 12px; padding: 4px 10px; border-radius: 99px; border: 1px solid var(--line-strong); background: transparent; color: var(--ink); cursor: pointer; white-space: nowrap; }
+    .chat-fab { position: fixed; right: 18px; bottom: max(18px, env(safe-area-inset-bottom)); width: 56px; height: 56px; border-radius: 50%; background: var(--accent); color: #fff; border: none; box-shadow: var(--shadow); font-size: 22px; cursor: pointer; z-index: 15; display: flex; align-items: center; justify-content: center; }
+    .chat-list { display: flex; flex-direction: column; gap: 8px; max-height: 52vh; overflow-y: auto; margin: 0 0 12px; }
+    .chat-msg { max-width: 88%; padding: 9px 13px; border-radius: 14px; font-size: 14px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: break-word; }
+    .chat-msg.user { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
+    .chat-msg.model { align-self: flex-start; background: var(--paper-soft); color: var(--ink); border-bottom-left-radius: 4px; }
+    .chat-msg.thinking { color: var(--muted); font-style: italic; }
+    .chat-input-row { display: flex; gap: 8px; }
+    .chat-input-row input { flex: 1; min-width: 0; min-height: 46px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--paper); color: var(--ink); padding: 10px 12px; outline: none; }
+    .chat-input-row input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
     .detail-actions { justify-content: flex-start; }
     .detail-actions .danger { margin-right: auto; }
     .photo-preview { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
@@ -392,6 +401,22 @@ service firebase.storage {
     </section>
   </div>
 
+  <div class="overlay" id="chatOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="chatTitle">
+    <section class="modal">
+      <div class="modal-head">
+        <h2 id="chatTitle">Stylist</h2>
+        <button class="icon-button" id="chatClose" type="button" aria-label="Close stylist chat">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="chat-list" id="chatList" aria-live="polite"></div>
+        <form class="chat-input-row" id="chatForm">
+          <input id="chatInput" type="text" maxlength="500" placeholder="e.g. casual dinner, 60°F" autocomplete="off" aria-label="Ask the stylist" />
+          <button class="primary" id="chatSend" type="submit">Send</button>
+        </form>
+      </div>
+    </section>
+  </div>
+
   <div class="overlay" id="itemOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="itemTitle">
     <section class="modal">
       <div class="modal-head">
@@ -440,6 +465,7 @@ service firebase.storage {
     </section>
   </div>
 
+  <button class="chat-fab" id="chatFab" type="button" aria-label="Ask the stylist">✨</button>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
@@ -484,6 +510,11 @@ service firebase.storage {
       var bulkProgress = document.getElementById("bulkProgress");
       var bulkStartBtn = document.getElementById("bulkStart");
       var bulkInput = document.getElementById("bulkInput");
+      var chatOverlay = document.getElementById("chatOverlay");
+      var chatList = document.getElementById("chatList");
+      var chatForm = document.getElementById("chatForm");
+      var chatInput = document.getElementById("chatInput");
+      var chatSend = document.getElementById("chatSend");
       var gallery = document.getElementById("gallery");
       var emptyState = document.getElementById("emptyState");
       var loadingGrid = document.getElementById("loadingGrid");
@@ -882,7 +913,7 @@ service firebase.storage {
       document.getElementById("addButton").addEventListener("click", beginAdd);
       document.getElementById("emptyAddButton").addEventListener("click", beginAdd);
 
-      [setupOverlay, uploadOverlay, itemOverlay, bulkOverlay].forEach(function (overlay) {
+      [setupOverlay, uploadOverlay, itemOverlay, bulkOverlay, chatOverlay].forEach(function (overlay) {
         overlay.addEventListener("click", function (event) { if (event.target === overlay) closeOverlay(overlay); });
       });
       document.addEventListener("keydown", function (event) {
@@ -890,6 +921,7 @@ service firebase.storage {
           if (!itemOverlay.hidden) closeItem();
           else if (!uploadOverlay.hidden) closeOverlay(uploadOverlay);
           else if (!bulkOverlay.hidden) closeOverlay(bulkOverlay);
+          else if (!chatOverlay.hidden) closeOverlay(chatOverlay);
           else if (!setupOverlay.hidden) closeOverlay(setupOverlay);
         }
       });
@@ -1414,6 +1446,87 @@ service firebase.storage {
       document.getElementById("bulkClose").addEventListener("click", function () { closeOverlay(bulkOverlay); });
       document.getElementById("bulkCancel").addEventListener("click", function () { closeOverlay(bulkOverlay); });
       document.getElementById("bulkButton").addEventListener("click", beginBulk);
+
+      // PC-10: chat stylist — text-only outfit picks over the cached
+      // descriptions. The model never sees photos here.
+      var stylistMessages = [];
+      var chatBusy = false;
+
+      function renderChat() {
+        chatList.textContent = "";
+        stylistMessages.forEach(function (m) {
+          var div = document.createElement("div");
+          div.className = "chat-msg " + m.role + (m.thinking ? " thinking" : "");
+          div.textContent = m.text;
+          chatList.appendChild(div);
+        });
+        chatList.scrollTop = chatList.scrollHeight;
+      }
+
+      function stylistItems() {
+        return allItems.map(function (it) {
+          var ai = it.ai || {};
+          return {
+            name: it.name,
+            category: it.category,
+            colors: Array.isArray(ai.colors) ? ai.colors : [],
+            pattern: ai.pattern,
+            fit: ai.fit,
+            fabric: ai.fabric_guess,
+            formality: ai.formality,
+            warmth: ai.warmth,
+            description: ai.description
+          };
+        });
+      }
+
+      function openChat() {
+        if (!configured) { setupRequired(); return; }
+        if (!currentUser) { signIn(); return; }
+        if (!stylistMessages.length) {
+          stylistMessages.push({
+            role: "model",
+            text: "Hi! Tell me the occasion, the weather, and anything you're feeling — I'll put together an outfit from your wardrobe."
+          });
+        }
+        renderChat();
+        openOverlay(chatOverlay);
+        window.setTimeout(function () { chatInput.focus(); }, 60);
+      }
+
+      function sendChat(event) {
+        event.preventDefault();
+        if (chatBusy || !currentUser) return;
+        var text = chatInput.value.trim();
+        if (!text) return;
+        if (!functions) { showToast("The stylist isn't ready yet — reload and try again."); return; }
+        chatInput.value = "";
+        stylistMessages.push({ role: "user", text: text });
+        var thinking = { role: "model", text: "Thinking…", thinking: true };
+        stylistMessages.push(thinking);
+        renderChat();
+        chatBusy = true;
+        chatSend.disabled = true;
+        var payload = {
+          items: stylistItems(),
+          messages: stylistMessages.filter(function (m) { return !m.thinking; })
+        };
+        functions.httpsCallable("askStylist")(payload).then(function (res) {
+          thinking.thinking = false;
+          thinking.text = (res.data && res.data.reply) || "Hmm, I couldn't put that together — try again?";
+        }).catch(function (err) {
+          thinking.thinking = false;
+          thinking.text = (err && err.message) || "The stylist is unavailable right now. Try again in a moment.";
+        }).then(function () {
+          chatBusy = false;
+          chatSend.disabled = false;
+          renderChat();
+        });
+      }
+
+      document.getElementById("chatFab").addEventListener("click", openChat);
+      document.getElementById("chatClose").addEventListener("click", function () { closeOverlay(chatOverlay); });
+      chatForm.addEventListener("submit", sendChat);
 
       setStatus(null);
       renderGallery();

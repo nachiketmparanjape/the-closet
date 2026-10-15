@@ -1,18 +1,22 @@
 "use strict";
 
-// index.js — Closet Cloud Functions (PC-6).
+// index.js — Closet Cloud Functions (PC-6 + PC-10).
 //
-// One callable function: describeItem. The client sends either a Storage
+// Two callable functions. describeItem: the client sends either a Storage
 // path to the signed-in user's own photo, or the photo bytes directly
 // (base64) — PC-7 analyzes at upload-confirm time, before the item exists.
-// Auth is mandatory; a Storage path must live under the caller's own
-// users/{uid}/ prefix. Model access is via Vertex AI + the function's
-// service account, so no API key exists anywhere in the client or repo.
+// askStylist: conversational outfit picks — the client sends its own item
+// list plus recent chat messages; the model reasons text-only over the
+// cached descriptions (no vision at recommendation time, per the decided
+// research in PRODUCT.md). Auth is mandatory on both; model access is via
+// Vertex AI + the function's service account, so no API key exists anywhere
+// in the client or repo.
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { initializeApp } = require("firebase-admin/app");
 const { getStorage } = require("firebase-admin/storage");
 const { describeImage } = require("./describe");
+const { askStylist, sanitizeItems, sanitizeMessages } = require("./stylist");
 
 initializeApp();
 
@@ -74,6 +78,41 @@ exports.describeItem = onCall(
       throw new HttpsError(
         "internal",
         "The description service is unavailable right now. Upload still works without it."
+      );
+    }
+  }
+);
+
+exports.askStylist = onCall(
+  {
+    region: "us-central1",
+    timeoutSeconds: 60,
+    memory: "512MiB",
+    maxInstances: 5,
+  },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Sign-in required.");
+    }
+    const data = request.data || {};
+    const items = sanitizeItems(data.items);
+    const messages = sanitizeMessages(data.messages);
+    if (!items.length) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Your wardrobe looks empty — add a few pieces first."
+      );
+    }
+    if (!messages.length) {
+      throw new HttpsError("invalid-argument", "Tell me the occasion first.");
+    }
+    try {
+      return await askStylist(items, messages);
+    } catch (err) {
+      console.error("askStylist model call failed:", err);
+      throw new HttpsError(
+        "internal",
+        "The stylist is unavailable right now. Try again in a moment."
       );
     }
   }

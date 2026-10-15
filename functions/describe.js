@@ -116,4 +116,4 @@ async function describeImage(imageBuffer, mimeType) {
   return parseModelJson(response.text);
 }
 
-module.exports = { describeImage, parseModelJson, PROMPT, CATEGORIES };
+module.exports = { describeImage, parseModelJson, getClient, PROMPT, CATEGORIES };
