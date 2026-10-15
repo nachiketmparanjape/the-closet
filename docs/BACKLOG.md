@@ -87,3 +87,41 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
 - **Chat stylist:** conversational outfit picks over the cached
   descriptions, reusing the PC-6 proxy. The v1 core loop's second half —
   **in Sprint 3 (approved 2026-10-14).**
+
+### PC-13: Outfit photo parsing (M/L) — Sprint 5+ candidate
+
+- **Problem:** Logging what you wore (or capturing an outfit you like)
+  is manual assembly today. The fastest capture is a photo — mirror
+  selfie or flat-lay — but there's no path from photo to outfit object.
+- **In scope:** user takes/uploads an outfit photo; AI identifies each
+  visible article (type, colors, pattern); user confirms each against
+  wardrobe items via a shortlist picker (human-in-the-loop matching —
+  auto visual-matching is the hard part, deferred); creates the outfit
+  doc (source: "photo") and optionally logs a wear in the same flow.
+  Doubles as the lowest-friction wear logging: photograph today's
+  outfit, ~30 seconds.
+- **Out of scope:** fully automatic visual similarity matching;
+  parsing outfits on other people.
+- **Done looks like:** founder photographs today's outfit, confirms 3
+  articles from shortlists, taps save — outfit in history, wear logged.
+- **Dependencies:** PC-12 (outfit object, wear events).
+- **Known risk:** multi-garment parsing accuracy. Cost ~$0.001/photo.
+
+### PC-14: Shop compatibility check (M) — Sprint 5+ candidate
+
+- **Problem:** "Should I buy this?" is currently a guess. The wardrobe
+  knows what you own and where the gaps are.
+- **In scope:** user snaps a shop photo or online screenshot;
+  describeItem extracts attributes; reasoning (new callable or
+  askStylist extension) returns a compatibility score 0–10 *with
+  reasoning* (color/formality/pattern harmony vs wardrobe), gap
+  analysis ("fills your brown-shoe gap, duplicates your navy tops"),
+  and 2–3 outfit suggestions incorporating it with existing pieces —
+  only if asked.
+- **Out of scope:** price/value judgment, purchase links, availability.
+- **Done looks like:** founder screenshots a jacket → "8/10 — fills a
+  gap, works with 6 existing pieces" + two outfits.
+- **Dependencies:** wardrobe data + describeItem (both exist); richer
+  with outfits/style profile, not required.
+- **Known risk:** score calibration — label it "wardrobe fit", always
+  show the reasoning, never a bare number.

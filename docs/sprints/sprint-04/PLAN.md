@@ -1,9 +1,10 @@
 # Sprint 4 — Closet
 
 **Dates:** 2026-11-12 → 2026-11-25 (fixed; unfinished cuts roll over, no guilt)
-**Status:** PROPOSED 2026-10-15 — awaiting founder approval. Design-first:
-PC-12's design is written and explained before any implementation; the
-founder interrogates it, fixes land in the design, then building starts.
+**Status:** APPROVED by founder 2026-10-15. **Started early 2026-10-15** —
+design-first process: PC-12's design was written, interrogated by the
+founder (two fixes: outfit versioning — edits create new versions;
+per-article wear history confirmed as derived), then approved.
 **Theme:** Foundations for the outfit era — editable data, trustworthy
 errors, and the outfit object with its full loop.
 
