@@ -9,7 +9,7 @@
 "use strict";
 
 const { GoogleGenAI } = require("@google/genai");
-const { getClient } = require("./describe");
+const { getClient, logAiFailure, MODEL_VERSION } = require("./describe");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { codedError } = require("./errors");
 
@@ -74,7 +74,7 @@ async function reflectOutfit(uid, ratingId) {
   const outfit = outfitSnap.data();
   const itemNames = Array.isArray(outfit.itemNames) ? outfit.itemNames.join(", ") : "";
 
-  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+  const model = process.env.GEMINI_MODEL || MODEL_VERSION;
   const userMessage =
     "Outfit worn: " + itemNames + ".\n" +
     "Your original confidence: " + (outfit.appConfidence == null ? "n/a" : outfit.appConfidence + "/10") + ".\n" +
@@ -89,8 +89,9 @@ async function reflectOutfit(uid, ratingId) {
       contents: [{ role: "user", parts: [{ text: userMessage }] }],
       config: {
         systemInstruction: REFLECT_SYSTEM,
-        temperature: 0.5,
-        maxOutputTokens: 400,
+        temperature: 0.3,
+        maxOutputTokens: 1200,
+        thinkingConfig: { thinkingBudget: 512 },
         responseMimeType: "application/json",
       },
     });
@@ -98,7 +99,10 @@ async function reflectOutfit(uid, ratingId) {
     throw codedError("AI_UNAVAILABLE", "reflectOutfit: generateContent failed: " + (err && err.message));
   }
   const text = (response.text || "").trim();
-  if (!text) throw codedError("AI_BAD_RESPONSE", "reflectOutfit: model returned no text");
+  if (!text) {
+    logAiFailure("reflectOutfit", response);
+    throw codedError("AI_BAD_RESPONSE", "reflectOutfit: model returned no text");
+  }
   const parsed = parseReflectionJson(text);
 
   await db.collection("users").doc(uid).collection("ratings").add({

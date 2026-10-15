@@ -17,7 +17,7 @@
 // validated IDs means no structured outfit (text-only reply).
 
 const { GoogleGenAI } = require("@google/genai");
-const { getClient } = require("./describe");
+const { getClient, logAiFailure, MODEL_VERSION } = require("./describe");
 const { codedError } = require("./errors");
 
 const MAX_ITEMS = 500;
@@ -171,7 +171,7 @@ function parseStylistJson(text) {
 // styleProfile: sanitized preference strings (may be empty).
 // Returns { reply, outfit: { itemIds, confidence, reasoning } | null }.
 async function askStylist(items, messages, styleProfile) {
-  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+  const model = process.env.GEMINI_MODEL || MODEL_VERSION;
   const ai = getClient();
   const wardrobe = items.map(itemLine).join("\n");
   let system = SYSTEM;
@@ -193,8 +193,9 @@ async function askStylist(items, messages, styleProfile) {
       contents,
       config: {
         systemInstruction: system,
-        temperature: 0.7,
-        maxOutputTokens: 800,
+        temperature: 0.3,
+        maxOutputTokens: 2500,
+        thinkingConfig: { thinkingBudget: 1024 },
         responseMimeType: "application/json",
       },
     });
@@ -202,7 +203,10 @@ async function askStylist(items, messages, styleProfile) {
     throw codedError("AI_UNAVAILABLE", "askStylist: generateContent failed: " + (err && err.message));
   }
   const text = (response.text || "").trim();
-  if (!text) throw codedError("AI_BAD_RESPONSE", "askStylist: model returned no text");
+  if (!text) {
+    logAiFailure("askStylist", response);
+    throw codedError("AI_BAD_RESPONSE", "askStylist: model returned no text");
+  }
   const parsed = parseStylistJson(text);
   return { reply: parsed.reply, outfit: mapOutfitToIds(parsed.outfit, items) };
 }

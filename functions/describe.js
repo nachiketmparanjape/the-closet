@@ -26,7 +26,7 @@ const PATTERNS = ["solid", "striped", "plaid", "check", "floral", "graphic", "ot
 const FITS = ["slim", "regular", "relaxed", "oversized", "unknown"];
 const FORMALITIES = ["casual", "smart-casual", "formal"];
 const WARMTHS = ["light", "medium", "heavy"];
-const MODEL_VERSION = "gemini-2.5-flash";
+const MODEL_VERSION = "gemini-2.5-flash"; // 2026-10-20 retirement — 3.x IDs 404 on Vertex us-central1 (2026-10-15); re-migrate once a servable ID is confirmed
 
 const PROMPT = `You are cataloguing one garment from its photo for a personal wardrobe app.
 Look at the photo and answer with ONLY a JSON object (no markdown, no prose) with exactly these keys:
@@ -139,13 +139,19 @@ async function describeImage(imageBuffer, mimeType, photoIds) {
           ],
         },
       ],
-      config: { responseMimeType: "application/json", temperature: 0.2 },
+      config: {
+        responseMimeType: "application/json",
+        temperature: 0.2,
+        maxOutputTokens: 1200,
+        thinkingConfig: { thinkingBudget: 1024 },
+      },
     });
   } catch (err) {
     // Network, auth, quota, model errors — a downstream failure, not our bug.
     throw codedError("AI_UNAVAILABLE", "describeItem: generateContent failed: " + (err && err.message));
   }
   if (!response || !response.text || !response.text.trim()) {
+    logAiFailure("describeItem", response);
     throw codedError("AI_BAD_RESPONSE", "describeItem: model returned no text");
   }
   const parsed = parseModelJson(response.text);
@@ -157,4 +163,24 @@ async function describeImage(imageBuffer, mimeType, photoIds) {
   return parsed;
 }
 
-module.exports = { describeImage, parseModelJson, getClient, PROMPT, CATEGORIES };
+// Log what the model actually did when a call comes back unusable —
+// finishReason and token usage distinguish "thought too long" (truncated)
+// from "refused" from "empty". Never throws; logging must not break the
+// error path it diagnoses.
+function logAiFailure(label, response) {
+  try {
+    const cand = response && response.candidates && response.candidates[0];
+    const usage = response && response.usageMetadata;
+    console.error(JSON.stringify({
+      event: "ai_bad_response",
+      label,
+      finishReason: cand ? cand.finishReason : null,
+      promptTokens: usage ? usage.promptTokenCount : null,
+      outputTokens: usage ? usage.candidatesTokenCount : null,
+      thoughtTokens: usage ? usage.thoughtsTokenCount : null,
+      totalTokens: usage ? usage.totalTokenCount : null,
+    }));
+  } catch (e) { /* logging must never throw */ }
+}
+
+module.exports = { describeImage, parseModelJson, getClient, logAiFailure, MODEL_VERSION, PROMPT, CATEGORIES };
