@@ -9,6 +9,10 @@ const path = require("node:path");
 
 const html = fs.readFileSync(path.join(__dirname, "..", "public", "index.html"), "utf8");
 const js = html.split("<script>")[1].split("</script>")[0];
+// The helpers reference window.Palette (browser global) — shim it with the
+// real client module so the tests exercise the actual palette.
+global.window = {};
+require("../public/js/palette.js");
 const scope = {};
 for (const name of ["itemColors", "itemPrimaryHex", "itemField", "buildColorsFromAI", "buildV2Fields", "syncPrimaryHex"]) {
   const m = js.match(new RegExp("function " + name + "\\([\\s\\S]*?\\n      \\}"));
@@ -70,7 +74,19 @@ describe("buildColorsFromAI / buildV2Fields", () => {
     assert.equal(f.pattern, "other");
     assert.equal(f.fit, "unknown");
     assert.equal(f.brand, null);
+    assert.equal(f.brandKey, null);
     assert.equal(f.colors[0].hex, "#5c6673");
+  });
+  it("carries brandKey and canonical families from the AI", () => {
+    const f = buildV2Fields({ brand: "Uniqlo", brandKey: "uniqlo", colors: ["navy", "white"] }, "#111111");
+    assert.equal(f.brand, "Uniqlo");
+    assert.equal(f.brandKey, "uniqlo");
+    assert.equal(f.colors[0].family, "navy");
+    assert.equal(f.colors[1].family, "white");
+  });
+  it("computes brandKey when the AI did not send one", () => {
+    const f = buildV2Fields({ brand: "UNIQLO" }, null);
+    assert.equal(f.brandKey, "uniqlo");
   });
 });
 

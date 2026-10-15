@@ -638,6 +638,7 @@ service firebase.storage {
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-storage-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-functions-compat.js"></script>
   <script src="js/friendly-error.js"></script>
+  <script src="js/palette.js"></script>
   <script>
     (function () {
       "use strict";
@@ -669,6 +670,7 @@ service firebase.storage {
       var aiRendered = false;    // true once the AI box has rendered (it then supersedes the on-device hint)
       var uploadPalette = [];    // PC-8: working palette for the upload form
       var detailPalette = [];    // PC-8: working palette for the detail view
+      var categoryTouched = false; // PC-8 follow-up: don't let a late AI reply override the user's pick
 
       function renderUploadPalette() {
         renderPaletteChips(uploadPalChips, uploadPalette, renderUploadPalette);
@@ -737,6 +739,9 @@ service firebase.storage {
       document.getElementById("colorInput").addEventListener("change", function () {
         syncPrimaryHex(uploadPalette, this.value);
         renderUploadPalette();
+      });
+      document.getElementById("categoryInput").addEventListener("change", function () {
+        categoryTouched = true;
       });
 
       function openOverlay(el) {
@@ -911,15 +916,17 @@ service firebase.storage {
       function buildColorsFromAI(ai, dominantHex) {
         var hex = /^#[0-9a-f]{6}$/i.test(dominantHex || "") ? dominantHex : "#5c6673";
         var names = ai && Array.isArray(ai.colors) ? ai.colors.filter(function (n) { return typeof n === "string" && n; }).slice(0, 3) : [];
-        if (!names.length) return [{ name: "", hex: hex, source: "user", primary: true }];
+        if (!names.length) return [{ name: "", hex: hex, source: "user", primary: true, family: window.Palette ? window.Palette.nearestFamily(hex) : null }];
         return names.map(function (n, i) {
-          return { name: n, hex: i === 0 ? hex : null, source: "ai", primary: i === 0 };
+          // AI names are already canonical (server-constrained) — family == name.
+          return { name: n, hex: i === 0 ? hex : null, source: "ai", primary: i === 0, family: n };
         });
       }
 
       // The v2 top-level fields for a new doc, pre-filled from the AI
       // suggestion (or safe defaults when AI failed).
       function buildV2Fields(ai, dominantHex) {
+        var brand = (ai && ai.brand) || null;
         return {
           colors: buildColorsFromAI(ai, dominantHex),
           description: (ai && ai.description) || "",
@@ -928,7 +935,8 @@ service firebase.storage {
           fabricGuess: (ai && ai.fabric_guess) || "unknown",
           formality: (ai && ai.formality) || "casual",
           warmth: (ai && ai.warmth) || "light",
-          brand: (ai && ai.brand) || null
+          brand: brand,
+          brandKey: (ai && ai.brandKey) || (window.Palette ? window.Palette.brandKey(brand) : null)
         };
       }
 
@@ -989,7 +997,11 @@ service firebase.storage {
         addBtn.addEventListener("click", function () {
           if (palette.length >= 3) { showToast("Up to 3 colors."); return; }
           var name = nameInput.value.trim().toLowerCase().slice(0, 24);
-          palette.push({ name: name, hex: hexInput.value, source: "user", primary: palette.length === 0 });
+          var hex = hexInput.value;
+          // User-added colors resolve to the nearest canonical family by
+          // hex — the family is what color-theory reasoning uses.
+          var family = window.Palette ? window.Palette.nearestFamily(hex) : null;
+          palette.push({ name: name, hex: hex, source: "user", primary: palette.length === 0, family: family });
           nameInput.value = "";
           refresh();
         });
@@ -1150,7 +1162,7 @@ service firebase.storage {
         // PC-8: palette (deep copy — the editor mutates) + editable fields,
         // pre-filled from the user layer with v1 fallbacks.
         setPalette(detailPalette, itemColors(item).map(function (c) {
-          return { name: c.name || "", hex: c.hex || null, source: c.source || "user", primary: !!c.primary };
+          return { name: c.name || "", hex: c.hex || null, source: c.source || "user", primary: !!c.primary, family: c.family || null };
         }));
         renderDetailPalette();
         itemDescInput.value = itemField(item, "description", "description", "");
@@ -1186,6 +1198,7 @@ service firebase.storage {
         // deleted on edit (reads fall back gracefully either way); the
         // `ai` blob stays untouched as the raw AI cache.
         var fabricVal = itemFabricInput.value.trim();
+        var brandVal = itemBrandInput.value.trim() || null;
         itemDocRef().update({
           name: itemNameInput.value.trim(),
           category: itemCategoryInput.value,
@@ -1196,7 +1209,8 @@ service firebase.storage {
           fabricGuess: fabricVal || "unknown",
           formality: itemFormalityInput.value,
           warmth: itemWarmthInput.value,
-          brand: itemBrandInput.value.trim() || null,
+          brand: brandVal,
+          brandKey: window.Palette ? window.Palette.brandKey(brandVal) : null,
           color: firebase.firestore.FieldValue.delete()
         }).then(function () {
           showToast("Piece updated.");
@@ -1322,48 +1336,10 @@ service firebase.storage {
       // PC-3: auto-suggest tags from the photo, on-device. Color comes from a
       // center-crop average; category from a small pre-trained image model.
       // Both only pre-fill the form — the user confirms before uploading.
-      var CATEGORY_KEYWORDS = [
-        ["Tops", ["jersey", "sweater", "cardigan", "tee", "t-shirt", "shirt", "blouse", "tank", "hoodie", "polo", "turtleneck", "maillot"]],
-        ["Bottoms", ["jean", "trouser", "pant", "shorts", "skirt", "khaki", "culotte"]],
-        ["Outerwear", ["jacket", "coat", "parka", "blazer", "suit", "windbreaker", "cloak", "poncho", "overcoat", "trench"]],
-        ["Shoes", ["sneaker", "shoe", "boot", "sandal", "loafer", "pump", "cleat", "footwear"]],
-        ["Accessories", ["hat", "cap", "beanie", "beret", "scarf", "glove", "belt", "watch", "sunglass", "handbag", "backpack", "tie", "purse", "wallet", "umbrella", "sock"]]
-      ];
-      var tagModelPromise = null;
-
-      function loadScript(src) {
-        return new Promise(function (resolve, reject) {
-          var s = document.createElement("script");
-          s.src = src;
-          s.onload = function () { resolve(); };
-          s.onerror = function () { reject(new Error("script failed")); };
-          document.head.appendChild(s);
-        });
-      }
-
-      function ensureTagModel() {
-        if (!tagModelPromise) {
-          tagModelPromise = loadScript("https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js")
-            .then(function () { return loadScript("https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1/dist/mobilenet.min.js"); })
-            .then(function () { return window.mobilenet.load(); })
-            .catch(function () { tagModelPromise = null; return null; });
-        }
-        return tagModelPromise;
-      }
-
-      function guessCategory(predictions) {
-        for (var i = 0; i < predictions.length; i++) {
-          var label = String(predictions[i].className || "").toLowerCase();
-          for (var c = 0; c < CATEGORY_KEYWORDS.length; c++) {
-            var keywords = CATEGORY_KEYWORDS[c][1];
-            for (var k = 0; k < keywords.length; k++) {
-              if (label.indexOf(keywords[k]) !== -1) return CATEGORY_KEYWORDS[c][0];
-            }
-          }
-        }
-        return null;
-      }
-
+      // PC-8 follow-up: the on-device MobileNet category guess is gone — it
+      // was a pre-API stopgap and the API is more accurate. The canvas
+      // dominant-color sampler stays: it's plain pixel math (not AI) and
+      // supplies the palette's primary hex, which the API doesn't return.
       function dominantColor(img) {
         var size = 48;
         var canvas = document.createElement("canvas");
@@ -1453,6 +1429,14 @@ service firebase.storage {
           renderUploadPalette();
           var nameInput = document.getElementById("nameInput");
           if (s && s.name && !nameInput.value.trim()) nameInput.value = s.name;
+          // PC-8 follow-up: the API is now the single category source (the
+          // on-device guess is gone). Apply it unless the user already chose.
+          var catInput = document.getElementById("categoryInput");
+          if (s && s.category && !categoryTouched) {
+            for (var ci = 0; ci < catInput.options.length; ci++) {
+              if (catInput.options[ci].value === s.category) { catInput.value = s.category; break; }
+            }
+          }
         }).catch(function () {
           // AI is a bonus: whatever the on-device suggestions filled in stays.
           if (myId !== aiRequestId) return;
@@ -1469,6 +1453,7 @@ service firebase.storage {
         aiRendered = false;
         setPalette(uploadPalette, []);
         renderUploadPalette();
+        categoryTouched = false;
         document.getElementById("aiSuggest").hidden = true;
         photoPreview.textContent = "";
         photoPreview.hidden = true;
@@ -1505,19 +1490,6 @@ service firebase.storage {
               }
             }
           } catch (e) {}
-          ensureTagModel().then(function (model) {
-            if (!model) return;
-            return model.classify(img).then(function (predictions) {
-              var category = guessCategory(predictions);
-              if (category) {
-                document.getElementById("categoryInput").value = category;
-                if (!aiRendered) {
-                  suggestHint.textContent = "✨ Suggested category: " + category + " — check before uploading.";
-                  suggestHint.hidden = false;
-                }
-              }
-            }).catch(function () {});
-          });
           URL.revokeObjectURL(url);
         };
         img.onerror = function () { URL.revokeObjectURL(url); };
@@ -1868,10 +1840,23 @@ service firebase.storage {
 
       // PC-10: flatten items for the stylist prompt. PC-8: reads the v2
       // user-confirmed layer first, falls back to the v1 `ai` blob.
+      // Colors are canonical families (PC-8 follow-up) — stable names for
+      // color-harmony reasoning; old free-text names map through aliases.
       function stylistItems() {
         return allItems.map(function (it) {
-          var colorNames = itemColors(it).map(function (c) { return c.name || ""; }).filter(function (n) { return n; });
-          if (!colorNames.length && it.ai && Array.isArray(it.ai.colors)) colorNames = it.ai.colors.slice(0, 3);
+          var colorNames = itemColors(it).map(function (c) {
+            if (c.family) return c.family;
+            if (window.Palette) {
+              var canon = window.Palette.canonicalName(c.name);
+              if (canon) return canon;
+            }
+            return c.name || "";
+          }).filter(function (n) { return n; });
+          if (!colorNames.length && it.ai && Array.isArray(it.ai.colors)) {
+            colorNames = it.ai.colors.map(function (n) {
+              return (window.Palette && window.Palette.canonicalName(n)) || n;
+            }).filter(Boolean).slice(0, 3);
+          }
           return {
             id: it.id, // PC-12: lets the server map outfit names back to IDs
             name: it.name,

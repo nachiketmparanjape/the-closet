@@ -18,6 +18,8 @@ const { GoogleGenAI } = require("@google/genai");
 // (mapped to client-safe messages at the callable boundary) and plain
 // Errors for unexpected ones (bugs, misconfiguration).
 const { codedError } = require("./errors");
+// Canonical color vocabulary + brand grouping key (PC-8 follow-up).
+const { PALETTE_NAMES, canonicalName, brandKey } = require("./palette");
 
 const CATEGORIES = ["Tops", "Bottoms", "Outerwear", "Shoes", "Accessories", "Other"];
 const PATTERNS = ["solid", "striped", "plaid", "check", "floral", "graphic", "other"];
@@ -33,13 +35,13 @@ Look at the photo and answer with ONLY a JSON object (no markdown, no prose) wit
   "name": "short, specific name a person would use, e.g. 'Navy striped crew-neck tee' (max 6 words)",
   "description": "one plain sentence describing the garment for outfit planning (style, cut, notable details)",
   "category": one of ${JSON.stringify(CATEGORIES)},
-  "colors": ["1 to 3 dominant colors of the GARMENT itself (ignore background), plain words like 'navy', 'cream'"],
+  "colors": ["1 to 3 dominant colors of the GARMENT itself (ignore background) — pick ONLY from this list: ${PALETTE_NAMES.join(", ")}"],
   "pattern": one of ${JSON.stringify(PATTERNS)},
   "fit": one of ${JSON.stringify(FITS)} (use 'unknown' if the photo can't tell),
   "fabric_guess": "best guess at the fabric in 1-3 words, or 'unknown' — this is a guess, be honest",
   "formality": one of ${JSON.stringify(FORMALITIES)},
   "warmth": one of ${JSON.stringify(WARMTHS)},
-  "brand": "visible brand/label name in 1-3 words, or null if none is visible — best effort, never guess"
+  "brand": "the PARENT brand in 1-3 words — strip sub-lines and collections ('Uniqlo UT' → 'Uniqlo', 'Nike SB' → 'Nike', 'H&M Conscious' → 'H&M'), or null if none is visible — best effort, never guess"
 }
 
 If the photo shows no garment, return every field as its safest value
@@ -73,9 +75,20 @@ function parseModelJson(text) {
   }
   if (!obj || typeof obj !== "object") obj = {};
 
-  const colors = Array.isArray(obj.colors)
-    ? [...new Set(obj.colors.filter((c) => typeof c === "string").map((c) => c.trim().toLowerCase()).filter(Boolean))].slice(0, 3)
-    : [];
+  // Colors: constrain to the canonical palette (exact → alias → drop).
+  // Anything off-palette is the model improvising — drop it rather than
+  // store a name the color-theory work can't reason about.
+  const colors = [];
+  if (Array.isArray(obj.colors)) {
+    const seen = new Set();
+    for (const c of obj.colors) {
+      const canon = canonicalName(c);
+      if (canon && !seen.has(canon)) { seen.add(canon); colors.push(canon); }
+      if (colors.length >= 3) break;
+    }
+  }
+
+  const brand = cleanString(obj.brand, 40) || null;
 
   return {
     name: cleanString(obj.name, 60) || "Untitled item",
@@ -87,7 +100,8 @@ function parseModelJson(text) {
     fabric_guess: cleanString(obj.fabric_guess, 40) || "unknown",
     formality: oneOf(obj.formality, FORMALITIES, "casual"),
     warmth: oneOf(obj.warmth, WARMTHS, "light"),
-    brand: cleanString(obj.brand, 40) || null,
+    brand,
+    brandKey: brandKey(brand), // grouping key: "UNIQLO" and "Uniqlo" → "uniqlo"
   };
 }
 
