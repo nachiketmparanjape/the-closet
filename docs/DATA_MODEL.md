@@ -140,3 +140,137 @@ ai: {
 and edit views, provenance rules in save paths, lazy migration per above.
 Size after this design: S/M. Not pulled into Sprint 2 (founder: end-to-end
 first).
+
+---
+
+# Data model v3: outfits, wear log, ratings, style profile (2026-10-15)
+
+Founder directive 2026-10-15: make the outfit a first-class object and
+close the recommendation loop end-to-end (recommend → save → wear → rate
+→ reflect → learn). The conversational loop shipping (PC-10) satisfied
+v2's deferral condition, so this is now designed.
+
+## Principles (v2's four stand, plus one)
+
+5. **Facts are append-only.** Wear events and ratings are never edited by
+   code — the user may delete their own history, but nothing is silently
+   rewritten. Stats are derived from facts at read time, never stored
+   (no cached counters to go stale).
+
+The v2 authority rule extends naturally: user-written ratings, outfits,
+and preferences outrank anything the app infers. App-suggested
+preferences sit *pending* until the user confirms them.
+
+## New collections (all under `users/{uid}/`)
+
+### `outfits/{outfitId}` — dimension (the thing)
+
+| field | type | notes |
+|---|---|---|
+| itemIds | string[] | item doc IDs — the stable join key |
+| itemNames | string[] | parallel snapshot; display survives item deletion |
+| source | `"stylist"` \| `"manual"` | provenance |
+| name | string | user-editable; stylist suggests ("Navy dinner outfit") |
+| occasion | string? | *intent* — what it was assembled for |
+| weather | string? | as given at recommendation time |
+| appConfidence | number? 0–10 | the prediction side; null for manual outfits |
+| appReasoning | string? | why the app picked it, in its words |
+| favorite | boolean | default false |
+| createdAt | timestamp | |
+
+### `wear_events/{eventId}` — fact (the event)
+
+| field | type | notes |
+|---|---|---|
+| wornAt | timestamp | when it was worn; defaults to now, user-adjustable |
+| articleIds | string[] | ground truth — always populated, even without an outfit |
+| articleNames | string[] | snapshot for display |
+| outfitId | string? | null when logged without a saved outfit |
+| occasion | string? | *actual* — may differ from the outfit's intent, deliberately |
+| note | string? | "felt overdressed" |
+| createdAt | timestamp | when logged (differs from wornAt on backfill) |
+
+Firestore can't join, so per-article stats ("worn 47 times") read
+`articleIds` directly — never resolve through outfits.
+
+### `ratings/{ratingId}` — fact (the event)
+
+| field | type | notes |
+|---|---|---|
+| targetKind | `"article"` \| `"outfit"` | one mechanism, two targets |
+| targetId | string | |
+| wearEventId | string? | which wear is being rated, when an outfit is worn repeatedly |
+| rater | `"user"` \| `"app"` | the two sides are literally two docs |
+| score | number 0–10 | |
+| note | string? | user's words / app's reflection text |
+| suggestedPreference | string? | app rater only; pending until the user confirms it |
+| createdAt | timestamp | |
+
+### `style_profile/{uid}` — single doc (slow-changing dimension)
+
+| field | type | notes |
+|---|---|---|
+| preferences | [{ text, source, createdAt }] | user-editable; cap 50, oldest app-sourced pruned first |
+| updatedAt | timestamp | |
+
+This is where "the stylist learns you" physically lives — and it grounds
+future stylist prompts, so learning compounds instead of evaporating.
+
+## Backend changes
+
+### `askStylist`: structured outfit output (contract extension)
+
+Returns `{ reply, outfit: { itemIds, confidence, reasoning } | null }`.
+The prompt additionally requests JSON: exact item names as listed,
+confidence 0–10, one-line reasoning. The server maps names → IDs
+case-insensitively against the list it sent, drops misses, and returns
+`outfit: null` when fewer than 2 IDs validate — the client then shows a
+text-only reply with no Save button. Grounding is enforced server-side,
+not trusted from the model.
+
+### New callable: `reflectOutfit`
+
+Input `{ outfitId, score, note, wearEventId? }`. The client writes the
+user's rating doc first (Firestore direct, owner rules), then calls.
+The function reads outfit + items + style profile and asks the model
+for: reflection text (engaging with the user's words, acknowledging the
+delta vs `appConfidence`) and an optional suggested preference. Returns
+`{ reflection, suggestedPreference }`; the client writes the app's
+rating doc (`rater: "app"`). Model failure never blocks the rating —
+same principle as PC-7: the rating stands, reflection shows
+"unavailable", retry offered.
+
+## Migration
+
+v3 is purely additive (four new collections). Zero migration — no
+backfill, no lazy-read fallbacks needed. v2's lazy migration for
+`colors`/top-level attributes proceeds independently under PC-8.
+
+## Deliberately not in v3
+
+- **Article-direct wear logging** (wearing clothes with no saved outfit):
+  v1 is outfit-centric; article stats derive from outfit wears. Fast
+  follow if the founder wants it.
+- **Offline support** — no offline persistence currently; failures show
+  the friendly error (PC-11).
+- **Push nudges** ("what should I wear today") — needs the loop first;
+  inbox.
+- **Embeddings / vector fields** — still deferred per 2026-10-06.
+
+## Minute decisions (2026-10-15 design session)
+
+- **Prediction must be stored.** The prized prediction-vs-outcome delta
+  can't be computed if only the outcome is saved — hence
+  `appConfidence`/`appReasoning` at creation.
+- **Intent vs actual occasion are different fields on purpose.**
+  Outfit.occasion is what it was *for*; wear_events.occasion is what
+  *happened*. Their disagreement is itself signal.
+- **No raw-score comparison.** The user's 6 and the app's 6 mean
+  different things; the UI labels them ("your rating" vs "app
+  confidence") and treats the delta as informational.
+- **One-tap wear logging is load-bearing.** The entire stats/reflection
+  edifice depends on wear events existing — the "I wore this" button
+  lives on the chat card and in history, one tap, no form.
+- **Implicit negatives are free.** "Recommended but never worn within 14
+  days" is a silent downvote the system already generates; the design
+  reserves it (consumed in a later cut, not this one).
