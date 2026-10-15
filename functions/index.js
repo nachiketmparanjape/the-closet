@@ -72,7 +72,10 @@ exports.describeItem = onCall(
     }
 
     try {
-      return await describeImage(buffer, mimeType);
+      const photoIds = Array.isArray(data.photoIds)
+        ? data.photoIds.filter((p) => typeof p === "string").slice(0, 4)
+        : [];
+      return await describeImage(buffer, mimeType, photoIds);
     } catch (err) {
       console.error("describeItem model call failed:", err);
       throw new HttpsError(

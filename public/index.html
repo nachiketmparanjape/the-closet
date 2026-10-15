@@ -106,6 +106,17 @@
     .chat-input-row { display: flex; gap: 8px; }
     .chat-input-row input { flex: 1; min-width: 0; min-height: 46px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--paper); color: var(--ink); padding: 10px 12px; outline: none; }
     .chat-input-row input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+    .pal-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 8px; min-height: 30px; }
+    .pal-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 4px 6px 4px 4px; border-radius: 99px; background: var(--paper-soft); border: 1px solid var(--line); }
+    .pal-chip.pal-primary { border-color: var(--accent); }
+    .pal-dot { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--line-strong); cursor: pointer; flex: none; }
+    .pal-x { border: none; background: transparent; color: var(--muted); cursor: pointer; font-size: 14px; padding: 0 2px; line-height: 1; }
+    .pal-add { display: flex; gap: 8px; align-items: center; }
+    .pal-add input[type="text"] { flex: 1; min-width: 0; min-height: 40px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--paper); color: var(--ink); padding: 8px 10px; outline: none; }
+    .pal-add input[type="color"] { width: 44px; height: 40px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--paper); padding: 2px; flex: none; }
+    .pal-add button { flex: none; }
+    .field textarea { width: 100%; min-height: 64px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--paper); color: var(--ink); padding: 10px 12px; outline: none; font: inherit; resize: vertical; }
+    .field textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
     .detail-actions { justify-content: flex-start; }
     .detail-actions .danger { margin-right: auto; }
     .photo-preview { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
@@ -365,6 +376,15 @@ service firebase.storage {
             <input id="colorInput" type="color" value="#5c6673" />
           </div>
         </div>
+        <div class="field">
+          <label>Colors</label>
+          <div class="pal-chips" id="uploadPalChips"></div>
+          <div class="pal-add">
+            <input id="uploadPalName" type="text" maxlength="24" placeholder="Color name (e.g. rust)" />
+            <input id="uploadPalHex" type="color" value="#5c6673" aria-label="Pick a color" />
+            <button id="uploadPalAdd" type="button" class="secondary">Add</button>
+          </div>
+        </div>
         <div class="progress" id="progress" hidden aria-label="Upload progress"><span></span></div>
         <p class="hint" id="suggestHint" hidden></p>
         <div class="ai-suggest" id="aiSuggest" hidden>
@@ -435,26 +455,81 @@ service firebase.storage {
           <label for="itemNameInput">Item name</label>
           <input id="itemNameInput" maxlength="80" />
         </div>
+        <div class="field">
+          <label for="itemCategoryInput">Category</label>
+          <select id="itemCategoryInput">
+            <option value="Tops">Tops</option>
+            <option value="Bottoms">Bottoms</option>
+            <option value="Outerwear">Outerwear</option>
+            <option value="Shoes">Shoes</option>
+            <option value="Accessories">Accessories</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Colors</label>
+          <div class="pal-chips" id="itemPalChips"></div>
+          <div class="pal-add">
+            <input id="itemPalName" type="text" maxlength="24" placeholder="Color name (e.g. rust)" />
+            <input id="itemPalHex" type="color" value="#5c6673" aria-label="Pick a color" />
+            <button id="itemPalAdd" type="button" class="secondary">Add</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="itemDescInput">Description</label>
+          <textarea id="itemDescInput" maxlength="240" rows="2"></textarea>
+        </div>
         <div class="form-row">
           <div class="field">
-            <label for="itemCategoryInput">Category</label>
-            <select id="itemCategoryInput">
-              <option value="Tops">Tops</option>
-              <option value="Bottoms">Bottoms</option>
-              <option value="Outerwear">Outerwear</option>
-              <option value="Shoes">Shoes</option>
-              <option value="Accessories">Accessories</option>
-              <option value="Other">Other</option>
+            <label for="itemPatternInput">Pattern</label>
+            <select id="itemPatternInput">
+              <option value="solid">solid</option>
+              <option value="striped">striped</option>
+              <option value="plaid">plaid</option>
+              <option value="check">check</option>
+              <option value="floral">floral</option>
+              <option value="graphic">graphic</option>
+              <option value="other">other</option>
             </select>
           </div>
           <div class="field">
-            <label for="itemColorInput">Color</label>
-            <input id="itemColorInput" type="color" />
+            <label for="itemFitInput">Fit</label>
+            <select id="itemFitInput">
+              <option value="slim">slim</option>
+              <option value="regular">regular</option>
+              <option value="relaxed">relaxed</option>
+              <option value="oversized">oversized</option>
+              <option value="unknown">unknown</option>
+            </select>
           </div>
         </div>
-        <div class="ai-suggest" id="itemAiSuggest" hidden>
-          <p class="ai-desc" id="itemAiDesc"></p>
-          <p class="ai-tags" id="itemAiTags"></p>
+        <div class="form-row">
+          <div class="field">
+            <label for="itemFormalityInput">Formality</label>
+            <select id="itemFormalityInput">
+              <option value="casual">casual</option>
+              <option value="smart-casual">smart-casual</option>
+              <option value="formal">formal</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="itemWarmthInput">Warmth</label>
+            <select id="itemWarmthInput">
+              <option value="light">light</option>
+              <option value="medium">medium</option>
+              <option value="heavy">heavy</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="field">
+            <label for="itemFabricInput">Fabric</label>
+            <input id="itemFabricInput" maxlength="40" />
+          </div>
+          <div class="field">
+            <label for="itemBrandInput">Brand</label>
+            <input id="itemBrandInput" maxlength="40" placeholder="Optional" />
+          </div>
         </div>
         <div class="form-actions detail-actions">
           <button class="danger" id="itemDelete" type="button">Delete</button>
@@ -502,6 +577,21 @@ service firebase.storage {
       var aiSuggestion = null;   // latest describeItem result for the upload form
       var aiRequestId = 0;       // guards against out-of-order AI responses
       var aiRendered = false;    // true once the AI box has rendered (it then supersedes the on-device hint)
+      var uploadPalette = [];    // PC-8: working palette for the upload form
+      var detailPalette = [];    // PC-8: working palette for the detail view
+
+      function renderUploadPalette() {
+        renderPaletteChips(uploadPalChips, uploadPalette, renderUploadPalette);
+      }
+      function renderDetailPalette() {
+        renderPaletteChips(itemPalChips, detailPalette, renderDetailPalette);
+      }
+      // Replaces contents in place so the add-button closures (bound to the
+      // array identity) keep working.
+      function setPalette(palette, entries) {
+        palette.length = 0;
+        entries.forEach(function (e) { palette.push(e); });
+      }
 
       var setupOverlay = document.getElementById("setupOverlay");
       var uploadOverlay = document.getElementById("uploadOverlay");
@@ -533,10 +623,31 @@ service firebase.storage {
       var itemTitle = document.getElementById("itemTitle");
       var itemNameInput = document.getElementById("itemNameInput");
       var itemCategoryInput = document.getElementById("itemCategoryInput");
-      var itemColorInput = document.getElementById("itemColorInput");
+      var itemPalChips = document.getElementById("itemPalChips");
+      var itemPalName = document.getElementById("itemPalName");
+      var itemPalHex = document.getElementById("itemPalHex");
+      var itemPalAdd = document.getElementById("itemPalAdd");
+      var itemDescInput = document.getElementById("itemDescInput");
+      var itemPatternInput = document.getElementById("itemPatternInput");
+      var itemFitInput = document.getElementById("itemFitInput");
+      var itemFabricInput = document.getElementById("itemFabricInput");
+      var itemFormalityInput = document.getElementById("itemFormalityInput");
+      var itemWarmthInput = document.getElementById("itemWarmthInput");
+      var itemBrandInput = document.getElementById("itemBrandInput");
+      var uploadPalChips = document.getElementById("uploadPalChips");
+      var uploadPalName = document.getElementById("uploadPalName");
+      var uploadPalHex = document.getElementById("uploadPalHex");
+      var uploadPalAdd = document.getElementById("uploadPalAdd");
       var itemSave = document.getElementById("itemSave");
       var itemDelete = document.getElementById("itemDelete");
       var activeItem = null;
+      wirePaletteAdd(uploadPalName, uploadPalHex, uploadPalAdd, uploadPalette, renderUploadPalette);
+      wirePaletteAdd(itemPalName, itemPalHex, itemPalAdd, detailPalette, renderDetailPalette);
+      // The upload color picker edits the primary entry's hex directly.
+      document.getElementById("colorInput").addEventListener("change", function () {
+        syncPrimaryHex(uploadPalette, this.value);
+        renderUploadPalette();
+      });
 
       function openOverlay(el) {
         el.hidden = false;
@@ -617,7 +728,7 @@ service firebase.storage {
         meta.className = "item-meta";
         var dot = document.createElement("span");
         dot.className = "color-dot";
-        dot.style.backgroundColor = /^#[0-9a-f]{6}$/i.test(item.color || "") ? item.color : "#8c8f89";
+        dot.style.backgroundColor = itemPrimaryHex(item); // PC-8: primary color, v1 fallback
         var category = document.createElement("span");
         category.textContent = item.category || "Other";
         meta.appendChild(dot);
@@ -646,6 +757,126 @@ service firebase.storage {
         if (item.photos && item.photos.length) return item.photos;
         if (item.imageUrl) return [{ url: item.imageUrl, storagePath: item.storagePath || null }];
         return [];
+      }
+
+      // PC-8: data model v2 — first-class colors array, top-level editable
+      // AI fields, provenance on colors. Lazy migration: read v2 when
+      // present, otherwise fall back from v1 `color` / the `ai` blob.
+      // No big-bang migration; old docs keep working.
+      function itemColors(item) {
+        if (item && Array.isArray(item.colors) && item.colors.length) return item.colors;
+        var hex = /^#[0-9a-f]{6}$/i.test((item && item.color) || "") ? item.color : "#5c6673";
+        return [{ name: "", hex: hex, source: "user", primary: true }];
+      }
+
+      function itemPrimaryHex(item) {
+        var colors = itemColors(item);
+        var i;
+        for (i = 0; i < colors.length; i++) {
+          if (colors[i].primary && /^#[0-9a-f]{6}$/i.test(colors[i].hex || "")) return colors[i].hex;
+        }
+        for (i = 0; i < colors.length; i++) {
+          if (/^#[0-9a-f]{6}$/i.test(colors[i].hex || "")) return colors[i].hex;
+        }
+        return "#8c8f89";
+      }
+
+      // Top-level v2 field first, then the v1 `ai` blob, then a default.
+      // Top-level is the user-confirmed layer; the `ai` blob is the raw
+      // cache — the user layer always wins (authority rule).
+      function itemField(item, topKey, aiKey, def) {
+        var v = item ? item[topKey] : undefined;
+        if (v === undefined || v === null || v === "") {
+          v = item && item.ai ? item.ai[aiKey || topKey] : undefined;
+        }
+        return (v === undefined || v === null || v === "") ? def : v;
+      }
+
+      function buildColorsFromAI(ai, dominantHex) {
+        var hex = /^#[0-9a-f]{6}$/i.test(dominantHex || "") ? dominantHex : "#5c6673";
+        var names = ai && Array.isArray(ai.colors) ? ai.colors.filter(function (n) { return typeof n === "string" && n; }).slice(0, 3) : [];
+        if (!names.length) return [{ name: "", hex: hex, source: "user", primary: true }];
+        return names.map(function (n, i) {
+          return { name: n, hex: i === 0 ? hex : null, source: "ai", primary: i === 0 };
+        });
+      }
+
+      // The v2 top-level fields for a new doc, pre-filled from the AI
+      // suggestion (or safe defaults when AI failed).
+      function buildV2Fields(ai, dominantHex) {
+        return {
+          colors: buildColorsFromAI(ai, dominantHex),
+          description: (ai && ai.description) || "",
+          pattern: (ai && ai.pattern) || "other",
+          fit: (ai && ai.fit) || "unknown",
+          fabricGuess: (ai && ai.fabric_guess) || "unknown",
+          formality: (ai && ai.formality) || "casual",
+          warmth: (ai && ai.warmth) || "light",
+          brand: (ai && ai.brand) || null
+        };
+      }
+
+      function syncPrimaryHex(palette, hex) {
+        if (!/^#[0-9a-f]{6}$/i.test(hex || "")) return;
+        var p = null, i;
+        for (i = 0; i < palette.length; i++) { if (palette[i].primary) { p = palette[i]; break; } }
+        if (!p && palette.length) { p = palette[0]; p.primary = true; }
+        if (p) p.hex = hex;
+      }
+
+      // Renders palette chips. The caller owns the (mutable) array;
+      // refresh() re-renders after any mutation.
+      function renderPaletteChips(container, palette, refresh) {
+        container.textContent = "";
+        palette.forEach(function (c) {
+          var chip = document.createElement("span");
+          chip.className = "pal-chip" + (c.primary ? " pal-primary" : "");
+          var dot = document.createElement("span");
+          dot.className = "pal-dot";
+          dot.style.backgroundColor = /^#[0-9a-f]{6}$/i.test(c.hex || "") ? c.hex : "#8c8f89";
+          dot.title = c.primary ? "Primary color" : "Set as primary";
+          dot.setAttribute("role", "button");
+          dot.setAttribute("tabindex", "0");
+          dot.setAttribute("aria-label", (c.primary ? "Primary color: " : "Set as primary: ") + (c.name || "custom"));
+          function makePrimary() {
+            if (c.primary) return;
+            palette.forEach(function (o) { o.primary = false; });
+            c.primary = true;
+            c.source = "user"; // a user decision — AI must not silently override it later
+            refresh();
+          }
+          dot.addEventListener("click", makePrimary);
+          dot.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); makePrimary(); }
+          });
+          var label = document.createElement("span");
+          label.textContent = (c.name || "custom") + (c.source === "ai" ? " ✨" : "");
+          var x = document.createElement("button");
+          x.type = "button";
+          x.className = "pal-x";
+          x.textContent = "×";
+          x.setAttribute("aria-label", "Remove " + (c.name || "color"));
+          x.addEventListener("click", function () {
+            var i = palette.indexOf(c);
+            if (i >= 0) palette.splice(i, 1);
+            if (c.primary && palette.length) palette[0].primary = true;
+            refresh();
+          });
+          chip.appendChild(dot);
+          chip.appendChild(label);
+          chip.appendChild(x);
+          container.appendChild(chip);
+        });
+      }
+
+      function wirePaletteAdd(nameInput, hexInput, addBtn, palette, refresh) {
+        addBtn.addEventListener("click", function () {
+          if (palette.length >= 3) { showToast("Up to 3 colors."); return; }
+          var name = nameInput.value.trim().toLowerCase().slice(0, 24);
+          palette.push({ name: name, hex: hexInput.value, source: "user", primary: palette.length === 0 });
+          nameInput.value = "";
+          refresh();
+        });
       }
 
       // PC-5: manage an item's photos individually — add more (up to MAX_PHOTOS
@@ -800,8 +1031,20 @@ service firebase.storage {
         renderThumbs();
         itemNameInput.value = item.name || "";
         itemCategoryInput.value = item.category || "Other";
-        itemColorInput.value = /^#[0-9a-f]{6}$/i.test(item.color || "") ? item.color : "#5c6673";
-        renderItemAI(item.ai);
+        // PC-8: palette (deep copy — the editor mutates) + editable fields,
+        // pre-filled from the user layer with v1 fallbacks.
+        setPalette(detailPalette, itemColors(item).map(function (c) {
+          return { name: c.name || "", hex: c.hex || null, source: c.source || "user", primary: !!c.primary };
+        }));
+        renderDetailPalette();
+        itemDescInput.value = itemField(item, "description", "description", "");
+        itemPatternInput.value = itemField(item, "pattern", "pattern", "other");
+        itemFitInput.value = itemField(item, "fit", "fit", "unknown");
+        var fabric = itemField(item, "fabricGuess", "fabric_guess", "");
+        itemFabricInput.value = fabric === "unknown" ? "" : fabric;
+        itemFormalityInput.value = itemField(item, "formality", "formality", "casual");
+        itemWarmthInput.value = itemField(item, "warmth", "warmth", "light");
+        itemBrandInput.value = itemField(item, "brand", "brand", "") || "";
         itemSave.disabled = false;
         itemDelete.disabled = false;
         openOverlay(itemOverlay);
@@ -822,10 +1065,22 @@ service firebase.storage {
       itemSave.addEventListener("click", function () {
         if (!activeItem || !currentUser) return;
         itemSave.disabled = true;
+        // PC-8: save the user-confirmed layer. The v1 `color` field is
+        // deleted on edit (reads fall back gracefully either way); the
+        // `ai` blob stays untouched as the raw AI cache.
+        var fabricVal = itemFabricInput.value.trim();
         itemDocRef().update({
           name: itemNameInput.value.trim(),
           category: itemCategoryInput.value,
-          color: itemColorInput.value
+          colors: detailPalette,
+          description: itemDescInput.value.trim(),
+          pattern: itemPatternInput.value,
+          fit: itemFitInput.value,
+          fabricGuess: fabricVal || "unknown",
+          formality: itemFormalityInput.value,
+          warmth: itemWarmthInput.value,
+          brand: itemBrandInput.value.trim() || null,
+          color: firebase.firestore.FieldValue.delete()
         }).then(function () {
           showToast("Piece updated.");
           closeItem();
@@ -854,7 +1109,8 @@ service firebase.storage {
         var query = searchInput.value.trim().toLowerCase();
         var visible = allItems.filter(function (item) {
           var categoryMatch = filter === "All" || item.category === filter;
-          var textMatch = !query || String(item.name || "").toLowerCase().indexOf(query) !== -1 || String(item.category || "").toLowerCase().indexOf(query) !== -1;
+          var colorText = itemColors(item).map(function (c) { return c.name || ""; }).join(" "); // PC-8
+          var textMatch = !query || String(item.name || "").toLowerCase().indexOf(query) !== -1 || String(item.category || "").toLowerCase().indexOf(query) !== -1 || colorText.toLowerCase().indexOf(query) !== -1;
           return categoryMatch && textMatch;
         });
 
@@ -1048,7 +1304,7 @@ service firebase.storage {
         aiRendered = true;
         suggestHint.hidden = true; // the AI box now carries the suggestion narrative
         document.getElementById("aiDesc").textContent = "✨ " + (s.description || s.name || "");
-        var tags = [s.pattern, s.fit, s.formality, s.warmth, s.fabric_guess]
+        var tags = [s.pattern, s.fit, s.formality, s.warmth, s.fabric_guess, s.brand]
           .filter(function (t) { return t && t !== "unknown" && t !== "other"; });
         document.getElementById("aiTags").textContent = tags.join(" · ");
         box.hidden = false;
@@ -1064,12 +1320,20 @@ service firebase.storage {
         box.hidden = false;
         downscaleForAI(file).then(function (img) {
           if (myId !== aiRequestId) return null;
-          return functions.httpsCallable("describeItem")({ imageBase64: img.base64, mimeType: img.mimeType });
+          return functions.httpsCallable("describeItem")({
+            imageBase64: img.base64,
+            mimeType: img.mimeType,
+            photoIds: [file.name] // v2 ai metadata: which photo was analyzed
+          });
         }).then(function (result) {
           if (!result || myId !== aiRequestId) return;
           var s = result.data || null;
           aiSuggestion = s;
           renderAISuggestion(s);
+          // PC-8: pre-fill the palette from the AI's color names; the
+          // dominant-color hex (colorInput) anchors the primary entry.
+          setPalette(uploadPalette, buildColorsFromAI(s, document.getElementById("colorInput").value));
+          renderUploadPalette();
           var nameInput = document.getElementById("nameInput");
           if (s && s.name && !nameInput.value.trim()) nameInput.value = s.name;
         }).catch(function () {
@@ -1080,23 +1344,14 @@ service firebase.storage {
         });
       }
 
-      // PC-7: read-only view of the cached AI description in the detail view.
-      function renderItemAI(ai) {
-        var box = document.getElementById("itemAiSuggest");
-        if (!ai || (!ai.description && !ai.name)) { box.hidden = true; return; }
-        document.getElementById("itemAiDesc").textContent = "✨ " + (ai.description || ai.name || "");
-        var tags = [ai.pattern, ai.fit, ai.formality, ai.warmth, ai.fabric_guess]
-          .filter(function (t) { return t && t !== "unknown" && t !== "other"; });
-        document.getElementById("itemAiTags").textContent = tags.join(" · ");
-        box.hidden = false;
-      }
-
       document.getElementById("photoInput").addEventListener("change", function () {
         var files = Array.prototype.slice.call(this.files, 0, MAX_PHOTOS);
         suggestHint.hidden = true;
         aiRequestId++;
         aiSuggestion = null;
         aiRendered = false;
+        setPalette(uploadPalette, []);
+        renderUploadPalette();
         document.getElementById("aiSuggest").hidden = true;
         photoPreview.textContent = "";
         photoPreview.hidden = true;
@@ -1125,6 +1380,8 @@ service firebase.storage {
             var color = dominantColor(img);
             if (color) {
               document.getElementById("colorInput").value = color;
+              syncPrimaryHex(uploadPalette, color);
+              renderUploadPalette();
               if (!aiRendered) {
                 suggestHint.textContent = "✨ Suggested from your photo — check before uploading.";
                 suggestHint.hidden = false;
@@ -1180,19 +1437,31 @@ service firebase.storage {
         }
 
         function saveDoc() {
+          // PC-8: v2 doc — top-level editable fields pre-filled from the AI
+          // (or safe defaults). The v1 `color` field is no longer written.
+          var v2 = buildV2Fields(aiSuggestion, document.getElementById("colorInput").value);
           var doc = {
             name: document.getElementById("nameInput").value.trim(),
             category: document.getElementById("categoryInput").value,
-            color: document.getElementById("colorInput").value,
             imageUrl: photos[0].url,
             storagePath: photos[0].storagePath,
             photos: photos,
+            colors: uploadPalette.length ? uploadPalette : v2.colors,
+            description: v2.description,
+            pattern: v2.pattern,
+            fit: v2.fit,
+            fabricGuess: v2.fabricGuess,
+            formality: v2.formality,
+            warmth: v2.warmth,
+            brand: v2.brand,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
           };
-          if (aiSuggestion) doc.ai = aiSuggestion; // PC-7: cached AI description
+          if (aiSuggestion) doc.ai = aiSuggestion; // PC-7: cached AI description (raw cache)
           docRef.set(doc).then(function () {
             uploadForm.reset();
             document.getElementById("colorInput").value = "#5c6673";
+            setPalette(uploadPalette, []);
+            renderUploadPalette();
             suggestHint.hidden = true;
             aiSuggestion = null;
             document.getElementById("aiSuggest").hidden = true;
@@ -1340,7 +1609,11 @@ service firebase.storage {
             try { color = dominantColor(img); } catch (e) {}
             var aiP = (functions && currentUser)
               ? Promise.resolve(downscaleImage(img)).then(function (d) {
-                  return functions.httpsCallable("describeItem")({ imageBase64: d.base64, mimeType: d.mimeType });
+                  return functions.httpsCallable("describeItem")({
+                    imageBase64: d.base64,
+                    mimeType: d.mimeType,
+                    photoIds: [file.name] // v2 ai metadata
+                  });
                 }).then(function (res) { return res.data || null; }).catch(function () { return null; })
               : Promise.resolve(null);
             return aiP.then(function (ai) { return { imageUrl: imageUrl, ai: ai, color: color }; });
@@ -1348,13 +1621,22 @@ service firebase.storage {
         }).then(function (r) {
           job.phase = "save";
           renderBulkList();
+          // PC-8: v2 doc shape, same as the single-upload flow.
+          var v2 = buildV2Fields(r.ai, r.color || "#5c6673");
           var doc = {
             name: (r.ai && r.ai.name) || "Untitled item",
             category: (r.ai && r.ai.category) || "Other",
-            color: r.color || "#5c6673",
             imageUrl: r.imageUrl,
             storagePath: storagePath,
             photos: [{ url: r.imageUrl, storagePath: storagePath }],
+            colors: v2.colors,
+            description: v2.description,
+            pattern: v2.pattern,
+            fit: v2.fit,
+            fabricGuess: v2.fabricGuess,
+            formality: v2.formality,
+            warmth: v2.warmth,
+            brand: v2.brand,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
           };
           if (r.ai) doc.ai = r.ai;
@@ -1463,19 +1745,22 @@ service firebase.storage {
         chatList.scrollTop = chatList.scrollHeight;
       }
 
+      // PC-10: flatten items for the stylist prompt. PC-8: reads the v2
+      // user-confirmed layer first, falls back to the v1 `ai` blob.
       function stylistItems() {
         return allItems.map(function (it) {
-          var ai = it.ai || {};
+          var colorNames = itemColors(it).map(function (c) { return c.name || ""; }).filter(function (n) { return n; });
+          if (!colorNames.length && it.ai && Array.isArray(it.ai.colors)) colorNames = it.ai.colors.slice(0, 3);
           return {
             name: it.name,
             category: it.category,
-            colors: Array.isArray(ai.colors) ? ai.colors : [],
-            pattern: ai.pattern,
-            fit: ai.fit,
-            fabric: ai.fabric_guess,
-            formality: ai.formality,
-            warmth: ai.warmth,
-            description: ai.description
+            colors: colorNames,
+            pattern: itemField(it, "pattern", "pattern", "other"),
+            fit: itemField(it, "fit", "fit", "unknown"),
+            fabric: itemField(it, "fabricGuess", "fabric_guess", "unknown"),
+            formality: itemField(it, "formality", "formality", "casual"),
+            warmth: itemField(it, "warmth", "warmth", "light"),
+            description: itemField(it, "description", "description", "")
           };
         });
       }
