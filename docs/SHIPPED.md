@@ -25,4 +25,11 @@ What went live. Momentum you can see.
   end-to-end: auth gate, live Vertex AI call, HTTP 200 in ~4s. Blaze
   confirmed on.
 - **PC-7: AI description + name suggestion at upload** — shipped
-  2026-10-14 via CI (`a8998ad`). Awaiting founder phone test.
+  2026-10-14 via CI (`a8998ad`). Founder phone-tested same day: AI worked,
+  two UI bugs found (dark-mode invisible text, stale on-device hint) —
+  both fixed and redeployed (`a37d410`, `7603467`).
+
+## Sprint 3 (2026-10-29 → 2026-11-11) — started early 2026-10-14
+
+- **PC-9: Bulk upload** — shipped 2026-10-14 via CI (`bb4a8ca`).
+  Awaiting founder phone test.

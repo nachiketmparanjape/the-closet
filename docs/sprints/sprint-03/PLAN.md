@@ -47,7 +47,12 @@ conscious tradeoff for the payoff: a working v1 loop by Nov 11.
 - **Constitution check:** passes — cataloguing acceleration, squarely in
   v1 scope; no weather API, calendar, social, or commerce (VISION.md
   "Explicitly not v1").
-- **Status:** in build 2026-10-14.
+- **Status:** shipped via CI (`bb4a8ca`) 2026-10-14, live — awaiting founder
+  phone test. Implementation notes: 3 parallel workers; per-file rows with
+  live phase (Uploading → Describing → Saving); unreadable photos fail
+  retryably instead of saving as untitled; batch survives overlay close;
+  `downscaleForAI` refactored around shared `loadImageFile`/`downscaleImage`
+  (single-upload flow unchanged).
 
 ### PC-10: Chat stylist (M)
 
