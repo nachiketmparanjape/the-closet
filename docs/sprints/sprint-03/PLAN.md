@@ -99,6 +99,26 @@ conscious tradeoff for the payoff: a working v1 loop by Nov 11.
   the founder's call — bulk upload and the stylist both get better once
   wrong AI guesses are fixable.
 
+### PC-11: Standardized error handling (S)
+
+- **Problem:** ~10 client catch sites each invent their own message
+  (mostly raw Firebase `error.message`); server throws ad-hoc errors
+  with no IDs, so a user report can't be matched to a log line.
+- **In scope:** `functions/errors.js` server catalog (`fail(key)` with
+  categories auth/validation/dependency/internal + short error IDs in
+  HttpsError details); client `friendlyError(err)` choke point mapping
+  Firebase codes to consistent copy (auth → sign-in wording, retryable →
+  "try again", invalid-argument → server message, internal → generic +
+  ID, network → "check connection"). Mechanical swap of catch sites;
+  unit tests for both mappings; function redeploy + CI.
+- **Out of scope:** changing AI-failure-never-blocks-upload, silent
+  storage cleanup, or the specific validation strings (already good UX).
+- **Done looks like:** every user-visible error comes from the catalog;
+  no raw SDK message reaches the UI; a reported error ID locates the
+  server log line.
+- **Status:** design proposed and accepted 2026-10-14; filed for a
+  future sprint, not built yet.
+
 ## Notes
 
 - Approved 2026-10-14; founder on medical leave — async as always, phone
