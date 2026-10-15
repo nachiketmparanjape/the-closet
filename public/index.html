@@ -90,6 +90,13 @@
     .ai-suggest { font-size: 13px; color: var(--accent-dark); margin: 6px 0 0; }
     .ai-suggest .ai-desc { margin: 0 0 4px; }
     .ai-suggest .ai-tags { margin: 0; color: var(--muted); font-size: 12px; }
+    .bulk-list { display: grid; gap: 6px; margin: 8px 0 0; max-height: 38vh; overflow-y: auto; }
+    .bulk-row { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 7px 10px; border-radius: 8px; background: var(--paper-soft); }
+    .bulk-row .bulk-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .bulk-row .bulk-status { color: var(--muted); font-size: 12px; white-space: nowrap; }
+    .bulk-row .bulk-status.st-done { color: var(--accent-dark); }
+    .bulk-row .bulk-status.st-failed { color: var(--danger); }
+    .bulk-retry { font-size: 12px; padding: 4px 10px; border-radius: 99px; border: 1px solid var(--line-strong); background: transparent; color: var(--ink); cursor: pointer; white-space: nowrap; }
     .detail-actions { justify-content: flex-start; }
     .detail-actions .danger { margin-right: auto; }
     .photo-preview { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
@@ -216,6 +223,7 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
           Add a piece
         </button>
+        <button class="secondary" id="bulkButton" type="button">Bulk add</button>
       </div>
     </section>
 
@@ -362,6 +370,28 @@ service firebase.storage {
     </section>
   </div>
 
+  <div class="overlay" id="bulkOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="bulkTitle">
+    <section class="modal">
+      <div class="modal-head">
+        <h2 id="bulkTitle">Bulk add</h2>
+        <button class="icon-button" id="bulkClose" type="button" aria-label="Close bulk add">×</button>
+      </div>
+      <div class="modal-body form-grid">
+        <p class="hint">One photo per piece — each becomes its own item, named and described by AI. Review them in the gallery afterwards.</p>
+        <div class="field file-drop">
+          <label for="bulkInput">Photos (up to 50)</label>
+          <input id="bulkInput" type="file" accept="image/jpeg,image/png,image/webp" multiple />
+        </div>
+        <div class="bulk-list" id="bulkList" hidden></div>
+        <div class="progress" id="bulkProgress" hidden aria-label="Bulk upload progress"><span></span></div>
+        <div class="form-actions">
+          <button class="secondary" id="bulkCancel" type="button">Close</button>
+          <button class="primary" id="bulkStart" type="button" disabled>Add pieces</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
   <div class="overlay" id="itemOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="itemTitle">
     <section class="modal">
       <div class="modal-head">
@@ -449,6 +479,11 @@ service firebase.storage {
 
       var setupOverlay = document.getElementById("setupOverlay");
       var uploadOverlay = document.getElementById("uploadOverlay");
+      var bulkOverlay = document.getElementById("bulkOverlay");
+      var bulkList = document.getElementById("bulkList");
+      var bulkProgress = document.getElementById("bulkProgress");
+      var bulkStartBtn = document.getElementById("bulkStart");
+      var bulkInput = document.getElementById("bulkInput");
       var gallery = document.getElementById("gallery");
       var emptyState = document.getElementById("emptyState");
       var loadingGrid = document.getElementById("loadingGrid");
@@ -847,13 +882,14 @@ service firebase.storage {
       document.getElementById("addButton").addEventListener("click", beginAdd);
       document.getElementById("emptyAddButton").addEventListener("click", beginAdd);
 
-      [setupOverlay, uploadOverlay, itemOverlay].forEach(function (overlay) {
+      [setupOverlay, uploadOverlay, itemOverlay, bulkOverlay].forEach(function (overlay) {
         overlay.addEventListener("click", function (event) { if (event.target === overlay) closeOverlay(overlay); });
       });
       document.addEventListener("keydown", function (event) {
         if (event.key === "Escape") {
           if (!itemOverlay.hidden) closeItem();
           else if (!uploadOverlay.hidden) closeOverlay(uploadOverlay);
+          else if (!bulkOverlay.hidden) closeOverlay(bulkOverlay);
           else if (!setupOverlay.hidden) closeOverlay(setupOverlay);
         }
       });
@@ -958,27 +994,20 @@ service firebase.storage {
 
       // PC-7: one AI description per upload, from the cover photo.
       // Runs alongside the on-device suggestions; the upload never waits on it.
+      function downscaleImage(img) {
+        var maxSide = 1024;
+        var scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+        var w = Math.max(1, Math.round(img.naturalWidth * scale));
+        var h = Math.max(1, Math.round(img.naturalHeight * scale));
+        var canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        var dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+        return { base64: dataUrl.split(",")[1], mimeType: "image/jpeg" };
+      }
+
       function downscaleForAI(file) {
-        return new Promise(function (resolve, reject) {
-          var url = URL.createObjectURL(file);
-          var img = new Image();
-          img.onload = function () {
-            try {
-              var maxSide = 1024;
-              var scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
-              var w = Math.max(1, Math.round(img.naturalWidth * scale));
-              var h = Math.max(1, Math.round(img.naturalHeight * scale));
-              var canvas = document.createElement("canvas");
-              canvas.width = w; canvas.height = h;
-              canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-              var dataUrl = canvas.toDataURL("image/jpeg", 0.85);
-              URL.revokeObjectURL(url);
-              resolve({ base64: dataUrl.split(",")[1], mimeType: "image/jpeg" });
-            } catch (e) { URL.revokeObjectURL(url); reject(e); }
-          };
-          img.onerror = function () { URL.revokeObjectURL(url); reject(new Error("unreadable")); };
-          img.src = url;
-        });
+        return loadImageFile(file).then(downscaleImage);
       }
 
       function renderAISuggestion(s) {
@@ -1175,6 +1204,216 @@ service firebase.storage {
 
         uploadOne(0);
       });
+
+      // PC-9: bulk add — N photos become N items, one per photo.
+      // Bounded concurrency (3), per-item failure isolation with retry.
+      var BULK_MAX = 50;
+      var BULK_CONCURRENCY = 3;
+      var bulkJobs = [];          // {file, name, status, phase, error}
+      var bulkRunning = false;
+      var bulkActiveWorkers = 0;
+
+      function loadImageFile(file) {
+        return new Promise(function (resolve, reject) {
+          var url = URL.createObjectURL(file);
+          var img = new Image();
+          img.onload = function () { URL.revokeObjectURL(url); resolve(img); };
+          img.onerror = function () { URL.revokeObjectURL(url); reject(new Error("unreadable")); };
+          img.src = url;
+        });
+      }
+
+      function validBulkFile(file) {
+        if (file.size > 10 * 1024 * 1024) return "over 10 MB";
+        if (["image/jpeg", "image/png", "image/webp"].indexOf(file.type) === -1) return "not JPEG/PNG/WebP";
+        return null;
+      }
+
+      function beginBulk() {
+        if (!configured) { setupRequired(); return; }
+        if (!currentUser) { signIn(); return; }
+        renderBulkList();
+        openOverlay(bulkOverlay);
+      }
+
+      function bulkJobStatusText(job) {
+        if (job.status === "queued") return "Waiting";
+        if (job.status === "done") return "Done";
+        if (job.status === "failed") return "Failed";
+        if (job.status === "invalid") return "Skipped";
+        if (job.phase === "upload") return "Uploading…";
+        if (job.phase === "describe") return "Describing…";
+        return "Saving…";
+      }
+
+      function renderBulkList() {
+        bulkList.textContent = "";
+        if (!bulkJobs.length) { bulkList.hidden = true; return; }
+        bulkList.hidden = false;
+        bulkJobs.forEach(function (job, idx) {
+          var row = document.createElement("div");
+          row.className = "bulk-row";
+          var name = document.createElement("span");
+          name.className = "bulk-name";
+          name.textContent = job.name;
+          var status = document.createElement("span");
+          status.className = "bulk-status" + (job.status === "done" ? " st-done" : job.status === "failed" ? " st-failed" : "");
+          status.textContent = job.status === "failed" && job.error ? "Failed — " + job.error
+            : job.status === "invalid" ? "Skipped — " + job.error
+            : bulkJobStatusText(job);
+          row.appendChild(name);
+          row.appendChild(status);
+          if (job.status === "failed") {
+            var retry = document.createElement("button");
+            retry.type = "button";
+            retry.className = "bulk-retry";
+            retry.textContent = "Retry";
+            retry.setAttribute("data-idx", String(idx));
+            row.appendChild(retry);
+          }
+          bulkList.appendChild(row);
+        });
+        updateBulkProgress();
+      }
+
+      function updateBulkProgress() {
+        var total = bulkJobs.length;
+        if (!total) { bulkProgress.hidden = true; return; }
+        var settled = bulkJobs.filter(function (j) {
+          return j.status === "done" || j.status === "failed" || j.status === "invalid";
+        }).length;
+        bulkProgress.hidden = false;
+        bulkProgress.querySelector("span").style.width = Math.round(settled / total * 100) + "%";
+      }
+
+      function bulkProcessItem(job) {
+        var file = job.file;
+        var docRef = db.collection("users").doc(currentUser.uid).collection("items").doc();
+        var safeName = "0-" + file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+        var storagePath = "users/" + currentUser.uid + "/items/" + docRef.id + "/" + safeName;
+        var fileRef = storage.ref().child(storagePath);
+        var uploaded = false;
+        job.phase = "upload";
+        renderBulkList();
+        return fileRef.put(file, { contentType: file.type }).then(function (task) {
+          uploaded = true;
+          return task.ref.getDownloadURL();
+        }).then(function (imageUrl) {
+          job.phase = "describe";
+          renderBulkList();
+          // Decode once: a photo we can't read is a failed item (retryable),
+          // not an untitled one. AI failure still never blocks the item.
+          return loadImageFile(file).then(function (img) {
+            var color = null;
+            try { color = dominantColor(img); } catch (e) {}
+            var aiP = (functions && currentUser)
+              ? Promise.resolve(downscaleImage(img)).then(function (d) {
+                  return functions.httpsCallable("describeItem")({ imageBase64: d.base64, mimeType: d.mimeType });
+                }).then(function (res) { return res.data || null; }).catch(function () { return null; })
+              : Promise.resolve(null);
+            return aiP.then(function (ai) { return { imageUrl: imageUrl, ai: ai, color: color }; });
+          }, function () { throw new Error("could not read photo"); });
+        }).then(function (r) {
+          job.phase = "save";
+          renderBulkList();
+          var doc = {
+            name: (r.ai && r.ai.name) || "Untitled item",
+            category: (r.ai && r.ai.category) || "Other",
+            color: r.color || "#5c6673",
+            imageUrl: r.imageUrl,
+            storagePath: storagePath,
+            photos: [{ url: r.imageUrl, storagePath: storagePath }],
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          };
+          if (r.ai) doc.ai = r.ai;
+          return docRef.set(doc);
+        }).catch(function (err) {
+          if (uploaded) { storage.ref().child(storagePath).delete().catch(function () {}); }
+          throw err;
+        });
+      }
+
+      function bulkWorker() {
+        var job = null;
+        for (var i = 0; i < bulkJobs.length; i++) {
+          if (bulkJobs[i].status === "queued") { job = bulkJobs[i]; job.status = "active"; job.phase = "upload"; break; }
+        }
+        if (!job) {
+          bulkActiveWorkers--;
+          if (bulkActiveWorkers <= 0) bulkFinish();
+          return;
+        }
+        renderBulkList();
+        bulkProcessItem(job).then(function () {
+          job.status = "done";
+          job.error = null;
+        }, function (err) {
+          job.status = "failed";
+          job.error = (err && err.message) || "upload failed";
+        }).then(function () {
+          renderBulkList();
+          bulkWorker();
+        });
+      }
+
+      function bulkKick() {
+        if (bulkRunning) return;
+        var hasQueued = bulkJobs.some(function (j) { return j.status === "queued"; });
+        if (!hasQueued) return;
+        bulkRunning = true;
+        bulkInput.disabled = true;
+        bulkStartBtn.disabled = true;
+        bulkActiveWorkers = BULK_CONCURRENCY;
+        for (var i = 0; i < BULK_CONCURRENCY; i++) bulkWorker();
+      }
+
+      function bulkFinish() {
+        bulkRunning = false;
+        bulkInput.disabled = false;
+        var done = bulkJobs.filter(function (j) { return j.status === "done"; }).length;
+        var failed = bulkJobs.filter(function (j) { return j.status === "failed"; }).length;
+        var msg = "Bulk add finished: " + done + " added" + (failed ? ", " + failed + " failed — retry them here" : "") + ".";
+        showToast(msg);
+        renderBulkList();
+      }
+
+      bulkInput.addEventListener("change", function () {
+        if (bulkRunning) return;
+        var files = Array.prototype.slice.call(this.files, 0, BULK_MAX);
+        if (this.files.length > BULK_MAX) showToast("Keeping the first " + BULK_MAX + " photos.");
+        bulkJobs = files.map(function (file) {
+          var problem = validBulkFile(file);
+          return {
+            file: file,
+            name: file.name,
+            status: problem ? "invalid" : "queued",
+            phase: null,
+            error: problem
+          };
+        });
+        var n = bulkJobs.filter(function (j) { return j.status === "queued"; }).length;
+        bulkStartBtn.disabled = n === 0;
+        bulkStartBtn.textContent = n > 0 ? "Add " + n + " piece" + (n === 1 ? "" : "s") : "Add pieces";
+        renderBulkList();
+      });
+
+      bulkStartBtn.addEventListener("click", bulkKick);
+
+      bulkList.addEventListener("click", function (event) {
+        var btn = event.target.closest ? event.target.closest(".bulk-retry") : null;
+        if (!btn) return;
+        var job = bulkJobs[parseInt(btn.getAttribute("data-idx"), 10)];
+        if (!job || job.status !== "failed") return;
+        job.status = "queued";
+        job.phase = null;
+        job.error = null;
+        renderBulkList();
+        bulkKick();
+      });
+
+      document.getElementById("bulkClose").addEventListener("click", function () { closeOverlay(bulkOverlay); });
+      document.getElementById("bulkCancel").addEventListener("click", function () { closeOverlay(bulkOverlay); });
+      document.getElementById("bulkButton").addEventListener("click", beginBulk);
 
       setStatus(null);
       renderGallery();
