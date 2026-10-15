@@ -52,6 +52,13 @@ colors: [
 - `primary` marks the display/search color (v1's `color` role).
 - `source` enforces the authority rule: AI re-runs may only add/replace
   `source:"ai"` entries; `source:"user"` entries are untouchable.
+- **New optional field (2026-10-15, founder feedback): `family`** — the
+  canonical palette name (`functions/palette.js`, ~30 names with hex
+  anchors, mirrored in `public/js/palette.js`). AI entries: constrained by
+  the prompt, so `family == name`. User entries: resolved by nearest hex.
+  Old free-text AI names map through an alias list for analysis. The
+  stylist and any future color-theory diagnosis reason over `family` —
+  stable vocabulary ("navy" and "midnight blue" are one family).
 
 **Representation decision (2026-10-14, founder: "whatever works best for
 the recommender"):** both are stored, but each consumer reads what suits
@@ -86,6 +93,14 @@ brand-preference matching, not outfit harmony — it won't move recommendation
 quality. Added for organization and future-proofing at ~zero cost: optional,
 no migration (absent = unknown), prompt change batches with the next
 function deploy.
+
+**Standardization (2026-10-15, founder: "uniqlo and uniqlo UT shouldn't be
+different brands"):** the model returns the *parent* brand — prompt
+instructs it to strip sub-lines/collections ("Uniqlo UT" → "Uniqlo",
+"Nike SB" → "Nike"). **New field `brandKey`** (string|null): lowercase,
+whitespace-collapsed grouping key ("UNIQLO" → "uniqlo") for dedupe and
+filtering. Display casing is never normalized (H&M must not become H&m).
+Computed server-side at upload and client-side on brand edits.
 
 The `ai` object stays as the **raw cache** of the last AI analysis, extended with:
 
