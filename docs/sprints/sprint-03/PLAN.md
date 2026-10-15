@@ -86,6 +86,10 @@ conscious tradeoff for the payoff: a working v1 loop by Nov 11.
   sanitize caps server-side; deploy went via direct REST (Firebase CLI
   broken on this VM's egress, same as PC-6); IAM via run v1
   `:getIamPolicy` GET + `:setIamPolicy` POST (v2 has no IAM methods).
+  Post-ship fix 2026-10-14: founder's first chat failed — logs showed the
+  model client had no project because the deploy omitted the env vars
+  describeItem carries (`GCLOUD_PROJECT`, `VERTEX_LOCATION`,
+  `GEMINI_MODEL`); patched live via updateMask, verified ACTIVE.
 
 ## Sprint 4 seed
 
