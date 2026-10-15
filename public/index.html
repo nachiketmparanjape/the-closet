@@ -548,6 +548,7 @@ service firebase.storage {
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-storage-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-functions-compat.js"></script>
+  <script src="js/friendly-error.js"></script>
   <script>
     (function () {
       "use strict";
@@ -669,13 +670,39 @@ service firebase.storage {
         toastTimer = window.setTimeout(function () { toast.classList.remove("show"); }, 3000);
       }
 
+      // PC-11: root error boundary equivalent (vanilla JS has no React
+      // boundaries). Unexpected crashes get a toast with a client-side
+      // error id the user can report; the full trace goes to the console.
+      // reportError() is the single hook where Sentry attaches later —
+      // wiring it needs a Sentry account/DSN, explicitly deferred (see
+      // sprint-04 plan, PC-11 notes). Event handlers and async code keep
+      // their local try/catch + toast; this is the last resort.
+      var clientErrorSeq = 0;
+      function reportError(where, err) {
+        clientErrorSeq++;
+        var id = "c" + Date.now().toString(36) + "-" + clientErrorSeq;
+        try {
+          console.error("[closet][" + id + "] " + where + ":", err && err.stack ? err.stack : err);
+        } catch (e) { /* logging must never throw */ }
+        return id;
+      }
+      window.addEventListener("error", function (event) {
+        var id = reportError("window.onerror", event.error || event.message);
+        showToast("Something went wrong (" + id + "). Try reloading the page.");
+      });
+      window.addEventListener("unhandledrejection", function (event) {
+        // Logged with an id, no toast: async failures already surface
+        // through their local catch sites; a stray one shouldn't pop UI.
+        reportError("unhandledrejection", event.reason);
+      });
+
       function setupRequired() { openOverlay(setupOverlay); }
 
       function signIn() {
         if (!configured) { setupRequired(); return; }
         var provider = new firebase.auth.GoogleAuthProvider();
         auth.signInWithPopup(provider).catch(function (error) {
-          showToast(error.message || "Google sign-in did not complete.");
+          showToast(friendlyError(error));
         });
       }
 
@@ -942,7 +969,7 @@ service firebase.storage {
           if (removed.storagePath) { storage.ref().child(removed.storagePath).delete().catch(function () {}); }
           showToast("Photo deleted.");
         }).catch(function (error) {
-          showToast(error.message || "Could not delete the photo.");
+          showToast(friendlyError(error));
         });
       }
 
@@ -961,7 +988,7 @@ service firebase.storage {
         persistPhotos(photos).then(function () {
           showToast("Cover photo updated.");
         }).catch(function (error) {
-          showToast(error.message || "Could not update cover photo.");
+          showToast(friendlyError(error));
         });
       });
 
@@ -999,7 +1026,7 @@ service firebase.storage {
             }).catch(function (error) {
               newPhotos.forEach(function (p) { storage.ref().child(p.storagePath).delete().catch(function () {}); });
               addBtn.disabled = false;
-              showToast(error.message || "Could not add photos.");
+              showToast(friendlyError(error));
             });
             return;
           }
@@ -1016,7 +1043,7 @@ service firebase.storage {
             failed = true;
             newPhotos.forEach(function (p) { storage.ref().child(p.storagePath).delete().catch(function () {}); });
             addBtn.disabled = false;
-            showToast(error.message || "Upload failed.");
+            showToast(friendlyError(error));
           });
         }
         uploadOne(0);
@@ -1086,7 +1113,7 @@ service firebase.storage {
           closeItem();
         }).catch(function (error) {
           itemSave.disabled = false;
-          showToast(error.message || "Could not save changes.");
+          showToast(friendlyError(error));
         });
       });
 
@@ -1101,7 +1128,7 @@ service firebase.storage {
           closeItem();
         }).catch(function (error) {
           itemDelete.disabled = false;
-          showToast(error.message || "Could not delete this piece.");
+          showToast(friendlyError(error));
         });
       });
 
@@ -1152,7 +1179,7 @@ service firebase.storage {
           }, function (error) {
             loadingGrid.hidden = true;
             gallery.hidden = false;
-            showToast(error.message || "Could not load your wardrobe.");
+            showToast(friendlyError(error));
             renderGallery();
           });
       }
@@ -1476,7 +1503,7 @@ service firebase.storage {
             cleanupUploads();
             progress.hidden = true;
             uploadSubmit.disabled = false;
-            showToast(error.message || "Could not save this piece.");
+            showToast(friendlyError(error));
           });
         }
 
@@ -1492,13 +1519,13 @@ service firebase.storage {
             var frac = (idx + snapshot.bytesTransferred / snapshot.totalBytes) / files.length;
             bar.style.width = Math.round(frac * 100) + "%";
           }, function (error) {
-            failUpload(error.message || "Upload failed.");
+            failUpload(friendlyError(error));
           }, function () {
             task.snapshot.ref.getDownloadURL().then(function (imageUrl) {
               photos.push({ url: imageUrl, storagePath: storagePath });
               uploadOne(idx + 1);
             }).catch(function (error) {
-              failUpload(error.message || "Upload failed.");
+              failUpload(friendlyError(error));
             });
           });
         }
@@ -1663,7 +1690,7 @@ service firebase.storage {
           job.error = null;
         }, function (err) {
           job.status = "failed";
-          job.error = (err && err.message) || "upload failed";
+          job.error = friendlyError(err);
         }).then(function () {
           renderBulkList();
           bulkWorker();
@@ -1801,7 +1828,7 @@ service firebase.storage {
           thinking.text = (res.data && res.data.reply) || "Hmm, I couldn't put that together — try again?";
         }).catch(function (err) {
           thinking.thinking = false;
-          thinking.text = (err && err.message) || "The stylist is unavailable right now. Try again in a moment.";
+          thinking.text = friendlyError(err);
         }).then(function () {
           chatBusy = false;
           chatSend.disabled = false;

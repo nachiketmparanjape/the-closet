@@ -17,10 +17,22 @@ const { initializeApp } = require("firebase-admin/app");
 const { getStorage } = require("firebase-admin/storage");
 const { describeImage } = require("./describe");
 const { askStylist, sanitizeItems, sanitizeMessages } = require("./stylist");
+// PC-11: every expected failure goes through the catalog; every failure
+// path logs with a correlation ID.
+const { fail, newCorrelationId, logError } = require("./errors");
 
 initializeApp();
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB — phone photos, pre-resize
+
+// Callable boundary: HttpsErrors (from fail()) pass through untouched;
+// coded downstream errors map via their key; anything else is INTERNAL.
+// The client never sees raw internals — only catalog messages.
+function boundary(where, correlationId, uid, err) {
+  logError(where, err, { uid: uid, correlationId: correlationId });
+  if (err instanceof HttpsError) throw err;
+  fail(err && err.key ? err.key : "INTERNAL");
+}
 
 exports.describeItem = onCall(
   {
@@ -30,58 +42,51 @@ exports.describeItem = onCall(
     maxInstances: 5,
   },
   async (request) => {
+    const correlationId = newCorrelationId();
+    const uid = request.auth ? request.auth.uid : null;
     if (!request.auth) {
-      throw new HttpsError("unauthenticated", "Sign-in required.");
+      fail("NOT_SIGNED_IN");
     }
-    const uid = request.auth.uid;
     const data = request.data || {};
 
     let buffer = null;
     let mimeType = "image/jpeg";
 
-    if (typeof data.storagePath === "string" && data.storagePath.length > 0) {
-      const expectedPrefix = "users/" + uid + "/";
-      if (!data.storagePath.startsWith(expectedPrefix)) {
-        throw new HttpsError(
-          "permission-denied",
-          "storagePath must point at your own photos."
-        );
-      }
-      const file = getStorage().bucket().file(data.storagePath);
-      const [metadata] = await file.getMetadata();
-      mimeType = metadata.contentType || mimeType;
-      const size = Number(metadata.size || 0);
-      if (size > MAX_IMAGE_BYTES) {
-        throw new HttpsError("invalid-argument", "Photo is too large.");
-      }
-      [buffer] = await file.download();
-    } else if (typeof data.imageBase64 === "string" && data.imageBase64.length > 0) {
-      buffer = Buffer.from(data.imageBase64, "base64");
-      if (typeof data.mimeType === "string" && data.mimeType.startsWith("image/")) {
-        mimeType = data.mimeType;
-      }
-    } else {
-      throw new HttpsError(
-        "invalid-argument",
-        "Provide storagePath or imageBase64."
-      );
-    }
-
-    if (!buffer || buffer.length === 0 || buffer.length > MAX_IMAGE_BYTES) {
-      throw new HttpsError("invalid-argument", "Photo is empty or too large.");
-    }
-
     try {
+      if (typeof data.storagePath === "string" && data.storagePath.length > 0) {
+        const expectedPrefix = "users/" + uid + "/";
+        if (!data.storagePath.startsWith(expectedPrefix)) {
+          fail("NOT_YOUR_PHOTO");
+        }
+        const file = getStorage().bucket().file(data.storagePath);
+        const [metadata] = await file.getMetadata();
+        mimeType = metadata.contentType || mimeType;
+        const size = Number(metadata.size || 0);
+        if (size > MAX_IMAGE_BYTES) {
+          fail("IMAGE_TOO_LARGE");
+        }
+        [buffer] = await file.download();
+      } else if (typeof data.imageBase64 === "string" && data.imageBase64.length > 0) {
+        buffer = Buffer.from(data.imageBase64, "base64");
+        if (typeof data.mimeType === "string" && data.mimeType.startsWith("image/")) {
+          mimeType = data.mimeType;
+        }
+      } else {
+        fail("NO_IMAGE");
+      }
+
+      if (!buffer || buffer.length === 0 || buffer.length > MAX_IMAGE_BYTES) {
+        fail("BAD_IMAGE");
+      }
+
       const photoIds = Array.isArray(data.photoIds)
         ? data.photoIds.filter((p) => typeof p === "string").slice(0, 4)
         : [];
       return await describeImage(buffer, mimeType, photoIds);
     } catch (err) {
-      console.error("describeItem model call failed:", err);
-      throw new HttpsError(
-        "internal",
-        "The description service is unavailable right now. Upload still works without it."
-      );
+      // Any failure inside describeImage is a downstream AI failure.
+      if (!(err instanceof HttpsError) && !err.key) err.key = "DESCRIBE_FAILED";
+      boundary("describeItem", correlationId, uid, err);
     }
   }
 );
@@ -94,29 +99,26 @@ exports.askStylist = onCall(
     maxInstances: 5,
   },
   async (request) => {
-    if (!request.auth) {
-      throw new HttpsError("unauthenticated", "Sign-in required.");
-    }
-    const data = request.data || {};
-    const items = sanitizeItems(data.items);
-    const messages = sanitizeMessages(data.messages);
-    if (!items.length) {
-      throw new HttpsError(
-        "invalid-argument",
-        "Your wardrobe looks empty — add a few pieces first."
-      );
-    }
-    if (!messages.length) {
-      throw new HttpsError("invalid-argument", "Tell me the occasion first.");
-    }
+    const correlationId = newCorrelationId();
+    const uid = request.auth ? request.auth.uid : null;
     try {
+      if (!request.auth) {
+        fail("NOT_SIGNED_IN");
+      }
+      const data = request.data || {};
+      const items = sanitizeItems(data.items);
+      const messages = sanitizeMessages(data.messages);
+      if (!items.length) {
+        fail("EMPTY_WARDROBE");
+      }
+      if (!messages.length) {
+        fail("BAD_MESSAGES");
+      }
       return await askStylist(items, messages);
     } catch (err) {
-      console.error("askStylist model call failed:", err);
-      throw new HttpsError(
-        "internal",
-        "The stylist is unavailable right now. Try again in a moment."
-      );
+      // Any failure inside askStylist is a downstream AI failure.
+      if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
+      boundary("askStylist", correlationId, uid, err);
     }
   }
 );

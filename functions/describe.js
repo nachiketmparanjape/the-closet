@@ -14,6 +14,11 @@
 
 const { GoogleGenAI } = require("@google/genai");
 
+// PC-11: describe.js throws codedError for expected downstream failures
+// (mapped to client-safe messages at the callable boundary) and plain
+// Errors for unexpected ones (bugs, misconfiguration).
+const { codedError } = require("./errors");
+
 const CATEGORIES = ["Tops", "Bottoms", "Outerwear", "Shoes", "Accessories", "Other"];
 const PATTERNS = ["solid", "striped", "plaid", "check", "floral", "graphic", "other"];
 const FITS = ["slim", "regular", "relaxed", "oversized", "unknown"];
@@ -101,25 +106,34 @@ function getClient() {
 // analysis metadata (v2 raw cache).
 async function describeImage(imageBuffer, mimeType, photoIds) {
   const model = process.env.GEMINI_MODEL || MODEL_VERSION;
-  const ai = getClient();
-  const response = await ai.models.generateContent({
-    model,
-    contents: [
-      {
-        role: "user",
-        parts: [
-          { text: PROMPT },
-          {
-            inlineData: {
-              mimeType: mimeType || "image/jpeg",
-              data: imageBuffer.toString("base64"),
+  let response;
+  try {
+    const ai = getClient();
+    response = await ai.models.generateContent({
+      model,
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { text: PROMPT },
+            {
+              inlineData: {
+                mimeType: mimeType || "image/jpeg",
+                data: imageBuffer.toString("base64"),
+              },
             },
-          },
-        ],
-      },
-    ],
-    config: { responseMimeType: "application/json", temperature: 0.2 },
-  });
+          ],
+        },
+      ],
+      config: { responseMimeType: "application/json", temperature: 0.2 },
+    });
+  } catch (err) {
+    // Network, auth, quota, model errors — a downstream failure, not our bug.
+    throw codedError("AI_UNAVAILABLE", "describeItem: generateContent failed: " + (err && err.message));
+  }
+  if (!response || !response.text || !response.text.trim()) {
+    throw codedError("AI_BAD_RESPONSE", "describeItem: model returned no text");
+  }
   const parsed = parseModelJson(response.text);
   parsed.modelVersion = model;
   parsed.analyzedAt = new Date().toISOString();
