@@ -144,10 +144,12 @@ PM's top 3, per the planning ritual — founder yes/no at approval:
 3. **Visual workflow map (studio system)** → the studio is product zero and
    gets no sprints. Stays parked until it earns a build.
 
-## Sprint 3 seeds (from 2026-10-14 design session)
+## Sprint 3 seeds (from 2026-10-14 design session; reordered by founder's
+2026-10-14 call — bulk upload + chat stylist take Sprint 3, PC-8 slides to
+Sprint 4; see sprints/sprint-03/PLAN.md)
 - **PC-8: color palette + item data model v2** — design done
-  (`DATA_MODEL.md`), backlog candidate. The data-model cut to take first:
-  everything later (garment model, stylist chat) builds on it.
+  (`DATA_MODEL.md`), now a Sprint 4 seed. The data-model cut to take first:
+  everything later (garment model, stylist improvements) builds on it.
 - **Garment-model revisit trigger** — in inbox; revisit once the
   conversational recommendation loop exists and can measure whether a
   richer multi-photo model produces better outfits.

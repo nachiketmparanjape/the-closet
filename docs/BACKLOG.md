@@ -32,6 +32,27 @@ Parked 2026-10-11 at the founder's call — it hasn't recurred. If it does,
 he'll report the details (saved or lost? app closed or back to gallery?)
 and diagnosis resumes; the fix becomes its own cut.
 
+## Sprint 3 (2026-10-29 → 2026-11-11) — APPROVED 2026-10-14
+
+Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
+
+### PC-9: Bulk upload (M)
+"Bulk add" mode: N photos → N items, one `describeItem` call each
+(bounded concurrency, progress UI, ~$0.05 for 50 photos). Per-item
+failures isolated with retry; newest-first landing for review.
+Single-photo per item; extra photos via PC-5's add-photos.
+
+### PC-10: Chat stylist (M)
+Conversational outfit picks over the cached descriptions + attributes
+(text-only reasoning, per the decided research), occasion/weather/
+preferences from conversation — no integrations. Reuses the PC-6 backend
+pattern. The v1 loop's second half.
+
+**Founder's call 2026-10-14:** PM proposed PC-8 (data model + editable
+fields) + PC-9 first, stylist in Sprint 4; founder chose bulk upload +
+stylist now, editable descriptions slide to Sprint 4. Known limitation:
+AI-written descriptions/attributes stay read-only through Sprint 3.
+
 ## Ideas (untriaged)
 
 - **Bulk upload (one photo per article):** select N photos → N items created
@@ -42,8 +63,7 @@ and diagnosis resumes; the fix becomes its own cut.
   $0.05; run a few in parallel with progress UI); per-item failures must not
   block the batch (same principle as PC-7); gallery is already newest-first
   so new items surface at top for review; bulk mode is single-photo only,
-  extra photos via PC-5's add-photos. Needs its own card (batch progress,
-  failure isolation, review path) — Sprint 3 candidate.
+  extra photos via PC-5's add-photos. **In Sprint 3 (approved 2026-10-14).**
 - **View-aware AI descriptions:** the AI assumes the cover photo shows the
   front — founder uploaded a back-print tee 2026-10-14 and got "print on
   the front". Small fidelity detail, not a broken flow (and the description
@@ -57,7 +77,8 @@ and diagnosis resumes; the fix becomes its own cut.
   so AI re-runs never clobber user edits); promote AI attributes
   (pattern/fit/formality/…) to top-level editable fields; lazy migration
   from v1 `color`, no backfill script. Design doc: `DATA_MODEL.md`.
-  Next-sprint candidate — founder asked for the design now, build later.
+  Sprint 4 — deferred at the founder's 2026-10-14 call (bulk upload +
+  stylist take Sprint 3).
 - **"Surprise me" shuffle:** one-tap random outfit suggestion per category.
   Sprint 2 pull-in candidate if time.
 - **Backfill AI descriptions for existing items:** run `describeItem` over
@@ -65,4 +86,4 @@ and diagnosis resumes; the fix becomes its own cut.
   founder wants the old pieces described too.
 - **Chat stylist:** conversational outfit picks over the cached
   descriptions, reusing the PC-6 proxy. The v1 core loop's second half —
-  Sprint 3 candidate once descriptions exist.
+  **in Sprint 3 (approved 2026-10-14).**
