@@ -36,3 +36,25 @@ What went live. Momentum you can see.
 - **PC-10: Chat stylist** — shipped 2026-10-14: new `askStylist` callable
   (us-central1, manual REST deploy) + chat UI via CI (`4c3b446`).
   Awaiting founder phone test.
+
+## Sprint 4 (2026-11-12 → 2026-11-25) — approved and started early 2026-10-15
+
+- **PC-8: Editable item data model v2** — shipped 2026-10-15 via CI.
+  `colors[]` palette (name/hex/source/primary, max 3), top-level editable
+  description/pattern/fit/fabric/formality/warmth/brand, AI brand
+  inference, palette editor in upload + detail views, lazy migration.
+  `describeItem` redeployed with the brand prompt.
+- **PC-11: Standardized error handling** — shipped 2026-10-15.
+  `functions/errors.js` catalog (11 keys, 4 categories), correlation IDs
+  on all server logs, `friendlyError(err)` client choke point (13 call
+  sites), window-level error handlers with client error IDs,
+  `reportError()` as the Sentry hook (Sentry itself explicitly deferred —
+  needs an account/DSN). 25 committed tests. Both functions redeployed.
+- **PC-12: Outfit object + end-to-end loop** — shipped 2026-10-15.
+  `askStylist` returns structured outfits (server-side name→ID
+  validation); new `reflectOutfit` callable (idempotent); style-profile
+  grounding in recommendations; Outfits tab + history; chat outfit card
+  with Save; one-tap wear logging; 0–10 ratings + app reflection with
+  user-confirmed style preferences; manual outfit builder; per-article
+  wear stats. Firestore rules for the four new collections deployed.
+  Awaiting founder phone test of the full loop.

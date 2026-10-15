@@ -110,9 +110,24 @@ founder explicitly asked for the whole end-to-end mechanism working.
 - **Constitution check:** passes — this is the v1 loop growing up, not
   scope creep: no social, commerce, or integrations.
 - **Design:** `DATA_MODEL.md` v3 (written 2026-10-15) + the edge-case
-  list below. **AWAITING FOUNDER INTERROGATION — no implementation
-  until the design is approved.**
-- **Status:** proposed.
+  list below. **APPROVED by founder 2026-10-15 after interrogation**
+  (two fixes: outfit versioning, per-article wear history confirmed).
+- **Status:** SHIPPED 2026-10-15. Backend: `askStylist` returns
+  `{ reply, outfit: { itemIds, confidence, reasoning } | null }` with
+  server-side name→ID validation; new `reflectOutfit` callable
+  (idempotent per rating via `reflectionFor`); style-profile grounding
+  in the stylist prompt (best-effort read); Firestore rules for outfits,
+  wear_events, ratings, style_profile (deployed via CLI — the REST
+  release call needed a field the helper lacked). Client: Outfits tab +
+  history (latest version per group), chat outfit card with Save, outfit
+  detail (items, confidence, reasoning, versions, favorite), one-tap "I
+  wore this", 0–10 rating + note, app reflection with suggested
+  preference (confirm → style profile, cap 50, prune oldest app-sourced),
+  manual builder (+ Build, source: manual), per-article "worn N× · last
+  worn" on item detail. As-built refinements: v1 versionGroup == doc ID;
+  user ratings written client-side direct to Firestore (reflection can't
+  block them); reflection retry reuses the same ratingId. Tests:
+  `tests/pc12-stylist.test.js` (34 assertions total across the suite).
 
 ## PC-12 edge cases (founder: "cover for all the cases")
 

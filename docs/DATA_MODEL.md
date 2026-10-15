@@ -167,7 +167,7 @@ preferences sit *pending* until the user confirms them.
 
 | field | type | notes |
 |---|---|---|
-| versionGroup | string | stable id across versions of "the same outfit" |
+| versionGroup | string | stable id across versions of "the same outfit" (v1: equals the doc ID) |
 | version | number | 1, 2, 3… |
 | supersedes | string? | previous version's doc ID; null on v1 |
 | itemIds | string[] | item doc IDs — the stable join key |
