@@ -26,7 +26,7 @@ const PATTERNS = ["solid", "striped", "plaid", "check", "floral", "graphic", "ot
 const FITS = ["slim", "regular", "relaxed", "oversized", "unknown"];
 const FORMALITIES = ["casual", "smart-casual", "formal"];
 const WARMTHS = ["light", "medium", "heavy"];
-const MODEL_VERSION = "gemini-2.5-flash"; // 2026-10-20 retirement — 3.x IDs 404 on Vertex us-central1 (2026-10-15); re-migrate once a servable ID is confirmed
+const MODEL_VERSION = "gemini-3.8-flash"; // 2.5-flash retires 2026-10-20 (Google lifecycle page)
 
 const PROMPT = `You are cataloguing one garment from its photo for a personal wardrobe app.
 Look at the photo and answer with ONLY a JSON object (no markdown, no prose) with exactly these keys:
@@ -109,7 +109,10 @@ let client = null;
 function getClient() {
   if (client) return client;
   const project = process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT;
-  const location = process.env.VERTEX_LOCATION || "us-central1";
+  // 2026-10-15: 3.x Gemini models serve from the *global* Vertex endpoint
+  // (aiplatform.googleapis.com), not the regional ones — regional
+  // publishers/google/models/<3.x> 404s. VERTEX_LOCATION still overrides.
+  const location = process.env.VERTEX_LOCATION || "global";
   client = new GoogleGenAI({ vertexai: true, project, location });
   return client;
 }
