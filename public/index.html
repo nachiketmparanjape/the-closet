@@ -117,6 +117,36 @@
     .pal-add button { flex: none; }
     .field textarea { width: 100%; min-height: 64px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--paper); color: var(--ink); padding: 10px 12px; outline: none; font: inherit; resize: vertical; }
     .field textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+    .tabs { display: flex; gap: 4px; margin: 18px 0 4px; }
+    .tab { flex: 1; border: 1px solid var(--line); background: var(--paper-soft); color: var(--muted); font: inherit; font-size: 14px; font-weight: 600; padding: 10px; border-radius: 10px; cursor: pointer; }
+    .tab.active { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+    .outfit-card { background: var(--paper-soft); border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-top: 8px; }
+    .outfit-card h4 { margin: 0 0 6px; font-size: 15px; }
+    .outfit-card ul { margin: 6px 0; padding-left: 18px; font-size: 14px; }
+    .outfit-card .conf { font-size: 13px; color: var(--muted); margin: 6px 0; }
+    .outfit-card .reason { font-size: 13px; font-style: italic; color: var(--muted); margin: 6px 0; }
+    .outfit-card button { margin-top: 4px; }
+    .outfit-thumbs { display: flex; gap: 4px; margin: 8px 0; }
+    .outfit-thumbs img { width: 52px; height: 52px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+    .outfit-row { display: flex; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+    .outfit-row img { width: 44px; height: 44px; object-fit: cover; border-radius: 8px; flex: none; }
+    .outfit-row .nm { font-size: 14px; font-weight: 600; }
+    .outfit-row .ct { font-size: 12px; color: var(--muted); }
+    .ver-badge { display: inline-block; font-size: 11px; font-weight: 700; background: var(--accent-soft); color: var(--accent); border-radius: 99px; padding: 2px 8px; margin-left: 6px; vertical-align: middle; }
+    .fav-star { background: none; border: none; font-size: 18px; cursor: pointer; padding: 4px; }
+    .rate-row { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
+    .rate-row input[type="range"] { flex: 1; }
+    .rate-val { font-size: 20px; font-weight: 700; min-width: 44px; text-align: center; }
+    .reflection { background: var(--paper-soft); border-left: 3px solid var(--accent); padding: 10px 12px; border-radius: 0 8px 8px 0; font-size: 14px; margin: 10px 0; }
+    .pref-suggest { background: var(--accent-soft); border-radius: 8px; padding: 10px 12px; font-size: 14px; margin: 10px 0; }
+    .pref-suggest button { margin: 6px 6px 0 0; }
+    .wear-list { margin: 8px 0; padding: 0; list-style: none; font-size: 13px; color: var(--muted); }
+    .wear-list li { padding: 4px 0; border-bottom: 1px dashed var(--line); }
+    .builder-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-height: 38vh; overflow-y: auto; margin-bottom: 12px; }
+    .builder-cell { border: 2px solid var(--line); border-radius: 8px; overflow: hidden; cursor: pointer; background: var(--paper-soft); }
+    .builder-cell.selected { border-color: var(--accent); }
+    .builder-cell img { width: 100%; height: 76px; object-fit: cover; display: block; }
+    .builder-cell span { display: block; font-size: 11px; padding: 4px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .detail-actions { justify-content: flex-start; }
     .detail-actions .danger { margin-right: auto; }
     .photo-preview { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
@@ -247,7 +277,12 @@
       </div>
     </section>
 
-    <section aria-label="Wardrobe catalog">
+    <div class="tabs" role="tablist" aria-label="Views">
+      <button class="tab active" type="button" data-view="wardrobe" role="tab" aria-selected="true">Wardrobe</button>
+      <button class="tab" type="button" data-view="outfits" role="tab" aria-selected="false">Outfits</button>
+    </div>
+
+    <section aria-label="Wardrobe catalog" id="wardrobeView">
       <div class="utility">
         <label class="search">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="m16 16 4 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
@@ -282,6 +317,16 @@
       <div class="skeleton-grid" id="loadingGrid" hidden aria-label="Loading wardrobe">
         <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
       </div>
+    </section>
+
+    <section aria-label="Outfits" id="outfitsView" hidden>
+      <div class="catalog-head">
+        <h2>Outfits</h2>
+        <span class="count" id="outfitCount">0 outfits</span>
+        <button class="secondary" id="buildOutfitBtn" type="button" style="margin-left:auto">+ Build</button>
+      </div>
+      <p class="hint" id="outfitsHint">Ask the stylist for an outfit, or build one yourself — saved outfits land here.</p>
+      <div class="gallery" id="outfitsGallery"></div>
     </section>
   </main>
 
@@ -451,6 +496,7 @@ service firebase.storage {
           <button class="secondary" id="setCoverBtn" type="button">Set as cover</button>
           <input id="addPhotoInput" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden />
         </div>
+        <p class="hint" id="itemWearStats" hidden></p>
         <div class="field">
           <label for="itemNameInput">Item name</label>
           <input id="itemNameInput" maxlength="80" />
@@ -541,6 +587,49 @@ service firebase.storage {
   </div>
 
   <button class="chat-fab" id="chatFab" type="button" aria-label="Ask the stylist">✨</button>
+
+  <div class="overlay" id="outfitOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="outfitTitle">
+    <section class="modal">
+      <div class="modal-head">
+        <h2 id="outfitTitle">Outfit</h2>
+        <button class="icon-button" id="outfitClose" type="button" aria-label="Close outfit">×</button>
+      </div>
+      <div class="modal-body">
+        <div id="outfitDetailBody"></div>
+        <div class="form-actions detail-actions">
+          <button class="secondary" id="outfitWearBtn" type="button">I wore this</button>
+          <button class="secondary" id="outfitFavBtn" type="button">☆ Favorite</button>
+        </div>
+        <div id="outfitRateSection"></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="overlay" id="builderOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="builderTitle">
+    <section class="modal">
+      <div class="modal-head">
+        <h2 id="builderTitle">Build an outfit</h2>
+        <button class="icon-button" id="builderClose" type="button" aria-label="Close builder">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="hint">Tap pieces to add them — pick at least 2.</p>
+        <div class="builder-grid" id="builderGrid"></div>
+        <div class="field">
+          <label for="builderName">Name</label>
+          <input id="builderName" maxlength="60" placeholder="e.g. Navy dinner outfit" />
+        </div>
+        <div class="field">
+          <label for="builderOccasion">Occasion</label>
+          <input id="builderOccasion" maxlength="60" placeholder="e.g. dinner, work" />
+        </div>
+        <div class="form-actions">
+          <button class="secondary" id="builderCancel" type="button">Cancel</button>
+          <button class="primary" id="builderSave" type="button" disabled>Save outfit</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
@@ -1074,6 +1163,7 @@ service firebase.storage {
         itemBrandInput.value = itemField(item, "brand", "brand", "") || "";
         itemSave.disabled = false;
         itemDelete.disabled = false;
+        renderItemWearStats(item); // PC-12: per-article wear stats
         openOverlay(itemOverlay);
       }
 
@@ -1768,6 +1858,10 @@ service firebase.storage {
           div.className = "chat-msg " + m.role + (m.thinking ? " thinking" : "");
           div.textContent = m.text;
           chatList.appendChild(div);
+          // PC-12: structured outfit card under the reply, with a Save action.
+          if (m.outfit && m.outfit.itemIds && m.outfit.itemIds.length >= 2) {
+            chatList.appendChild(renderOutfitCard(m));
+          }
         });
         chatList.scrollTop = chatList.scrollHeight;
       }
@@ -1779,6 +1873,7 @@ service firebase.storage {
           var colorNames = itemColors(it).map(function (c) { return c.name || ""; }).filter(function (n) { return n; });
           if (!colorNames.length && it.ai && Array.isArray(it.ai.colors)) colorNames = it.ai.colors.slice(0, 3);
           return {
+            id: it.id, // PC-12: lets the server map outfit names back to IDs
             name: it.name,
             category: it.category,
             colors: colorNames,
@@ -1826,6 +1921,9 @@ service firebase.storage {
         functions.httpsCallable("askStylist")(payload).then(function (res) {
           thinking.thinking = false;
           thinking.text = (res.data && res.data.reply) || "Hmm, I couldn't put that together — try again?";
+          // PC-12: structured outfit attached for the saveable card.
+          var outfit = res.data && res.data.outfit;
+          thinking.outfit = (outfit && outfit.itemIds && outfit.itemIds.length >= 2) ? outfit : null;
         }).catch(function (err) {
           thinking.thinking = false;
           thinking.text = friendlyError(err);
@@ -1839,6 +1937,602 @@ service firebase.storage {
       document.getElementById("chatFab").addEventListener("click", openChat);
       document.getElementById("chatClose").addEventListener("click", function () { closeOverlay(chatOverlay); });
       chatForm.addEventListener("submit", sendChat);
+
+      // PC-12: outfits — first-class objects with versions, wear history,
+      // ratings, and learned style preferences.
+      var allOutfits = [];
+      var outfitUnsub = null;
+      var activeOutfitGroup = null; // versionGroup id of the outfit being viewed
+
+      function switchView(view) {
+        document.querySelectorAll(".tab").forEach(function (t) {
+          var on = t.getAttribute("data-view") === view;
+          t.classList.toggle("active", on);
+          t.setAttribute("aria-selected", on ? "true" : "false");
+        });
+        document.getElementById("wardrobeView").hidden = view !== "wardrobe";
+        document.getElementById("outfitsView").hidden = view !== "outfits";
+      }
+      document.querySelectorAll(".tab").forEach(function (t) {
+        t.addEventListener("click", function () { switchView(t.getAttribute("data-view")); });
+      });
+
+      function itemById(id) {
+        for (var i = 0; i < allItems.length; i++) {
+          if (allItems[i].id === id) return allItems[i];
+        }
+        return null;
+      }
+
+      function watchOutfits(user) {
+        if (outfitUnsub) { outfitUnsub(); outfitUnsub = null; }
+        allOutfits = [];
+        if (!user) { renderOutfits(); return; }
+        outfitUnsub = db.collection("users").doc(user.uid).collection("outfits")
+          .orderBy("createdAt", "desc")
+          .onSnapshot(function (snap) {
+            allOutfits = snap.docs.map(function (d) { var o = d.data(); o.id = d.id; return o; });
+            renderOutfits();
+            if (activeOutfitGroup) renderOutfitDetail(); // refresh open detail
+          }, function (error) {
+            showToast(friendlyError(error));
+          });
+      }
+
+      // Latest version per versionGroup.
+      function latestOutfits() {
+        var byGroup = {};
+        allOutfits.forEach(function (o) {
+          var g = o.versionGroup || o.id;
+          var v = o.version || 1;
+          if (!byGroup[g] || v > (byGroup[g].version || 1)) byGroup[g] = o;
+        });
+        return Object.keys(byGroup).map(function (k) { return byGroup[k]; });
+      }
+
+      function outfitVersions(groupId) {
+        return allOutfits
+          .filter(function (o) { return (o.versionGroup || o.id) === groupId; })
+          .sort(function (a, b) { return (b.version || 1) - (a.version || 1); });
+      }
+
+      function renderOutfits() {
+        var gallery = document.getElementById("outfitsGallery");
+        gallery.textContent = "";
+        var list = latestOutfits();
+        document.getElementById("outfitCount").textContent =
+          list.length + (list.length === 1 ? " outfit" : " outfits");
+        document.getElementById("outfitsHint").hidden = list.length > 0;
+        list.forEach(function (o) {
+          var card = document.createElement("article");
+          card.className = "item";
+          card.setAttribute("role", "button");
+          card.setAttribute("tabindex", "0");
+          var thumbs = document.createElement("div");
+          thumbs.className = "outfit-thumbs";
+          (o.itemIds || []).slice(0, 3).forEach(function (id) {
+            var it = itemById(id);
+            var photos = it ? itemPhotos(it) : [];
+            if (photos.length) {
+              var img = document.createElement("img");
+              img.src = photos[0].url;
+              img.alt = "";
+              img.loading = "lazy";
+              thumbs.appendChild(img);
+            }
+          });
+          var details = document.createElement("div");
+          details.className = "item-details";
+          var name = document.createElement("p");
+          name.className = "item-name";
+          name.textContent = (o.favorite ? "★ " : "") + (o.name || "Outfit");
+          if ((o.version || 1) > 1) {
+            var badge = document.createElement("span");
+            badge.className = "ver-badge";
+            badge.textContent = "v" + o.version;
+            name.appendChild(badge);
+          }
+          var meta = document.createElement("div");
+          meta.className = "item-meta";
+          var span = document.createElement("span");
+          span.textContent = (o.itemIds || []).length + " pieces" +
+            (o.occasion ? " · " + o.occasion : "") +
+            (o.source === "stylist" ? " · ✨" : "");
+          meta.appendChild(span);
+          details.appendChild(name);
+          details.appendChild(meta);
+          if (thumbs.children.length) card.appendChild(thumbs);
+          card.appendChild(details);
+          card.style.cursor = "pointer";
+          function open() { openOutfit(o.versionGroup || o.id); }
+          card.addEventListener("click", open);
+          card.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); }
+          });
+          gallery.appendChild(card);
+        });
+      }
+
+      function openOutfit(groupId) {
+        activeOutfitGroup = groupId;
+        renderOutfitDetail();
+        openOverlay(document.getElementById("outfitOverlay"));
+      }
+
+      function closeOutfit() {
+        activeOutfitGroup = null;
+        closeOverlay(document.getElementById("outfitOverlay"));
+      }
+
+      function renderOutfitDetail() {
+        var versions = outfitVersions(activeOutfitGroup);
+        var o = versions[0];
+        var body = document.getElementById("outfitDetailBody");
+        body.textContent = "";
+        if (!o) { closeOutfit(); return; }
+        document.getElementById("outfitTitle").textContent = o.name || "Outfit";
+
+        (o.itemIds || []).forEach(function (id, i) {
+          var it = itemById(id);
+          var row = document.createElement("div");
+          row.className = "outfit-row";
+          var photos = it ? itemPhotos(it) : [];
+          if (photos.length) {
+            var img = document.createElement("img");
+            img.src = photos[0].url;
+            img.alt = "";
+            row.appendChild(img);
+          }
+          var txt = document.createElement("div");
+          var nm = document.createElement("div");
+          nm.className = "nm";
+          nm.textContent = (o.itemNames && o.itemNames[i]) || (it && it.name) || "Unknown item";
+          var ct = document.createElement("div");
+          ct.className = "ct";
+          ct.textContent = it ? it.category || "" : "removed from wardrobe";
+          txt.appendChild(nm);
+          txt.appendChild(ct);
+          row.appendChild(txt);
+          body.appendChild(row);
+        });
+
+        var meta = document.createElement("div");
+        meta.className = "conf";
+        var bits = [];
+        if (o.source === "stylist" && o.appConfidence != null) bits.push("Stylist confidence: " + o.appConfidence + "/10");
+        if (o.occasion) bits.push("Occasion: " + o.occasion);
+        if (o.source) bits.push(o.source === "stylist" ? "Suggested by the stylist" : "Built by you");
+        if ((o.version || 1) > 1) bits.push("Version " + o.version + " of " + versions.length);
+        meta.textContent = bits.join(" · ");
+        body.appendChild(meta);
+
+        if (o.appReasoning) {
+          var reason = document.createElement("p");
+          reason.className = "reason";
+          reason.textContent = "\u201C" + o.appReasoning + "\u201D";
+          body.appendChild(reason);
+        }
+
+        var favBtn = document.getElementById("outfitFavBtn");
+        favBtn.textContent = o.favorite ? "★ Favorited" : "☆ Favorite";
+        favBtn.onclick = function () {
+          db.collection("users").doc(currentUser.uid).collection("outfits").doc(o.id)
+            .update({ favorite: !o.favorite })
+            .catch(function (err) { showToast(friendlyError(err)); });
+        };
+
+        // Phase 3: fresh rating section + wear history per open.
+        document.getElementById("outfitRateSection").textContent = "";
+        renderWearHistory(o);
+      }
+
+      document.getElementById("outfitClose").addEventListener("click", closeOutfit);
+
+      // PC-12 phase 4: manual outfit builder (same outfit object,
+      // source: "manual") + per-article wear stats.
+      var builderSelection = [];
+
+      function openBuilder() {
+        if (!currentUser) { signIn(); return; }
+        builderSelection = [];
+        document.getElementById("builderName").value = "";
+        document.getElementById("builderOccasion").value = "";
+        renderBuilderGrid();
+        openOverlay(document.getElementById("builderOverlay"));
+      }
+
+      function renderBuilderGrid() {
+        var grid = document.getElementById("builderGrid");
+        grid.textContent = "";
+        allItems.forEach(function (it) {
+          var cell = document.createElement("div");
+          cell.className = "builder-cell" + (builderSelection.indexOf(it.id) !== -1 ? " selected" : "");
+          var photos = itemPhotos(it);
+          if (photos.length) {
+            var img = document.createElement("img");
+            img.src = photos[0].url;
+            img.alt = "";
+            img.loading = "lazy";
+            cell.appendChild(img);
+          }
+          var nm = document.createElement("span");
+          nm.textContent = it.name || "Untitled";
+          cell.appendChild(nm);
+          cell.setAttribute("role", "button");
+          cell.setAttribute("tabindex", "0");
+          cell.setAttribute("aria-pressed", builderSelection.indexOf(it.id) !== -1 ? "true" : "false");
+          function toggle() {
+            var i = builderSelection.indexOf(it.id);
+            if (i === -1) builderSelection.push(it.id);
+            else builderSelection.splice(i, 1);
+            renderBuilderGrid();
+          }
+          cell.addEventListener("click", toggle);
+          cell.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
+          });
+          grid.appendChild(cell);
+        });
+        document.getElementById("builderSave").disabled = builderSelection.length < 2;
+      }
+
+      function closeBuilder() {
+        closeOverlay(document.getElementById("builderOverlay"));
+      }
+
+      document.getElementById("buildOutfitBtn").addEventListener("click", openBuilder);
+      document.getElementById("builderClose").addEventListener("click", closeBuilder);
+      document.getElementById("builderCancel").addEventListener("click", closeBuilder);
+      document.getElementById("builderSave").addEventListener("click", function () {
+        if (builderSelection.length < 2) { showToast("Pick at least 2 pieces."); return; }
+        var ref = db.collection("users").doc(currentUser.uid).collection("outfits").doc();
+        var names = builderSelection.map(function (id) {
+          var it = itemById(id);
+          return it ? it.name : "Unknown item";
+        });
+        ref.set({
+          versionGroup: ref.id,
+          version: 1,
+          supersedes: null,
+          itemIds: builderSelection.slice(),
+          itemNames: names,
+          source: "manual",
+          name: document.getElementById("builderName").value.trim() || defaultOutfitName(),
+          occasion: document.getElementById("builderOccasion").value.trim() || null,
+          weather: null,
+          appConfidence: null,
+          appReasoning: "",
+          favorite: false,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        }).then(function () {
+          closeBuilder();
+          showToast("Outfit saved.");
+          switchView("outfits");
+        }).catch(function (err) {
+          showToast(friendlyError(err));
+        });
+      });
+
+      // Per-article wear stats in the item detail view. One array-contains
+      // query, client-side sort (avoids a composite index).
+      function renderItemWearStats(item) {
+        var el = document.getElementById("itemWearStats");
+        el.hidden = true;
+        if (!currentUser || !item || !item.id) return;
+        db.collection("users").doc(currentUser.uid).collection("wear_events")
+          .where("articleIds", "array-contains", item.id)
+          .limit(100).get()
+          .then(function (snap) {
+            if (snap.empty) return;
+            var last = null;
+            snap.forEach(function (d) {
+              var w = d.data();
+              var t = w.wornAt && w.wornAt.toDate ? w.wornAt.toDate().getTime() : 0;
+              if (!last || t > last) last = t;
+            });
+            var txt = "Worn " + snap.size + "×" + (snap.size >= 100 ? "+" : "");
+            if (last) {
+              txt += " · last worn " + new Date(last).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+            }
+            el.textContent = txt;
+            el.hidden = false;
+          }).catch(function () { /* stats are a bonus; stay silent */ });
+      }
+
+      // PC-12 phase 3: wear logging, ratings, reflection, style profile.
+      document.getElementById("outfitWearBtn").addEventListener("click", function () {
+        var versions = outfitVersions(activeOutfitGroup);
+        var o = versions[0];
+        if (!currentUser || !o) return;
+        var ref = db.collection("users").doc(currentUser.uid).collection("wear_events").doc();
+        ref.set({
+          wornAt: firebase.firestore.FieldValue.serverTimestamp(),
+          articleIds: o.itemIds || [],
+          articleNames: o.itemNames || [],
+          outfitId: o.id, // exact version worn
+          occasion: o.occasion || null,
+          note: "",
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        }).then(function () {
+          showToast("Logged — enjoy the fit.");
+          renderRateSection(o, ref.id);
+          renderWearHistory(o);
+        }).catch(function (err) {
+          showToast(friendlyError(err));
+        });
+      });
+
+      function renderRateSection(outfit, wearEventId) {
+        var sec = document.getElementById("outfitRateSection");
+        sec.textContent = "";
+        var label = document.createElement("p");
+        label.innerHTML = "<strong>How was it?</strong>";
+        sec.appendChild(label);
+        var row = document.createElement("div");
+        row.className = "rate-row";
+        var slider = document.createElement("input");
+        slider.type = "range";
+        slider.min = "0";
+        slider.max = "10";
+        slider.value = "7";
+        slider.setAttribute("aria-label", "Rating out of 10");
+        var val = document.createElement("span");
+        val.className = "rate-val";
+        val.textContent = "7";
+        slider.addEventListener("input", function () { val.textContent = slider.value; });
+        row.appendChild(slider);
+        row.appendChild(val);
+        sec.appendChild(row);
+        var note = document.createElement("textarea");
+        note.placeholder = "Optional note — what worked, what didn't";
+        note.maxLength = 280;
+        note.rows = 2;
+        sec.appendChild(note);
+        var save = document.createElement("button");
+        save.type = "button";
+        save.className = "primary";
+        save.textContent = "Save rating";
+        save.addEventListener("click", function () {
+          save.disabled = true;
+          saveRating(outfit, wearEventId, Number(slider.value), note.value.trim(), function () {
+            save.disabled = false;
+          });
+        });
+        sec.appendChild(save);
+      }
+
+      // The user's rating is written first (direct to Firestore — fast);
+      // reflection runs after and can never block it.
+      function saveRating(outfit, wearEventId, score, noteText, done) {
+        var ref = db.collection("users").doc(currentUser.uid).collection("ratings").doc();
+        ref.set({
+          targetKind: "outfit",
+          targetId: outfit.id,
+          wearEventId: wearEventId || null,
+          rater: "user",
+          score: score,
+          note: noteText || "",
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        }).then(function () {
+          renderReflectionLoading();
+          functions.httpsCallable("reflectOutfit")({ ratingId: ref.id }).then(function (res) {
+            renderReflection(res.data || {});
+          }).catch(function (err) {
+            renderReflectionError(ref.id, err);
+          });
+          if (done) done();
+        }).catch(function (err) {
+          showToast(friendlyError(err));
+          if (done) done();
+        });
+      }
+
+      function renderReflectionLoading() {
+        var sec = document.getElementById("outfitRateSection");
+        var p = document.createElement("p");
+        p.className = "hint";
+        p.id = "reflectionStatus";
+        p.textContent = "✨ Reflecting on the outcome…";
+        sec.appendChild(p);
+      }
+
+      function renderReflection(data) {
+        var status = document.getElementById("reflectionStatus");
+        if (status) status.remove();
+        var sec = document.getElementById("outfitRateSection");
+        if (data.reflection) {
+          var box = document.createElement("div");
+          box.className = "reflection";
+          box.textContent = data.reflection;
+          sec.appendChild(box);
+        }
+        // AI suggests, user decides: the preference only enters the style
+        // profile on explicit confirmation.
+        if (data.suggestedPreference) {
+          var sug = document.createElement("div");
+          sug.className = "pref-suggest";
+          var t = document.createElement("div");
+          t.textContent = "Suggested style note: \u201C" + data.suggestedPreference + "\u201D";
+          sug.appendChild(t);
+          var add = document.createElement("button");
+          add.type = "button";
+          add.className = "primary";
+          add.textContent = "Add to style profile";
+          add.addEventListener("click", function () {
+            confirmPreference(data.suggestedPreference);
+            sug.remove();
+          });
+          var no = document.createElement("button");
+          no.type = "button";
+          no.className = "secondary";
+          no.textContent = "Dismiss";
+          no.addEventListener("click", function () { sug.remove(); });
+          sug.appendChild(add);
+          sug.appendChild(no);
+          sec.appendChild(sug);
+        }
+      }
+
+      function renderReflectionError(ratingId, err) {
+        var status = document.getElementById("reflectionStatus");
+        if (status) status.remove();
+        var sec = document.getElementById("outfitRateSection");
+        var p = document.createElement("p");
+        p.className = "hint";
+        p.textContent = "Couldn't reflect on this one (" + friendlyError(err) + "). ";
+        var retry = document.createElement("button");
+        retry.type = "button";
+        retry.className = "secondary";
+        retry.textContent = "Retry reflection";
+        retry.addEventListener("click", function () {
+          p.remove();
+          renderReflectionLoading();
+          functions.httpsCallable("reflectOutfit")({ ratingId: ratingId }).then(function (res) {
+            renderReflection(res.data || {});
+          }).catch(function (e) {
+            renderReflectionError(ratingId, e);
+          });
+        });
+        p.appendChild(retry);
+        sec.appendChild(p);
+      }
+
+      function confirmPreference(text) {
+        var profRef = db.collection("users").doc(currentUser.uid).collection("style_profile").doc(currentUser.uid);
+        db.runTransaction(function (tx) {
+          return tx.get(profRef).then(function (snap) {
+            var prefs = (snap.exists && Array.isArray(snap.data().preferences)) ? snap.data().preferences : [];
+            if (prefs.some(function (p) { return p && p.text === text; })) return; // no dupes
+            prefs.push({ text: text, source: "app", createdAt: new Date().toISOString() });
+            while (prefs.length > 50) {
+              var idx = -1;
+              for (var i = 0; i < prefs.length; i++) {
+                if (prefs[i] && prefs[i].source === "app") { idx = i; break; }
+              }
+              prefs.splice(idx === -1 ? 0 : idx, 1); // oldest app-sourced first
+            }
+            tx.set(profRef, {
+              preferences: prefs,
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+          });
+        }).then(function () {
+          showToast("Added to your style profile.");
+        }).catch(function (err) {
+          showToast(friendlyError(err));
+        });
+      }
+
+      // Wear history for the viewed version group (one fetch, client filter —
+      // personal scale; avoids an N-way query across versions).
+      function renderWearHistory(outfit) {
+        var versions = outfitVersions(activeOutfitGroup);
+        var ids = {};
+        versions.forEach(function (v) { ids[v.id] = true; });
+        db.collection("users").doc(currentUser.uid).collection("wear_events")
+          .orderBy("wornAt", "desc").limit(100).get()
+          .then(function (snap) {
+            var body = document.getElementById("outfitDetailBody");
+            var old = document.getElementById("wearHistory");
+            if (old) old.remove();
+            var wears = [];
+            snap.forEach(function (d) {
+              var w = d.data();
+              if (w.outfitId && ids[w.outfitId]) wears.push(w);
+            });
+            if (!wears.length) return;
+            var wrap = document.createElement("div");
+            wrap.id = "wearHistory";
+            var h = document.createElement("p");
+            h.innerHTML = "<strong>Worn " + wears.length + "×</strong>";
+            wrap.appendChild(h);
+            var ul = document.createElement("ul");
+            ul.className = "wear-list";
+            wears.slice(0, 10).forEach(function (w) {
+              var li = document.createElement("li");
+              var when = w.wornAt && w.wornAt.toDate ? w.wornAt.toDate().toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "";
+              li.textContent = when + (w.occasion ? " · " + w.occasion : "") + (w.note ? " — " + w.note : "");
+              ul.appendChild(li);
+            });
+            wrap.appendChild(ul);
+            body.appendChild(wrap);
+          }).catch(function () { /* history is a bonus; stay silent */ });
+      }
+
+      // PC-12: save a stylist-recommended outfit from the chat as v1.
+      function defaultOutfitName() {
+        return "Outfit · " + new Date().toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      }
+
+      function saveChatOutfit(msg) {
+        var o = msg.outfit;
+        if (!currentUser || !o || o.savedId || !o.itemIds) return;
+        var ref = db.collection("users").doc(currentUser.uid).collection("outfits").doc();
+        var names = o.itemIds.map(function (id) {
+          var it = itemById(id);
+          return it ? it.name : "Unknown item";
+        });
+        ref.set({
+          versionGroup: ref.id,
+          version: 1,
+          supersedes: null,
+          itemIds: o.itemIds,
+          itemNames: names,
+          source: "stylist",
+          name: defaultOutfitName(),
+          occasion: null,
+          weather: null,
+          appConfidence: o.confidence,
+          appReasoning: o.reasoning || "",
+          favorite: false,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        }).then(function () {
+          o.savedId = ref.id;
+          renderChat();
+          showToast("Outfit saved.");
+        }).catch(function (err) {
+          showToast(friendlyError(err));
+        });
+      }
+
+      function renderOutfitCard(msg) {
+        var o = msg.outfit;
+        var card = document.createElement("div");
+        card.className = "outfit-card";
+        var h = document.createElement("h4");
+        h.textContent = "Outfit pick";
+        card.appendChild(h);
+        var ul = document.createElement("ul");
+        o.itemIds.forEach(function (id) {
+          var it = itemById(id);
+          var li = document.createElement("li");
+          li.textContent = it ? it.name : "Unknown item";
+          ul.appendChild(li);
+        });
+        card.appendChild(ul);
+        if (o.confidence != null) {
+          var conf = document.createElement("p");
+          conf.className = "conf";
+          conf.textContent = "Stylist confidence: " + o.confidence + "/10";
+          card.appendChild(conf);
+        }
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = o.savedId ? "secondary" : "primary";
+        btn.textContent = o.savedId ? "Saved ✓ — view in Outfits" : "Save outfit";
+        btn.disabled = !!o.savedId;
+        if (!o.savedId) {
+          btn.addEventListener("click", function () { saveChatOutfit(msg); });
+        } else {
+          btn.addEventListener("click", function () {
+            closeOverlay(chatOverlay);
+            switchView("outfits");
+            openOutfit(o.savedId); // v1: versionGroup == doc id
+          });
+        }
+        card.appendChild(btn);
+        return card;
+      }
 
       setStatus(null);
       renderGallery();
@@ -1854,6 +2548,7 @@ service firebase.storage {
             currentUser = user;
             setStatus(user);
             watchItems(user);
+            watchOutfits(user); // PC-12
           });
         } catch (error) {
           configured = false;
