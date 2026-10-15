@@ -163,20 +163,29 @@ preferences sit *pending* until the user confirms them.
 
 ## New collections (all under `users/{uid}/`)
 
-### `outfits/{outfitId}` — dimension (the thing)
+### `outfits/{outfitId}` — dimension (the thing), versioned
 
 | field | type | notes |
 |---|---|---|
+| versionGroup | string | stable id across versions of "the same outfit" |
+| version | number | 1, 2, 3… |
+| supersedes | string? | previous version's doc ID; null on v1 |
 | itemIds | string[] | item doc IDs — the stable join key |
 | itemNames | string[] | parallel snapshot; display survives item deletion |
-| source | `"stylist"` \| `"manual"` | provenance |
-| name | string | user-editable; stylist suggests ("Navy dinner outfit") |
+| source | `"stylist"` \| `"manual"` | provenance of origin (v1); preserved across versions |
+| name | string | user-editable |
 | occasion | string? | *intent* — what it was assembled for |
 | weather | string? | as given at recommendation time |
-| appConfidence | number? 0–10 | the prediction side; null for manual outfits |
-| appReasoning | string? | why the app picked it, in its words |
-| favorite | boolean | default false |
-| createdAt | timestamp | |
+| appConfidence | number? 0–10 | the prediction side; set on v1 stylist outfits, nulled on user edits (the app didn't predict the variant) |
+| appReasoning | string? | why the app picked it; same nulling rule |
+| favorite | boolean | copied forward to new versions (behaves group-level) |
+| createdAt | timestamp | of this version |
+
+Edits create a new version (new doc), never mutate — there is value in
+keeping what was recommended. History lists the latest version per group
+(client-side grouping; personal scale). Wear events and ratings reference
+the exact version doc ID, so "what did I wear / rate" is forever precise
+even as the outfit evolves.
 
 ### `wear_events/{eventId}` — fact (the event)
 
@@ -268,6 +277,11 @@ backfill, no lazy-read fallbacks needed. v2's lazy migration for
 - **No raw-score comparison.** The user's 6 and the app's 6 mean
   different things; the UI labels them ("your rating" vs "app
   confidence") and treats the delta as informational.
+- **Outfits are versioned, not mutated** (founder 2026-10-15: "there is
+  value in keeping what was recommended"). A new doc per version sharing
+  `versionGroup`; wears/ratings pin exact version IDs. User edits null
+  out `appConfidence`/`appReasoning` — the prediction described v1, not
+  the variant. Re-scoring edited outfits is a reserved future cut.
 - **One-tap wear logging is load-bearing.** The entire stats/reflection
   edifice depends on wear events existing — the "I wore this" button
   lives on the chat card and in history, one tap, no form.

@@ -100,9 +100,11 @@ founder explicitly asked for the whole end-to-end mechanism working.
 3. Double-tap Save → button disables on first tap (client guard).
 4. Item deleted after outfit saved → outfit shows "Removed item";
    wear snapshots keep names, history intact.
-5. Outfit edited after worn → allowed; wear events already snapshotted,
-   so history is unaffected. Ratings refer to the outfit as currently
-   defined (documented semantics).
+5. Outfit edited → creates a NEW version (new doc, same versionGroup,
+   supersedes set, favorite copied forward, appConfidence nulled). What
+   was recommended is preserved. Wear events and ratings pin exact
+   version IDs, so history stays precise forever. History lists latest
+   version per group.
 6. Rating without wearing → allowed (`wearEventId` null).
 7. Wear without a saved outfit → v1: not supported (outfit-centric);
    noted limitation, fast follow if wanted.
