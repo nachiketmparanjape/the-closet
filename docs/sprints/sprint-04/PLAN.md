@@ -35,7 +35,14 @@ founder explicitly asked for the whole end-to-end mechanism working.
   and fixes a wrong color; the palette shows AI chips he can add to,
   remove, or re-mark primary; old items keep working untouched.
 - **Design:** `DATA_MODEL.md` v2 (done 2026-10-14).
-- **Status:** proposed.
+- **Status:** SHIPPED 2026-10-15. `colors[]` (name/hex/source/primary,
+  max 3); top-level editable `description`, `pattern`, `fit`,
+  `fabricGuess`, `formality`, `warmth`, `brand`; `ai` blob extended with
+  modelVersion/analyzedAt/photoIds. Palette chip editor in upload + edit
+  views; edit saves delete the v1 `color` field. Lazy migration in
+  gallery dot, search (now matches color names), and stylist prompt.
+  Provenance shown as ✨ on AI colors. Tests:
+  `tests/pc8-helpers.test.js`.
 
 ### PC-11: Standardized error handling (S)
 
@@ -56,7 +63,21 @@ founder explicitly asked for the whole end-to-end mechanism working.
   no raw SDK message reaches the UI; a reported error ID locates the
   server log line.
 - **Design:** proposed and accepted 2026-10-14 (this plan).
-- **Status:** proposed.
+- **Status:** SHIPPED 2026-10-15. `functions/errors.js` catalog (11 keys,
+  4 categories; `fail(key)`, `codedError`, `newCorrelationId`, structured
+  `logError`); both callables route through a `boundary()` (HttpsErrors
+  pass through, downstream failures map via key, correlation ID on every
+  log line); both functions redeployed and ACTIVE.
+  Client: `public/js/friendly-error.js` choke point (13 call sites
+  swapped — no raw SDK message reaches the UI), `window.onerror` +
+  `unhandledrejection` root handlers with client error IDs, `reportError()`
+  as the Sentry hook. Tests: `tests/errors-server.test.js` +
+  `tests/errors-client.test.js` (25 assertions total across the suite).
+  Reconciliation notes: (a) Sentry explicitly deferred — needs a Sentry
+  account/DSN, the hook is ready; (b) vanilla-JS app, so "error
+  boundaries" are window-level handlers + per-feature toasts, documented
+  in code; (c) AI-failure-never-blocks-upload and silent storage cleanup
+  preserved by design.
 
 ### PC-12: Outfit object + the end-to-end loop (L)
 
