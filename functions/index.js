@@ -15,8 +15,10 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { initializeApp } = require("firebase-admin/app");
 const { getStorage } = require("firebase-admin/storage");
+const { getFirestore } = require("firebase-admin/firestore");
 const { describeImage } = require("./describe");
-const { askStylist, sanitizeItems, sanitizeMessages } = require("./stylist");
+const { askStylist, sanitizeItems, sanitizeMessages, sanitizeStyleProfile } = require("./stylist");
+const { reflectOutfit } = require("./reflect");
 // PC-11: every expected failure goes through the catalog; every failure
 // path logs with a correlation ID.
 const { fail, newCorrelationId, logError } = require("./errors");
@@ -114,11 +116,57 @@ exports.askStylist = onCall(
       if (!messages.length) {
         fail("BAD_MESSAGES");
       }
-      return await askStylist(items, messages);
+      // PC-12: ground recommendations in confirmed style preferences.
+      // Best-effort — a failed read never blocks the chat.
+      let styleProfile = [];
+      try {
+        const profSnap = await getFirestore()
+          .collection("users").doc(uid).collection("style_profile").doc(uid).get();
+        if (profSnap.exists) {
+          const prefs = profSnap.data().preferences;
+          styleProfile = sanitizeStyleProfile(
+            Array.isArray(prefs) ? prefs.map((p) => p && p.text) : []
+          );
+        }
+      } catch (e) {
+        logError("askStylist.styleProfile", e, { uid: uid, correlationId: correlationId });
+      }
+      return await askStylist(items, messages, styleProfile);
     } catch (err) {
       // Any failure inside askStylist is a downstream AI failure.
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
       boundary("askStylist", correlationId, uid, err);
+    }
+  }
+);
+
+// PC-12: post-wear reflection. The client writes the user's rating first
+// (direct to Firestore); this callable runs the model reflection and
+// persists it as a sibling app rating. Idempotent per ratingId — safe to
+// retry after a failure.
+exports.reflectOutfit = onCall(
+  {
+    region: "us-central1",
+    timeoutSeconds: 60,
+    memory: "512MiB",
+    maxInstances: 5,
+  },
+  async (request) => {
+    const correlationId = newCorrelationId();
+    const uid = request.auth ? request.auth.uid : null;
+    try {
+      if (!request.auth) {
+        fail("NOT_SIGNED_IN");
+      }
+      const data = request.data || {};
+      const ratingId = typeof data.ratingId === "string" ? data.ratingId.trim() : "";
+      if (!ratingId || ratingId.length > 100) {
+        fail("BAD_REQUEST");
+      }
+      return await reflectOutfit(uid, ratingId);
+    } catch (err) {
+      if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
+      boundary("reflectOutfit", correlationId, uid, err);
     }
   }
 );

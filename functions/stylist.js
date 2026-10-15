@@ -10,13 +10,20 @@
 // The anti-hallucination design: every reply is grounded on the exact item
 // list in the prompt, and the system instruction forbids naming anything
 // not listed. At a few hundred items the whole catalogue fits in context.
+//
+// PC-12: the model now returns structured JSON — the conversational reply
+// PLUS a machine-readable outfit (item names, confidence, reasoning). The
+// server maps names back to item IDs (dropping misses); fewer than two
+// validated IDs means no structured outfit (text-only reply).
 
 const { GoogleGenAI } = require("@google/genai");
 const { getClient } = require("./describe");
+const { codedError } = require("./errors");
 
 const MAX_ITEMS = 500;
 const MAX_MESSAGES = 20;
 const MAX_TEXT = 2000;
+const MAX_PREFERENCES = 50;
 
 function cleanText(value, maxLen) {
   if (typeof value !== "string") return "";
@@ -64,13 +71,28 @@ RULES — follow them strictly:
 - Keep it conversational and brief: the outfit first, then one or two sentences on why it works (color harmony, formality match, weather).
 - The user's message carries the occasion, weather, and any preferences — use all three.
 - If the wardrobe honestly cannot cover the occasion (e.g. no formal wear for a wedding), say so plainly and offer the closest workable option instead of faking it.
-- The colors listed are the garment's own colors as catalogued; reason about harmony from the color names.`;
+- The colors listed are the garment's own colors as catalogued; reason about harmony from the color names.
+
+OUTPUT FORMAT — respond with ONLY a JSON object, no markdown, no prose:
+{
+  "reply": "<your conversational reply, markdown, as the user sees it>",
+  "outfit": {
+    "items": ["<exact listed item name>", ...],
+    "confidence": <0-10 integer: how confident you are this outfit works>,
+    "reasoning": "<one or two sentences on why it works>"
+  }
+}
+Set "outfit" to null when you did NOT recommend a specific combination
+(e.g. the wardrobe can't cover the occasion, or the user only asked a
+question). The "items" names must be copied EXACTLY from the wardrobe
+list, letter for letter.`;
 
 function sanitizeItems(items) {
   if (!Array.isArray(items)) return [];
   return items.slice(0, MAX_ITEMS).map((it) => {
     if (!it || typeof it !== "object") return null;
     return {
+      id: cleanText(it.id, 100), // PC-12: lets the server map outfit names back to IDs
       name: cleanText(it.name, 80),
       category: cleanText(it.category, 20),
       colors: cleanList(it.colors, 3, 30),
@@ -97,29 +119,92 @@ function sanitizeMessages(messages) {
   return out;
 }
 
-// items: sanitized array. messages: sanitized [{role, text}]. Returns {reply}.
-async function askStylist(items, messages) {
+// User-confirmed style preferences (PC-12). Plain strings, capped.
+function sanitizeStyleProfile(prefs) {
+  if (!Array.isArray(prefs)) return [];
+  return prefs
+    .map((p) => cleanText(p, 140))
+    .filter(Boolean)
+    .slice(0, MAX_PREFERENCES);
+}
+
+// Map the model's outfit (item NAMES) back to real item IDs. Drops misses;
+// fewer than two validated IDs means no structured outfit.
+function mapOutfitToIds(outfit, items) {
+  if (!outfit || !Array.isArray(outfit.items)) return null;
+  const byName = new Map();
+  for (const it of items) {
+    const key = (it.name || "").trim().toLowerCase();
+    if (key && it.id && !byName.has(key)) byName.set(key, it.id);
+  }
+  const itemIds = [];
+  for (const n of outfit.items) {
+    const id = byName.get(String(n || "").trim().toLowerCase());
+    if (id && itemIds.indexOf(id) === -1) itemIds.push(id);
+  }
+  if (itemIds.length < 2) return null;
+  const confidence = Math.max(0, Math.min(10, Math.round(Number(outfit.confidence))));
+  return {
+    itemIds: itemIds,
+    confidence: Number.isFinite(confidence) ? confidence : 0,
+    reasoning: cleanText(outfit.reasoning, 300),
+  };
+}
+
+function parseStylistJson(text) {
+  let obj = null;
+  if (typeof text === "string") {
+    const match = text.match(/\{[\s\S]*\}/);
+    if (match) {
+      try { obj = JSON.parse(match[0]); } catch (e) { obj = null; }
+    }
+  }
+  if (!obj || typeof obj !== "object") {
+    throw codedError("AI_BAD_RESPONSE", "askStylist: model returned non-JSON");
+  }
+  const reply = cleanText(obj.reply, 2000);
+  if (!reply) throw codedError("AI_BAD_RESPONSE", "askStylist: model returned no reply");
+  return { reply: reply, outfit: obj.outfit && typeof obj.outfit === "object" ? obj.outfit : null };
+}
+
+// items: sanitized array. messages: sanitized [{role, text}].
+// styleProfile: sanitized preference strings (may be empty).
+// Returns { reply, outfit: { itemIds, confidence, reasoning } | null }.
+async function askStylist(items, messages, styleProfile) {
   const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
   const ai = getClient();
   const wardrobe = items.map(itemLine).join("\n");
+  let system = SYSTEM;
+  const prefs = Array.isArray(styleProfile) ? styleProfile.filter(Boolean) : [];
+  if (prefs.length) {
+    system += "\n\nSTYLE PROFILE — the user's confirmed preferences. Honor them when recommending:\n" +
+      prefs.map((p) => "- " + p).join("\n");
+  }
   const contents = [
     { role: "user", parts: [{ text: "WARDROBE (pick only from these items):\n" + wardrobe }] },
   ];
   for (const m of messages) {
     contents.push({ role: m.role, parts: [{ text: m.text }] });
   }
-  const response = await ai.models.generateContent({
-    model,
-    contents,
-    config: {
-      systemInstruction: SYSTEM,
-      temperature: 0.7,
-      maxOutputTokens: 500,
-    },
-  });
-  const reply = (response.text || "").trim();
-  if (!reply) throw new Error("empty model reply");
-  return { reply };
+  let response;
+  try {
+    response = await ai.models.generateContent({
+      model,
+      contents,
+      config: {
+        systemInstruction: system,
+        temperature: 0.7,
+        maxOutputTokens: 800,
+        responseMimeType: "application/json",
+      },
+    });
+  } catch (err) {
+    throw codedError("AI_UNAVAILABLE", "askStylist: generateContent failed: " + (err && err.message));
+  }
+  const text = (response.text || "").trim();
+  if (!text) throw codedError("AI_BAD_RESPONSE", "askStylist: model returned no text");
+  const parsed = parseStylistJson(text);
+  return { reply: parsed.reply, outfit: mapOutfitToIds(parsed.outfit, items) };
 }
 
-module.exports = { askStylist, sanitizeItems, sanitizeMessages, itemLine, SYSTEM };
+module.exports = { askStylist, sanitizeItems, sanitizeMessages, sanitizeStyleProfile, mapOutfitToIds, itemLine, SYSTEM };

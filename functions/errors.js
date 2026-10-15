@@ -48,6 +48,11 @@ const CATALOG = {
     grpc: "invalid-argument",
     message: "That message couldn't be sent. Try again.",
   },
+  BAD_REQUEST: {
+    category: "validation",
+    grpc: "invalid-argument",
+    message: "Something in that request wasn't right.",
+  },
   EMPTY_WARDROBE: {
     category: "validation",
     grpc: "invalid-argument",

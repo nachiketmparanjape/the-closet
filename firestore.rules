@@ -1,7 +1,25 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // PC-12: outfits and their facts are owner-only, same as items.
+    // style_profile is a single doc per user (doc id == user id).
     match /users/{userId}/items/{itemId} {
+      allow read, create, update, delete:
+        if request.auth != null && request.auth.uid == userId;
+    }
+    match /users/{userId}/outfits/{outfitId} {
+      allow read, create, update, delete:
+        if request.auth != null && request.auth.uid == userId;
+    }
+    match /users/{userId}/wear_events/{eventId} {
+      allow read, create, update, delete:
+        if request.auth != null && request.auth.uid == userId;
+    }
+    match /users/{userId}/ratings/{ratingId} {
+      allow read, create, update, delete:
+        if request.auth != null && request.auth.uid == userId;
+    }
+    match /users/{userId}/style_profile/{profileId} {
       allow read, create, update, delete:
         if request.auth != null && request.auth.uid == userId;
     }
