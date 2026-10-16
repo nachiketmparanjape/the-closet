@@ -1,5 +1,4 @@
 // GENERATED from functions/palette.js — do not edit by hand.
-// Regenerate: node -e "<see functions/palette.js header>"
 // (tests/palette-sync.test.js fails if the two drift.)
 (function (global) {
 "use strict";
@@ -10,8 +9,9 @@
 // The AI prompt is constrained to these names; user-added colors resolve
 // to the nearest family by hex. Old free-text names map through aliases.
 //
-// This file is mirrored at public/js/palette.js for the client — keep the
-// PALETTE arrays identical. tests/palette-sync.test.js enforces it.
+// Mirrored at public/js/palette.js for the client. Regenerate after edits:
+//   node -e "const fs=require('fs');let s=fs.readFileSync('functions/palette.js','utf8').replace('\"use strict\";','').replace(/module\.exports = .*;/,'');fs.writeFileSync('public/js/palette.js','// GENERATED from functions/palette.js — do not edit by hand.\n// (tests/palette-sync.test.js fails if the two drift.)\n(function (global) {\n\"use strict\";\n'+s+'\n  global.Palette = { PALETTE: PALETTE, PALETTE_NAMES: PALETTE_NAMES, COLOR_ALIASES: COLOR_ALIASES, canonicalName: canonicalName, nearestFamily: nearestFamily, brandKey: brandKey };\n})(typeof window !== \"undefined\" ? window : globalThis);\n')"
+// tests/palette-sync.test.js enforces the two stay identical.
 
 
 const PALETTE = [
@@ -96,20 +96,51 @@ function canonicalName(raw) {
 }
 
 // Nearest palette family for a hex (user-picked colors). Null when unusable.
+// Sprint 5: distance is measured in OKLCH (perceptually uniform) — RGB
+// distance calls dark navy and black "close" and can't tell mustard from
+// gold reliably. Code measures; the model judges.
 function nearestFamily(hex) {
-  const rgb = hexToRgb(hex);
-  if (!rgb) return null;
+  const target = hexToOklch(hex);
+  if (!target) return null;
   let best = null;
   let bestDist = Infinity;
   for (const p of PALETTE) {
-    const prgb = hexToRgb(p.hex);
-    const d =
-      (rgb[0] - prgb[0]) * (rgb[0] - prgb[0]) +
-      (rgb[1] - prgb[1]) * (rgb[1] - prgb[1]) +
-      (rgb[2] - prgb[2]) * (rgb[2] - prgb[2]);
+    const d = oklchDistance(target, hexToOklch(p.hex));
     if (d < bestDist) { bestDist = d; best = p.name; }
   }
   return best;
+}
+
+// hex → OKLCH {L 0..1, C, H 0..360}. Null for garbage input.
+function hexToOklch(hex) {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return null;
+  const lin = rgb.map((v) => {
+    v /= 255;
+    return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  });
+  const r = lin[0], g = lin[1], b = lin[2];
+  const l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
+  const m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
+  const s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b;
+  const l_ = Math.cbrt(l), m_ = Math.cbrt(m), s_ = Math.cbrt(s);
+  const L = 0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_;
+  const a = 1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_;
+  const bb = 0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_;
+  const C = Math.sqrt(a * a + bb * bb);
+  let H = Math.atan2(bb, a) * 180 / Math.PI;
+  if (H < 0) H += 360;
+  return { L: L, C: C, H: H };
+}
+
+function oklchDistance(c1, c2) {
+  const dL = (c1.L - c2.L) * 1.2; // lightness dominates garment matching
+  const dC = (c1.C - c2.C) * 0.8;
+  let dH = Math.abs(c1.H - c2.H);
+  if (dH > 180) dH = 360 - dH;
+  // Hue is noise when chroma is low (greys) — weight it by saturation.
+  const dHc = (dH / 180) * Math.min(c1.C, c2.C) * 1.5;
+  return dL * dL + dC * dC + dHc * dHc;
 }
 
 // Brand grouping key: "UNIQLO" and "Uniqlo" → "uniqlo". Display casing is
@@ -122,5 +153,5 @@ function brandKey(brand) {
 
 
 
-  global.Palette = { PALETTE: PALETTE, PALETTE_NAMES: PALETTE_NAMES, COLOR_ALIASES: COLOR_ALIASES, canonicalName: canonicalName, nearestFamily: nearestFamily, brandKey: brandKey };
+  global.Palette = { PALETTE: PALETTE, PALETTE_NAMES: PALETTE_NAMES, COLOR_ALIASES: COLOR_ALIASES, canonicalName: canonicalName, nearestFamily: nearestFamily, hexToOklch: hexToOklch, oklchDistance: oklchDistance, brandKey: brandKey };
 })(typeof window !== "undefined" ? window : globalThis);

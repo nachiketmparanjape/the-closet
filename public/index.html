@@ -1840,28 +1840,26 @@ service firebase.storage {
 
       // PC-10: flatten items for the stylist prompt. PC-8: reads the v2
       // user-confirmed layer first, falls back to the v1 `ai` blob.
-      // Colors are canonical families (PC-8 follow-up) — stable names for
-      // color-harmony reasoning; old free-text names map through aliases.
+      // Sprint 5: colors go as rich objects {name, family, primary} — the
+      // server renders "navy (primary), cream" for the rubric.
       function stylistItems() {
         return allItems.map(function (it) {
-          var colorNames = itemColors(it).map(function (c) {
-            if (c.family) return c.family;
-            if (window.Palette) {
-              var canon = window.Palette.canonicalName(c.name);
-              if (canon) return canon;
-            }
-            return c.name || "";
-          }).filter(function (n) { return n; });
-          if (!colorNames.length && it.ai && Array.isArray(it.ai.colors)) {
-            colorNames = it.ai.colors.map(function (n) {
-              return (window.Palette && window.Palette.canonicalName(n)) || n;
-            }).filter(Boolean).slice(0, 3);
+          var richColors = itemColors(it).map(function (c) {
+            var family = c.family || null;
+            if (!family && window.Palette) family = window.Palette.canonicalName(c.name);
+            return { name: c.name || "", family: family || c.name || "", primary: !!c.primary };
+          }).filter(function (c) { return c.name; });
+          if (!richColors.length && it.ai && Array.isArray(it.ai.colors)) {
+            richColors = it.ai.colors.map(function (n) {
+              var family = (window.Palette && window.Palette.canonicalName(n)) || n;
+              return { name: n, family: family, primary: false };
+            }).filter(function (c) { return c.name; }).slice(0, 3);
           }
           return {
-            id: it.id, // PC-12: lets the server map outfit names back to IDs
+            id: it.id,
             name: it.name,
             category: it.category,
-            colors: colorNames,
+            colors: richColors,
             pattern: itemField(it, "pattern", "pattern", "other"),
             fit: itemField(it, "fit", "fit", "unknown"),
             fabric: itemField(it, "fabricGuess", "fabric_guess", "unknown"),
@@ -2085,6 +2083,12 @@ service firebase.storage {
         meta.className = "conf";
         var bits = [];
         if (o.source === "stylist" && o.appConfidence != null) bits.push("Stylist confidence: " + o.appConfidence + "/10");
+        if (o.source === "stylist" && o.appScores) {
+          var scoreBits = ["color", "formality", "weather", "proportion", "occasion"]
+            .map(function (k) { return k.slice(0, 4) + " " + o.appScores[k]; })
+            .join(" · ");
+          bits.push("Scores — " + scoreBits);
+        }
         if (o.occasion) bits.push("Occasion: " + o.occasion);
         if (o.source) bits.push(o.source === "stylist" ? "Suggested by the stylist" : "Built by you");
         if ((o.version || 1) > 1) bits.push("Version " + o.version + " of " + versions.length);
@@ -2469,6 +2473,7 @@ service firebase.storage {
           weather: null,
           appConfidence: o.confidence,
           appReasoning: o.reasoning || "",
+          appScores: o.scores || null,
           favorite: false,
           createdAt: firebase.firestore.FieldValue.serverTimestamp()
         }).then(function () {

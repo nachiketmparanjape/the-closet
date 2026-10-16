@@ -25,7 +25,25 @@ describe("canonicalName", () => {
   });
 });
 
-describe("nearestFamily", () => {
+describe("hexToOklch", () => {
+  it("matches reference values", () => {
+    const white = server.hexToOklch("#ffffff");
+    assert.ok(Math.abs(white.L - 1) < 0.001);
+    assert.ok(white.C < 0.001);
+    const black = server.hexToOklch("#000000");
+    assert.ok(black.L < 0.001);
+    const red = server.hexToOklch("#ff0000");
+    assert.ok(Math.abs(red.L - 0.628) < 0.01);
+    assert.ok(Math.abs(red.C - 0.258) < 0.01);
+    assert.ok(Math.abs(red.H - 29) < 2);
+  });
+  it("returns null for garbage", () => {
+    assert.equal(server.hexToOklch("nope"), null);
+    assert.equal(server.hexToOklch(null), null);
+  });
+});
+
+describe("nearestFamily (OKLCH distance)", () => {
   it("finds the nearest anchor", () => {
     assert.equal(server.nearestFamily("#1c1c1e"), "black");
     assert.equal(server.nearestFamily("#e07b39"), "orange");
@@ -67,5 +85,15 @@ describe("palette sync (server <-> client)", () => {
     const a = clientSrc.match(/const COLOR_ALIASES = (\{[\s\S]*?\});/);
     assert.ok(a, "COLOR_ALIASES not found in client file");
     assert.deepEqual(eval("(" + a[1] + ")"), server.COLOR_ALIASES);
+  });
+
+  it("client exposes the same helpers as the server", () => {
+    const clientSrc = fs.readFileSync(
+      path.join(__dirname, "..", "public", "js", "palette.js"), "utf8"
+    );
+    for (const fn of ["canonicalName", "nearestFamily", "hexToOklch", "oklchDistance", "brandKey"]) {
+      assert.ok(new RegExp("function " + fn + "\\(").test(clientSrc), fn + " missing from client");
+      assert.ok(clientSrc.includes(fn + ": " + fn), fn + " not exported on window.Palette");
+    }
   });
 });

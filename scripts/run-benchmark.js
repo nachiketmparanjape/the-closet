@@ -15,7 +15,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
-const { buildStylistRequest, mapOutfitToIds } = require("../functions/stylist");
+const { buildStylistRequest, parseStylistJson, mapHandlesToIds, validateSlots } = require("../functions/stylist");
 const { SCENARIOS } = require("../tests/benchmark/scenarios");
 
 async function accessToken() {
@@ -97,17 +97,19 @@ function finishOk(scenario, json, ms) {
   let parsed = null;
   let parseError = null;
   try {
-    parsed = JSON.parse(text);
+    parsed = parseStylistJson(text);
   } catch (e) {
     parseError = e.message;
   }
   // Validate the outfit against the scenario wardrobe, like the server does.
   let mapped = null;
+  let slotProblem = null;
   if (parsed && parsed.outfit) {
     try {
-      mapped = mapOutfitToIds(parsed.outfit, scenario.wardrobe);
+      mapped = mapHandlesToIds(parsed.outfit, scenario.wardrobe);
+      slotProblem = mapped ? validateSlots(mapped, scenario.wardrobe) : "no valid handles";
     } catch (e) {
-      parseError = (parseError ? parseError + "; " : "") + "mapOutfitToIds: " + e.message;
+      parseError = (parseError ? parseError + "; " : "") + "mapping: " + e.message;
     }
   }
   return {
@@ -119,6 +121,8 @@ function finishOk(scenario, json, ms) {
     reply: parsed ? parsed.reply : null,
     outfitRaw: parsed ? parsed.outfit : null,
     outfitMapped: mapped,
+    slotProblem,
+    scores: parsed && parsed.outfit ? parsed.outfit.scores : null,
     parseError,
     rawText: parseError ? text.slice(0, 500) : undefined,
     checks: scenario.checks,
@@ -151,6 +155,8 @@ async function main() {
     console.log("Request:", sc.messages.map((m) => m.text).join(" / "));
     if (r.parseError) console.log("PARSE FAIL:", r.parseError);
     console.log("Outfit:", JSON.stringify(r.outfitMapped));
+    if (r.scores) console.log("Scores:", JSON.stringify(r.scores));
+    if (r.slotProblem) console.log("SLOT PROBLEM:", r.slotProblem);
     console.log("Reasoning:", (r.outfitRaw && r.outfitRaw.reasoning) || "(none)");
     console.log("Reply:", (r.reply || "").slice(0, 300));
     console.log("Checks to judge:");
