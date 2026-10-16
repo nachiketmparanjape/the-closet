@@ -1,6 +1,6 @@
 # Sprint 5 plan — Stylist quality + model migration
 
-**Status:** proposed 2026-10-15, awaiting founder approval.
+**Status:** Phase 0–3 + docs shipped 2026-10-15/16. Founder acceptance pending.
 **Inputs:** Claude's stylist.js review (6 points) + ChatGPT's full-repo review (7 sections).
 Both reviews were assessed against the code and (for the retirement claim)
 against Google's docs. Verdicts below; disagreements noted explicitly.
