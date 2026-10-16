@@ -35,21 +35,49 @@ and non-goals: `VISION.md`.
 - **Add with up to 4 photos.** Why: one photo can't capture a garment — front,
   back, fabric detail each matter. First photo is the cover.
 - **Auto-suggest tags at upload.** Why: manual tagging is the biggest
-  cataloguing friction. On-device guess (category model + dominant color),
-  user confirms before saving. No server, no API keys, no cost.
-- **AI description at upload (decided 2026-10-06, not yet built).** Why: tags
-  can't capture pattern, fit, or formality — the chat stylist needs those to
-  reason about vibe. One cheap vision call on the cover photo, cached as text
-  in Firestore; the chat itself stays text-only. Research killed the fancier
-  options: multi-photo analysis has no evidence of improving outfit decisions,
-  and embeddings solve a scale problem a 300-item wardrobe doesn't have.
-  Needs a minimal backend (Cloud Functions proxy for the API key — card on
-  file via Blaze, free tier covers usage); the chat stylist will reuse it.
-- **Edit name / category / color.** Why: mistags happen; fixing shouldn't
-  require delete + re-upload. (Photo replacement stays out — delete the
-  piece instead.)
+  cataloguing friction. Canvas dominant-color sampling pre-fills the palette
+  hex; the AI description (below) fills the rest. User confirms before
+  saving. (The on-device MobileNet category guess was removed 2026-10-15 —
+  the API is more accurate and the model download was pure overhead.)
+- **AI description at upload (shipped 2026-10-14, PC-7).** One vision call on
+  the cover photo generates name, description, category, colors (constrained
+  to the canonical palette), pattern, fit, fabric guess, formality, warmth,
+  brand (parent brand), subtype, and style tags — cached in Firestore, user
+  confirms/edits before saving. The on-device category guess was removed
+  2026-10-15 (the API is more accurate); the canvas dominant-color sampler
+  stays for the palette hex.
+- **Canonical color palette (shipped 2026-10-15).** 32 color families with
+  hex anchors and alias mapping; AI colors are prompt-constrained to it,
+  user-added colors resolve to the nearest family by hex (OKLCH distance).
+  Every color carries a hex (sampled or palette-anchor) so swatch and label
+  can't contradict. Foundation for color-theory reasoning.
+- **Brand normalization (shipped 2026-10-15).** Parent brand from the model
+  ("Uniqlo UT" → "Uniqlo") plus a lowercase `brandKey` for grouping.
+- **Edit name / category / colors / attributes / brand / subtype / style tags.**
+  Why: mistags happen; fixing shouldn't require delete + re-upload. AI
+  entries are replaceable, user entries untouchable (source authority rule).
+  (Photo replacement stays out — delete the piece instead.)
 - **Delete a piece.** Why: obvious. Removes the Firestore record *and* all of
   the item's Storage photos — no orphans.
+- **Bulk upload (shipped 2026-10-14).** One photo per article auto-creates
+  items for batch cataloguing, then curate.
+
+### Get an outfit (shipped 2026-10-15, PC-12; quality rework Sprint 5)
+- **Conversational stylist.** Ask for an outfit; the model picks from the
+  real wardrobe (stable handles, server-validated), judged against a
+  versioned styling rubric (color theory, formality, weather, proportion,
+  occasion). Returns sub-scores per dimension; confidence is computed in
+  code from the score mean. Slot validation (one top, one bottom) with one
+  repair attempt.
+- **Saved outfits with versions.** Edits create new versions (stable
+  versionGroup, supersedes chain) — the original recommendation is kept.
+- **Wear logging + ratings + reflection.** One-tap "I wore this", 0–10
+  rating with note, model reflection on the prediction/outcome gap.
+  Reflection is history-aware: preferences are suggested only for explicit
+  statements or repeated patterns (never one-offs), with cited evidence,
+  and only enter the style profile on explicit user confirmation.
+- **Manual outfit builder.** Same outfit schema, source "manual".
+- **Per-article wear stats.** "Worn N× · last worn …" derived from wear events.
 
 ### Manage a piece's photos
 - **Choose the cover photo.** Why: the cover drives the gallery card (and

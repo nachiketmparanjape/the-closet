@@ -19,18 +19,22 @@ decision is recorded as an ADR in the project notes.
 ## What the current version does
 
 - **Photo catalog** — add pieces with up to 4 photos each (front, back,
-  detail); the first photo is the cover.
-- **Auto-suggested tags at upload** — on-device analysis pre-fills a category
-  guess and the dominant color; you confirm or correct before saving. No
-  server, no API keys, no cost.
-- **Full piece management** — edit tags/category anytime; delete a piece and
-  all its photos go with it.
+  detail); the first photo is the cover. Bulk upload for batch cataloguing.
 - **AI descriptions at upload** — the cover photo gets a name, description,
-  and attributes (pattern, fit, formality, warmth, colors) from a vision
-  model via a backend proxy; you confirm or edit before saving.
-
-**Coming next:** conversational outfit picks — describe the occasion and
-weather in chat and get outfit suggestions from your catalog.
+  category, canonical-palette colors, pattern, fit, fabric guess, formality,
+  warmth, parent brand, subtype, and style tags from a vision model via a
+  backend proxy; you confirm or edit before saving.
+- **Full piece management** — edit everything anytime (AI suggestions are
+  replaceable, your edits are untouchable); delete a piece and all its
+  photos go with it.
+- **Conversational stylist** — describe the occasion and weather in chat and
+  get outfit picks from your actual wardrobe, judged against a styling
+  rubric (color theory, formality, weather, proportion, occasion) with
+  per-dimension scores.
+- **Outfit loop** — save outfits (edits version, originals kept), log wears
+  with one tap, rate 0–10, get an honest reflection; durable style
+  preferences are learned from repeated patterns with your explicit
+  confirmation, and per-article wear stats accumulate automatically.
 
 ## Product docs
 
