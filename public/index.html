@@ -220,6 +220,7 @@
 
     .form-grid { display: grid; gap: 18px; }
     .field label { display: block; margin-bottom: 7px; font-size: 13px; font-weight: 600; }
+    .pref-evidence { font-size: 12px; color: #666; margin: 4px 0 8px; font-style: italic; }
     .tag-checks { display: flex; flex-wrap: wrap; gap: 4px 12px; }
     .tag-checks .tag-check { display: inline-flex; align-items: center; gap: 5px; margin-bottom: 0; font-size: 13px; font-weight: 400; cursor: pointer; }
     .field input, .field select { width: 100%; min-height: 46px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--paper); color: var(--ink); padding: 10px 12px; outline: none; }
@@ -2402,6 +2403,14 @@ service firebase.storage {
           var t = document.createElement("div");
           t.textContent = "Suggested style note: \u201C" + data.suggestedPreference + "\u201D";
           sug.appendChild(t);
+          // Sprint 5: show the evidence behind the suggestion — the user
+          // decides with the receipts, not just the model's word.
+          if (data.evidence) {
+            var ev = document.createElement("div");
+            ev.className = "pref-evidence";
+            ev.textContent = "Why: " + data.evidence;
+            sug.appendChild(ev);
+          }
           var add = document.createElement("button");
           add.type = "button";
           add.className = "primary";
