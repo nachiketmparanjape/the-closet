@@ -220,6 +220,8 @@
 
     .form-grid { display: grid; gap: 18px; }
     .field label { display: block; margin-bottom: 7px; font-size: 13px; font-weight: 600; }
+    .tag-checks { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+    .tag-checks .tag-check { display: inline-flex; align-items: center; gap: 5px; margin-bottom: 0; font-size: 13px; font-weight: 400; cursor: pointer; }
     .field input, .field select { width: 100%; min-height: 46px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--paper); color: var(--ink); padding: 10px 12px; outline: none; }
     .field input:focus, .field select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
     .file-drop { border: 1px dashed var(--line-strong); padding: 28px 18px; text-align: center; background: var(--bg); }
@@ -577,6 +579,16 @@ service firebase.storage {
             <input id="itemBrandInput" maxlength="40" placeholder="Optional" />
           </div>
         </div>
+        <div class="form-row">
+          <div class="field">
+            <label for="itemSubtypeInput">Subtype</label>
+            <input id="itemSubtypeInput" maxlength="40" placeholder="e.g. oxford shirt" />
+          </div>
+          <div class="field">
+            <label>Style tags</label>
+            <div id="itemStyleTags" class="tag-checks"></div>
+          </div>
+        </div>
         <div class="form-actions detail-actions">
           <button class="danger" id="itemDelete" type="button">Delete</button>
           <button class="secondary" id="itemCancel" type="button">Cancel</button>
@@ -723,9 +735,35 @@ service firebase.storage {
       var itemPatternInput = document.getElementById("itemPatternInput");
       var itemFitInput = document.getElementById("itemFitInput");
       var itemFabricInput = document.getElementById("itemFabricInput");
+      var itemBrandInput = document.getElementById("itemBrandInput");
+      var itemSubtypeInput = document.getElementById("itemSubtypeInput");
+      var itemStyleTagsBox = document.getElementById("itemStyleTags");
+      // Sprint 5: controlled style-tag vocabulary (mirrors STYLE_TAGS in functions/describe.js).
+      var STYLE_TAGS = ["classic", "minimalist", "preppy", "streetwear", "workwear", "athleisure", "bohemian", "formal"];
+      function renderStyleTagChecks(selected) {
+        itemStyleTagsBox.innerHTML = "";
+        STYLE_TAGS.forEach(function (tag) {
+          var label = document.createElement("label");
+          label.className = "tag-check";
+          var box = document.createElement("input");
+          box.type = "checkbox";
+          box.value = tag;
+          box.checked = selected.indexOf(tag) !== -1;
+          label.appendChild(box);
+          label.appendChild(document.createTextNode(" " + tag));
+          itemStyleTagsBox.appendChild(label);
+        });
+      }
+      function readStyleTagChecks() {
+        var out = [];
+        var boxes = itemStyleTagsBox.querySelectorAll("input[type=checkbox]");
+        for (var i = 0; i < boxes.length; i++) {
+          if (boxes[i].checked) out.push(boxes[i].value);
+        }
+        return out.slice(0, 3);
+      }
       var itemFormalityInput = document.getElementById("itemFormalityInput");
       var itemWarmthInput = document.getElementById("itemWarmthInput");
-      var itemBrandInput = document.getElementById("itemBrandInput");
       var uploadPalChips = document.getElementById("uploadPalChips");
       var uploadPalName = document.getElementById("uploadPalName");
       var uploadPalHex = document.getElementById("uploadPalHex");
@@ -919,7 +957,16 @@ service firebase.storage {
         if (!names.length) return [{ name: "", hex: hex, source: "user", primary: true, family: window.Palette ? window.Palette.nearestFamily(hex) : null }];
         return names.map(function (n, i) {
           // AI names are already canonical (server-constrained) — family == name.
-          return { name: n, hex: i === 0 ? hex : null, source: "ai", primary: i === 0, family: n };
+          // Sprint 5: every color gets a hex — sampled for the primary,
+          // palette-anchor for the rest (definitionally consistent with the
+          // family name, so swatch and label can never contradict).
+          var anchorHex = null;
+          if (window.Palette) {
+            for (var p = 0; p < window.Palette.PALETTE.length; p++) {
+              if (window.Palette.PALETTE[p].name === n) { anchorHex = window.Palette.PALETTE[p].hex; break; }
+            }
+          }
+          return { name: n, hex: i === 0 ? hex : anchorHex, source: "ai", primary: i === 0, family: n };
         });
       }
 
@@ -936,7 +983,11 @@ service firebase.storage {
           formality: (ai && ai.formality) || "casual",
           warmth: (ai && ai.warmth) || "light",
           brand: brand,
-          brandKey: (ai && ai.brandKey) || (window.Palette ? window.Palette.brandKey(brand) : null)
+          brandKey: (ai && ai.brandKey) || (window.Palette ? window.Palette.brandKey(brand) : null),
+          subtype: (ai && ai.subtype) || null,
+          styleTags: (ai && Array.isArray(ai.style_tags))
+            ? ai.style_tags.filter(function (t) { return STYLE_TAGS.indexOf(t) !== -1; }).slice(0, 3)
+            : []
         };
       }
 
@@ -1173,6 +1224,9 @@ service firebase.storage {
         itemFormalityInput.value = itemField(item, "formality", "formality", "casual");
         itemWarmthInput.value = itemField(item, "warmth", "warmth", "light");
         itemBrandInput.value = itemField(item, "brand", "brand", "") || "";
+        itemSubtypeInput.value = itemField(item, "subtype", "subtype", "") || "";
+        var existingTags = itemField(item, "styleTags", "style_tags", []);
+        renderStyleTagChecks(Array.isArray(existingTags) ? existingTags : []);
         itemSave.disabled = false;
         itemDelete.disabled = false;
         renderItemWearStats(item); // PC-12: per-article wear stats
@@ -1199,6 +1253,7 @@ service firebase.storage {
         // `ai` blob stays untouched as the raw AI cache.
         var fabricVal = itemFabricInput.value.trim();
         var brandVal = itemBrandInput.value.trim() || null;
+        var subtypeVal = itemSubtypeInput.value.trim() || null;
         itemDocRef().update({
           name: itemNameInput.value.trim(),
           category: itemCategoryInput.value,
@@ -1211,6 +1266,8 @@ service firebase.storage {
           warmth: itemWarmthInput.value,
           brand: brandVal,
           brandKey: window.Palette ? window.Palette.brandKey(brandVal) : null,
+          subtype: subtypeVal,
+          styleTags: readStyleTagChecks(),
           color: firebase.firestore.FieldValue.delete()
         }).then(function () {
           showToast("Piece updated.");
@@ -1865,7 +1922,9 @@ service firebase.storage {
             fabric: itemField(it, "fabricGuess", "fabric_guess", "unknown"),
             formality: itemField(it, "formality", "formality", "casual"),
             warmth: itemField(it, "warmth", "warmth", "light"),
-            description: itemField(it, "description", "description", "")
+            description: itemField(it, "description", "description", ""),
+            subtype: itemField(it, "subtype", "subtype", ""),
+            styleTags: itemField(it, "styleTags", "style_tags", [])
           };
         });
       }

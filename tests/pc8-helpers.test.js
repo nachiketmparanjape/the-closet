@@ -14,6 +14,9 @@ const js = html.split("<script>")[1].split("</script>")[0];
 global.window = {};
 require("../public/js/palette.js");
 const scope = {};
+const tagMatch = js.match(/var STYLE_TAGS = (\[[^\]]*\]);/);
+assert.ok(tagMatch, "STYLE_TAGS not found in index.html");
+const STYLE_TAGS = eval(tagMatch[1]);
 for (const name of ["itemColors", "itemPrimaryHex", "itemField", "buildColorsFromAI", "buildV2Fields", "syncPrimaryHex"]) {
   const m = js.match(new RegExp("function " + name + "\\([\\s\\S]*?\\n      \\}"));
   assert.ok(m, "helper not found in index.html: " + name);
@@ -63,7 +66,10 @@ describe("buildColorsFromAI / buildV2Fields", () => {
     assert.equal(c.length, 3);
     assert.equal(c[0].hex, "#111111");
     assert.equal(c[0].primary, true);
-    assert.equal(c[1].hex, null);
+    // Sprint 5: non-primary colors get the palette-anchor hex (never null),
+    // so swatch and label can't contradict each other.
+    assert.equal(c[1].hex, "#f4f4f2"); // white anchor
+    assert.equal(c[2].hex, "#c0392b"); // red anchor
     assert.equal(c[2].source, "ai");
   });
   it("creates a user entry when AI gave nothing", () => {
@@ -83,6 +89,11 @@ describe("buildColorsFromAI / buildV2Fields", () => {
     assert.equal(f.brandKey, "uniqlo");
     assert.equal(f.colors[0].family, "navy");
     assert.equal(f.colors[1].family, "white");
+  });
+  it("carries subtype and style tags from the AI (constrained to the vocab)", () => {
+    const f = buildV2Fields({ subtype: "oxford shirt", style_tags: ["preppy", "classic", "bogus"] }, null);
+    assert.equal(f.subtype, "oxford shirt");
+    assert.deepEqual(f.styleTags, ["preppy", "classic"]);
   });
   it("computes brandKey when the AI did not send one", () => {
     const f = buildV2Fields({ brand: "UNIQLO" }, null);

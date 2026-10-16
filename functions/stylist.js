@@ -58,6 +58,10 @@ function itemLine(it, idx) {
     "formality: " + (cleanText(it.formality, 20) || "casual"),
     "warmth: " + (cleanText(it.warmth, 20) || "light"),
   ];
+  const subtype = cleanText(it.subtype, 40);
+  if (subtype) bits.push("subtype: " + subtype);
+  const styleTags = Array.isArray(it.styleTags) ? it.styleTags.filter(Boolean) : [];
+  if (styleTags.length) bits.push("style: " + styleTags.join("/"));
   const desc = cleanText(it.description, 200);
   let line = "[" + handle + '] "' + name + '" [' + category + "] — colors: " +
     colors + "; " + bits.join("; ") + ".";
@@ -174,6 +178,12 @@ function sanitizeItems(items) {
       formality: cleanText(it.formality, 20),
       warmth: cleanText(it.warmth, 20),
       description: cleanText(it.description, 200),
+      subtype: cleanText(it.subtype, 40),
+      styleTags: Array.isArray(it.styleTags)
+        ? it.styleTags.filter((t) => typeof t === "string").map((t) => cleanText(t, 20)).filter(Boolean).slice(0, 3)
+        : (Array.isArray(it.style_tags)
+          ? it.style_tags.filter((t) => typeof t === "string").map((t) => cleanText(t, 20)).filter(Boolean).slice(0, 3)
+          : []),
     };
   }).filter(Boolean);
 }

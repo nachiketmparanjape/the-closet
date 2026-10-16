@@ -26,6 +26,9 @@ const PATTERNS = ["solid", "striped", "plaid", "check", "floral", "graphic", "ot
 const FITS = ["slim", "regular", "relaxed", "oversized", "unknown"];
 const FORMALITIES = ["casual", "smart-casual", "formal"];
 const WARMTHS = ["light", "medium", "heavy"];
+// Sprint 5: controlled style-tag vocabulary. Each tag must earn its place —
+// these are the ones that change outfit decisions.
+const STYLE_TAGS = ["classic", "minimalist", "preppy", "streetwear", "workwear", "athleisure", "bohemian", "formal"];
 const MODEL_VERSION = "gemini-3.8-flash"; // 2.5-flash retires 2026-10-20 (Google lifecycle page)
 
 const PROMPT = `You are cataloguing one garment from its photo for a personal wardrobe app.
@@ -41,12 +44,17 @@ Look at the photo and answer with ONLY a JSON object (no markdown, no prose) wit
   "fabric_guess": "best guess at the fabric in 1-3 words, or 'unknown' — this is a guess, be honest",
   "formality": one of ${JSON.stringify(FORMALITIES)},
   "warmth": one of ${JSON.stringify(WARMTHS)},
-  "brand": "the PARENT brand in 1-3 words — strip sub-lines and collections ('Uniqlo UT' → 'Uniqlo', 'Nike SB' → 'Nike', 'H&M Conscious' → 'H&M'), or null if none is visible — best effort, never guess"
+  "brand": "the PARENT brand in 1-3 words — strip sub-lines and collections ('Uniqlo UT' → 'Uniqlo', 'Nike SB' → 'Nike', 'H&M Conscious' → 'H&M'), or null if none is visible — best effort, never guess",
+  "subtype": "the specific garment type in 1-3 words ('oxford shirt', 'crewneck tee', 'straight-leg jeans', 'chelsea boots') — null if unclear. An oversized graphic tee and an oxford shirt are both 'Tops' but play totally different roles; be specific",
+  "style_tags": ["0 to 3 tags from this list ONLY: ${STYLE_TAGS.join(", ")} — the garment's style lane(s); empty array if none fit clearly"]
 }
+
+Describe ONLY what is visible in THIS photo. If it shows the back of the garment, say so in the description and do not assume the front matches. Never invent details for the unseen side.
 
 If the photo shows no garment, return every field as its safest value
 (category "Other", fit "unknown", fabric_guess "unknown", pattern "other",
-formality "casual", warmth "light", colors [], brand null, name
+formality "casual", warmth "light", colors [], brand null, subtype null,
+style_tags [], name
 "Unidentified item",
 description "No garment could be identified in the photo.").`;
 
@@ -90,6 +98,18 @@ function parseModelJson(text) {
 
   const brand = cleanString(obj.brand, 40) || null;
 
+  // Style tags: constrained to the controlled vocabulary.
+  const styleTags = [];
+  if (Array.isArray(obj.style_tags)) {
+    for (const t of obj.style_tags) {
+      const tag = String(t || "").trim().toLowerCase();
+      if (STYLE_TAGS.indexOf(tag) !== -1 && styleTags.indexOf(tag) === -1) {
+        styleTags.push(tag);
+      }
+      if (styleTags.length >= 3) break;
+    }
+  }
+
   return {
     name: cleanString(obj.name, 60) || "Untitled item",
     description: cleanString(obj.description, 240),
@@ -102,6 +122,8 @@ function parseModelJson(text) {
     warmth: oneOf(obj.warmth, WARMTHS, "light"),
     brand,
     brandKey: brandKey(brand), // grouping key: "UNIQLO" and "Uniqlo" → "uniqlo"
+    subtype: cleanString(obj.subtype, 40) || null,
+    style_tags: styleTags,
   };
 }
 
@@ -186,4 +208,4 @@ function logAiFailure(label, response) {
   } catch (e) { /* logging must never throw */ }
 }
 
-module.exports = { describeImage, parseModelJson, getClient, logAiFailure, MODEL_VERSION, PROMPT, CATEGORIES };
+module.exports = { describeImage, parseModelJson, getClient, logAiFailure, MODEL_VERSION, PROMPT, CATEGORIES, STYLE_TAGS };
