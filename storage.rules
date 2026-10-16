@@ -3,10 +3,15 @@ service firebase.storage {
   match /b/{bucket}/o {
     match /users/{userId}/items/{allPaths=**} {
       allow read: if request.auth != null && request.auth.uid == userId;
-      allow write: if request.auth != null
+      // Create/update: owner-only, images under 10 MB.
+      allow create, update: if request.auth != null
         && request.auth.uid == userId
         && request.resource.size < 10 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
+      // Delete: owner-only. Split from create/update because
+      // request.resource is absent on delete — the size/contentType
+      // checks above would fail closed and deny every deletion.
+      allow delete: if request.auth != null && request.auth.uid == userId;
     }
   }
 }

@@ -8,3 +8,5 @@ deploy-askstylist.js
 node_modules/
 firebase-debug.log
 check-iam.js
+deploy-update.js
+deploy-create.js

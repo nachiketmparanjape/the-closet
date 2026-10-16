@@ -170,9 +170,11 @@ function parseStylistJson(text) {
 // items: sanitized array. messages: sanitized [{role, text}].
 // styleProfile: sanitized preference strings (may be empty).
 // Returns { reply, outfit: { itemIds, confidence, reasoning } | null }.
-async function askStylist(items, messages, styleProfile) {
+// Build the exact model request askStylist sends. Exported so the
+// benchmark runner (tests/benchmark) exercises the real prompt —
+// prompt changes and benchmark stay in sync by construction.
+function buildStylistRequest(items, messages, styleProfile) {
   const model = process.env.GEMINI_MODEL || MODEL_VERSION;
-  const ai = getClient();
   const wardrobe = items.map(itemLine).join("\n");
   let system = SYSTEM;
   const prefs = Array.isArray(styleProfile) ? styleProfile.filter(Boolean) : [];
@@ -186,19 +188,22 @@ async function askStylist(items, messages, styleProfile) {
   for (const m of messages) {
     contents.push({ role: m.role, parts: [{ text: m.text }] });
   }
+  const config = {
+    systemInstruction: system,
+    temperature: 0.3,
+    maxOutputTokens: 2500,
+    thinkingConfig: { thinkingBudget: 1024 },
+    responseMimeType: "application/json",
+  };
+  return { model, contents, config };
+}
+
+async function askStylist(items, messages, styleProfile) {
+  const { model, contents, config } = buildStylistRequest(items, messages, styleProfile);
+  const ai = getClient();
   let response;
   try {
-    response = await ai.models.generateContent({
-      model,
-      contents,
-      config: {
-        systemInstruction: system,
-        temperature: 0.3,
-        maxOutputTokens: 2500,
-        thinkingConfig: { thinkingBudget: 1024 },
-        responseMimeType: "application/json",
-      },
-    });
+    response = await ai.models.generateContent({ model, contents, config });
   } catch (err) {
     throw codedError("AI_UNAVAILABLE", "askStylist: generateContent failed: " + (err && err.message));
   }
@@ -211,4 +216,4 @@ async function askStylist(items, messages, styleProfile) {
   return { reply: parsed.reply, outfit: mapOutfitToIds(parsed.outfit, items) };
 }
 
-module.exports = { askStylist, sanitizeItems, sanitizeMessages, sanitizeStyleProfile, mapOutfitToIds, itemLine, SYSTEM };
+module.exports = { askStylist, buildStylistRequest, sanitizeItems, sanitizeMessages, sanitizeStyleProfile, mapOutfitToIds, itemLine, SYSTEM };
