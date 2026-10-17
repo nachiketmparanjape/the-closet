@@ -2,8 +2,10 @@
 
 **Dates:** batch started 2026-10-17 at founder's pull (sprints are work
 batches — see playbook 2026-10-17); originally sketched Oct 31 → Nov 14.
-**Status:** in progress — lane metrics shipped; PC-13 + PC-27 design docs
-awaiting founder validation.
+**Status:** all three cuts shipped 2026-10-17 — founder testing.
+- Lane metrics: `scripts/lane-metrics.js` + tests (baseline recorded above).
+- PC-27: `critiqueOutfit` live; "AI take" button in outfit view (manual/photo only).
+- PC-13: `parseOutfitPhoto` live; "From photo" in Outfits + "Add photo" in outfit view.
 
 ## Lane metrics baseline (2026-10-17, `node scripts/lane-metrics.js`)
 
