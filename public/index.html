@@ -581,6 +581,7 @@
           <input type="date" id="outfitWearDate" aria-label="Wear date" title="When did you wear this?" />
           <button class="secondary" id="outfitFavBtn" type="button">☆ Favorite</button>
           <button class="secondary" id="outfitRenameBtn" type="button">Rename</button>
+          <button class="secondary" id="outfitCritiqueBtn" type="button">AI take</button>
           <button class="danger" id="outfitDelete" type="button">Delete</button>
         </div>
         <div id="outfitRateSection"></div>
@@ -2295,12 +2296,49 @@
           body.appendChild(scoresWrap);
         }
 
+        // PC-27: AI critique for manual/photo outfits — labeled chips + text,
+        // rendered by renderCritique below (fetched on open, or after tapping).
+        var critiqueSec = document.createElement("div");
+        critiqueSec.id = "outfitCritiqueSection";
+        body.appendChild(critiqueSec);
+
         if (o.appReasoning) {
           var reason = document.createElement("p");
           reason.className = "reason";
           reason.textContent = "\u201C" + o.appReasoning + "\u201D";
           body.appendChild(reason);
         }
+
+        // PC-27: "AI take" button — manual/photo outfits only. Stylist picks
+        // already carry scores; critiquing them would be noise.
+        var critiqueBtn = document.getElementById("outfitCritiqueBtn");
+        critiqueBtn.style.display = o.source === "stylist" ? "none" : "";
+        critiqueBtn.textContent = "AI take";
+        critiqueBtn.disabled = false;
+        critiqueBtn.onclick = function () {
+          critiqueBtn.disabled = true;
+          critiqueBtn.textContent = "Thinking…";
+          functions.httpsCallable("critiqueOutfit")({ outfitId: o.id }).then(function (res) {
+            renderCritique(res.data || {});
+            critiqueBtn.textContent = "AI take";
+            critiqueBtn.disabled = false;
+          }).catch(function (err) {
+            showToast(friendlyError(err));
+            critiqueBtn.textContent = "AI take";
+            critiqueBtn.disabled = false;
+          });
+        };
+        // Fetch any existing critique (app-rater rating, kind "critique").
+        db.collection("users").doc(currentUser.uid).collection("ratings")
+          .where("rater", "==", "app")
+          .where("ratingKind", "==", "critique")
+          .where("targetId", "==", o.id)
+          .limit(1).get().then(function (snap) {
+            if (!snap.empty) {
+              var d = snap.docs[0].data();
+              renderCritique({ scores: d.scores || null, critique: d.note || "" });
+            }
+          }).catch(function () { /* critique is optional; stay quiet */ });
 
         var favBtn = document.getElementById("outfitFavBtn");
         favBtn.textContent = o.favorite ? "★ Favorited" : "☆ Favorite";
@@ -2757,6 +2795,36 @@
         }).catch(function (err) {
           showToast(friendlyError(err));
         });
+      }
+
+      // PC-27: render an AI critique — labeled score chips + the critique
+      // text. Provenance is explicit ("AI critique") so it can't be read
+      // as stylist-pick scores.
+      function renderCritique(data) {
+        var sec = document.getElementById("outfitCritiqueSection");
+        if (!sec) return;
+        sec.textContent = "";
+        if (!data || !data.scores) return;
+        var label = document.createElement("div");
+        label.className = "conf";
+        label.textContent = "AI critique";
+        sec.appendChild(label);
+        var wrap = document.createElement("div");
+        wrap.className = "score-chips";
+        ["color", "formality", "weather", "proportion", "occasion"].forEach(function (k) {
+          var chip = document.createElement("span");
+          chip.className = "score-chip";
+          var v = data.scores[k];
+          chip.textContent = k.charAt(0).toUpperCase() + k.slice(1) + " " + (v != null ? v : "–");
+          wrap.appendChild(chip);
+        });
+        sec.appendChild(wrap);
+        if (data.critique) {
+          var p = document.createElement("p");
+          p.className = "reason";
+          p.textContent = "\u201C" + data.critique + "\u201D";
+          sec.appendChild(p);
+        }
       }
 
       // Wear history for the viewed version group (one fetch, client filter —

@@ -19,6 +19,7 @@ const { getFirestore } = require("firebase-admin/firestore");
 const { describeImage } = require("./describe");
 const { askStylist, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeReferences, sanitizeStyleProfile } = require("./stylist");
 const { reflectOutfit } = require("./reflect");
+const { critiqueOutfit } = require("./critique");
 // PC-11: every expected failure goes through the catalog; every failure
 // path logs with a correlation ID.
 const { fail, newCorrelationId, logError } = require("./errors");
@@ -169,6 +170,33 @@ exports.reflectOutfit = onCall(
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
       boundary("reflectOutfit", correlationId, uid, err);
+    }
+  }
+);
+
+exports.critiqueOutfit = onCall(
+  {
+    region: "us-central1",
+    timeoutSeconds: 60,
+    memory: "512MiB",
+    maxInstances: 5,
+  },
+  async (request) => {
+    const correlationId = newCorrelationId();
+    const uid = request.auth ? request.auth.uid : null;
+    try {
+      if (!request.auth) {
+        fail("NOT_SIGNED_IN");
+      }
+      const data = request.data || {};
+      const outfitId = typeof data.outfitId === "string" ? data.outfitId.trim() : "";
+      if (!outfitId || outfitId.length > 100) {
+        fail("BAD_REQUEST");
+      }
+      return await critiqueOutfit(uid, outfitId);
+    } catch (err) {
+      if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
+      boundary("critiqueOutfit", correlationId, uid, err);
     }
   }
 );

@@ -1,6 +1,10 @@
 # PC-13 design: outfit photo parsing
 
-**Status:** proposed 2026-10-17 — awaiting founder validation before build.
+**Status:** validated by founder 2026-10-17 — building.
+**Decisions:** photos may be added to existing outfits (upload → set
+`photoUrl`, no validation — parked as low priority: it's the user's own
+photo on their own outfit, no integrity risk worth an AI call). Confirm
+screen uses per-match confirm/remove (PM call — vetoable).
 **Lane:** Loop ("capture outcomes faithfully").
 
 ## The flow

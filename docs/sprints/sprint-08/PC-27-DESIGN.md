@@ -1,6 +1,9 @@
 # PC-27 design: "Score my outfit" AI critique
 
-**Status:** proposed 2026-10-17 — awaiting founder validation before build.
+**Status:** validated by founder 2026-10-17 — building.
+**Decisions:** tone is honest-but-kind (never brutal); scoped to
+manual/photo outfits only — critiquing a stylist pick is the model
+second-guessing its own scores, no signal.
 **Lane:** Stylist ("pick the right outfit for the moment") — critique is
 stylist judgment applied to a fixed outfit, not a new pick.
 
