@@ -2,8 +2,25 @@
 
 **Dates:** batch started 2026-10-17 at founder's pull (sprints are work
 batches — see playbook 2026-10-17); originally sketched Oct 31 → Nov 14.
-**Status:** in progress — lane metrics building; PC-13 + PC-27 design docs
-up next for founder validation.
+**Status:** in progress — lane metrics shipped; PC-13 + PC-27 design docs
+awaiting founder validation.
+
+## Lane metrics baseline (2026-10-17, `node scripts/lane-metrics.js`)
+
+| Lane | Metric | Baseline |
+|---|---|---|
+| Catalogue | AI tag acceptance | **97.6%** (n=42 fields; brand 75%, rest 100%) |
+| Catalogue | AI color acceptance | **100%** (n=12) |
+| Outfits | wear-through (saved → worn) | **0%** (0/2 — no wears logged yet) |
+| Loop | rating completion | n/a (no wears) |
+| Stylist | calibration gap | n/a (rated outfits were deleted in Sprint 7 testing; ratings dangle) |
+| Personalization | suggestion acceptance | n/a (no suggestions yet) |
+
+Notes: tag acceptance excludes v1/bulk items that never had the newer
+fields written (vintage guard in the script). The 3 existing user ratings
+reference deleted outfit docs — correctly excluded from calibration, not
+misattributed. The wear → rate → reflect loop is still unexercised
+end to end (Sprint 4 open item).
 **Theme:** the outfit lifecycle end to end — from a photo of what you wore
 to a logged outfit, AI feedback on your own picks, and the lanes finally
 measured instead of vibed.
