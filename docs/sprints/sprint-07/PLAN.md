@@ -68,6 +68,16 @@ and approved without veto.
   descriptive default names from their pieces
   ("Black Nike Air joggers + White Cotton Tee +1"); the outfit view has a
   Rename button (metadata-only, no version bump). 90/90 tests, live via CI.
+- **Builder guardrails (Option 2) — SHIPPED 2026-10-17.** Founder built a
+  two-pants outfit; the builder had no notion of slots. Now: piece picker
+  grouped by category, live slot summary pills ("Tops 1 · Bottoms 2 ⚠"),
+  and a warn-don't-block confirm on save when a non-accessory slot is
+  doubled (mirrors the server's slot rule). 92/92 tests, live via CI.
+- **Stylist score on manual outfits?** Founder asked. Recommendation: yes,
+  but as a separate cut — an explicit "AI critique" with its own prompt
+  path and provenance labeling, not a silent auto-score (avoids polluting
+  the calibration metric and changing the builder's character). Parked as
+  a Sprint 8 candidate.
 
 ## Parked this sprint (ranked, not selected)
 - Lane metrics instrumentation (S/M) — rank 4.
