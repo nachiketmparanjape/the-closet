@@ -12,7 +12,11 @@ and approved without veto.
 
 ## Cuts
 
-### PC-20 + PC-21: Wear history correctness (S, Loop lane)
+### PC-20 + PC-21: Wear history correctness (S, Loop lane) — DONE 2026-10-17
+- Shipped: date picker on "I wore this" (defaults today, capped at today;
+  past dates stored at local noon, createdAt always server time) + per-entry
+  delete with confirm (derived stats un-count automatically). 77/77 tests,
+  live via CI.
 - **Problem:** "I wore this" stamps today only, and entries can't be
   deleted — mis-taps append forever and wrong dates poison the learning data.
 - **In scope:**
