@@ -28,7 +28,20 @@ and approved without veto.
   a mis-tapped entry and watch the "Worn N×" count drop.
 - **Size:** S. **Constitution check:** passes (no non-goal conflicts).
 
-### PC-18: Outfit dedup (S/M, Outfits lane)
+### PC-18: Outfit dedup (S/M, Outfits lane) — DONE 2026-10-17
+- Shipped: content hash (sorted itemIds + source) stored as `dedupHash` at
+  save; both chat and builder saves check first — identical save links to
+  the existing outfit with a toast instead of minting a duplicate.
+  Forward-only; 80/80 tests (3 new hash tests), live via CI.
+- Bonus, founder-requested mid-sprint: **delete outfit** — danger button in
+  the outfit view; confirm names the wear count if worn; wear events stay
+  (history is factual), outfit doc goes; the live listener refreshes and
+  closes the view. Firestore rules already allowed owner delete.
+
+### PC-22: Chat references (M/L, Stylist lane) — DESIGN READY, awaiting validation
+- Design doc: `PC-22-DESIGN.md`. @-picker with article/outfit sections,
+  chips above the input, per-message references, explicit beats previousPick.
+  Build starts on founder's go.
 - **Problem:** saving the same pick twice mints two unrelated docs —
   wear history and ratings fragment across duplicates.
 - **In scope:** content hash over sorted itemIds (+ source) computed at
