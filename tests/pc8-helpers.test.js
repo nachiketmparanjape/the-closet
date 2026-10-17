@@ -17,12 +17,12 @@ const scope = {};
 const tagMatch = js.match(/var STYLE_TAGS = (\[[^\]]*\]);/);
 assert.ok(tagMatch, "STYLE_TAGS not found in index.html");
 const STYLE_TAGS = eval(tagMatch[1]);
-for (const name of ["itemColors", "itemPrimaryHex", "itemField", "buildColorsFromAI", "buildV2Fields", "syncPrimaryHex", "outfitDedupHash", "defaultOutfitName"]) {
+for (const name of ["itemColors", "itemPrimaryHex", "itemField", "buildColorsFromAI", "buildV2Fields", "syncPrimaryHex", "outfitDedupHash", "defaultOutfitName", "builderCategory", "builderDupSlot"]) {
   const m = js.match(new RegExp("function " + name + "\\([\\s\\S]*?\\n      \\}"));
   assert.ok(m, "helper not found in index.html: " + name);
   scope[name] = eval("(" + m[0].replace("function " + name, "function") + ")");
 }
-const { itemColors, itemPrimaryHex, itemField, buildColorsFromAI, buildV2Fields, syncPrimaryHex, outfitDedupHash, defaultOutfitName } = scope;
+const { itemColors, itemPrimaryHex, itemField, buildColorsFromAI, buildV2Fields, syncPrimaryHex, outfitDedupHash, defaultOutfitName, builderCategory, builderDupSlot } = scope;
 
 describe("itemColors (lazy migration)", () => {
   it("passes v2 colors through untouched", () => {
@@ -142,5 +142,20 @@ describe("defaultOutfitName (Sprint 7)", () => {
   it("falls back to the date when nothing resolves", () => {
     const name = defaultOutfitName(["zzz"]);
     assert.ok(name.startsWith("Outfit · "));
+  });
+});
+
+describe("builderDupSlot (Sprint 7, builder guardrails)", () => {
+  const cats = { a: "Bottoms", b: "Bottoms", c: "Tops", d: "Accessories", e: "Accessories" };
+  it("flags two in one non-accessory slot", () => {
+    global.itemById = (id) => ({ category: cats[id] });
+    assert.equal(builderDupSlot(["a", "b", "c"]), "Two bottoms selected");
+    delete global.itemById;
+  });
+  it("passes a clean outfit and repeated accessories", () => {
+    global.itemById = (id) => ({ category: cats[id] });
+    assert.equal(builderDupSlot(["a", "c"]), null);
+    assert.equal(builderDupSlot(["d", "e", "c"]), null);
+    delete global.itemById;
   });
 });

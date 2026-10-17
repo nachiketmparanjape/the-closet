@@ -155,6 +155,11 @@
     .wear-del:hover { color: #ff8080; border-color: #ff8080; }
     #outfitWearDate { font-size: 13px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: inherit; max-width: 140px; }
     .builder-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-height: 38vh; overflow-y: auto; margin-bottom: 12px; }
+    .builder-grid-sec { grid-column: 1 / -1; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 10px 0 2px; }
+    .builder-grid-sec:first-child { margin-top: 0; }
+    .builder-slots { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; font-size: 12px; }
+    .slot-pill { padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+    .slot-pill.warn { border-color: #e0a800; color: #e0a800; font-weight: 600; }
     .builder-cell { border: 2px solid var(--line); border-radius: 8px; overflow: hidden; cursor: pointer; background: var(--paper-soft); }
     .builder-cell.selected { border-color: var(--accent); }
     .builder-cell img { width: 100%; height: 76px; object-fit: cover; display: block; }
@@ -591,6 +596,7 @@
       </div>
       <div class="modal-body">
         <p class="hint">Tap pieces to add them — pick at least 2.</p>
+        <div id="builderSlots" class="builder-slots" hidden></div>
         <div class="builder-grid" id="builderGrid"></div>
         <div class="field">
           <label for="builderName">Name</label>
@@ -2324,39 +2330,104 @@
         openOverlay(document.getElementById("builderOverlay"));
       }
 
+      // Option 2 (Sprint 7): the builder thinks in slots. Pieces are grouped
+      // by category, a live summary shows what's picked per slot, and saving
+      // with two in one slot warns (mirrors the server's slot rule —
+      // Accessories may repeat) without blocking.
+      var BUILDER_CAT_ORDER = ["Tops", "Bottoms", "Outerwear", "Shoes", "Accessories"];
+      function builderCategory(it) {
+        return (it && it.category) || "Other";
+      }
+      // Returns "Two bottoms selected" etc. when a non-accessory slot is
+      // doubled, else null.
+      function builderDupSlot(ids) {
+        var counts = {};
+        ids.forEach(function (id) {
+          var c = builderCategory(typeof itemById === "function" ? itemById(id) : null);
+          counts[c] = (counts[c] || 0) + 1;
+        });
+        for (var c in counts) {
+          if (counts[c] > 1 && c !== "Accessories") {
+            var singular = c.charAt(c.length - 1) === "s" ? c.slice(0, -1).toLowerCase() : c.toLowerCase();
+            return "Two " + singular + "s selected";
+          }
+        }
+        return null;
+      }
+      function renderBuilderSlots() {
+        var el = document.getElementById("builderSlots");
+        el.textContent = "";
+        if (!builderSelection.length) { el.hidden = true; return; }
+        var counts = {};
+        builderSelection.forEach(function (id) {
+          var c = builderCategory(typeof itemById === "function" ? itemById(id) : null);
+          counts[c] = (counts[c] || 0) + 1;
+        });
+        Object.keys(counts).sort().forEach(function (c) {
+          var pill = document.createElement("span");
+          var dup = counts[c] > 1 && c !== "Accessories";
+          pill.className = "slot-pill" + (dup ? " warn" : "");
+          pill.textContent = c + " " + counts[c] + (dup ? " ⚠" : "");
+          el.appendChild(pill);
+        });
+        el.hidden = false;
+      }
       function renderBuilderGrid() {
         var grid = document.getElementById("builderGrid");
         grid.textContent = "";
+        var groups = {};
         allItems.forEach(function (it) {
-          var cell = document.createElement("div");
-          cell.className = "builder-cell" + (builderSelection.indexOf(it.id) !== -1 ? " selected" : "");
-          var photos = itemPhotos(it);
-          if (photos.length) {
-            var img = document.createElement("img");
-            img.src = photos[0].url;
-            img.alt = "";
-            img.loading = "lazy";
-            cell.appendChild(img);
-          }
-          var nm = document.createElement("span");
-          nm.textContent = it.name || "Untitled";
-          cell.appendChild(nm);
-          cell.setAttribute("role", "button");
-          cell.setAttribute("tabindex", "0");
-          cell.setAttribute("aria-pressed", builderSelection.indexOf(it.id) !== -1 ? "true" : "false");
-          function toggle() {
-            var i = builderSelection.indexOf(it.id);
-            if (i === -1) builderSelection.push(it.id);
-            else builderSelection.splice(i, 1);
-            renderBuilderGrid();
-          }
-          cell.addEventListener("click", toggle);
-          cell.addEventListener("keydown", function (e) {
-            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
-          });
-          grid.appendChild(cell);
+          var c = builderCategory(it);
+          if (!groups[c]) groups[c] = [];
+          groups[c].push(it);
         });
+        var cats = Object.keys(groups).sort(function (a, b) {
+          var ia = BUILDER_CAT_ORDER.indexOf(a), ib = BUILDER_CAT_ORDER.indexOf(b);
+          if (ia === -1 && ib === -1) return a < b ? -1 : 1;
+          if (ia === -1) return 1;
+          if (ib === -1) return -1;
+          return ia - ib;
+        });
+        cats.forEach(function (c) {
+          var sec = document.createElement("div");
+          sec.className = "builder-grid-sec";
+          sec.textContent = c;
+          grid.appendChild(sec);
+          groups[c].forEach(function (it) {
+            renderBuilderCell(grid, it);
+          });
+        });
+        renderBuilderSlots();
         document.getElementById("builderSave").disabled = builderSelection.length < 2;
+      }
+      function renderBuilderCell(grid, it) {
+        var cell = document.createElement("div");
+        cell.className = "builder-cell" + (builderSelection.indexOf(it.id) !== -1 ? " selected" : "");
+        var photos = itemPhotos(it);
+        if (photos.length) {
+          var img = document.createElement("img");
+          img.src = photos[0].url;
+          img.alt = "";
+          img.loading = "lazy";
+          cell.appendChild(img);
+        }
+        var nm = document.createElement("span");
+        nm.textContent = it.name || "Untitled";
+        cell.appendChild(nm);
+        cell.setAttribute("role", "button");
+        cell.setAttribute("tabindex", "0");
+        cell.setAttribute("aria-pressed", builderSelection.indexOf(it.id) !== -1 ? "true" : "false");
+        function toggle() {
+          var i = builderSelection.indexOf(it.id);
+          if (i === -1) builderSelection.push(it.id);
+          else builderSelection.splice(i, 1);
+          renderBuilderGrid();
+        }
+        cell.addEventListener("click", toggle);
+        cell.addEventListener("keydown", function (e) {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
+        });
+        grid.appendChild(cell);
       }
 
       function closeBuilder() {
@@ -2369,6 +2440,9 @@
       document.getElementById("builderSave").addEventListener("click", function () {
         if (builderSelection.length < 2) { showToast("Pick at least 2 pieces."); return; }
         var sel = builderSelection.slice();
+        // Option 2: same slot twice is usually a mistake — warn, don't block.
+        var dupSlot = builderDupSlot(sel);
+        if (dupSlot && !window.confirm(dupSlot + ". Save anyway?")) return;
         // PC-18: same dedup check as chat saves.
         findDuplicateOutfit(sel, "manual").then(function (dup) {
           if (dup) {
