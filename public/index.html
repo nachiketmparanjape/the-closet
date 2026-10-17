@@ -269,7 +269,6 @@
     <div class="topline">
       <div class="status" id="statusText"><span class="status-dot" id="statusDot"></span><span>Firebase setup needed</span></div>
       <div class="top-actions">
-        <button class="text-button" id="setupOpen" type="button">Setup guide</button>
         <button class="auth-button" id="authButton" type="button" disabled title="Complete Firebase setup to enable Google sign-in">Sign in with Google · setup needed</button>
       </div>
     </div>
@@ -339,63 +338,6 @@
     </section>
   </main>
 
-  <div class="overlay" id="setupOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="setupTitle">
-    <section class="modal">
-      <div class="modal-head">
-        <h2 id="setupTitle">Finish Firebase setup</h2>
-        <button class="icon-button" id="setupClose" type="button" aria-label="Close setup guide">×</button>
-      </div>
-      <div class="modal-body">
-        <p class="setup-intro">The Closet web app is connected to the closet-404e9 Firebase project. Use this checklist to confirm the console-side services and access rules.</p>
-        <ol class="steps">
-          <li><div><strong>Web app connected</strong><span>The supplied Firebase web configuration is installed in this artifact.</span></div></li>
-          <li><div><strong>Enable Google sign-in</strong><span>Authentication → Sign-in method → Google → Enable. Add the published artifact domain to Authorized domains.</span></div></li>
-          <li><div><strong>Create Firestore</strong><span>Create the default Cloud Firestore database in production mode.</span></div></li>
-          <li><div><strong>Enable Cloud Storage</strong><span>Create the default Storage bucket. Uploaded photos will live under users/{uid}/items.</span></div></li>
-          <li><div><strong>Publish access rules</strong><span>Publish the per-user Firestore and Storage rules below in their respective Rules tabs.</span></div></li>
-        </ol>
-
-        <details class="rules">
-          <summary>Firestore rules</summary>
-          <p>Each signed-in person can access only their own item documents.</p>
-          <div class="code-wrap">
-            <button class="copy" type="button" data-copy="firestoreRules">Copy</button>
-            <pre id="firestoreRules">rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /users/{userId}/items/{itemId} {
-      allow read, create, update, delete:
-        if request.auth != null &amp;&amp; request.auth.uid == userId;
-    }
-  }
-}</pre>
-          </div>
-        </details>
-
-        <details class="rules">
-          <summary>Storage rules</summary>
-          <p>Only image uploads under 10 MB are accepted, and only for the signed-in owner.</p>
-          <div class="code-wrap">
-            <button class="copy" type="button" data-copy="storageRules">Copy</button>
-            <pre id="storageRules">rules_version = '2';
-service firebase.storage {
-  match /b/{bucket}/o {
-    match /users/{userId}/items/{allPaths=**} {
-      allow read: if request.auth != null &amp;&amp; request.auth.uid == userId;
-      allow write: if request.auth != null
-        &amp;&amp; request.auth.uid == userId
-        &amp;&amp; request.resource.size &lt; 10 * 1024 * 1024
-        &amp;&amp; request.resource.contentType.matches('image/.*');
-    }
-  }
-}</pre>
-          </div>
-        </details>
-
-        <a class="doc-link" href="https://firebase.google.com/docs/auth/web/start" target="_blank" rel="noopener noreferrer">Open Firebase web setup documentation ↗</a>
-      </div>
-    </section>
-  </div>
 
   <div class="overlay" id="uploadOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="uploadTitle">
     <section class="modal">
@@ -704,7 +646,6 @@ service firebase.storage {
         entries.forEach(function (e) { palette.push(e); });
       }
 
-      var setupOverlay = document.getElementById("setupOverlay");
       var uploadOverlay = document.getElementById("uploadOverlay");
       var bulkOverlay = document.getElementById("bulkOverlay");
       var bulkList = document.getElementById("bulkList");
@@ -835,7 +776,9 @@ service firebase.storage {
         reportError("unhandledrejection", event.reason);
       });
 
-      function setupRequired() { openOverlay(setupOverlay); }
+      // Setup guide removed 2026-10-16 (dead weight — the app ships
+      // configured). The !configured guards below stay as a safety net.
+      function setupRequired() { showToast("The app isn't connected — reload and try again."); }
 
       function signIn() {
         if (!configured) { setupRequired(); return; }
@@ -1352,19 +1295,17 @@ service firebase.storage {
           });
       }
 
-      document.getElementById("setupOpen").addEventListener("click", setupRequired);
       document.getElementById("authButton").addEventListener("click", function () {
         if (!configured) return;
         if (currentUser) auth.signOut();
         else signIn();
       });
-      document.getElementById("setupClose").addEventListener("click", function () { closeOverlay(setupOverlay); });
       document.getElementById("uploadClose").addEventListener("click", function () { closeOverlay(uploadOverlay); });
       document.getElementById("uploadCancel").addEventListener("click", function () { closeOverlay(uploadOverlay); });
       document.getElementById("addButton").addEventListener("click", beginAdd);
       document.getElementById("emptyAddButton").addEventListener("click", beginAdd);
 
-      [setupOverlay, uploadOverlay, itemOverlay, bulkOverlay, chatOverlay].forEach(function (overlay) {
+      [uploadOverlay, itemOverlay, bulkOverlay, chatOverlay].forEach(function (overlay) {
         overlay.addEventListener("click", function (event) { if (event.target === overlay) closeOverlay(overlay); });
       });
       document.addEventListener("keydown", function (event) {
@@ -1373,7 +1314,6 @@ service firebase.storage {
           else if (!uploadOverlay.hidden) closeOverlay(uploadOverlay);
           else if (!bulkOverlay.hidden) closeOverlay(bulkOverlay);
           else if (!chatOverlay.hidden) closeOverlay(chatOverlay);
-          else if (!setupOverlay.hidden) closeOverlay(setupOverlay);
         }
       });
 

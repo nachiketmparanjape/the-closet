@@ -29,13 +29,25 @@ done, an owner, one health metric, and a contract with the lanes it touches.
 - **Contracts out:** wear events + ratings → Loop. **Contracts in:** pick
   schema from Stylist.
 
-## Loop — "learn without nagging"
-- **Owner:** Bramble. **Metric:** suggestion acceptance rate (confirmed vs
-  dismissed style-note suggestions).
-- **Covers:** post-wear rating UI, reflection, evidence-backed preference
-  suggestions, style profile.
-- **Contracts in:** wear events + ratings (with predicted confidence) from
-  Outfits; writes confirmed preferences → Stylist honors them.
+## Loop — "capture outcomes faithfully"
+- **Owner:** Bramble. **Metric:** rating completion rate (wears that get rated).
+- **Covers:** "I wore this" action, wear date picker (PC-20), wear history
+  with deletion (PC-21), post-wear rating UI.
+- **Contracts out:** wear events + ratings (with predicted confidence) →
+  Personalization. **Contracts in:** outfit ids from Outfits.
+
+## Personalization — "the app knows your taste" (pillar, founder 2026-10-16)
+- **Owner:** Bramble. **Metric:** suggestion acceptance rate; calibration gap
+  (mean predicted confidence vs mean user rating).
+- **Covers:** the intelligence layer over recommendations and feedback —
+  reflection engine (reflectOutfit), evidence-backed preference suggestions,
+  confirm/dismiss flow, style profile storage, calibration logging,
+  preference honoring in picks. This is where the smart engineering lives:
+  reweighting confidence against ratings, pattern-vs-one-off detection,
+  taste decay/refresh.
+- **Contracts in:** wear events + ratings from Loop; outfit picks + scores
+  from Stylist. **Contracts out:** confirmed preferences → Stylist honors
+  them; calibration signals → prompt/rubric tuning.
 
 ## Anti-silo rule
 A cut that deletes a seam between lanes outranks lane-local polish.
