@@ -2336,9 +2336,34 @@
           txt.appendChild(nm);
           var cf = document.createElement("div");
           cf.className = "hint";
-          cf.textContent = "match " + Math.round((m.confidence || 0) * 100) + "%";
+          cf.textContent = m.swapped ? "you picked this" : "match " + Math.round((m.confidence || 0) * 100) + "%";
           txt.appendChild(cf);
           row.appendChild(txt);
+          // PC-13: swap a wrong match for the right piece. Pieces already
+          // kept in other rows are disabled — no duplicate pieces.
+          var usedIds = {};
+          kept.forEach(function (k) { if (k !== m) usedIds[k.itemId] = true; });
+          var sel = document.createElement("select");
+          sel.setAttribute("aria-label", "Swap piece");
+          var placeholder = document.createElement("option");
+          placeholder.value = "";
+          placeholder.textContent = "Swap…";
+          sel.appendChild(placeholder);
+          allItems.forEach(function (cand) {
+            var opt = document.createElement("option");
+            opt.value = cand.id;
+            opt.textContent = cand.name || "Untitled";
+            if (cand.id === m.itemId) opt.selected = true;
+            if (usedIds[cand.id]) opt.disabled = true;
+            sel.appendChild(opt);
+          });
+          sel.onchange = function () {
+            if (!sel.value) return;
+            m.itemId = sel.value;
+            m.swapped = true;
+            renderPhotoParseConfirm();
+          };
+          row.appendChild(sel);
           var rm = document.createElement("button");
           rm.className = "secondary";
           rm.type = "button";
