@@ -481,4 +481,4 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
   };
 }
 
-module.exports = { askStylist, buildStylistRequest, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeReferences, sanitizeStyleProfile, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, RUBRIC_VERSION, SYSTEM };
+module.exports = { askStylist, buildStylistRequest, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeReferences, sanitizeStyleProfile, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM };

@@ -141,6 +141,7 @@
     .outfit-row img { width: 44px; height: 44px; object-fit: cover; border-radius: 8px; flex: none; }
     .outfit-row .nm { font-size: 14px; font-weight: 600; }
     .outfit-row .ct { font-size: 12px; color: var(--muted); }
+    .outfit-photo { width: 100%; max-height: 320px; object-fit: cover; border-radius: 12px; margin-bottom: 12px; }
     .ver-badge { display: inline-block; font-size: 11px; font-weight: 700; background: var(--accent-soft); color: var(--accent); border-radius: 99px; padding: 2px 8px; margin-left: 6px; vertical-align: middle; }
     .fav-star { background: none; border: none; font-size: 18px; cursor: pointer; padding: 4px; }
     .rate-row { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
@@ -349,6 +350,8 @@
         <h2>Outfits</h2>
         <span class="count" id="outfitCount">0 outfits</span>
         <button class="secondary" id="buildOutfitBtn" type="button" style="margin-left:auto">+ Build</button>
+        <button class="secondary" id="photoParseBtn" type="button">From photo</button>
+        <input type="file" id="photoParseInput" accept="image/*" hidden>
       </div>
       <p class="hint" id="outfitsHint">Ask the stylist for an outfit, or build one yourself — saved outfits land here.</p>
       <div class="gallery" id="outfitsGallery"></div>
@@ -356,8 +359,25 @@
   </main>
 
 
-  <div class="overlay" id="uploadOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="uploadTitle">
+  <!-- PC-13: confirm the AI's photo matches before saving. -->
+  <div class="overlay" id="photoParseOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="photoParseTitle">
     <section class="modal">
+      <div class="modal-head">
+        <h2 id="photoParseTitle">Matches from your photo</h2>
+        <button class="icon-button" id="photoParseClose" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <div id="photoParseMatches"></div>
+        <div id="photoParseUnknown" class="hint" style="margin-top:8px"></div>
+      </div>
+      <div class="form-actions">
+        <button class="secondary" id="photoParseCancel" type="button">Cancel</button>
+        <button class="primary" id="photoParseSave" type="button">Save outfit</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="overlay" id="uploadOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="uploadTitle">    <section class="modal">
       <div class="modal-head">
         <h2 id="uploadTitle">Add a piece</h2>
         <button class="icon-button" id="uploadClose" type="button" aria-label="Close upload form">×</button>
@@ -582,6 +602,8 @@
           <button class="secondary" id="outfitFavBtn" type="button">☆ Favorite</button>
           <button class="secondary" id="outfitRenameBtn" type="button">Rename</button>
           <button class="secondary" id="outfitCritiqueBtn" type="button">AI take</button>
+          <button class="secondary" id="outfitPhotoBtn" type="button">Add photo</button>
+          <input type="file" id="outfitPhotoInput" accept="image/*" hidden>
           <button class="danger" id="outfitDelete" type="button">Delete</button>
         </div>
         <div id="outfitRateSection"></div>
@@ -2240,6 +2262,159 @@
         closeOverlay(document.getElementById("outfitOverlay"));
       }
 
+      // PC-13: outfit photo parsing — upload, AI match, confirm, save.
+      var photoParseState = null; // { photoUrl, storagePath, matches: [{itemId, confidence, removed}], unknown: [] }
+
+      function openPhotoParse() {
+        document.getElementById("photoParseInput").click();
+      }
+
+      function closePhotoParse(cleanup) {
+        closeOverlay(document.getElementById("photoParseOverlay"));
+        if (cleanup && photoParseState && photoParseState.storagePath) {
+          storage.ref().child(photoParseState.storagePath).delete().catch(function () {});
+        }
+        photoParseState = null;
+        document.getElementById("photoParseInput").value = "";
+      }
+
+      function handlePhotoParseFile(file) {
+        if (!file || !currentUser) return;
+        showToast("Analyzing photo…");
+        var safeName = Date.now() + "-" + file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+        var storagePath = "users/" + currentUser.uid + "/outfit-photos/" + safeName;
+        var fileRef = storage.ref().child(storagePath);
+        fileRef.put(file, { contentType: file.type }).then(function () {
+          return fileRef.getDownloadURL();
+        }).then(function (url) {
+          return functions.httpsCallable("parseOutfitPhoto")({ storagePath: storagePath }).then(function (res) {
+            var data = res.data || {};
+            photoParseState = {
+              photoUrl: url,
+              storagePath: storagePath,
+              matches: (data.matches || []).map(function (m) {
+                return { itemId: m.itemId, confidence: m.confidence, removed: false };
+              }),
+              unknown: data.unknown || []
+            };
+            renderPhotoParseConfirm();
+            openOverlay(document.getElementById("photoParseOverlay"));
+          });
+        }).catch(function (err) {
+          storage.ref().child(storagePath).delete().catch(function () {});
+          showToast(friendlyError(err));
+        });
+      }
+
+      function renderPhotoParseConfirm() {
+        var st = photoParseState;
+        if (!st) return;
+        var wrap = document.getElementById("photoParseMatches");
+        wrap.textContent = "";
+        var kept = st.matches.filter(function (m) { return !m.removed; });
+        if (!kept.length) {
+          var p = document.createElement("p");
+          p.className = "hint";
+          p.textContent = "Nothing matched your wardrobe — cancel and try another photo, or build it manually.";
+          wrap.appendChild(p);
+        }
+        kept.forEach(function (m) {
+          var it = itemById(m.itemId);
+          var row = document.createElement("div");
+          row.className = "outfit-row";
+          var photos = it ? itemPhotos(it) : [];
+          if (photos.length) {
+            var img = document.createElement("img");
+            img.src = photos[0].url;
+            img.alt = "";
+            row.appendChild(img);
+          }
+          var txt = document.createElement("div");
+          var nm = document.createElement("div");
+          nm.className = "nm";
+          nm.textContent = (it && it.name) || "Unknown item";
+          txt.appendChild(nm);
+          var cf = document.createElement("div");
+          cf.className = "hint";
+          cf.textContent = "match " + Math.round((m.confidence || 0) * 100) + "%";
+          txt.appendChild(cf);
+          row.appendChild(txt);
+          var rm = document.createElement("button");
+          rm.className = "secondary";
+          rm.type = "button";
+          rm.textContent = "Remove";
+          rm.onclick = function () { m.removed = true; renderPhotoParseConfirm(); };
+          row.appendChild(rm);
+          wrap.appendChild(row);
+        });
+        var unk = document.getElementById("photoParseUnknown");
+        unk.textContent = st.unknown.length ? "Not in your wardrobe: " + st.unknown.join("; ") : "";
+        document.getElementById("photoParseSave").disabled = kept.length < 1;
+      }
+
+      function savePhotoParseOutfit() {
+        var st = photoParseState;
+        if (!st) return;
+        var sel = st.matches.filter(function (m) { return !m.removed; }).map(function (m) { return m.itemId; });
+        if (!sel.length) { showToast("Keep at least one match to save."); return; }
+        // PC-18: same dedup check as chat/builder saves.
+        findDuplicateOutfit(sel, "photo").then(function (dup) {
+          if (dup) {
+            closePhotoParse(true);
+            showToast("This exact outfit is already saved — opening the existing one.");
+            switchView("outfits");
+            openOutfit(dup.id);
+            return;
+          }
+          var ref = db.collection("users").doc(currentUser.uid).collection("outfits").doc();
+          ref.set({
+            versionGroup: ref.id,
+            version: 1,
+            supersedes: null,
+            itemIds: sel,
+            itemNames: sel.map(function (id) { var it = itemById(id); return it ? it.name : "Unknown item"; }),
+            source: "photo",
+            name: defaultOutfitName(sel),
+            occasion: null,
+            weather: null,
+            appConfidence: null,
+            appReasoning: "",
+            photoUrl: st.photoUrl,
+            dedupHash: outfitDedupHash(sel, "photo"),
+            favorite: false,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          }).then(function () {
+            closePhotoParse(false);
+            showToast("Outfit saved.");
+            switchView("outfits");
+            openOutfit(ref.id);
+          }).catch(function (err) {
+            showToast(friendlyError(err));
+          });
+        }).catch(function (err) {
+          showToast(friendlyError(err));
+        });
+      }
+
+      // PC-13: add a photo to an existing outfit. No validation (parked —
+      // it's the user's own photo on their own outfit).
+      function handleOutfitPhotoFile(file, outfit) {
+        if (!file || !outfit || !currentUser) return;
+        var safeName = Date.now() + "-" + file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+        var storagePath = "users/" + currentUser.uid + "/outfit-photos/" + safeName;
+        var fileRef = storage.ref().child(storagePath);
+        fileRef.put(file, { contentType: file.type }).then(function () {
+          return fileRef.getDownloadURL();
+        }).then(function (url) {
+          return db.collection("users").doc(currentUser.uid).collection("outfits").doc(outfit.id).update({ photoUrl: url });
+        }).then(function () {
+          showToast("Photo added.");
+          renderOutfitDetail();
+        }).catch(function (err) {
+          showToast(friendlyError(err));
+        });
+      }
+
       function renderOutfitDetail() {
         var versions = outfitVersions(activeOutfitGroup);
         var o = versions[0];
@@ -2247,6 +2422,15 @@
         body.textContent = "";
         if (!o) { closeOutfit(); return; }
         document.getElementById("outfitTitle").textContent = o.name || "Outfit";
+
+        // PC-13: the outfit photo, when one was parsed or added.
+        if (o.photoUrl) {
+          var oimg = document.createElement("img");
+          oimg.src = o.photoUrl;
+          oimg.alt = "Outfit photo";
+          oimg.className = "outfit-photo";
+          body.appendChild(oimg);
+        }
 
         (o.itemIds || []).forEach(function (id, i) {
           var it = itemById(id);
@@ -2346,6 +2530,16 @@
           db.collection("users").doc(currentUser.uid).collection("outfits").doc(o.id)
             .update({ favorite: !o.favorite })
             .catch(function (err) { showToast(friendlyError(err)); });
+        };
+
+        // PC-13: add a photo to this outfit (no validation — parked).
+        var outfitPhotoInput = document.getElementById("outfitPhotoInput");
+        document.getElementById("outfitPhotoBtn").onclick = function () {
+          outfitPhotoInput.click();
+        };
+        outfitPhotoInput.onchange = function () {
+          handleOutfitPhotoFile(this.files && this.files[0], o);
+          this.value = "";
         };
 
         // Phase 3: fresh rating section + wear history per open.
@@ -2473,6 +2667,14 @@
       }
 
       document.getElementById("buildOutfitBtn").addEventListener("click", openBuilder);
+      // PC-13: outfit photo parsing.
+      document.getElementById("photoParseBtn").addEventListener("click", openPhotoParse);
+      document.getElementById("photoParseInput").addEventListener("change", function () {
+        handlePhotoParseFile(this.files && this.files[0]);
+      });
+      document.getElementById("photoParseClose").addEventListener("click", function () { closePhotoParse(true); });
+      document.getElementById("photoParseCancel").addEventListener("click", function () { closePhotoParse(true); });
+      document.getElementById("photoParseSave").addEventListener("click", savePhotoParseOutfit);
       document.getElementById("builderClose").addEventListener("click", closeBuilder);
       document.getElementById("builderCancel").addEventListener("click", closeBuilder);
       document.getElementById("builderSave").addEventListener("click", function () {
