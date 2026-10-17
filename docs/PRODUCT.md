@@ -137,3 +137,9 @@ Decided topics stay as compact records; full reports live in `research_notes/`.
   than retail's 1 where it matters (accent matching), and 4th+ colors are
   usually shading noise. The single `primary` color keeps us compatible
   with the industry's one-color convention for display/filtering.
+
+### [DECIDED 2026-10-16] Rating stays gated behind wearing
+- **Question:** should a user be able to rate an outfit without logging it as worn?
+- **Decision:** no — rating remains post-wear only. The rating is the
+  reflection loop's input (predicted confidence vs actual outcome), and an
+  outcome only exists once the outfit was actually worn. Founder call.
