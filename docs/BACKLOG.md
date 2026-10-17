@@ -146,3 +146,27 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
   your Navy Tee — add anyway?") rather than blocking. Possible
   `duplicateOf` link or quantity field later.
 - **Not yet sized** — parked; on our mind per founder.
+
+### PC-20: Log a wear on a chosen date (S)
+- **Problem (founder 2026-10-16):** "I wore this" stamps today only — no
+  way to log a wear on a past date (e.g. yesterday's outfit remembered
+  today).
+- **Shape:** date picker on the wear action, defaulting to today; wear
+  history shows the chosen date. Backfill-safe: existing entries keep
+  their server timestamps.
+
+### PC-21: Delete a wear history entry (S)
+- **Problem (founder 2026-10-16):** no way to remove a wear entry — a
+  mis-tap appends forever, polluting wear counts and per-article stats.
+- **Shape:** swipe/tap-to-delete on wear history rows, with confirm.
+  Deleting a wear un-counts it from article stats (derived, so automatic).
+
+### PC-22: Reference articles/outfits in chat (M/L) — future component
+- **Idea (founder 2026-10-16):** a referencing mechanism so the chat has
+  context: "@ this outfit but slightly warmer", "design the rest around
+  this navy tee". A reusable component for many future features.
+- **Shape:** reference chips in the chat input (@-mention style); payload
+  carries `{articleIds, outfitIds}`; server resolves to wardrobe lines +
+  outfit context. Generalizes PC-16's previousPick (which only knows the
+  last pick, implicitly).
+- **Not yet sized** — candidate for prioritization.
