@@ -1,6 +1,13 @@
 # Sprint 5 plan — Stylist quality + model migration
 
-**Status:** Phase 0–3 + docs shipped 2026-10-15/16. Founder acceptance pending.
+**Status:** CLOSED 2026-10-16 — founder-tested and accepted. Phase 0–3 + docs
+shipped 2026-10-15/16, all functions ACTIVE on gemini-3.8-flash (global
+endpoint), storage-rules delete bug fixed and verified live, 71/71 tests,
+CI green. Founder phone test 2026-10-16 produced three follow-ups, queued
+as PC-15/16/17 for Sprint 6. One loose end rolled over: the stylist quality
+benchmark ran but never produced a clean multi-scenario baseline (network
+friction) — infrastructure is committed, re-run in Sprint 6. Founder
+decision recorded: rating stays gated behind wearing (PRODUCT.md).
 **Inputs:** Claude's stylist.js review (6 points) + ChatGPT's full-repo review (7 sections).
 Both reviews were assessed against the code and (for the retirement claim)
 against Google's docs. Verdicts below; disagreements noted explicitly.

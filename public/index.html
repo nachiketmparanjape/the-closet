@@ -2578,7 +2578,6 @@ service firebase.storage {
         btn.type = "button";
         btn.className = o.savedId ? "secondary" : "primary";
         btn.textContent = o.savedId ? "Saved ✓ — view in Outfits" : "Save outfit";
-        btn.disabled = !!o.savedId;
         if (!o.savedId) {
           btn.addEventListener("click", function () { saveChatOutfit(msg); });
         } else {
