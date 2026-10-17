@@ -201,6 +201,17 @@ function sanitizeMessages(messages) {
   return out;
 }
 
+// PC-16: the client's latest pick, for in-chat iteration ("swap the
+// shorts"). Just item ids — the server resolves them to wardrobe handles.
+function sanitizePreviousPick(value) {
+  if (!value || typeof value !== "object") return null;
+  const ids = Array.isArray(value.itemIds)
+    ? value.itemIds.filter((id) => typeof id === "string" && id).slice(0, 6)
+    : [];
+  if (!ids.length) return null;
+  return { itemIds: ids };
+}
+
 // User-confirmed style preferences (PC-12). Plain strings, capped.
 function sanitizeStyleProfile(prefs) {
   if (!Array.isArray(prefs)) return [];
@@ -296,10 +307,11 @@ function parseStylistJson(text) {
 
 // items: sanitized array. messages: sanitized [{role, text}].
 // styleProfile: sanitized preference strings (may be empty).
+// previousPick: sanitized {itemIds} from sanitizePreviousPick, or null.
 // Build the exact model request askStylist sends. Exported so the
 // benchmark runner (tests/benchmark) exercises the real prompt —
 // prompt changes and benchmark stay in sync by construction.
-function buildStylistRequest(items, messages, styleProfile) {
+function buildStylistRequest(items, messages, styleProfile, previousPick) {
   const model = process.env.GEMINI_MODEL || MODEL_VERSION;
   const wardrobe = items.map((it, i) => itemLine(it, i)).join("\n");
   let system = SYSTEM;
@@ -307,6 +319,24 @@ function buildStylistRequest(items, messages, styleProfile) {
   if (prefs.length) {
     system += "\n\nSTYLE PROFILE — the user's confirmed preferences. Honor them when recommending:\n" +
       prefs.map((p) => "- " + p).join("\n");
+  }
+  // PC-16: iteration. The user is refining the previous pick, not starting
+  // over — resolve its ids to wardrobe handles so the model can address
+  // slots ("swap the shorts") precisely.
+  if (previousPick && Array.isArray(previousPick.itemIds) && previousPick.itemIds.length) {
+    const prevHandles = previousPick.itemIds.map((id) => {
+      const idx = items.findIndex((it) => it && it.id === id);
+      if (idx === -1) return null;
+      return "[i" + (idx + 1) + '] "' + cleanText(items[idx].name, 60) + '"';
+    }).filter(Boolean);
+    if (prevHandles.length) {
+      system += "\n\nITERATION — the user is refining your previous pick, not starting over.\n" +
+        "Previous pick: " + prevHandles.join(", ") + ".\n" +
+        "- \"swap/change the X\" → replace only that slot's item; keep the rest.\n" +
+        "- \"something warmer/cooler/dressier/…\" → adjust the pick in that direction, keeping what still works.\n" +
+        "- \"another option\" / \"try again\" → pick a fully different outfit; avoid reusing previous items unless the wardrobe gives no alternative.\n" +
+        "- Always return the COMPLETE new outfit (all slots), scored fresh against the rubric.";
+    }
   }
   const contents = [
     { role: "user", parts: [{ text: "WARDROBE (pick only from these items):\n" + wardrobe }] },
@@ -349,9 +379,10 @@ function confidenceFromScores(scores) {
 
 // items: sanitized array. messages: sanitized [{role, text}].
 // styleProfile: sanitized preference strings (may be empty).
+// previousPick: sanitized {itemIds} or null (PC-16 iteration).
 // Returns { reply, outfit: { itemIds, confidence, reasoning, scores } | null }.
-async function askStylist(items, messages, styleProfile) {
-  const { model, contents, config } = buildStylistRequest(items, messages, styleProfile);
+async function askStylist(items, messages, styleProfile, previousPick) {
+  const { model, contents, config } = buildStylistRequest(items, messages, styleProfile, previousPick);
   const ai = getClient();
   let parsed = await callStylistModel(ai, model, contents, config, "askStylist");
 
@@ -389,4 +420,4 @@ async function askStylist(items, messages, styleProfile) {
   };
 }
 
-module.exports = { askStylist, buildStylistRequest, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizeStyleProfile, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, RUBRIC_VERSION, SYSTEM };
+module.exports = { askStylist, buildStylistRequest, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeStyleProfile, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, RUBRIC_VERSION, SYSTEM };

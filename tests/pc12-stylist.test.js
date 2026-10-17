@@ -4,7 +4,7 @@ const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
 const path = require("node:path");
 module.paths.unshift(path.join(__dirname, "..", "functions", "node_modules"));
-const { sanitizeItems, sanitizeStyleProfile, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine } = require("../functions/stylist.js");
+const { sanitizeItems, sanitizePreviousPick, sanitizeStyleProfile, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, buildStylistRequest } = require("../functions/stylist.js");
 
 describe("sanitizeItems (PC-12)", () => {
   it("keeps a cleaned id for server-side handle→id mapping", () => {
@@ -126,5 +126,41 @@ describe("sanitizeStyleProfile", () => {
   it("returns [] for non-arrays", () => {
     assert.deepEqual(sanitizeStyleProfile(null), []);
     assert.deepEqual(sanitizeStyleProfile("nope"), []);
+  });
+});
+
+describe("sanitizePreviousPick (PC-16)", () => {
+  it("keeps string ids, caps at 6", () => {
+    const p = sanitizePreviousPick({ itemIds: ["a", "b", 42, null, "c"] });
+    assert.deepEqual(p, { itemIds: ["a", "b", "c"] });
+  });
+  it("returns null for missing/empty/non-object input", () => {
+    assert.equal(sanitizePreviousPick(null), null);
+    assert.equal(sanitizePreviousPick({}), null);
+    assert.equal(sanitizePreviousPick({ itemIds: [] }), null);
+    assert.equal(sanitizePreviousPick("nope"), null);
+  });
+});
+
+describe("buildStylistRequest iteration block (PC-16)", () => {
+  const items = sanitizeItems([
+    { id: "aaa", name: "Navy Tee", category: "Tops" },
+    { id: "bbb", name: "Tan Shorts", category: "Bottoms" },
+  ]);
+  const messages = [{ role: "user", text: "casual lunch" }];
+  it("adds the iteration block with resolved handles when a previous pick exists", () => {
+    const { config } = buildStylistRequest(items, messages, [], { itemIds: ["aaa", "bbb"] });
+    const sys = config.systemInstruction;
+    assert.ok(sys.includes("ITERATION"));
+    assert.ok(sys.includes('[i1] "Navy Tee"'));
+    assert.ok(sys.includes('[i2] "Tan Shorts"'));
+  });
+  it("omits the block without a previous pick (benchmark-compatible)", () => {
+    const { config } = buildStylistRequest(items, messages, []);
+    assert.ok(!config.systemInstruction.includes("ITERATION"));
+  });
+  it("skips ids that are not in the wardrobe", () => {
+    const { config } = buildStylistRequest(items, messages, [], { itemIds: ["zzz"] });
+    assert.ok(!config.systemInstruction.includes("ITERATION"));
   });
 });
