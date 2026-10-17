@@ -142,6 +142,7 @@
     .outfit-row .nm { font-size: 14px; font-weight: 600; }
     .outfit-row .ct { font-size: 12px; color: var(--muted); }
     .outfit-photo { width: 100%; max-height: 320px; object-fit: cover; border-radius: 12px; margin-bottom: 12px; }
+    .photo-actions { display: flex; gap: 8px; margin-top: 8px; }
     .ver-badge { display: inline-block; font-size: 11px; font-weight: 700; background: var(--accent-soft); color: var(--accent); border-radius: 99px; padding: 2px 8px; margin-left: 6px; vertical-align: middle; }
     .fav-star { background: none; border: none; font-size: 18px; cursor: pointer; padding: 4px; }
     .rate-row { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
@@ -386,6 +387,10 @@
         <div class="field file-drop">
           <label for="photoInput">Photos (up to 4)</label>
           <input id="photoInput" type="file" accept="image/jpeg,image/png,image/webp" multiple required />
+          <div class="photo-actions">
+            <button class="secondary" id="photoCameraBtn" type="button">Take photo</button>
+            <input id="photoInputCamera" type="file" accept="image/*" capture="environment" hidden />
+          </div>
           <div class="photo-preview" id="photoPreview" hidden></div>
         </div>
         <div class="field">
@@ -443,6 +448,10 @@
         <div class="field file-drop">
           <label for="bulkInput">Photos (up to 50)</label>
           <input id="bulkInput" type="file" accept="image/jpeg,image/png,image/webp" multiple />
+          <div class="photo-actions">
+            <button class="secondary" id="bulkCameraBtn" type="button">Take photo</button>
+            <input id="bulkInputCamera" type="file" accept="image/*" capture="environment" hidden />
+          </div>
         </div>
         <div class="bulk-list" id="bulkList" hidden></div>
         <div class="progress" id="bulkProgress" hidden aria-label="Bulk upload progress"><span></span></div>
@@ -1496,7 +1505,27 @@
       }
 
       document.getElementById("photoInput").addEventListener("change", function () {
-        var files = Array.prototype.slice.call(this.files, 0, MAX_PHOTOS);
+        handlePhotoInputFiles(this);
+      });
+      // Camera capture feeds the same flow: the captured file is placed
+      // into the library input so preview, AI suggest, and submit all work
+      // unchanged. (Android's picker often offers no camera option.)
+      document.getElementById("photoCameraBtn").addEventListener("click", function () {
+        document.getElementById("photoInputCamera").click();
+      });
+      document.getElementById("photoInputCamera").addEventListener("change", function () {
+        var file = this.files && this.files[0];
+        this.value = "";
+        if (!file) return;
+        var dt = new DataTransfer();
+        dt.items.add(file);
+        var lib = document.getElementById("photoInput");
+        lib.files = dt.files;
+        lib.dispatchEvent(new Event("change"));
+      });
+
+      function handlePhotoInputFiles(input) {
+        var files = Array.prototype.slice.call(input.files, 0, MAX_PHOTOS);
         suggestHint.hidden = true;
         aiRequestId++;
         aiSuggestion = null;
@@ -1508,7 +1537,7 @@
         photoPreview.textContent = "";
         photoPreview.hidden = true;
         if (!files.length) return;
-        if (this.files.length > MAX_PHOTOS) {
+        if (input.files.length > MAX_PHOTOS) {
           showToast("Keeping the first " + MAX_PHOTOS + " photos.");
         }
         files.forEach(function (file) {
@@ -1544,7 +1573,7 @@
         };
         img.onerror = function () { URL.revokeObjectURL(url); };
         img.src = url;
-      });
+      }
 
       uploadForm.addEventListener("submit", function (event) {
         event.preventDefault();
@@ -1831,10 +1860,23 @@
       }
 
       bulkInput.addEventListener("change", function () {
-        if (bulkRunning) return;
-        var files = Array.prototype.slice.call(this.files, 0, BULK_MAX);
+        setBulkJobs(Array.prototype.slice.call(this.files, 0, BULK_MAX), false);
         if (this.files.length > BULK_MAX) showToast("Keeping the first " + BULK_MAX + " photos.");
-        bulkJobs = files.map(function (file) {
+      });
+      // Camera capture appends one photo per tap (bulkRunning guard shared).
+      document.getElementById("bulkCameraBtn").addEventListener("click", function () {
+        document.getElementById("bulkInputCamera").click();
+      });
+      document.getElementById("bulkInputCamera").addEventListener("change", function () {
+        var file = this.files && this.files[0];
+        this.value = "";
+        if (!file) return;
+        setBulkJobs([file], true);
+      });
+
+      function setBulkJobs(files, append) {
+        if (bulkRunning) return;
+        var jobs = files.map(function (file) {
           var problem = validBulkFile(file);
           return {
             file: file,
@@ -1844,11 +1886,12 @@
             error: problem
           };
         });
+        bulkJobs = append ? bulkJobs.concat(jobs).slice(0, BULK_MAX) : jobs;
         var n = bulkJobs.filter(function (j) { return j.status === "queued"; }).length;
         bulkStartBtn.disabled = n === 0;
         bulkStartBtn.textContent = n > 0 ? "Add " + n + " piece" + (n === 1 ? "" : "s") : "Add pieces";
         renderBulkList();
-      });
+      }
 
       bulkStartBtn.addEventListener("click", bulkKick);
 
