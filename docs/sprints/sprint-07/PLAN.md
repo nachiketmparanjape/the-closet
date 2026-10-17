@@ -1,7 +1,7 @@
 # Sprint 7 — Trustworthy history, referenceable chat
 
 **Dates:** 2026-10-17 → 2026-10-31 (fixed; unfinished cuts roll over, no guilt)
-**Status:** proposed by PM 2026-10-16, awaiting founder approval.
+**Status:** in progress — all three planned cuts shipped; founder testing.
 **Theme:** the data the app learns from must be correct (wear history,
 outfit identity), and the chat grows from answering questions into a
 surface you can point things at.
@@ -19,13 +19,7 @@ and approved without veto.
   live via CI.
 - **Problem:** "I wore this" stamps today only, and entries can't be
   deleted — mis-taps append forever and wrong dates poison the learning data.
-- **In scope:**
-  - Date picker on the wear action, defaulting to today; history shows the
-    chosen date. Existing entries keep their server timestamps.
-  - Delete a wear entry (confirm first); derived article stats un-count it.
 - **Out of scope:** editing a wear's note/occasion after the fact; bulk ops.
-- **Done looks like:** log yesterday's outfit with yesterday's date; delete
-  a mis-tapped entry and watch the "Worn N×" count drop.
 - **Size:** S. **Constitution check:** passes (no non-goal conflicts).
 
 ### PC-18: Outfit dedup (S/M, Outfits lane) — DONE 2026-10-17
@@ -33,6 +27,11 @@ and approved without veto.
   save; both chat and builder saves check first — identical save links to
   the existing outfit with a toast instead of minting a duplicate.
   Forward-only; 80/80 tests (3 new hash tests), live via CI.
+- **Problem:** saving the same pick twice mints two unrelated docs —
+  wear history and ratings fragment across duplicates.
+- **Out of scope:** merging already-existing duplicates (forward-only);
+  fuzzy/near-duplicate detection.
+- **Size:** S/M. **Constitution check:** passes.
 - Bonus, founder-requested mid-sprint: **delete outfit** — danger button in
   the outfit view; confirm names the wear count if worn; wear events stay
   (history is factual), outfit doc goes; the live listener refreshes and
@@ -45,39 +44,33 @@ and approved without veto.
   every id re-validated server-side against the real wardrobe). New
   EXPLICIT REFERENCES prompt block outranks the implicit previousPick.
   87/87 tests (7 new), `askStylist` redeployed ACTIVE, live via CI.
-- Design note: one deviation from the design doc — outfit contents are
-  resolved client-side rather than via a server Firestore read (same trust
-  level, no added latency).
-- **Problem:** saving the same pick twice mints two unrelated docs —
-  wear history and ratings fragment across duplicates.
-- **In scope:** content hash over sorted itemIds (+ source) computed at
-  save time; saving an identical combination surfaces "you already saved
-  this exact outfit" with a shortcut to the existing one instead of a
-  silent duplicate. Interacts with versioning: a re-save of an identical
-  *version* is the dup case; edited versions are still new versions.
-- **Out of scope:** merging already-existing duplicates (forward-only);
-  fuzzy/near-duplicate detection.
-- **Done looks like:** save an outfit, ask for the same thing again, save
-  again — second save nudges to the existing outfit, one doc exists.
-- **Size:** S/M. **Constitution check:** passes.
-
-### PC-22: Chat references (M/L, Stylist lane) — design first
+- Design doc: `PC-22-DESIGN.md` (approved by founder before build). One
+  deviation: outfit contents resolved client-side rather than via a server
+  Firestore read (same trust level, no added latency).
 - **Problem:** the chat can't be pointed at things — "this outfit but
   warmer", "build around this tee" has no mechanism.
-- **In scope:** design doc first (founder validates), then build:
-  @-style reference chips in the chat input; payload carries
-  `{articleIds, outfitIds}`; server resolves to wardrobe lines + outfit
-  context. Generalizes PC-16's previousPick (implicit, last-pick-only)
-  into an explicit, reusable component.
 - **Out of scope:** referencing across products; rich link previews;
   multi-outfit comparison.
-- **Done looks like:** reference an outfit, say "warmer version of this",
-  get an iterated pick without leaving chat; reference an article, say
-  "build around this", get a full outfit containing it.
 - **Size:** M/L (split design + build). **Constitution check:** passes.
+
+## Founder feedback round (2026-10-17, phone testing)
+
+- **@-tags not ingested?** Founder reported the chat ignoring a tagged item.
+  Investigated: prompt construction verified locally, then ran his exact
+  scenario against the live model — it built the outfit around the tagged
+  joggers correctly. His screenshot showed the tagged message composed but
+  unsent. No code change; asked him to tap Send and report.
+- **Outfit naming + rename — SHIPPED 2026-10-17.** All chat saves were
+  "Outfit · \<date\>", indistinguishable same-day. New outfits now get
+  descriptive default names from their pieces
+  ("Black Nike Air joggers + White Cotton Tee +1"); the outfit view has a
+  Rename button (metadata-only, no version bump). 90/90 tests, live via CI.
 
 ## Parked this sprint (ranked, not selected)
 - Lane metrics instrumentation (S/M) — rank 4.
 - PC-13 outfit photo parsing (M/L) — rank 5, natural Sprint 8.
 - PC-14 shop compatibility (M) — rank 6.
 - PC-19 article dup detection (M) — parked per founder (not high priority).
+- PC-23 archive layer (M) — parked per founder 2026-10-16; trigger: a
+  "deleted something I wanted back" moment or an article delete visibly
+  breaking an old outfit.
