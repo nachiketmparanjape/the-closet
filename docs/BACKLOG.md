@@ -183,3 +183,35 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
 - **Trigger to build:** founder says "I deleted something I wanted back",
   or an article delete visibly breaks an old outfit. Parked until then
   per founder 2026-10-16.
+
+### PC-24: Wearer style preference — "shop for me like" (S/M)
+- **Idea (founder 2026-10-16):** clothing norms are heavily gendered, and
+  the stylist currently has zero signal about the wearer — it guesses or
+  defaults. Capture an explicit, optional wearer preference: shop
+  menswear-leaning / womenswear-leaning / no preference (mix).
+- **Shape:** a style-profile setting (framed as "when I say 'a shirt',
+  which side do you shop?" — not "what is your gender?"); passed to the
+  stylist prompt as recommendation guidance. Optional, changeable anytime.
+- **Deliberate non-goals:** never inferred from photos, names, or existing
+  clothes; binary is not the only option; does not constrain what the
+  user may own or ask for.
+- **Not yet sized** — parked; candidate for prioritization.
+
+### PC-25: Garment gender tagging (S/M)
+- **Idea (founder 2026-10-16):** tag clothes as menswear / womenswear /
+  unisex — a property of the *garment's design intent*, kept separate from
+  the wearer's identity (PC-24). A man can own womenswear; the data model
+  must allow it.
+- **Shape:** optional `gender` field on items; AI suggests at upload (it can
+  usually read design intent off the garment), user confirms. Enables
+  filtering and gives the stylist fit language ("women's blouse" vs
+  "men's shirt").
+- **Not yet sized** — parked; candidate for prioritization.
+
+### PC-26: Gender-aware stylist prompting (M, depends on PC-24 + PC-25)
+- **Idea (founder 2026-10-16):** once both signals exist, teach the rubric
+  to use them with nuance: honor the wearer preference by default, use
+  garment tags to avoid mismatches, and handle cross-shopping gracefully
+  ("I want to try something from the other side") without lecturing.
+  Includes a copy audit of prompts and UI for gendered assumptions.
+- **Not yet sized** — parked; candidate for prioritization.
