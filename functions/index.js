@@ -17,7 +17,7 @@ const { initializeApp } = require("firebase-admin/app");
 const { getStorage } = require("firebase-admin/storage");
 const { getFirestore } = require("firebase-admin/firestore");
 const { describeImage } = require("./describe");
-const { askStylist, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeStyleProfile } = require("./stylist");
+const { askStylist, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeReferences, sanitizeStyleProfile } = require("./stylist");
 const { reflectOutfit } = require("./reflect");
 // PC-11: every expected failure goes through the catalog; every failure
 // path logs with a correlation ID.
@@ -111,6 +111,7 @@ exports.askStylist = onCall(
       const items = sanitizeItems(data.items);
       const messages = sanitizeMessages(data.messages);
       const previousPick = sanitizePreviousPick(data.previousPick);
+      const references = sanitizeReferences(data.references, items);
       if (!items.length) {
         fail("EMPTY_WARDROBE");
       }
@@ -132,7 +133,7 @@ exports.askStylist = onCall(
       } catch (e) {
         logError("askStylist.styleProfile", e, { uid: uid, correlationId: correlationId });
       }
-      return await askStylist(items, messages, styleProfile, previousPick);
+      return await askStylist(items, messages, styleProfile, previousPick, references);
     } catch (err) {
       // Any failure inside askStylist is a downstream AI failure.
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";

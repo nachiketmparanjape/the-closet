@@ -212,6 +212,39 @@ function sanitizePreviousPick(value) {
   return { itemIds: ids };
 }
 
+// PC-22: @-mention references. The client sends { articleIds, outfits }
+// where outfits carry their itemIds (resolved from its local cache); every
+// id is re-validated against the real wardrobe here, so the model only
+// ever sees items that exist. Malformed input → empty (never a 400).
+function sanitizeReferences(value, items) {
+  const out = { articles: [], outfits: [] };
+  const valid = new Set((items || []).map((it) => it && it.id).filter(Boolean));
+  if (!value || typeof value !== "object") return out;
+  if (Array.isArray(value.articleIds)) {
+    for (const id of value.articleIds.slice(0, 5)) {
+      if (typeof id === "string" && id && valid.has(id) && !out.articles.includes(id)) {
+        out.articles.push(id);
+      }
+    }
+  }
+  if (Array.isArray(value.outfits)) {
+    for (const o of value.outfits.slice(0, 3)) {
+      if (!o || typeof o !== "object") continue;
+      const ids = Array.isArray(o.itemIds)
+        ? o.itemIds.filter((id) => typeof id === "string" && id && valid.has(id))
+        : [];
+      if (ids.length >= 2) {
+        out.outfits.push({
+          id: typeof o.id === "string" ? o.id : "",
+          name: cleanText(o.name, 60),
+          itemIds: ids,
+        });
+      }
+    }
+  }
+  return out;
+}
+
 // User-confirmed style preferences (PC-12). Plain strings, capped.
 function sanitizeStyleProfile(prefs) {
   if (!Array.isArray(prefs)) return [];
@@ -309,10 +342,11 @@ function parseStylistJson(text) {
 // items: sanitized array. messages: sanitized [{role, text}].
 // styleProfile: sanitized preference strings (may be empty).
 // previousPick: sanitized {itemIds} from sanitizePreviousPick, or null.
+// references: sanitized {articles, outfits} from sanitizeReferences, or null.
 // Build the exact model request askStylist sends. Exported so the
 // benchmark runner (tests/benchmark) exercises the real prompt —
 // prompt changes and benchmark stay in sync by construction.
-function buildStylistRequest(items, messages, styleProfile, previousPick) {
+function buildStylistRequest(items, messages, styleProfile, previousPick, references) {
   const model = process.env.GEMINI_MODEL || MODEL_VERSION;
   const wardrobe = items.map((it, i) => itemLine(it, i)).join("\n");
   let system = SYSTEM;
@@ -337,6 +371,31 @@ function buildStylistRequest(items, messages, styleProfile, previousPick) {
         "- \"something warmer/cooler/dressier/…\" → adjust the pick in that direction, keeping what still works.\n" +
         "- \"another option\" / \"try again\" → pick a fully different outfit; avoid reusing previous items unless the wardrobe gives no alternative.\n" +
         "- Always return the COMPLETE new outfit (all slots), scored fresh against the rubric.";
+    }
+  }
+  // PC-22: explicit @-references outrank the implicit previousPick — the
+  // user pointed at these deliberately. Resolved to wardrobe handles so
+  // the model addresses exact pieces.
+  function refHandle(id) {
+    const idx = items.findIndex((it) => it && it.id === id);
+    if (idx === -1) return null;
+    return "[i" + (idx + 1) + '] "' + cleanText(items[idx].name, 60) + '"';
+  }
+  if (references && (references.articles.length || references.outfits.length)) {
+    const lines = [];
+    const artHandles = references.articles.map(refHandle).filter(Boolean);
+    if (artHandles.length) lines.push("Pointed-at PIECES: " + artHandles.join(", "));
+    for (const o of references.outfits) {
+      const parts = o.itemIds.map(refHandle).filter(Boolean);
+      if (parts.length) lines.push('Pointed-at OUTFIT "' + (o.name || "Outfit") + '": ' + parts.join(", "));
+    }
+    if (lines.length) {
+      system += "\n\nEXPLICIT REFERENCES — the user @-mentioned these; they outrank the previous pick.\n" +
+        lines.join("\n") + "\n" +
+        "- Referenced PIECES: build the outfit around them; keep all of them unless the request says otherwise.\n" +
+        "- Referenced OUTFIT: treat the request as an iteration on that outfit " +
+        "(\"warmer version of this\", \"dress this up\"); return the COMPLETE new outfit, scored fresh.\n" +
+        "- Both present: the outfit is the base, the pieces are must-keeps.";
     }
   }
   const contents = [
@@ -381,9 +440,10 @@ function confidenceFromScores(scores) {
 // items: sanitized array. messages: sanitized [{role, text}].
 // styleProfile: sanitized preference strings (may be empty).
 // previousPick: sanitized {itemIds} or null (PC-16 iteration).
+// references: sanitized {articles, outfits} or null (PC-22 @-mentions).
 // Returns { reply, outfit: { itemIds, confidence, reasoning, scores } | null }.
-async function askStylist(items, messages, styleProfile, previousPick) {
-  const { model, contents, config } = buildStylistRequest(items, messages, styleProfile, previousPick);
+async function askStylist(items, messages, styleProfile, previousPick, references) {
+  const { model, contents, config } = buildStylistRequest(items, messages, styleProfile, previousPick, references);
   const ai = getClient();
   let parsed = await callStylistModel(ai, model, contents, config, "askStylist");
 
@@ -421,4 +481,4 @@ async function askStylist(items, messages, styleProfile, previousPick) {
   };
 }
 
-module.exports = { askStylist, buildStylistRequest, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeStyleProfile, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, RUBRIC_VERSION, SYSTEM };
+module.exports = { askStylist, buildStylistRequest, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeReferences, sanitizeStyleProfile, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, RUBRIC_VERSION, SYSTEM };

@@ -4,7 +4,7 @@ const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
 const path = require("node:path");
 module.paths.unshift(path.join(__dirname, "..", "functions", "node_modules"));
-const { sanitizeItems, sanitizePreviousPick, sanitizeStyleProfile, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, buildStylistRequest } = require("../functions/stylist.js");
+const { sanitizeItems, sanitizePreviousPick, sanitizeReferences, sanitizeStyleProfile, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, buildStylistRequest } = require("../functions/stylist.js");
 
 describe("sanitizeItems (PC-12)", () => {
   it("keeps a cleaned id for server-side handle→id mapping", () => {
@@ -167,5 +167,58 @@ describe("buildStylistRequest iteration block (PC-16)", () => {
   it("skips ids that are not in the wardrobe", () => {
     const { config } = buildStylistRequest(items, messages, [], { itemIds: ["zzz"] });
     assert.ok(!config.systemInstruction.includes("ITERATION"));
+  });
+});
+
+describe("sanitizeReferences (PC-22)", () => {
+  const items = sanitizeItems([
+    { id: "aaa", name: "Navy Tee", category: "Tops" },
+    { id: "bbb", name: "Tan Shorts", category: "Bottoms" },
+    { id: "ccc", name: "White Sneakers", category: "Shoes" },
+  ]);
+  it("keeps valid article ids and drops unknown ones", () => {
+    const r = sanitizeReferences({ articleIds: ["aaa", "zzz", 42], outfits: [] }, items);
+    assert.deepEqual(r.articles, ["aaa"]);
+    assert.deepEqual(r.outfits, []);
+  });
+  it("keeps outfits with >=2 valid items, resolving against the wardrobe", () => {
+    const r = sanitizeReferences({
+      articleIds: [],
+      outfits: [{ id: "o1", name: "Weekend", itemIds: ["aaa", "bbb", "zzz"] }],
+    }, items);
+    assert.equal(r.outfits.length, 1);
+    assert.deepEqual(r.outfits[0].itemIds, ["aaa", "bbb"]);
+  });
+  it("drops outfits with fewer than 2 valid items", () => {
+    const r = sanitizeReferences({ articleIds: [], outfits: [{ id: "o1", name: "X", itemIds: ["aaa"] }] }, items);
+    assert.deepEqual(r.outfits, []);
+  });
+  it("treats malformed input as empty, never throws", () => {
+    assert.deepEqual(sanitizeReferences(null, items), { articles: [], outfits: [] });
+    assert.deepEqual(sanitizeReferences("nope", items).articles, []);
+  });
+  it("caps counts", () => {
+    const many = Array.from({ length: 10 }, (_, i) => "aaa");
+    const r = sanitizeReferences({ articleIds: many, outfits: [] }, items);
+    assert.ok(r.articles.length <= 5);
+  });
+});
+
+describe("buildStylistRequest references block (PC-22)", () => {
+  const items = sanitizeItems([
+    { id: "aaa", name: "Navy Tee", category: "Tops" },
+    { id: "bbb", name: "Tan Shorts", category: "Bottoms" },
+  ]);
+  const messages = [{ role: "user", text: "build around this" }];
+  it("adds the references block with resolved handles", () => {
+    const refs = sanitizeReferences({ articleIds: ["aaa"], outfits: [] }, items);
+    const { config } = buildStylistRequest(items, messages, [], null, refs);
+    const sys = config.systemInstruction;
+    assert.ok(sys.includes("EXPLICIT REFERENCES"));
+    assert.ok(sys.includes('[i1] "Navy Tee"'));
+  });
+  it("omits the block without references (benchmark-compatible)", () => {
+    const { config } = buildStylistRequest(items, messages, [], null, null);
+    assert.ok(!config.systemInstruction.includes("EXPLICIT REFERENCES"));
   });
 });

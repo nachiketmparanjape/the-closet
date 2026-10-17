@@ -1,6 +1,8 @@
 # PC-22 Design — Chat references (@-mentions)
 
-**Status:** proposed 2026-10-17, awaiting founder validation before build.
+**Status:** approved by founder 2026-10-16 ("go ahead with planned work");
+open questions resolved with proposed defaults (name search only, chips
+above input). Build in progress.
 **Goal:** let the founder point the stylist chat at things — "warmer version
 of *this*", "build an outfit around *this tee*". Generalizes PC-16's
 implicit `previousPick` (last pick only, invisible) into an explicit,

@@ -170,3 +170,16 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
   outfit context. Generalizes PC-16's previousPick (which only knows the
   last pick, implicitly).
 - **Not yet sized** — candidate for prioritization.
+
+### PC-23: Archive layer for outfits/articles (M) — parked
+- **Idea (founder 2026-10-16):** soft-delete instead of hard-delete across
+  objects — archived items hidden from views but restorable, old outfits
+  and wears keep resolving instead of showing "Unknown item".
+- **Value case:** undo for destructive actions; referential integrity for
+  history; keeps the Personalization learning substrate intact.
+- **Cost case:** every query + the stylist wardrobe builder needs an
+  `archived == false` filter — one missed filter and the AI recommends
+  ghost clothes. Plus archive/restore/purge UI.
+- **Trigger to build:** founder says "I deleted something I wanted back",
+  or an article delete visibly breaks an old outfit. Parked until then
+  per founder 2026-10-16.

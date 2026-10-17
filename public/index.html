@@ -103,7 +103,14 @@
     .chat-msg.user { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
     .chat-msg.model { align-self: flex-start; background: var(--paper-soft); color: var(--ink); border-bottom-left-radius: 4px; }
     .chat-msg.thinking { color: var(--muted); font-style: italic; }
-    .chat-input-row { display: flex; gap: 8px; }
+    .chat-input-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .chat-ref-chips { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 6px; }
+    .chat-ref-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 4px 6px 4px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--ink); border: 1px solid var(--line); }
+    .chat-ref-chip button { border: none; background: transparent; color: var(--muted); cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px; }
+    .chat-ref-picker { position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); max-height: 220px; overflow-y: auto; background: var(--paper); border: 1px solid var(--line-strong); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.18); z-index: 30; }
+    .chat-ref-picker .picker-sec { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 8px 12px 2px; }
+    .chat-ref-opt { display: block; width: 100%; text-align: left; border: none; background: transparent; color: var(--ink); padding: 8px 12px; font-size: 14px; cursor: pointer; }
+    .chat-ref-opt:hover, .chat-ref-opt.active { background: var(--accent-soft); }
     .chat-input-row input { flex: 1; min-width: 0; min-height: 46px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--paper); color: var(--ink); padding: 10px 12px; outline: none; }
     .chat-input-row input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
     .pal-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 8px; min-height: 30px; }
@@ -428,8 +435,10 @@
       </div>
       <div class="modal-body">
         <div class="chat-list" id="chatList" aria-live="polite"></div>
-        <form class="chat-input-row" id="chatForm">
-          <input id="chatInput" type="text" maxlength="500" placeholder="e.g. casual dinner, 60°F" autocomplete="off" aria-label="Ask the stylist" />
+        <form class="chat-input-row" id="chatForm" style="position:relative;">
+          <div id="chatRefChips" class="chat-ref-chips" hidden></div>
+          <div id="chatRefPicker" class="chat-ref-picker" hidden></div>
+          <input id="chatInput" type="text" maxlength="500" placeholder="e.g. casual dinner, 60°F — @ to reference a piece or outfit" autocomplete="off" aria-label="Ask the stylist" />
           <button class="primary" id="chatSend" type="submit">Send</button>
         </form>
       </div>
@@ -1895,6 +1904,116 @@
         window.setTimeout(function () { chatInput.focus(); }, 60);
       }
 
+      // PC-22: @-mention references. Typing "@" in the chat input opens a
+      // picker of articles + saved outfits; selections become chips carried
+      // as structured ids in the payload (never parsed from text).
+      var chatRefs = { articles: [], outfits: [] };
+      var refPickerEl = document.getElementById("chatRefPicker");
+      var refChipsEl = document.getElementById("chatRefChips");
+      var refQuery = null;
+
+      function renderRefChips() {
+        refChipsEl.textContent = "";
+        var all = chatRefs.articles.concat(chatRefs.outfits);
+        refChipsEl.hidden = !all.length;
+        all.forEach(function (r) {
+          var chip = document.createElement("span");
+          chip.className = "chat-ref-chip";
+          chip.textContent = (r.kind === "article" ? "▸ " : "◈ ") + r.label + " ";
+          var x = document.createElement("button");
+          x.type = "button";
+          x.textContent = "×";
+          x.setAttribute("aria-label", "Remove reference to " + r.label);
+          x.addEventListener("click", function () {
+            chatRefs.articles = chatRefs.articles.filter(function (a) { return a.id !== r.id; });
+            chatRefs.outfits = chatRefs.outfits.filter(function (a) { return a.id !== r.id; });
+            renderRefChips();
+            chatInput.focus();
+          });
+          chip.appendChild(x);
+          refChipsEl.appendChild(chip);
+        });
+      }
+
+      function refCandidates(q) {
+        q = (q || "").toLowerCase();
+        var arts = allItems
+          .filter(function (it) { return !q || String(it.name || "").toLowerCase().indexOf(q) !== -1; })
+          .slice(0, 6)
+          .map(function (it) { return { kind: "article", id: it.id, label: it.name || "Unnamed" }; });
+        var outs = (typeof latestOutfits === "function" ? latestOutfits() : [])
+          .filter(function (o) { return !q || String(o.name || "").toLowerCase().indexOf(q) !== -1; })
+          .slice(0, 4)
+          .map(function (o) { return { kind: "outfit", id: (o.versionGroup || o.id), label: o.name || "Outfit" }; });
+        return { articles: arts, outfits: outs };
+      }
+
+      function renderRefPicker() {
+        refPickerEl.textContent = "";
+        if (refQuery === null) { refPickerEl.hidden = true; return; }
+        var cands = refCandidates(refQuery);
+        if (!cands.articles.length && !cands.outfits.length) {
+          refPickerEl.hidden = true;
+          return;
+        }
+        function addSection(title, list) {
+          if (!list.length) return;
+          var sec = document.createElement("div");
+          sec.className = "picker-sec";
+          sec.textContent = title;
+          refPickerEl.appendChild(sec);
+          list.forEach(function (c) {
+            var b = document.createElement("button");
+            b.type = "button";
+            b.className = "chat-ref-opt";
+            b.textContent = (c.kind === "article" ? "▸ " : "◈ ") + c.label;
+            b.addEventListener("click", function () { pickRef(c); });
+            refPickerEl.appendChild(b);
+          });
+        }
+        addSection("Pieces", cands.articles);
+        addSection("Outfits", cands.outfits);
+        refPickerEl.hidden = false;
+      }
+
+      function pickRef(c) {
+        var list = c.kind === "article" ? chatRefs.articles : chatRefs.outfits;
+        if (!list.some(function (r) { return r.id === c.id; })) list.push(c);
+        // Remove the "@query" token from the input text.
+        var v = chatInput.value;
+        var at = v.lastIndexOf("@");
+        if (at !== -1) chatInput.value = (v.slice(0, at) + v.slice(at).replace(/^@[^\s]*/, "")).replace(/\s+$/, " ");
+        refQuery = null;
+        renderRefPicker();
+        renderRefChips();
+        chatInput.focus();
+      }
+
+      chatInput.addEventListener("input", function () {
+        var v = chatInput.value;
+        var at = v.lastIndexOf("@");
+        // Trigger on "@" at start or after whitespace, with no space after it.
+        if (at !== -1 && (at === 0 || /\s/.test(v[at - 1])) && !/[\s]/.test(v.slice(at + 1))) {
+          refQuery = v.slice(at + 1);
+          renderRefPicker();
+        } else {
+          refQuery = null;
+          renderRefPicker();
+        }
+      });
+      chatInput.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && refQuery !== null) {
+          refQuery = null;
+          renderRefPicker();
+        }
+      });
+      document.addEventListener("click", function (e) {
+        if (refQuery !== null && !refPickerEl.contains(e.target) && e.target !== chatInput) {
+          refQuery = null;
+          renderRefPicker();
+        }
+      });
+
       function sendChat(event) {
         event.preventDefault();
         if (chatBusy || !currentUser) return;
@@ -1921,8 +2040,21 @@
         var payload = {
           items: stylistItems(),
           messages: stylistMessages.filter(function (m) { return !m.thinking; }),
-          previousPick: previousPick
+          previousPick: previousPick,
+          // PC-22: explicit @-references ride along as structured ids.
+          // Outfit contents are resolved client-side (it already has them);
+          // the server re-validates every id against the real wardrobe.
+          references: {
+            articleIds: chatRefs.articles.map(function (r) { return r.id; }),
+            outfits: chatRefs.outfits.map(function (r) {
+              var vs = (typeof outfitVersions === "function") ? outfitVersions(r.id) : [];
+              var o = vs[0];
+              return { id: r.id, name: r.label, itemIds: o ? (o.itemIds || []) : [] };
+            })
+          }
         };
+        chatRefs = { articles: [], outfits: [] }; // per-message; PC-16 carries continuity
+        renderRefChips();
         functions.httpsCallable("askStylist")(payload).then(function (res) {
           thinking.thinking = false;
           thinking.text = (res.data && res.data.reply) || "Hmm, I couldn't put that together — try again?";
