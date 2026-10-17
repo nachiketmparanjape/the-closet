@@ -35,6 +35,11 @@ describe("mapHandlesToIds (Sprint 5: handles replace names)", () => {
     assert.deepEqual(out.map((m) => m.id), ["1", "3"]);
   });
 
+  it("accepts bracketed handles as the prompt shows them ([i1])", () => {
+    const out = mapHandlesToIds({ items: ["[i1]", "[i3]"] }, wardrobe);
+    assert.deepEqual(out.map((m) => m.id), ["1", "3"]);
+  });
+
   it("distinguishes duplicate names via handles", () => {
     const out = mapHandlesToIds({ items: ["i2", "i3"] }, wardrobe);
     assert.deepEqual(out.map((m) => m.id), ["2", "3"]);

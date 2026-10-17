@@ -133,17 +133,20 @@ async function main() {
   const label = process.argv[2] || new Date().toISOString().replace(/[:.]/g, "-");
   const at = await accessToken();
   console.log("Benchmark label:", label);
+  const dir = path.join(__dirname, "..", "tests", "benchmark", "results");
+  fs.mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, label + ".json");
+  const save = (results, done) => fs.writeFileSync(
+    file, JSON.stringify({ label, at: new Date().toISOString(), done: !!done, results }, null, 2));
   const results = [];
   for (const s of SCENARIOS) {
     process.stdout.write("  " + s.id + " ... ");
     const r = await runScenario(at, s);
     console.log(r.error || (r.parseError ? "PARSE-FAIL" : "ok (" + r.ms + "ms)"));
     results.push(r);
+    save(results, false); // partial progress survives a kill
   }
-  const dir = path.join(__dirname, "..", "tests", "benchmark", "results");
-  fs.mkdirSync(dir, { recursive: true });
-  const file = path.join(dir, label + ".json");
-  fs.writeFileSync(file, JSON.stringify({ label, at: new Date().toISOString(), results }, null, 2));
+  save(results, true);
   console.log("\nSaved:", file);
 
   // Judging summary

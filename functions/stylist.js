@@ -230,7 +230,8 @@ function mapHandlesToIds(outfit, items) {
   const mapped = [];
   const seen = new Set();
   for (const h of outfit.items) {
-    const m = /^i(\d+)$/.exec(String(h || "").trim().toLowerCase());
+    // Accept "[i1]" (as the prompt shows them) and bare "i1".
+    const m = /^\[?i(\d+)\]?$/.exec(String(h || "").trim().toLowerCase());
     if (!m) continue;
     const idx = parseInt(m[1], 10) - 1;
     if (idx < 0 || idx >= items.length || seen.has(idx)) continue;
