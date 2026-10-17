@@ -17,12 +17,12 @@ const scope = {};
 const tagMatch = js.match(/var STYLE_TAGS = (\[[^\]]*\]);/);
 assert.ok(tagMatch, "STYLE_TAGS not found in index.html");
 const STYLE_TAGS = eval(tagMatch[1]);
-for (const name of ["itemColors", "itemPrimaryHex", "itemField", "buildColorsFromAI", "buildV2Fields", "syncPrimaryHex"]) {
+for (const name of ["itemColors", "itemPrimaryHex", "itemField", "buildColorsFromAI", "buildV2Fields", "syncPrimaryHex", "outfitDedupHash"]) {
   const m = js.match(new RegExp("function " + name + "\\([\\s\\S]*?\\n      \\}"));
   assert.ok(m, "helper not found in index.html: " + name);
   scope[name] = eval("(" + m[0].replace("function " + name, "function") + ")");
 }
-const { itemColors, itemPrimaryHex, itemField, buildColorsFromAI, buildV2Fields, syncPrimaryHex } = scope;
+const { itemColors, itemPrimaryHex, itemField, buildColorsFromAI, buildV2Fields, syncPrimaryHex, outfitDedupHash } = scope;
 
 describe("itemColors (lazy migration)", () => {
   it("passes v2 colors through untouched", () => {
@@ -107,5 +107,18 @@ describe("syncPrimaryHex", () => {
     syncPrimaryHex(p, "#ffffff");
     assert.equal(p[0].hex, "#ffffff");
     syncPrimaryHex([], "#ffffff");
+  });
+});
+
+describe("outfitDedupHash (PC-18)", () => {
+  it("is order-insensitive over item ids", () => {
+    assert.equal(outfitDedupHash(["a", "b"], "stylist"), outfitDedupHash(["b", "a"], "stylist"));
+  });
+  it("distinguishes sources and combinations", () => {
+    assert.notEqual(outfitDedupHash(["a", "b"], "stylist"), outfitDedupHash(["a", "b"], "manual"));
+    assert.notEqual(outfitDedupHash(["a", "b"], "stylist"), outfitDedupHash(["a", "c"], "stylist"));
+  });
+  it("returns a short string hash", () => {
+    assert.ok(/^[0-9a-z]+$/.test(outfitDedupHash(["x"], "manual")));
   });
 });

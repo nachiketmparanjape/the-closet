@@ -564,6 +564,7 @@
           <button class="secondary" id="outfitWearBtn" type="button">I wore this</button>
           <input type="date" id="outfitWearDate" aria-label="Wear date" title="When did you wear this?" />
           <button class="secondary" id="outfitFavBtn" type="button">☆ Favorite</button>
+          <button class="danger" id="outfitDelete" type="button">Delete</button>
         </div>
         <div id="outfitRateSection"></div>
       </div>
@@ -2211,29 +2212,43 @@
       document.getElementById("builderCancel").addEventListener("click", closeBuilder);
       document.getElementById("builderSave").addEventListener("click", function () {
         if (builderSelection.length < 2) { showToast("Pick at least 2 pieces."); return; }
-        var ref = db.collection("users").doc(currentUser.uid).collection("outfits").doc();
-        var names = builderSelection.map(function (id) {
-          var it = itemById(id);
-          return it ? it.name : "Unknown item";
-        });
-        ref.set({
-          versionGroup: ref.id,
-          version: 1,
-          supersedes: null,
-          itemIds: builderSelection.slice(),
-          itemNames: names,
-          source: "manual",
-          name: document.getElementById("builderName").value.trim() || defaultOutfitName(),
-          occasion: document.getElementById("builderOccasion").value.trim() || null,
-          weather: null,
-          appConfidence: null,
-          appReasoning: "",
-          favorite: false,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        }).then(function () {
-          closeBuilder();
-          showToast("Outfit saved.");
-          switchView("outfits");
+        var sel = builderSelection.slice();
+        // PC-18: same dedup check as chat saves.
+        findDuplicateOutfit(sel, "manual").then(function (dup) {
+          if (dup) {
+            closeBuilder();
+            showToast("This exact outfit is already saved — opening the existing one.");
+            switchView("outfits");
+            openOutfit(dup.id);
+            return;
+          }
+          var ref = db.collection("users").doc(currentUser.uid).collection("outfits").doc();
+          var names = sel.map(function (id) {
+            var it = itemById(id);
+            return it ? it.name : "Unknown item";
+          });
+          ref.set({
+            versionGroup: ref.id,
+            version: 1,
+            supersedes: null,
+            itemIds: sel,
+            itemNames: names,
+            source: "manual",
+            name: document.getElementById("builderName").value.trim() || defaultOutfitName(),
+            occasion: document.getElementById("builderOccasion").value.trim() || null,
+            weather: null,
+            appConfidence: null,
+            appReasoning: "",
+            dedupHash: outfitDedupHash(sel, "manual"),
+            favorite: false,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          }).then(function () {
+            closeBuilder();
+            showToast("Outfit saved.");
+            switchView("outfits");
+          }).catch(function (err) {
+            showToast(friendlyError(err));
+          });
         }).catch(function (err) {
           showToast(friendlyError(err));
         });
@@ -2265,7 +2280,31 @@
           }).catch(function () { /* stats are a bonus; stay silent */ });
       }
 
-      // PC-12 phase 3: wear logging, ratings, reflection, style profile.
+      // Delete the whole version group. Wear events are historical facts —
+      // they stay (per-article stats keep counting them); the outfit and
+      // its versions go. The onSnapshot listener refreshes the list and
+      // closes the detail view automatically.
+      document.getElementById("outfitDelete").addEventListener("click", function () {
+        if (!currentUser || !activeOutfitGroup) return;
+        var versions = outfitVersions(activeOutfitGroup);
+        if (!versions.length) return;
+        var ids = versions.map(function (v) { return v.id; });
+        var col = db.collection("users").doc(currentUser.uid);
+        col.collection("wear_events").where("outfitId", "in", ids.slice(0, 10)).get()
+          .then(function (snap) {
+            var worn = snap.size;
+            var msg = "Delete this outfit?";
+            if (worn) msg += " It has been worn " + worn + "× — the wear history stays, the outfit goes.";
+            if (!window.confirm(msg)) return null;
+            var batch = db.batch();
+            ids.forEach(function (id) { batch.delete(col.collection("outfits").doc(id)); });
+            return batch.commit();
+          })
+          .then(function (res) {
+            if (res) showToast("Outfit deleted.");
+          })
+          .catch(function (err) { showToast(friendlyError(err)); });
+      });
       // PC-20: wornAt honors the chosen date (default today); createdAt is
       // always the server timestamp. Chosen dates land at local noon to
       // dodge timezone-boundary surprises.
@@ -2526,7 +2565,24 @@
           }).catch(function () { /* history is a bonus; stay silent */ });
       }
 
-      // PC-12: save a stylist-recommended outfit from the chat as v1.
+      // PC-18: content hash identifying an outfit's exact combination.
+      // Sorted ids + source — identical clothes from the same origin are
+      // the same outfit. Forward-only: older docs lack the field and never match.
+      function outfitDedupHash(itemIds, source) {
+        var ids = (itemIds || []).slice().sort();
+        var s = (source || "") + "|" + ids.join(",");
+        var h = 5381;
+        for (var i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+        return h.toString(36);
+      }
+      function findDuplicateOutfit(itemIds, source) {
+        var hash = outfitDedupHash(itemIds, source);
+        return db.collection("users").doc(currentUser.uid).collection("outfits")
+          .where("dedupHash", "==", hash).limit(1).get()
+          .then(function (snap) {
+            return snap.empty ? null : { id: snap.docs[0].id, hash: hash };
+          });
+      }
       function defaultOutfitName() {
         return "Outfit · " + new Date().toLocaleDateString(undefined, { month: "short", day: "numeric" });
       }
@@ -2534,30 +2590,43 @@
       function saveChatOutfit(msg) {
         var o = msg.outfit;
         if (!currentUser || !o || o.savedId || !o.itemIds) return;
-        var ref = db.collection("users").doc(currentUser.uid).collection("outfits").doc();
-        var names = o.itemIds.map(function (id) {
-          var it = itemById(id);
-          return it ? it.name : "Unknown item";
-        });
-        ref.set({
-          versionGroup: ref.id,
-          version: 1,
-          supersedes: null,
-          itemIds: o.itemIds,
-          itemNames: names,
-          source: "stylist",
-          name: defaultOutfitName(),
-          occasion: null,
-          weather: null,
-          appConfidence: o.confidence,
-          appReasoning: o.reasoning || "",
-          appScores: o.scores || null,
-          favorite: false,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        }).then(function () {
-          o.savedId = ref.id;
-          renderChat();
-          showToast("Outfit saved.");
+        // PC-18: identical combination already saved → link to the existing
+        // outfit instead of minting a duplicate.
+        findDuplicateOutfit(o.itemIds, "stylist").then(function (dup) {
+          if (dup) {
+            o.savedId = dup.id;
+            renderChat();
+            showToast("This exact outfit is already saved — showing the existing one.");
+            return;
+          }
+          var ref = db.collection("users").doc(currentUser.uid).collection("outfits").doc();
+          var names = o.itemIds.map(function (id) {
+            var it = itemById(id);
+            return it ? it.name : "Unknown item";
+          });
+          ref.set({
+            versionGroup: ref.id,
+            version: 1,
+            supersedes: null,
+            itemIds: o.itemIds,
+            itemNames: names,
+            source: "stylist",
+            name: defaultOutfitName(),
+            occasion: null,
+            weather: null,
+            appConfidence: o.confidence,
+            appReasoning: o.reasoning || "",
+            appScores: o.scores || null,
+            dedupHash: outfitDedupHash(o.itemIds, "stylist"),
+            favorite: false,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          }).then(function () {
+            o.savedId = ref.id;
+            renderChat();
+            showToast("Outfit saved.");
+          }).catch(function (err) {
+            showToast(friendlyError(err));
+          });
         }).catch(function (err) {
           showToast(friendlyError(err));
         });
