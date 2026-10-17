@@ -38,10 +38,16 @@ and approved without veto.
   (history is factual), outfit doc goes; the live listener refreshes and
   closes the view. Firestore rules already allowed owner delete.
 
-### PC-22: Chat references (M/L, Stylist lane) — DESIGN READY, awaiting validation
-- Design doc: `PC-22-DESIGN.md`. @-picker with article/outfit sections,
-  chips above the input, per-message references, explicit beats previousPick.
-  Build starts on founder's go.
+### PC-22: Chat references (M/L, Stylist lane) — DONE 2026-10-17
+- Shipped: `@` in chat opens a picker (Pieces + Outfits sections, name
+  search); selections become removable chips above the input, sent as
+  structured `{articleIds, outfits[]}` (outfit contents resolved client-side,
+  every id re-validated server-side against the real wardrobe). New
+  EXPLICIT REFERENCES prompt block outranks the implicit previousPick.
+  87/87 tests (7 new), `askStylist` redeployed ACTIVE, live via CI.
+- Design note: one deviation from the design doc — outfit contents are
+  resolved client-side rather than via a server Firestore read (same trust
+  level, no added latency).
 - **Problem:** saving the same pick twice mints two unrelated docs —
   wear history and ratings fragment across duplicates.
 - **In scope:** content hash over sorted itemIds (+ source) computed at
