@@ -225,6 +225,8 @@
     .outfit-card .outfit-thumb { margin: 0; flex: 1 1 0; min-width: 0; }
     .outfit-card .outfit-thumb img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; display: block; }
     .outfit-card .outfit-thumb figcaption { font-size: 11px; color: #aaa; margin-top: 4px; line-height: 1.3; }
+    .score-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; }
+    .score-chip { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); }
     .tag-checks { display: flex; flex-wrap: wrap; gap: 4px 12px; }
     .tag-checks .tag-check { display: inline-flex; align-items: center; gap: 5px; margin-bottom: 0; font-size: 13px; font-weight: 400; cursor: pointer; }
     .field input, .field select { width: 100%; min-height: 46px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--paper); color: var(--ink); padding: 10px 12px; outline: none; }
@@ -2158,17 +2160,25 @@ service firebase.storage {
         meta.className = "conf";
         var bits = [];
         if (o.source === "stylist" && o.appConfidence != null) bits.push("Stylist confidence: " + o.appConfidence + "/10");
-        if (o.source === "stylist" && o.appScores) {
-          var scoreBits = ["color", "formality", "weather", "proportion", "occasion"]
-            .map(function (k) { return k.slice(0, 4) + " " + o.appScores[k]; })
-            .join(" · ");
-          bits.push("Scores — " + scoreBits);
-        }
         if (o.occasion) bits.push("Occasion: " + o.occasion);
         if (o.source) bits.push(o.source === "stylist" ? "Suggested by the stylist" : "Built by you");
         if ((o.version || 1) > 1) bits.push("Version " + o.version + " of " + versions.length);
         meta.textContent = bits.join(" · ");
         body.appendChild(meta);
+
+        // PC-17: per-dimension scores as labeled chips, not a text blob.
+        if (o.source === "stylist" && o.appScores) {
+          var scoresWrap = document.createElement("div");
+          scoresWrap.className = "score-chips";
+          ["color", "formality", "weather", "proportion", "occasion"].forEach(function (k) {
+            var chip = document.createElement("span");
+            chip.className = "score-chip";
+            var v = o.appScores[k];
+            chip.textContent = k.charAt(0).toUpperCase() + k.slice(1) + " " + (v != null ? v : "–");
+            scoresWrap.appendChild(chip);
+          });
+          body.appendChild(scoresWrap);
+        }
 
         if (o.appReasoning) {
           var reason = document.createElement("p");
