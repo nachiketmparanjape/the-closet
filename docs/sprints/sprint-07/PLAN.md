@@ -1,7 +1,7 @@
 # Sprint 7 — Trustworthy history, referenceable chat
 
 **Dates:** 2026-10-17 → 2026-10-31 (fixed; unfinished cuts roll over, no guilt)
-**Status:** in progress — all three planned cuts shipped; founder testing.
+**Status:** CLOSED 2026-10-17 — all cuts shipped and founder-tested.
 **Theme:** the data the app learns from must be correct (wear history,
 outfit identity), and the chat grows from answering questions into a
 surface you can point things at.
