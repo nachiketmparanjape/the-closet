@@ -58,8 +58,11 @@ and approved without veto.
 - **@-tags not ingested?** Founder reported the chat ignoring a tagged item.
   Investigated: prompt construction verified locally, then ran his exact
   scenario against the live model — it built the outfit around the tagged
-  joggers correctly. His screenshot showed the tagged message composed but
-  unsent. No code change; asked him to tap Send and report.
+  joggers correctly. Resolved itself on retry (likely a stale function
+  instance right after deploy); founder confirmed ingestion works.
+  Follow-up nitpick shipped: referenced pieces/outfits now render as chips
+  inside the sent message bubble, so the thread keeps its context.
+  90/90 tests, live via CI.
 - **Outfit naming + rename — SHIPPED 2026-10-17.** All chat saves were
   "Outfit · \<date\>", indistinguishable same-day. New outfits now get
   descriptive default names from their pieces
