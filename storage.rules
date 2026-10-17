@@ -13,5 +13,15 @@ service firebase.storage {
       // checks above would fail closed and deny every deletion.
       allow delete: if request.auth != null && request.auth.uid == userId;
     }
+    // PC-13: outfit photos (parsed or user-added). Same owner-only shape
+    // as item photos — the client uploads here before parseOutfitPhoto.
+    match /users/{userId}/outfit-photos/{allPaths=**} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create, update: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
   }
 }
