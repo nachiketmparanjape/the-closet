@@ -1,7 +1,9 @@
 # Sprint 8 — Close the loop
 
-**Dates:** 2026-10-31 → 2026-11-14 (fixed; unfinished cuts roll over, no guilt)
-**Status:** proposed by PM 2026-10-17, approved by founder (no veto).
+**Dates:** batch started 2026-10-17 at founder's pull (sprints are work
+batches — see playbook 2026-10-17); originally sketched Oct 31 → Nov 14.
+**Status:** in progress — lane metrics building; PC-13 + PC-27 design docs
+up next for founder validation.
 **Theme:** the outfit lifecycle end to end — from a photo of what you wore
 to a logged outfit, AI feedback on your own picks, and the lanes finally
 measured instead of vibed.
