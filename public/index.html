@@ -109,6 +109,8 @@
     .chat-ref-chip button { border: none; background: transparent; color: var(--muted); cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px; }
     .chat-ref-picker { position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); max-height: 220px; overflow-y: auto; background: var(--paper); border: 1px solid var(--line-strong); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.18); z-index: 30; }
     .chat-ref-picker .picker-sec { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 8px 12px 2px; }
+    .chat-msg-refs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+    .chat-ref-chip.static { cursor: default; }
     .chat-ref-opt { display: block; width: 100%; text-align: left; border: none; background: transparent; color: var(--ink); padding: 8px 12px; font-size: 14px; cursor: pointer; }
     .chat-ref-opt:hover, .chat-ref-opt.active { background: var(--accent-soft); }
     .chat-input-row input { flex: 1; min-width: 0; min-height: 46px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--paper); color: var(--ink); padding: 10px 12px; outline: none; }
@@ -1847,7 +1849,21 @@
         stylistMessages.forEach(function (m) {
           var div = document.createElement("div");
           div.className = "chat-msg " + m.role + (m.thinking ? " thinking" : "");
-          div.textContent = m.text;
+          // PC-22: show @-referenced pieces/outfits inside the sent bubble.
+          if (m.refLabels && m.refLabels.length) {
+            var refs = document.createElement("div");
+            refs.className = "chat-msg-refs";
+            m.refLabels.forEach(function (r) {
+              var s = document.createElement("span");
+              s.className = "chat-ref-chip static";
+              s.textContent = (r.kind === "article" ? "▸ " : "◈ ") + r.label;
+              refs.appendChild(s);
+            });
+            div.appendChild(refs);
+          }
+          var t = document.createElement("span");
+          t.textContent = m.text;
+          div.appendChild(t);
           chatList.appendChild(div);
           // PC-12: structured outfit card under the reply, with a Save action.
           if (m.outfit && m.outfit.itemIds && m.outfit.itemIds.length >= 2) {
@@ -2022,7 +2038,14 @@
         if (!text) return;
         if (!functions) { showToast("The stylist isn't ready yet — reload and try again."); return; }
         chatInput.value = "";
-        stylistMessages.push({ role: "user", text: text });
+        // PC-22: keep the referenced labels on the message so the thread
+        // shows what was pointed at (the chips above the input clear on send).
+        var refLabels = chatRefs.articles.concat(chatRefs.outfits).map(function (r) {
+          return { kind: r.kind, label: r.label };
+        });
+        var userMsg = { role: "user", text: text };
+        if (refLabels.length) userMsg.refLabels = refLabels;
+        stylistMessages.push(userMsg);
         var thinking = { role: "model", text: "Thinking…", thinking: true };
         stylistMessages.push(thinking);
         renderChat();
