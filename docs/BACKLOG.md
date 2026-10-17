@@ -125,3 +125,24 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
   with outfits/style profile, not required.
 - **Known risk:** score calibration — label it "wardrobe fit", always
   show the reasoning, never a bare number.
+
+### PC-18: Outfit dedup — one canonical record per unique combination (S/M)
+- **Problem (founder 2026-10-16):** nothing identifies identical outfits.
+  Saving the same pick twice mints two unrelated docs — wear history,
+  ratings, and version chains fragment across duplicates.
+- **Shape:** content hash over sorted itemIds (+ source) at save time;
+  "you already saved this exact combination" nudge instead of a silent
+  duplicate. Interacts with versioning (edits create new versions — a
+  re-save of an identical version is the dup case).
+- **Not yet sized** — candidate for prioritization.
+
+### PC-19: Article duplicate detection — warn, don't block (M)
+- **Problem (founder 2026-10-16):** the same photo uploaded twice creates
+  two items; nothing detects it. Soft problem, not high priority — but the
+  data model must *allow* two of the same article (owning two identical
+  black tees is legitimate).
+- **Shape:** same-image detection at upload (exact byte hash minimum;
+  perceptual hash if re-exports matter) that *warns* ("this looks like
+  your Navy Tee — add anyway?") rather than blocking. Possible
+  `duplicateOf` link or quantity field later.
+- **Not yet sized** — parked; on our mind per founder.

@@ -7,7 +7,9 @@ leave it. Plus the Sprint 5 benchmark baseline that never got a clean run.
 
 ## Cuts
 
-### PC-15: Fix dead "view in Outfits" chat button (S)
+### PC-15: Fix dead "view in Outfits" chat button (S) — DONE 2026-10-16
+- Shipped: removed the `disabled` flag; the existing navigation handler now
+  fires. Verified live.
 - **In scope:** the chat outfit card's "Saved ✓ — view in Outfits" button is
   `disabled` despite carrying a navigation handler — remove the disable so it
   closes the stylist, switches to Outfits, and opens the saved outfit.
@@ -15,7 +17,10 @@ leave it. Plus the Sprint 5 benchmark baseline that never got a clean run.
 - **Acceptance:** save an outfit in chat, tap the button, land on the open
   outfit in the Outfits view.
 
-### PC-16: Inline outfit preview + iterate in chat (M)
+### PC-16: Inline outfit preview + iterate in chat (M) — DONE 2026-10-16
+- Shipped per approved design: thumbnails in chat card, previousPick in the
+  askStylist payload, server iteration block. askStylist redeployed ACTIVE.
+  76/76 tests, CI green, live.
 - **In scope:** the chat outfit card shows item thumbnails (cover photos),
   not just names; follow-up messages in the same chat can iterate
   ("swap the shorts", "something warmer", "another option") without leaving
@@ -25,7 +30,10 @@ leave it. Plus the Sprint 5 benchmark baseline that never got a clean run.
 - **Acceptance:** ask for an outfit, see photos inline, iterate twice via
   chat, save the final version — all without closing the stylist.
 
-### PC-17: Structured score display (S)
+### PC-17: Structured score display (S) — DONE 2026-10-16
+- Shipped: per-dimension chips (Color/Formality/Weather/Proportion/Occasion)
+  in the outfit view; confidence stays the prominent number. Client-only,
+  live via CI.
 - **In scope:** render `appScores` as labeled per-dimension chips/bars in
   the outfit view instead of the flat "colo 8 · form 10…" text blob.
   Confidence stays a single prominent number.
