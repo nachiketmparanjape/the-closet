@@ -573,6 +573,7 @@
           <button class="secondary" id="outfitWearBtn" type="button">I wore this</button>
           <input type="date" id="outfitWearDate" aria-label="Wear date" title="When did you wear this?" />
           <button class="secondary" id="outfitFavBtn" type="button">☆ Favorite</button>
+          <button class="secondary" id="outfitRenameBtn" type="button">Rename</button>
           <button class="danger" id="outfitDelete" type="button">Delete</button>
         </div>
         <div id="outfitRateSection"></div>
@@ -2366,7 +2367,7 @@
             itemIds: sel,
             itemNames: names,
             source: "manual",
-            name: document.getElementById("builderName").value.trim() || defaultOutfitName(),
+            name: document.getElementById("builderName").value.trim() || defaultOutfitName(sel),
             occasion: document.getElementById("builderOccasion").value.trim() || null,
             weather: null,
             appConfidence: null,
@@ -2411,6 +2412,25 @@
             el.hidden = false;
           }).catch(function () { /* stats are a bonus; stay silent */ });
       }
+
+      // Rename: metadata-only, no new version — the pieces are unchanged.
+      // The onSnapshot listener refreshes the title and list automatically.
+      document.getElementById("outfitRenameBtn").addEventListener("click", function () {
+        if (!currentUser || !activeOutfitGroup) return;
+        var versions = outfitVersions(activeOutfitGroup);
+        var o = versions[0];
+        if (!o) return;
+        var next = window.prompt("Rename outfit", o.name || "");
+        if (next === null) return;
+        next = next.trim().slice(0, 80);
+        if (!next || next === o.name) return;
+        var batch = db.batch();
+        var col = db.collection("users").doc(currentUser.uid).collection("outfits");
+        versions.forEach(function (v) { batch.update(col.doc(v.id), { name: next }); });
+        batch.commit()
+          .then(function () { showToast("Renamed."); })
+          .catch(function (err) { showToast(friendlyError(err)); });
+      });
 
       // Delete the whole version group. Wear events are historical facts —
       // they stay (per-article stats keep counting them); the outfit and
@@ -2715,7 +2735,19 @@
             return snap.empty ? null : { id: snap.docs[0].id, hash: hash };
           });
       }
-      function defaultOutfitName() {
+      // Default outfit name derived from its pieces ("Navy Tee + Tan Shorts")
+      // so same-day saves stay distinguishable. Falls back to the date
+      // when no item names resolve.
+      function defaultOutfitName(itemIds) {
+        var names = (itemIds || []).map(function (id) {
+          var it = typeof itemById === "function" ? itemById(id) : null;
+          return it && it.name ? it.name : null;
+        }).filter(Boolean);
+        if (names.length) {
+          var short = names.slice(0, 2).join(" + ");
+          if (names.length > 2) short += " +" + (names.length - 2);
+          return short.length > 48 ? short.slice(0, 48) + "…" : short;
+        }
         return "Outfit · " + new Date().toLocaleDateString(undefined, { month: "short", day: "numeric" });
       }
 
@@ -2743,7 +2775,7 @@
             itemIds: o.itemIds,
             itemNames: names,
             source: "stylist",
-            name: defaultOutfitName(),
+            name: defaultOutfitName(o.itemIds),
             occasion: null,
             weather: null,
             appConfidence: o.confidence,

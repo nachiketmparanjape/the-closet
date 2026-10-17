@@ -17,12 +17,12 @@ const scope = {};
 const tagMatch = js.match(/var STYLE_TAGS = (\[[^\]]*\]);/);
 assert.ok(tagMatch, "STYLE_TAGS not found in index.html");
 const STYLE_TAGS = eval(tagMatch[1]);
-for (const name of ["itemColors", "itemPrimaryHex", "itemField", "buildColorsFromAI", "buildV2Fields", "syncPrimaryHex", "outfitDedupHash"]) {
+for (const name of ["itemColors", "itemPrimaryHex", "itemField", "buildColorsFromAI", "buildV2Fields", "syncPrimaryHex", "outfitDedupHash", "defaultOutfitName"]) {
   const m = js.match(new RegExp("function " + name + "\\([\\s\\S]*?\\n      \\}"));
   assert.ok(m, "helper not found in index.html: " + name);
   scope[name] = eval("(" + m[0].replace("function " + name, "function") + ")");
 }
-const { itemColors, itemPrimaryHex, itemField, buildColorsFromAI, buildV2Fields, syncPrimaryHex, outfitDedupHash } = scope;
+const { itemColors, itemPrimaryHex, itemField, buildColorsFromAI, buildV2Fields, syncPrimaryHex, outfitDedupHash, defaultOutfitName } = scope;
 
 describe("itemColors (lazy migration)", () => {
   it("passes v2 colors through untouched", () => {
@@ -120,5 +120,27 @@ describe("outfitDedupHash (PC-18)", () => {
   });
   it("returns a short string hash", () => {
     assert.ok(/^[0-9a-z]+$/.test(outfitDedupHash(["x"], "manual")));
+  });
+});
+
+describe("defaultOutfitName (Sprint 7)", () => {
+  const fakeItems = {
+    a: { name: "Black Nike Air joggers" },
+    b: { name: "White Cotton Tee" },
+    c: { name: "Grey Hoodie" },
+  };
+  it("derives a name from the first two pieces", () => {
+    global.itemById = (id) => fakeItems[id] || null;
+    assert.equal(defaultOutfitName(["a", "b"]), "Black Nike Air joggers + White Cotton Tee");
+    delete global.itemById;
+  });
+  it("counts extra pieces", () => {
+    global.itemById = (id) => fakeItems[id] || null;
+    assert.equal(defaultOutfitName(["a", "b", "c"]), "Black Nike Air joggers + White Cotton Tee +1");
+    delete global.itemById;
+  });
+  it("falls back to the date when nothing resolves", () => {
+    const name = defaultOutfitName(["zzz"]);
+    assert.ok(name.startsWith("Outfit · "));
   });
 });
