@@ -2,6 +2,7 @@
 
 **Dates:** 2026-10-16 → 2026-10-30 (fixed; unfinished cuts roll over, no guilt)
 **Status:** APPROVED by founder 2026-10-16 ("yes … let's start the next sprint").
+**CLOSED 2026-10-16/17** — all cuts shipped, verified, founder-tested surface.
 **Theme:** the stylist conversation is the core loop — stop making the user
 leave it. Plus the Sprint 5 benchmark baseline that never got a clean run.
 
@@ -41,10 +42,11 @@ leave it. Plus the Sprint 5 benchmark baseline that never got a clean run.
 - **Acceptance:** open a stylist outfit, see five labeled dimension scores
   that match the stored `appScores`.
 
-### Rolled from Sprint 5: stylist benchmark baseline
-- Re-run `scripts/run-benchmark.js` scenario-by-scenario with bounded
-  monitoring until a complete baseline result file exists. No prompt tuning
-  until the baseline is in hand.
+### Rolled from Sprint 5: stylist benchmark baseline — DONE 2026-10-16/17
+- 6/6 scenarios completed, all checks pass. Report: `BENCHMARK-BASELINE.md`.
+  Found + fixed a real bug via the benchmark (prompt/parser handle-format
+  mismatch). Noted: model self-scores run hot — calibration logging will
+  tell us how hot once real ratings accumulate.
 
 ## Decisions carried in
 - Rating stays gated behind wearing (founder 2026-10-16, in PRODUCT.md).
