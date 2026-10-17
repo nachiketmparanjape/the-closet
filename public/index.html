@@ -141,7 +141,10 @@
     .pref-suggest { background: var(--accent-soft); border-radius: 8px; padding: 10px 12px; font-size: 14px; margin: 10px 0; }
     .pref-suggest button { margin: 6px 6px 0 0; }
     .wear-list { margin: 8px 0; padding: 0; list-style: none; font-size: 13px; color: var(--muted); }
-    .wear-list li { padding: 4px 0; border-bottom: 1px dashed var(--line); }
+    .wear-list li { padding: 4px 0; border-bottom: 1px dashed var(--line); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .wear-del { flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--line); background: transparent; color: var(--muted); font-size: 15px; line-height: 1; cursor: pointer; }
+    .wear-del:hover { color: #ff8080; border-color: #ff8080; }
+    #outfitWearDate { font-size: 13px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: inherit; max-width: 140px; }
     .builder-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-height: 38vh; overflow-y: auto; margin-bottom: 12px; }
     .builder-cell { border: 2px solid var(--line); border-radius: 8px; overflow: hidden; cursor: pointer; background: var(--paper-soft); }
     .builder-cell.selected { border-color: var(--accent); }
@@ -559,6 +562,7 @@
         <div id="outfitDetailBody"></div>
         <div class="form-actions detail-actions">
           <button class="secondary" id="outfitWearBtn" type="button">I wore this</button>
+          <input type="date" id="outfitWearDate" aria-label="Wear date" title="When did you wear this?" />
           <button class="secondary" id="outfitFavBtn" type="button">☆ Favorite</button>
         </div>
         <div id="outfitRateSection"></div>
@@ -2055,6 +2059,14 @@
 
       function openOutfit(groupId) {
         activeOutfitGroup = groupId;
+        // PC-20: wear date defaults to today, capped at today.
+        var wd = document.getElementById("outfitWearDate");
+        if (wd) {
+          var t = new Date();
+          var iso = t.getFullYear() + "-" + String(t.getMonth() + 1).padStart(2, "0") + "-" + String(t.getDate()).padStart(2, "0");
+          wd.value = iso;
+          wd.max = iso;
+        }
         renderOutfitDetail();
         openOverlay(document.getElementById("outfitOverlay"));
       }
@@ -2254,13 +2266,27 @@
       }
 
       // PC-12 phase 3: wear logging, ratings, reflection, style profile.
+      // PC-20: wornAt honors the chosen date (default today); createdAt is
+      // always the server timestamp. Chosen dates land at local noon to
+      // dodge timezone-boundary surprises.
+      function chosenWornAt() {
+        var input = document.getElementById("outfitWearDate");
+        var v = input && input.value;
+        var now = new Date();
+        if (!v) return firebase.firestore.FieldValue.serverTimestamp();
+        var p = v.split("-");
+        if (p.length !== 3) return firebase.firestore.FieldValue.serverTimestamp();
+        var sameDay = (+p[0] === now.getFullYear() && (+p[1] - 1) === now.getMonth() && +p[2] === now.getDate());
+        if (sameDay) return firebase.firestore.FieldValue.serverTimestamp();
+        return firebase.firestore.Timestamp.fromDate(new Date(+p[0], +p[1] - 1, +p[2], 12, 0, 0));
+      }
       document.getElementById("outfitWearBtn").addEventListener("click", function () {
         var versions = outfitVersions(activeOutfitGroup);
         var o = versions[0];
         if (!currentUser || !o) return;
         var ref = db.collection("users").doc(currentUser.uid).collection("wear_events").doc();
         ref.set({
-          wornAt: firebase.firestore.FieldValue.serverTimestamp(),
+          wornAt: chosenWornAt(),
           articleIds: o.itemIds || [],
           articleNames: o.itemNames || [],
           outfitId: o.id, // exact version worn
@@ -2460,7 +2486,7 @@
             var wears = [];
             snap.forEach(function (d) {
               var w = d.data();
-              if (w.outfitId && ids[w.outfitId]) wears.push(w);
+              if (w.outfitId && ids[w.outfitId]) { w._docId = d.id; wears.push(w); }
             });
             if (!wears.length) return;
             var wrap = document.createElement("div");
@@ -2473,7 +2499,26 @@
             wears.slice(0, 10).forEach(function (w) {
               var li = document.createElement("li");
               var when = w.wornAt && w.wornAt.toDate ? w.wornAt.toDate().toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "";
-              li.textContent = when + (w.occasion ? " · " + w.occasion : "") + (w.note ? " — " + w.note : "");
+              var span = document.createElement("span");
+              span.textContent = when + (w.occasion ? " · " + w.occasion : "") + (w.note ? " — " + w.note : "");
+              li.appendChild(span);
+              // PC-21: mis-taps happen — every entry is deletable. Stats
+              // are derived from wear_events, so deletion un-counts them.
+              var del = document.createElement("button");
+              del.type = "button";
+              del.className = "wear-del";
+              del.textContent = "×";
+              del.setAttribute("aria-label", "Delete this wear entry");
+              del.addEventListener("click", function () {
+                if (!confirm("Delete this wear entry?")) return;
+                db.collection("users").doc(currentUser.uid).collection("wear_events").doc(w._docId).delete()
+                  .then(function () {
+                    showToast("Wear entry deleted.");
+                    renderWearHistory(outfit);
+                  })
+                  .catch(function (err) { showToast(friendlyError(err)); });
+              });
+              li.appendChild(del);
               ul.appendChild(li);
             });
             wrap.appendChild(ul);
