@@ -27,7 +27,10 @@ history of everything tried, revisit-able for later purchase.
 users/{uid}/shopChecks/{checkId}
   photoPath: string            # users/{uid}/shop-checks/…
   photoUrl: string             # download URL at save time (display)
-  item: { category, colors[], pattern, note }
+  item: CatalogItem            # the unified model — see
+                             # CATALOG-ITEM-PROPOSAL.md (same shape as a
+                             # wardrobe article, not a separate "shop item"
+                             # blob); includes the AI's one-line `note`
   score: number|null, verdict: string, reasons: string[]
   similarOwned: [{ itemId, note }]
   outfits: [{ pieces[], note }]
