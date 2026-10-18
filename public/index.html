@@ -71,7 +71,7 @@
     .text-button { border: 0; background: transparent; padding: 7px 0; font-weight: 600; font-size: 13px; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
     .auth-button { min-height: 38px; border: 1px solid var(--line-strong); background: var(--paper); border-radius: 4px; padding: 0 13px; font-size: 12px; font-weight: 600; cursor: pointer; }
     .auth-button:disabled { color: var(--muted); cursor: not-allowed; opacity: .75; }
-    .guest-banner { position: sticky; top: 0; z-index: 40; display: flex; align-items: center; gap: 10px; margin: 10px 0 0; padding: 11px 14px; background: #fdf6e3; border: 1px solid #e5cf8a; border-radius: 10px; font-size: 13px; color: #6b5312; box-shadow: 0 2px 10px rgba(120, 90, 20, .08); }
+    .guest-banner { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 10px; margin: 10px 0 0; padding: 11px 14px; background: #fdf6e3; border: 1px solid #e5cf8a; border-radius: 10px; font-size: 13px; color: #6b5312; box-shadow: 0 2px 10px rgba(120, 90, 20, .08); }
     .guest-banner[hidden] { display: none; }
     .guest-banner .guest-icon { flex: none; width: 22px; height: 22px; }
     .guest-banner .link-button { color: #6b5312; margin-left: auto; }
@@ -1142,12 +1142,15 @@
         });
       }
 
-      function startEmailLink(email) {
+      function startEmailLink(email, statusEl) {
         if (!configured) return;
         email = (email || "").trim();
         if (!email || email.indexOf("@") === -1) { showToast("Enter a valid email address."); return; }
         try { window.localStorage.setItem("emailForSignIn", email); } catch (e) {}
         auth.sendSignInLinkToEmail(email, actionCodeSettings).then(function () {
+          // Persistent confirmation in the overlay — a toast alone is too
+          // easy to miss.
+          if (statusEl) statusEl.textContent = "✓ Link sent to " + email + " — check your inbox (and spam folder).";
           showToast("Sign-in link sent — check your inbox (and spam folder).");
         }).catch(function (err) { showToast(friendlyError(err)); });
       }
@@ -1287,8 +1290,11 @@
           var send = el("button", "secondary", "Email me a sign-in link");
           send.type = "button";
           send.style.width = "100%";
-          send.addEventListener("click", function () { startEmailLink(em.value); });
+          send.addEventListener("click", function () { startEmailLink(em.value, status); });
           body.appendChild(send);
+          var status = el("p", "hint", "");
+          status.style.marginTop = "8px";
+          body.appendChild(status);
           body.appendChild(el("p", "hint", "The link can land in spam — check there if you don't see it."));
         } else {
           document.getElementById("accountTitle").textContent = "Your account";
@@ -1325,7 +1331,9 @@
         }
         renderVibeSection(body);
         body.appendChild(h("Privacy"));
-        body.appendChild(el("p", "hint", "Your wardrobe and photos are private to your account — no ads, no trackers, nothing sold. When you add a photo, it's sent to Google's AI service to generate the description and tags."));
+        var priv = el("p", "hint", "Your wardrobe and photos are private to your account — no ads, no trackers, nothing sold. When you add a photo, it's sent to Google's AI service to generate the description and tags.");
+        priv.style.color = "var(--ink)";
+        body.appendChild(priv);
       }
 
       function signIn() {
@@ -4826,6 +4834,9 @@
             currentUser = user;
             setStatus(user);
             updateGuestBanner();
+            // If the account sheet is open, re-render it — the guest vs.
+            // signed-in content must reflect the new state immediately.
+            if (!document.getElementById("accountOverlay").hidden) renderAccountBody();
             // FB-1: feedback needs a signed-in user (create-only rules).
             document.getElementById("feedbackFab").hidden = !user;
             loadVibeProfile(); // Sprint 13 personalization
