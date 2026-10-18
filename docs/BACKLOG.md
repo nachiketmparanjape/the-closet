@@ -215,3 +215,15 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
   ("I want to try something from the other side") without lecturing.
   Includes a copy audit of prompts and UI for gendered assumptions.
 - **Not yet sized** — parked; candidate for prioritization.
+
+### UX-T1: First-run tutorial / onboarding experience (not yet sized)
+- **Idea (founder 2026-10-17):** a quick tutorial for new users so they can
+  figure out what to do on their own.
+- **Why parked:** the app is mid-UX-polish — flows are still changing, and a
+  tutorial built now rots with every change. The empty states already teach
+  (wardrobe empty state explains the loop; outfits hint names the three
+  paths), and the labeled "Ask the stylist" button closed the biggest
+  discoverability gap. If onboarding is needed, lightest touch first:
+  coach marks on first run, not a carousel.
+- **Revisit trigger:** a stranger (not a hand-held tester) gets lost in the
+  app, or the UX polish sprint settles and the flows stop moving.
