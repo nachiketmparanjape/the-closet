@@ -72,7 +72,7 @@ function buildShopCheckRequest(imageBase64, mimeType, items) {
   const config = {
     temperature: 0.3,
     maxOutputTokens: 1600,
-    thinkingConfig: { thinkingBudget: 768 },
+    thinkingConfig: { thinkingBudget: 512 },
     responseMimeType: "application/json",
   };
   return { model, contents, config };
