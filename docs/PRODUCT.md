@@ -110,6 +110,24 @@ Decided topics stay as compact records; full reports live in `research_notes/`.
   chat stylist reasons over text only. Needs a Cloud Functions proxy for the
   API key (Blaze card on file; free tier covers usage).
 
+### [OPEN 2026-10-17] UI/UX audit approach for the polish phase
+- **Question:** the app is functionally complete but visually clumsy — are
+  there tools/services to audit the UI and suggest improvements, and how
+  should the polish work be planned?
+- **Findings:** AI audit tools exist and several are free (UX Pickle $0;
+  SecretUXD free tier with Nielsen-heuristics + WCAG 2.2; Pixelait/Fleck
+  screenshot-based; UX Pilot trial) — but they're first-pass instruments,
+  weak on "can a user figure out the flow." URL-based auditors can't pass
+  the Google sign-in; only screenshot tools work here. Paid usability
+  platforms are overkill: the FB-1 feedback form + daily digest already is
+  unmoderated usability testing with his own testers. Microsoft Clarity
+  (free heatmaps/recordings) is a later decision with a privacy tradeoff.
+- **Recommendation:** Bramble runs a structured Nielsen-heuristics audit
+  (free, immediate, knows the app's intent) as the first cut of a "UX
+  polish" sprint; free AI tools cross-check accessibility/contrast; hire a
+  designer only if big questions remain. Full report:
+  `research_notes/closet-ux-audit-approach.md`.
+
 ### [DECIDED 2026-10-14] Color representation for AI recommendations
 - **Question:** for outfit recommendations, should garment colors be stored
   as names, hex codes, or both — and how many colors per garment? What does
