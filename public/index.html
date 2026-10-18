@@ -111,6 +111,15 @@
        obvious without a tutorial. */
     .feedback-fab { position: fixed; left: 18px; bottom: max(18px, env(safe-area-inset-bottom)); z-index: 15; padding: 12px 18px; border-radius: 999px; background: var(--paper); color: var(--ink); border: 1px solid var(--line); box-shadow: var(--shadow); font-size: 14px; font-weight: 600; cursor: pointer; }
     .feedback-fab:hover { border-color: var(--ink); }
+    /* UX-11: bottom-sheet chooser for the three ways to add an outfit. */
+    .overlay.sheet-overlay { place-items: end center; padding: 0; }
+    .sheet { width: min(560px, 100%); background: var(--paper); border-radius: 14px 14px 0 0; padding: 10px 10px calc(10px + env(safe-area-inset-bottom)); box-shadow: var(--shadow); }
+    .sheet-title { margin: 0; padding: 10px 14px 6px; font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+    .sheet-option { display: flex; align-items: center; width: 100%; padding: 15px 14px; background: none; border: none; border-radius: 10px; font: inherit; text-align: left; cursor: pointer; color: var(--ink); }
+    .sheet-option:hover { background: var(--paper-soft); }
+    .sheet-option .opt-title { display: block; font-weight: 600; font-size: 15px; }
+    .sheet-option .opt-sub { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+    .sheet-option.sheet-cancel .opt-title { color: var(--muted); font-weight: 600; }
     .feedback-text { width: 100%; min-height: 140px; font: inherit; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink); resize: vertical; }
     /* WX-1: shows the weather the stylist is working with. Hidden until a
        reading succeeds — no chip is better than a stale or "unknown" one. */
@@ -367,9 +376,7 @@
       <div class="catalog-head">
         <h2>Outfits</h2>
         <span class="count" id="outfitCount">0 outfits</span>
-        <button class="secondary" id="buildOutfitBtn" type="button" style="margin-left:auto">+ Build</button>
-        <button class="secondary" id="photoParseBtn" type="button">Match a photo</button>
-        <button class="secondary" id="photoParseCameraBtn" type="button">Match with camera</button>
+        <button class="secondary" id="addOutfitBtn" type="button" style="margin-left:auto">+ Add outfit</button>
         <input type="file" id="photoParseInput" accept="image/*" hidden>
         <input type="file" id="photoParseInputCamera" accept="image/*" capture="environment" hidden>
       </div>
@@ -394,6 +401,25 @@
         <button class="secondary" id="photoParseCancel" type="button">Cancel</button>
         <button class="primary" id="photoParseSave" type="button">Save outfit</button>
       </div>
+    </section>
+  </div>
+
+  <!-- UX-11: one "Add outfit" entry — the sheet names the three ways. -->
+  <div class="overlay sheet-overlay" id="addOutfitSheet" hidden role="dialog" aria-modal="true" aria-labelledby="addOutfitSheetTitle">
+    <section class="sheet">
+      <h2 class="sheet-title" id="addOutfitSheetTitle">Add an outfit</h2>
+      <button class="sheet-option" id="sheetBuild" type="button">
+        <span><span class="opt-title">Build manually</span><span class="opt-sub">Pick pieces from your wardrobe</span></span>
+      </button>
+      <button class="sheet-option" id="sheetPhoto" type="button">
+        <span><span class="opt-title">Match a photo</span><span class="opt-sub">Upload a photo of an outfit</span></span>
+      </button>
+      <button class="sheet-option" id="sheetCamera" type="button">
+        <span><span class="opt-title">Match with camera</span><span class="opt-sub">Photograph an outfit now</span></span>
+      </button>
+      <button class="sheet-option sheet-cancel" id="sheetCancel" type="button">
+        <span><span class="opt-title">Cancel</span></span>
+      </button>
     </section>
   </div>
 
@@ -1433,6 +1459,7 @@
           else if (!uploadOverlay.hidden) closeOverlay(uploadOverlay);
           else if (!bulkOverlay.hidden) closeOverlay(bulkOverlay);
           else if (!chatOverlay.hidden) closeOverlay(chatOverlay);
+          else if (!document.getElementById("addOutfitSheet").hidden) closeOverlay(document.getElementById("addOutfitSheet"));
         }
       });
 
@@ -2945,16 +2972,23 @@
         closeOverlay(document.getElementById("builderOverlay"));
       }
 
-      document.getElementById("buildOutfitBtn").addEventListener("click", openBuilder);
-      // PC-13: outfit photo parsing.
-      document.getElementById("photoParseBtn").addEventListener("click", openPhotoParse);
+      // UX-11: one "Add outfit" entry — the sheet names the three ways.
+      var addOutfitSheet = document.getElementById("addOutfitSheet");
+      function closeAddOutfitSheet() { closeOverlay(addOutfitSheet); }
+      document.getElementById("addOutfitBtn").addEventListener("click", function () { openOverlay(addOutfitSheet); });
+      document.getElementById("sheetBuild").addEventListener("click", function () { closeAddOutfitSheet(); openBuilder(); });
+      document.getElementById("sheetPhoto").addEventListener("click", function () { closeAddOutfitSheet(); openPhotoParse(); });
+      document.getElementById("sheetCamera").addEventListener("click", function () {
+        closeAddOutfitSheet();
+        document.getElementById("photoParseInputCamera").click();
+      });
+      document.getElementById("sheetCancel").addEventListener("click", closeAddOutfitSheet);
+      addOutfitSheet.addEventListener("click", function (event) { if (event.target === addOutfitSheet) closeAddOutfitSheet(); });
       document.getElementById("photoParseInput").addEventListener("change", function () {
         handlePhotoParseFile(this.files && this.files[0]);
       });
       // Camera variant of photo matching — same flow, rear camera directly.
-      document.getElementById("photoParseCameraBtn").addEventListener("click", function () {
-        document.getElementById("photoParseInputCamera").click();
-      });
+      // (The old standalone button is gone — UX-11 routes it via the sheet.)
       document.getElementById("photoParseInputCamera").addEventListener("change", function () {
         var file = this.files && this.files[0];
         this.value = "";
