@@ -72,13 +72,6 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
   description/attributes user-editable (merges with PC-8's editable
   fields); the full fix belongs with the garment-model idea. Defer until
   the app is more mature.
-- **PC-8: Color palette + future-proof item data model:** first-class
-  `colors` array on items (AI-suggested, user-editable, provenance-tracked
-  so AI re-runs never clobber user edits); promote AI attributes
-  (pattern/fit/formality/…) to top-level editable fields; lazy migration
-  from v1 `color`, no backfill script. Design doc: `DATA_MODEL.md`.
-  Sprint 4 — deferred at the founder's 2026-10-14 call (bulk upload +
-  stylist take Sprint 3).
 - **"Surprise me" shuffle:** one-tap random outfit suggestion per category.
   Sprint 2 pull-in candidate if time.
 - **Backfill AI descriptions for existing items:** run `describeItem` over
@@ -183,13 +176,10 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
 - **Revisit trigger:** a stranger (not a hand-held tester) gets lost in the
   app, or the UX polish sprint settles and the flows stop moving.
 
-### AUTH-1: Privacy-friendlier sign-in options (not yet sized)
-- **Idea (founder 2026-10-17):** Google sign-in upfront may deter
-  privacy-conscious users. Explore subtler persistent-account options
-  (e.g. anonymous auth with later upgrade, email link) alongside Google,
-  plus a visible privacy-safety note in the app.
-- **Status:** parked for discussion AFTER PC-14 ships (founder's call —
-  not urgent, but "a big deal" for onboarding comfort).
+### AUTH-1: Privacy-friendlier sign-in — IN SPRINT 13
+Anonymous-first auth with Google/email-link upgrade, one account per
+email, guest banner + privacy note. Built 2026-10-18, in founder phone
+validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
 
 ### Personalization: exploration vs. exploitation (open modeling question)
 - **Problem:** the vibe profile only learns from what the user wears —
