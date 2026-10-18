@@ -1579,6 +1579,90 @@
       // was a pre-API stopgap and the API is more accurate. The canvas
       // dominant-color sampler stays: it's plain pixel math (not AI) and
       // supplies the palette's primary hex, which the API doesn't return.
+      // PC-19: perceptual-hash photo dedup. pHash (DCT-based, 63-bit) catches
+      // exact re-uploads and resized/recompressed copies. Hashes are
+      // computed at photo-selection time and stashed on the File object as
+      // file._phash; the submit check is then synchronous (warn, don't
+      // block — the builder-dupSlot precedent).
+      var PHASH_THRESHOLD = 5;
+      function phashFromGray(g) {
+        var N = 32, coeffs = [], u, v, x, y, sum;
+        for (u = 0; u < 8; u++) {
+          for (v = 0; v < 8; v++) {
+            if (u === 0 && v === 0) continue; // skip DC (avg brightness)
+            sum = 0;
+            for (y = 0; y < N; y++) {
+              for (x = 0; x < N; x++) {
+                sum += g[y * N + x] *
+                  Math.cos((Math.PI / N) * (x + 0.5) * u) *
+                  Math.cos((Math.PI / N) * (y + 0.5) * v);
+              }
+            }
+            coeffs.push(sum);
+          }
+        }
+        var sorted = coeffs.slice().sort(function (a, b) { return a - b; });
+        var med = sorted[Math.floor(sorted.length / 2)];
+        var maxAbs = 0, i;
+        for (i = 0; i < coeffs.length; i++) {
+          var a = Math.abs(coeffs[i]);
+          if (a > maxAbs) maxAbs = a;
+        }
+        if (maxAbs < 1e-6) return "0000000000000000"; // degenerate: no AC energy
+        var h = 0n;
+        for (i = 0; i < coeffs.length; i++) {
+          if (coeffs[i] > med) h |= (1n << BigInt(i));
+        }
+        return h.toString(16).padStart(16, "0");
+      }
+      function phashDistance(a, b) {
+        if (!a || !b || a.length !== 16 || b.length !== 16) return 99;
+        var x = BigInt("0x" + a) ^ BigInt("0x" + b), d = 0;
+        while (x > 0n) { d += Number(x & 1n); x >>= 1n; }
+        return d;
+      }
+      function computePHash(img) {
+        var c = document.createElement("canvas");
+        c.width = 32; c.height = 32;
+        var ctx = c.getContext("2d", { willReadFrequently: true });
+        ctx.drawImage(img, 0, 0, 32, 32);
+        var d = ctx.getImageData(0, 0, 32, 32).data, g = new Array(1024), i;
+        for (i = 0; i < 1024; i++) {
+          g[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
+        }
+        return phashFromGray(g);
+      }
+      function existingPHashes() {
+        var out = [];
+        (allItems || []).forEach(function (it) {
+          (it.photos || []).forEach(function (p) {
+            if (p && p.phash) out.push({ hash: p.phash, itemName: it.name || "an item" });
+          });
+        });
+        return out;
+      }
+      function findPhotoDupe(files) {
+        var existing = existingPHashes();
+        if (!existing.length) return null;
+        for (var f = 0; f < files.length; f++) {
+          var h = files[f]._phash;
+          if (!h) continue;
+          for (var i = 0; i < existing.length; i++) {
+            if (phashDistance(h, existing[i].hash) <= PHASH_THRESHOLD) {
+              return { fileIndex: f, itemName: existing[i].itemName };
+            }
+          }
+        }
+        return null;
+      }
+      function stashPHashes(files) {
+        files.forEach(function (file) {
+          if (file._phash || file.type.indexOf("image/") !== 0) return;
+          loadImageFile(file).then(function (img) {
+            try { file._phash = computePHash(img); } catch (e) {}
+          }).catch(function () {});
+        });
+      }
       function dominantColor(img) {
         var size = 48;
         var canvas = document.createElement("canvas");
@@ -1720,6 +1804,7 @@
         if (input.files.length > MAX_PHOTOS) {
           showToast("Keeping the first " + MAX_PHOTOS + " photos.");
         }
+        stashPHashes(files); // PC-19: hash in the background for the submit-time dupe check.
         files.forEach(function (file) {
           if (file.type.indexOf("image/") !== 0) return;
           var thumbUrl = URL.createObjectURL(file);
@@ -1764,6 +1849,9 @@
           if (files[v].size > 10 * 1024 * 1024) { showToast("Each image must be under 10 MB."); return; }
           if (["image/jpeg", "image/png", "image/webp"].indexOf(files[v].type) === -1) { showToast("Use JPEG, PNG, or WebP images."); return; }
         }
+        // PC-19: warn, don't block — same photo (or a resized copy) already on file.
+        var dupe = findPhotoDupe(files);
+        if (dupe && !window.confirm("This photo looks like one already on '" + dupe.itemName + "'. Upload anyway?")) return;
 
         var docRef = db.collection("users").doc(currentUser.uid).collection("items").doc();
         var bar = progress.querySelector("span");
@@ -1843,7 +1931,7 @@
             failUpload(friendlyError(error));
           }, function () {
             task.snapshot.ref.getDownloadURL().then(function (imageUrl) {
-              photos.push({ url: imageUrl, storagePath: storagePath });
+              photos.push({ url: imageUrl, storagePath: storagePath, phash: file._phash || null });
               uploadOne(idx + 1);
             }).catch(function (error) {
               failUpload(friendlyError(error));
@@ -1976,7 +2064,7 @@
             category: (r.ai && r.ai.category) || "Other",
             imageUrl: r.imageUrl,
             storagePath: storagePath,
-            photos: [{ url: r.imageUrl, storagePath: storagePath }],
+            photos: [{ url: r.imageUrl, storagePath: storagePath, phash: job.file._phash || null }],
             colors: v2.colors,
             description: v2.description,
             pattern: v2.pattern,
@@ -2022,6 +2110,9 @@
         if (bulkRunning) return;
         var hasQueued = bulkJobs.some(function (j) { return j.status === "queued"; });
         if (!hasQueued) return;
+        // PC-19: warn, don't block.
+        var dupe = findPhotoDupe(bulkJobs.filter(function (j) { return j.status === "queued"; }).map(function (j) { return j.file; }));
+        if (dupe && !window.confirm("One of these photos looks like one already on '" + dupe.itemName + "'. Add anyway?")) return;
         bulkRunning = true;
         bulkInput.disabled = true;
         bulkStartBtn.disabled = true;
@@ -2067,6 +2158,7 @@
           };
         });
         bulkJobs = append ? bulkJobs.concat(jobs).slice(0, BULK_MAX) : jobs;
+        stashPHashes(bulkJobs.map(function (j) { return j.file; })); // PC-19
         var n = bulkJobs.filter(function (j) { return j.status === "queued"; }).length;
         bulkStartBtn.disabled = n === 0;
         bulkStartBtn.textContent = n > 0 ? "Add " + n + " piece" + (n === 1 ? "" : "s") : "Add pieces";
