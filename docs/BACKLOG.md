@@ -216,7 +216,7 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
   Includes a copy audit of prompts and UI for gendered assumptions.
 - **Not yet sized** — parked; candidate for prioritization.
 
-### UX-T1: First-run tutorial / onboarding experience (not yet sized)
+### UX-12: First-run tutorial / onboarding experience (not yet sized)
 - **Idea (founder 2026-10-17):** a quick tutorial for new users so they can
   figure out what to do on their own.
 - **Why parked:** the app is mid-UX-polish — flows are still changing, and a
