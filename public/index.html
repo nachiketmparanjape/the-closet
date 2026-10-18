@@ -1391,7 +1391,9 @@
         h.style.margin = "18px 0 8px";
         body.appendChild(h);
         if (vibeConfidence(vibeProfileCache) < 0.3) {
-          body.appendChild(el("p", "hint", "Not enough wears yet — your vibe appears here once the app gets to know your taste."));
+          var empty = el("p", "hint", "Not enough wears yet — your vibe appears here once the app gets to know your taste.");
+          empty.style.color = "var(--ink)";
+          body.appendChild(empty);
           return;
         }
         var row = el("div", null);
