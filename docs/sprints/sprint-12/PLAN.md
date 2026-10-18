@@ -25,3 +25,17 @@
   the hash dedup"). 63-bit DCT pHash, Hamming ≤ 5, warn-don't-block on
   single + bulk upload; `phash` stored on photo entries; 7 unit tests;
   backfilled all 14 existing photos via scripts/backfill-phash.js.
+
+### Shop-flow tidy batch (founder test 2026-10-18) — SHIPPED
+- Title = full AI note verbatim → now shortened ("An off-white baseball
+  cap with..." → "Off-white baseball cap"); description keeps the full note.
+- Shop-check AI returned free-text categories ("Headwear") outside the app
+  vocabulary → category now constrained to CATEGORIES in the prompt AND
+  server-validated (falls back to "Other"), same as describeItem.
+- Filter chips were missing Accessories/Other → added.
+- One-tap add from the ephemeral result now auto-records the shop check
+  as "bought" (manual Save still = "considering").
+- Style-tag checkboxes inherited `.field input { width: 100% }` and
+  rendered as giant black boxes → excluded via :not([type="checkbox"]) +
+  proper 18px checkbox styling.
+- Repaired his cap item title in Firestore.
