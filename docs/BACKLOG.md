@@ -227,3 +227,11 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
   coach marks on first run, not a carousel.
 - **Revisit trigger:** a stranger (not a hand-held tester) gets lost in the
   app, or the UX polish sprint settles and the flows stop moving.
+
+### AUTH-1: Privacy-friendlier sign-in options (not yet sized)
+- **Idea (founder 2026-10-17):** Google sign-in upfront may deter
+  privacy-conscious users. Explore subtler persistent-account options
+  (e.g. anonymous auth with later upgrade, email link) alongside Google,
+  plus a visible privacy-safety note in the app.
+- **Status:** parked for discussion AFTER PC-14 ships (founder's call —
+  not urgent, but "a big deal" for onboarding comfort).

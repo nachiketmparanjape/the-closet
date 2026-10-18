@@ -23,5 +23,15 @@ service firebase.storage {
         && request.resource.contentType.matches('image/.*');
       allow delete: if request.auth != null && request.auth.uid == userId;
     }
+    // PC-14: shop-check photos (ephemeral). Same owner-only shape — the
+    // client uploads here before shopCheck; nothing is ever catalogued.
+    match /users/{userId}/shop-checks/{allPaths=**} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create, update: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
   }
 }

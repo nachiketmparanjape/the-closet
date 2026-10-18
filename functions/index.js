@@ -21,6 +21,7 @@ const { askStylist, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanit
 const { reflectOutfit } = require("./reflect");
 const { critiqueOutfit } = require("./critique");
 const { parseOutfitPhoto } = require("./photo");
+const { shopCheck } = require("./shopcheck");
 // PC-11: every expected failure goes through the catalog; every failure
 // path logs with a correlation ID.
 const { fail, newCorrelationId, logError } = require("./errors");
@@ -226,6 +227,34 @@ exports.parseOutfitPhoto = onCall(
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
       boundary("parseOutfitPhoto", correlationId, uid, err);
+    }
+  }
+);
+
+// PC-14: shop compatibility check.
+exports.shopCheck = onCall(
+  {
+    region: "us-central1",
+    timeoutSeconds: 120,
+    memory: "512MiB",
+    maxInstances: 5,
+  },
+  async (request) => {
+    const correlationId = newCorrelationId();
+    const uid = request.auth ? request.auth.uid : null;
+    try {
+      if (!request.auth) {
+        fail("NOT_SIGNED_IN");
+      }
+      const data = request.data || {};
+      const storagePath = typeof data.storagePath === "string" ? data.storagePath.trim() : "";
+      if (!storagePath || storagePath.length > 300) {
+        fail("BAD_REQUEST");
+      }
+      return await shopCheck(uid, storagePath);
+    } catch (err) {
+      if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
+      boundary("shopCheck", correlationId, uid, err);
     }
   }
 );

@@ -120,6 +120,19 @@
     .sheet-option .opt-title { display: block; font-weight: 600; font-size: 15px; }
     .sheet-option .opt-sub { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
     .sheet-option.sheet-cancel .opt-title { color: var(--muted); font-weight: 600; }
+    /* PC-14: shop-check result. */
+    .shop-head { display: flex; gap: 18px; align-items: center; margin-bottom: 6px; }
+    .shop-photo { width: 96px; height: 116px; object-fit: cover; border-radius: 8px; background: var(--paper-soft); flex-shrink: 0; }
+    .shop-score { display: flex; align-items: baseline; gap: 8px; }
+    .shop-score .num { font-family: "Closet Serif", serif; font-size: 58px; font-weight: 500; letter-spacing: -.03em; line-height: 1; }
+    .shop-score .of { color: var(--muted); font-size: 14px; }
+    .shop-verdict { margin: 8px 0 0; font-size: 15px; line-height: 1.55; }
+    .shop-section-title { margin: 22px 0 8px; font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+    .shop-reasons { margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.65; }
+    .shop-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+    .shop-thumb { width: 52px; height: 62px; object-fit: cover; border-radius: 6px; background: var(--paper-soft); flex-shrink: 0; }
+    .shop-row-title { font-weight: 600; font-size: 14px; }
+    .shop-thumbs { display: flex; gap: 8px; margin-bottom: 6px; }
     .feedback-text { width: 100%; min-height: 140px; font: inherit; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink); resize: vertical; }
     /* WX-1: shows the weather the stylist is working with. Hidden until a
        reading succeeds — no chip is better than a stale or "unknown" one. */
@@ -327,6 +340,7 @@
           Add a piece
         </button>
         <button class="secondary" id="bulkButton" type="button">Bulk add</button>
+        <button class="secondary" id="shopCheckButton" type="button">Shop check</button>
       </div>
     </section>
 
@@ -420,6 +434,35 @@
       <button class="sheet-option sheet-cancel" id="sheetCancel" type="button">
         <span><span class="opt-title">Cancel</span></span>
       </button>
+    </section>
+  </div>
+
+  <!-- PC-14: shop compatibility check — photo source sheet. -->
+  <div class="overlay sheet-overlay" id="shopCheckSheet" hidden role="dialog" aria-modal="true" aria-labelledby="shopCheckSheetTitle">
+    <section class="sheet">
+      <h2 class="sheet-title" id="shopCheckSheetTitle">Check a shop item</h2>
+      <button class="sheet-option" id="shopSheetCamera" type="button">
+        <span><span class="opt-title">Take photo</span><span class="opt-sub">Snap it in the store</span></span>
+      </button>
+      <button class="sheet-option" id="shopSheetUpload" type="button">
+        <span><span class="opt-title">Upload photo</span><span class="opt-sub">Screenshot or saved photo</span></span>
+      </button>
+      <button class="sheet-option sheet-cancel" id="shopSheetCancel" type="button">
+        <span><span class="opt-title">Cancel</span></span>
+      </button>
+    </section>
+  </div>
+  <input type="file" id="shopCheckInput" accept="image/*" hidden>
+  <input type="file" id="shopCheckInputCamera" accept="image/*" capture="environment" hidden>
+
+  <!-- PC-14: shop-check result. -->
+  <div class="overlay" id="shopCheckOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="shopCheckTitle">
+    <section class="modal">
+      <div class="modal-head">
+        <h2 id="shopCheckTitle">Shop check</h2>
+        <button class="icon-button" id="shopCheckClose" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body" id="shopCheckBody"></div>
     </section>
   </div>
 
@@ -1460,6 +1503,8 @@
           else if (!bulkOverlay.hidden) closeOverlay(bulkOverlay);
           else if (!chatOverlay.hidden) closeOverlay(chatOverlay);
           else if (!document.getElementById("addOutfitSheet").hidden) closeOverlay(document.getElementById("addOutfitSheet"));
+          else if (!document.getElementById("shopCheckSheet").hidden) closeOverlay(document.getElementById("shopCheckSheet"));
+          else if (!document.getElementById("shopCheckOverlay").hidden) closeOverlay(document.getElementById("shopCheckOverlay"));
         }
       });
 
@@ -2984,6 +3029,178 @@
       });
       document.getElementById("sheetCancel").addEventListener("click", closeAddOutfitSheet);
       addOutfitSheet.addEventListener("click", function (event) { if (event.target === addOutfitSheet) closeAddOutfitSheet(); });
+
+      // PC-14: shop compatibility check.
+      var shopCheckState = null;
+      var shopCheckSheet = document.getElementById("shopCheckSheet");
+      function closeShopCheckSheet() { closeOverlay(shopCheckSheet); }
+      document.getElementById("shopCheckButton").addEventListener("click", function () {
+        if (!currentUser) { signIn(); return; }
+        openOverlay(shopCheckSheet);
+      });
+      document.getElementById("shopSheetCamera").addEventListener("click", function () {
+        closeShopCheckSheet();
+        document.getElementById("shopCheckInputCamera").click();
+      });
+      document.getElementById("shopSheetUpload").addEventListener("click", function () {
+        closeShopCheckSheet();
+        document.getElementById("shopCheckInput").click();
+      });
+      document.getElementById("shopSheetCancel").addEventListener("click", closeShopCheckSheet);
+      shopCheckSheet.addEventListener("click", function (event) { if (event.target === shopCheckSheet) closeShopCheckSheet(); });
+      document.getElementById("shopCheckInputCamera").addEventListener("change", function () {
+        var file = this.files && this.files[0];
+        this.value = "";
+        if (file) handleShopCheckFile(file);
+      });
+      document.getElementById("shopCheckInput").addEventListener("change", function () {
+        var file = this.files && this.files[0];
+        this.value = "";
+        if (file) handleShopCheckFile(file);
+      });
+      document.getElementById("shopCheckClose").addEventListener("click", function () {
+        closeOverlay(document.getElementById("shopCheckOverlay"));
+      });
+
+      function handleShopCheckFile(file) {
+        if (!file || !currentUser) return;
+        showToast("Checking against your wardrobe…");
+        var safeName = Date.now() + "-" + (file.name || "shop.jpg").replace(/[^a-zA-Z0-9._-]/g, "-");
+        var storagePath = "users/" + currentUser.uid + "/shop-checks/" + safeName;
+        var fileRef = storage.ref().child(storagePath);
+        fileRef.put(file, { contentType: file.type }).then(function () {
+          return fileRef.getDownloadURL();
+        }).then(function (url) {
+          return functions.httpsCallable("shopCheck")({ storagePath: storagePath }).then(function (res) {
+            shopCheckState = {
+              photoUrl: url,
+              fileName: file.name || "shop-check.jpg",
+              fileType: file.type || "image/jpeg",
+              result: res.data || {}
+            };
+            renderShopCheckResult();
+            openOverlay(document.getElementById("shopCheckOverlay"));
+          });
+        }).catch(function (err) {
+          // The photo stays in shop-checks (ephemeral history); the user can retry.
+          showToast(friendlyError(err));
+        });
+      }
+
+      function shopCheckAddToWardrobe() {
+        var st = shopCheckState;
+        closeOverlay(document.getElementById("shopCheckOverlay"));
+        if (!st) { openOverlay(document.getElementById("uploadOverlay")); return; }
+        // Feed the shop photo through the normal upload flow (preview, AI
+        // suggest, submit) via the camera-capture DataTransfer pattern.
+        fetch(st.photoUrl).then(function (resp) { return resp.blob(); }).then(function (blob) {
+          var file = new File([blob], st.fileName, { type: st.fileType || blob.type || "image/jpeg" });
+          var dt = new DataTransfer();
+          dt.items.add(file);
+          var lib = document.getElementById("photoInput");
+          lib.files = dt.files;
+          lib.dispatchEvent(new Event("change"));
+          openOverlay(document.getElementById("uploadOverlay"));
+        }).catch(function () {
+          openOverlay(document.getElementById("uploadOverlay"));
+        });
+      }
+
+      function renderShopCheckResult() {
+        var st = shopCheckState;
+        var body = document.getElementById("shopCheckBody");
+        body.textContent = "";
+        var r = st ? st.result : null;
+        if (!r) return;
+        function el(tag, cls, text) {
+          var e = document.createElement(tag);
+          if (cls) e.className = cls;
+          if (text != null) e.textContent = text;
+          return e;
+        }
+        function thumbFor(itemId) {
+          var it = itemById(itemId);
+          if (!it) return null;
+          var photos = itemPhotos(it);
+          if (!photos.length) return null;
+          var t = document.createElement("img");
+          t.src = photos[0].url;
+          t.alt = it.name || "";
+          t.className = "shop-thumb";
+          return t;
+        }
+        if (r.notClothing) {
+          body.appendChild(el("p", null, "That doesn't look like a garment — try a clearer photo of the item."));
+        } else {
+          var head = el("div", "shop-head");
+          var img = document.createElement("img");
+          img.src = st.photoUrl;
+          img.alt = "Shop item photo";
+          img.className = "shop-photo";
+          head.appendChild(img);
+          var scoreWrap = el("div", null);
+          var scoreLine = el("div", "shop-score");
+          scoreLine.appendChild(el("span", "num", r.score == null ? "–" : String(r.score)));
+          scoreLine.appendChild(el("span", "of", "/ 10 wardrobe fit"));
+          scoreWrap.appendChild(scoreLine);
+          if (r.verdict) scoreWrap.appendChild(el("p", "shop-verdict", r.verdict));
+          head.appendChild(scoreWrap);
+          body.appendChild(head);
+
+          if (r.item && r.item.note) {
+            body.appendChild(el("p", "hint", "Seen as: " + r.item.note));
+          }
+          if (r.reasons && r.reasons.length) {
+            body.appendChild(el("h3", "shop-section-title", "Why this score"));
+            var ul = el("ul", "shop-reasons");
+            r.reasons.forEach(function (reason) { ul.appendChild(el("li", null, reason)); });
+            body.appendChild(ul);
+          }
+          if (r.similarOwned && r.similarOwned.length) {
+            body.appendChild(el("h3", "shop-section-title", "Already in your wardrobe"));
+            r.similarOwned.forEach(function (s) {
+              var it = itemById(s.itemId);
+              var row = el("div", "shop-row");
+              var t = thumbFor(s.itemId);
+              if (t) row.appendChild(t);
+              var txt = el("div", null);
+              txt.appendChild(el("div", "shop-row-title", it ? it.name : "Unknown item"));
+              if (s.note) txt.appendChild(el("div", "hint", s.note));
+              row.appendChild(txt);
+              body.appendChild(row);
+            });
+          }
+          if (r.outfits && r.outfits.length) {
+            body.appendChild(el("h3", "shop-section-title", "It would work with"));
+            r.outfits.forEach(function (o) {
+              var card = el("div", "outfit-card");
+              var thumbs = el("div", "shop-thumbs");
+              o.pieces.forEach(function (pid) {
+                var t = thumbFor(pid);
+                if (t) thumbs.appendChild(t);
+              });
+              card.appendChild(thumbs);
+              if (o.note) card.appendChild(el("p", "hint", o.note));
+              body.appendChild(card);
+            });
+          } else {
+            body.appendChild(el("p", "hint", "Not enough wardrobe pieces yet to suggest outfits — add a few staples and check again."));
+          }
+          body.appendChild(el("p", "hint", "Nothing was saved — this item isn't in your wardrobe."));
+        }
+        var actions = el("div", "form-actions");
+        if (!r.notClothing) {
+          var add = el("button", "primary", "Add it to your wardrobe");
+          add.type = "button";
+          add.addEventListener("click", shopCheckAddToWardrobe);
+          actions.appendChild(add);
+        }
+        var done = el("button", "secondary", "Done");
+        done.type = "button";
+        done.addEventListener("click", function () { closeOverlay(document.getElementById("shopCheckOverlay")); });
+        actions.appendChild(done);
+        body.appendChild(actions);
+      }
       document.getElementById("photoParseInput").addEventListener("change", function () {
         handlePhotoParseFile(this.files && this.files[0]);
       });
