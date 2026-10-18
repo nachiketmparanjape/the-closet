@@ -1343,6 +1343,18 @@
           if (files[v].size > 10 * 1024 * 1024) { showToast("Each image must be under 10 MB."); return; }
           if (["image/jpeg", "image/png", "image/webp"].indexOf(files[v].type) === -1) { showToast("Use JPEG, PNG, or WebP images."); return; }
         }
+        // PC-19: hash first (async), then warn-don't-block before uploading.
+        Promise.all(files.map(function (file) {
+          return loadImageFile(file).then(function (img) {
+            try { file._phash = computePHash(img); } catch (e) {}
+          }).catch(function () {});
+        })).then(function () {
+          var dupe = findPhotoDupe(files);
+          if (dupe && !window.confirm("This photo looks like one already on '" + dupe.itemName + "'. Add anyway?")) return;
+          beginAddPhotos();
+        });
+
+        function beginAddPhotos() {
         var addBtn = document.getElementById("addPhotosBtn");
         addBtn.disabled = true;
         showToast("Uploading " + files.length + (files.length === 1 ? " photo…" : " photos…"));
@@ -1368,7 +1380,7 @@
           fileRef.put(file, { contentType: file.type }).then(function () {
             return fileRef.getDownloadURL();
           }).then(function (url) {
-            newPhotos.push({ url: url, storagePath: storagePath });
+            newPhotos.push({ url: url, storagePath: storagePath, phash: file._phash || null });
             uploadOne(idx + 1);
           }).catch(function (error) {
             failed = true;
@@ -1378,6 +1390,7 @@
           });
         }
         uploadOne(0);
+        }
       });
 
       function openItem(item) {
