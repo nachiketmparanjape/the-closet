@@ -83,3 +83,18 @@ yes/no acted as veto over the proposal.
 - PC-23 archive layer (M) — trigger: a "deleted something I wanted back"
   moment or an article delete visibly breaking an old outfit.
 - PC-24/25/26 gender-aware work — parked per founder; sized and waiting.
+
+## Session add-ons (shipped 2026-10-17, recorded for the history migration)
+
+### Swap picker for photo-parse confirm rows (S)
+- **Status:** shipped 2026-10-17 — per-row "Swap…" select; swapped rows show
+  "you picked this"; kept pieces disabled to prevent duplicates.
+
+### Camera capture on all photo entry points (S)
+- **Status:** shipped 2026-10-17 — dedicated "Take photo" buttons with
+  `capture="environment"` on upload, bulk, photo-parse, item and outfit
+  flows; desktop falls back to the file dialog.
+
+### Button copy pass: goal-labeled actions (S)
+- **Status:** shipped 2026-10-17 — "Match a photo" / "Match with camera" /
+  "AI critique"; buttons labeled by user goal, not mechanism.

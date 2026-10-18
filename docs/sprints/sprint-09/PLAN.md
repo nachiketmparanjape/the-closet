@@ -15,6 +15,7 @@ rolled into this batch instead of built ad hoc.
 ## Cuts
 
 ### FB-1: In-app feedback form (S)
+- **Status:** shipped 2026-10-17 — rules deployed, live, founder testing.
 - **Problem (founder 2026-10-17):** testers are coming; without in-context
   capture, feedback scatters across chats and DMs.
 - **In scope:** floating "Feedback" button (always visible) → modal with one
@@ -29,6 +30,7 @@ rolled into this batch instead of built ad hoc.
 - **Size:** S. **Constitution check:** passes.
 
 ### WX-1: Weather-aware stylist (S)
+- **Status:** shipped 2026-10-17 — function redeployed and healthy, live.
 - **Problem (founder 2026-10-17):** the rubric already scores a `weather`
   dimension, but it runs on whatever the user typed or nothing at all.
 - **In scope:** browser geolocation (permission-gated, graceful fallback) →
@@ -45,6 +47,7 @@ rolled into this batch instead of built ad hoc.
   core loop and this removes friction from its top request.)
 
 ### PM-3: GitHub Issues adoption — full history migrated (S/M)
+- **Status:** in progress — migration running 2026-10-17.
 - **Problem (founder 2026-10-17):** adopting GitHub issues requires the
   whole history there, not just new work.
 - **In scope:** labels (type/lane/size) + milestones (Sprints 1–9) on the

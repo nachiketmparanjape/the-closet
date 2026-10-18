@@ -155,3 +155,25 @@ was written from a static review without the retirement date).
   error gone; no null color hexes.
 - Phase 3: one-off bad rating no longer creates a durable preference;
   suggestions carry evidence.
+
+## Shipped cuts (recorded 2026-10-17 for the GitHub history migration)
+
+### Model migration to gemini-3.8-flash (S)
+- **Status:** shipped 2026-10-15 — all three functions live on the global
+  endpoint (regional Vertex 404s on 3.8); thinking budgets + raised token caps.
+
+### Stylist engine v1: rubric, handles, slot validation (M)
+- **Status:** shipped 2026-10-15 — color-theory rubric 2026-10-15-v1, `[i1]`
+  handles, slot validation with one repair, OKLCH palette distance.
+
+### Garment understanding: subtype, style tags, hardened colors (M)
+- **Status:** shipped 2026-10-15 — view-aware describe prompt, style_tags
+  vocab, secondary AI colors anchored to canonical palette hexes.
+
+### Reflection engine: evidence-backed preferences + calibration (L)
+- **Status:** shipped 2026-10-16 — explicit/repeated-evidence preferences
+  with confirm/dismiss, predicted-vs-actual calibration logging.
+
+### Storage rules delete fix (S)
+- **Status:** shipped 2026-10-15 — standalone owner-only `allow delete`
+  (combined `allow write` referenced the absent `request.resource`).

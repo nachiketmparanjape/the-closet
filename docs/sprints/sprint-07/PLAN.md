@@ -87,3 +87,21 @@ and approved without veto.
 - PC-23 archive layer (M) — parked per founder 2026-10-16; trigger: a
   "deleted something I wanted back" moment or an article delete visibly
   breaking an old outfit.
+
+## Session add-ons (shipped 2026-10-17, recorded for the history migration)
+
+### Outfit delete: remove a whole version group (S)
+- **Status:** shipped 2026-10-17 — danger-zone button, batch delete by
+  version group; wear events stay.
+
+### Chat bubble chips for @-references (S)
+- **Status:** shipped 2026-10-17 — referenced pieces/outfits render as chips
+  inside the sent message bubble.
+
+### Outfit naming from pieces + rename (S)
+- **Status:** shipped 2026-10-17 — `defaultOutfitName` derives from pieces
+  ("Black Nike Air joggers + White Cotton Tee +1"); rename is metadata-only.
+
+### Builder guardrails: grouped picker, slot pills, warn-don't-block (S)
+- **Status:** shipped 2026-10-17 — category-grouped picker, live slot
+  summary, non-blocking confirm on doubled non-accessory slots.
