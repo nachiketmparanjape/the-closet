@@ -2,8 +2,7 @@
 
 **Dates:** batch opened 2026-10-17 at founder's direction (sprints are work
 batches — see playbook 2026-10-17).
-**Status:** FB-1 + WX-1 shipped 2026-10-17 (133/133 tests; function redeployed
-and healthy). PM-3 pending.
+**Status:** all three cuts shipped 2026-10-17 — Sprint 9 CLOSED.
 **Theme:** the app is about to meet other humans — feedback capture, weather
 that just works, and the full history visible as GitHub issues.
 **Planning note:** ranked backlog per the prioritization rule (value,
@@ -47,7 +46,8 @@ rolled into this batch instead of built ad hoc.
   core loop and this removes friction from its top request.)
 
 ### PM-3: GitHub Issues adoption — full history migrated (S/M)
-- **Status:** in progress — migration running 2026-10-17.
+- **Status:** shipped 2026-10-17 — 44 issues + 9 milestones + labels live;
+  mirror.py --to-product-repos keeps them generated from docs/.
 - **Problem (founder 2026-10-17):** adopting GitHub issues requires the
   whole history there, not just new work.
 - **In scope:** labels (type/lane/size) + milestones (Sprints 1–9) on the
