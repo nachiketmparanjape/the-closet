@@ -309,7 +309,8 @@
     .score-chip { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); }
     .tag-checks { display: flex; flex-wrap: wrap; gap: 4px 12px; }
     .tag-checks .tag-check { display: inline-flex; align-items: center; gap: 5px; margin-bottom: 0; font-size: 13px; font-weight: 400; cursor: pointer; }
-    .field input, .field select { width: 100%; min-height: 46px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--paper); color: var(--ink); padding: 10px 12px; outline: none; }
+    .field input:not([type="checkbox"]), .field select { width: 100%; min-height: 46px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--paper); color: var(--ink); padding: 10px 12px; outline: none; }
+    .field input[type="checkbox"] { width: 18px; height: 18px; flex: none; accent-color: var(--ink); }
     .field input:focus, .field select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
     .file-drop { border: 1px dashed var(--line-strong); padding: 28px 18px; text-align: center; background: var(--bg); }
     .file-drop input { width: 100%; }
@@ -384,6 +385,8 @@
           <button class="chip" type="button" data-filter="Bottoms">Bottoms</button>
           <button class="chip" type="button" data-filter="Outerwear">Outerwear</button>
           <button class="chip" type="button" data-filter="Shoes">Shoes</button>
+          <button class="chip" type="button" data-filter="Accessories">Accessories</button>
+          <button class="chip" type="button" data-filter="Other">Other</button>
         </div>
       </div>
 
@@ -3334,7 +3337,7 @@
         }).then(function (vals) {
           var url = vals[1];
           var doc = {
-            name: item.note || item.category || "Untitled item",
+            name: shopCheckShortTitle(item),
             category: item.category || "Other",
             imageUrl: url,
             storagePath: newPath,
@@ -3354,11 +3357,24 @@
           };
           return docRef.set(doc);
         }).then(function () {
+          // Record the check: bought via a saved entry, or auto-record the
+          // ephemeral check as bought so the shop list keeps the history.
+          var recorded = Promise.resolve();
           if (source.savedCheckId) {
-            shopCheckDocRef(source.savedCheckId)
+            recorded = shopCheckDocRef(source.savedCheckId)
               .update({ status: "bought", updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
               .catch(function () {});
+          } else if (source.result && !source.result.notClothing && source.storagePath) {
+            var r = source.result;
+            recorded = writeShopCheckDoc({
+              photoPath: source.storagePath,
+              photoUrl: source.photoUrl,
+              item: r.item, score: r.score, verdict: r.verdict,
+              reasons: r.reasons, similarOwned: r.similarOwned, outfits: r.outfits
+            }, "bought").catch(function () {});
           }
+          return recorded;
+        }).then(function () {
           showToast("Added to your wardrobe.");
           switchView("wardrobe");
         }).catch(function (err) {
@@ -3471,7 +3487,9 @@
             var st = shopCheckState;
             shopCheckAddToWardrobe({
               photoUrl: st ? st.photoUrl : null,
+              storagePath: st ? st.storagePath : null,
               item: st && st.result ? st.result.item : null,
+              result: st ? st.result : null,
               fileName: st ? st.fileName : null,
               fileType: st ? st.fileType : null
             });
@@ -3490,29 +3508,49 @@
       var shopCheckUnsub = null;
       var STATUS_LABELS = { considering: "Considering", bought: "Bought", dismissed: "Dismissed" };
 
+      // Short title from the AI's one-line note:
+      // "An off-white baseball cap with a dark green brim, ..." -> "Off-white baseball cap"
+      function shopCheckShortTitle(item) {
+        var note = (item.note || "").trim().replace(/^(an?|the)\s+/i, "").split(",")[0].trim();
+        if (note) {
+          var t = note.charAt(0).toUpperCase() + note.slice(1);
+          return t.length > 60 ? t.slice(0, 57).trim() + "…" : t;
+        }
+        return item.category || "Untitled item";
+      }
+
+      function writeShopCheckDoc(d, status) {
+        var ref = db.collection("users").doc(currentUser.uid).collection("shopChecks").doc();
+        return ref.set({
+          photoPath: d.photoPath,
+          photoUrl: d.photoUrl || null,
+          item: d.item || null,
+          score: d.score == null ? null : d.score,
+          verdict: d.verdict || "",
+          reasons: d.reasons || [],
+          similarOwned: d.similarOwned || [],
+          outfits: d.outfits || [],
+          userNote: "",
+          link: "",
+          sku: "",
+          status: status,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }).then(function () { return ref.id; });
+      }
+
       function saveShopCheck(st, saveBtn) {
         if (!currentUser || !st || !st.result || st.savedId || st.result.notClothing) return;
         var r = st.result;
         saveBtn.disabled = true;
         saveBtn.textContent = "Saving…";
-        var ref = db.collection("users").doc(currentUser.uid).collection("shopChecks").doc();
-        ref.set({
+        writeShopCheckDoc({
           photoPath: st.storagePath,
-          photoUrl: st.photoUrl || null,
-          item: r.item || null,
-          score: r.score == null ? null : r.score,
-          verdict: r.verdict || "",
-          reasons: r.reasons || [],
-          similarOwned: r.similarOwned || [],
-          outfits: r.outfits || [],
-          userNote: "",
-          link: "",
-          sku: "",
-          status: "considering",
-          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        }).then(function () {
-          st.savedId = ref.id;
+          photoUrl: st.photoUrl,
+          item: r.item, score: r.score, verdict: r.verdict,
+          reasons: r.reasons, similarOwned: r.similarOwned, outfits: r.outfits
+        }, "considering").then(function (id) {
+          st.savedId = id;
           saveBtn.textContent = "Saved ✓";
           showToast("Saved to your shop list.");
         }).catch(function (err) {

@@ -53,6 +53,19 @@ describe("parseShopCheckJson", () => {
     assert.deepEqual(r, { notClothing: true });
   });
 
+  it("constrains category to the app vocabulary", () => {
+    const ok = parseShopCheckJson(JSON.stringify({
+      item: { category: "Accessories", colors: [], pattern: "solid", note: "Cap" },
+      score: 5, verdict: "v",
+    }), ["a"]);
+    assert.equal(ok.item.category, "Accessories");
+    const bad = parseShopCheckJson(JSON.stringify({
+      item: { category: "Headwear", colors: [], pattern: "solid", note: "Cap" },
+      score: 5, verdict: "v",
+    }), ["a"]);
+    assert.equal(bad.item.category, "Other");
+  });
+
   it("caps outfits at 3 and reasons at 4", () => {
     const r = parseShopCheckJson(JSON.stringify({
       score: 5, verdict: "v",

@@ -12,11 +12,15 @@
 
 const { getFirestore } = require("firebase-admin/firestore");
 const { getStorage } = require("firebase-admin/storage");
-const { getClient, MODEL_VERSION } = require("./describe");
+const { getClient, MODEL_VERSION, CATEGORIES } = require("./describe");
 const { codedError } = require("./errors");
 const { cleanText } = require("./stylist");
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+
+function oneOf(value, allowed, fallback) {
+  return allowed.indexOf(value) !== -1 ? value : fallback;
+}
 
 function cleanScore(v) {
   const n = Number(v);
@@ -49,7 +53,7 @@ function buildShopCheckRequest(imageBase64, mimeType, items) {
     "their things? Never comment on price, value for money, where to buy it, " +
     "or availability — judge fit with THIS wardrobe only.\n\n" +
     "WARDROBE:\n" + wardrobe + "\n\n" +
-    'Respond with JSON only: {"item": {"category": "...", "colors": ["..."], ' +
+    'Respond with JSON only: {"item": {"category": one of ' + JSON.stringify(CATEGORIES) + ', "colors": ["..."], ' +
     '"pattern": "...", "formality": 0.0-1.0, "note": "one-line description"}, ' +
     '"score": 0-10, "verdict": "one honest sentence", ' +
     '"reasons": ["...", "..."], ' +
@@ -125,7 +129,7 @@ function parseShopCheckJson(text, validIds) {
   return {
     notClothing: false,
     item: {
-      category: cleanText(item.category, 40),
+      category: oneOf(item.category, CATEGORIES, "Other"),
       colors: Array.isArray(item.colors)
         ? item.colors.filter((c) => typeof c === "string").map((c) => cleanText(c, 30)).filter(Boolean).slice(0, 5)
         : [],
