@@ -23,5 +23,15 @@ service cloud.firestore {
       allow read, create, update, delete:
         if request.auth != null && request.auth.uid == userId;
     }
+    // FB-1: beta feedback. Any signed-in user can submit; nobody reads via
+    // the client (triage happens in the console / admin SDK). Write-only
+    // keeps tester identities out of each other's reach.
+    match /feedback/{feedbackId} {
+      allow create: if request.auth != null
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 5000;
+      allow read, update, delete: if false;
+    }
   }
 }
