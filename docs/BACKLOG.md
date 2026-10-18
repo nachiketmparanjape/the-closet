@@ -232,7 +232,7 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
   from the wardrobe scored per leg against forecasts; outfits per leg;
   trip-aware chat and trip-aware shop check ("will this earn a place *for
   this trip*?").
-- **Proposal:** `docs/sprints/sprint-13/TRIPS-PROPOSAL.md` — 3 phases,
+- **Proposal:** `docs/proposals/TRIPS-PROPOSAL.md` — 3 phases,
   4 open questions for the founder.
 - **Status:** parked until the founder validates the proposal. Revisit
   trigger: founder says "let's scope trips" or answers the open questions.
