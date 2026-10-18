@@ -2,8 +2,8 @@
 
 **Dates:** batch opened 2026-10-17 at founder's direction (sprints are work
 batches — see playbook 2026-10-17).
-**Status:** FB-1 shipped 2026-10-17 (rules deployed, app live, 124/124 tests).
-WX-1 and PM-3 pending.
+**Status:** FB-1 + WX-1 shipped 2026-10-17 (133/133 tests; function redeployed
+and healthy). PM-3 pending.
 **Theme:** the app is about to meet other humans — feedback capture, weather
 that just works, and the full history visible as GitHub issues.
 **Planning note:** ranked backlog per the prioritization rule (value,
