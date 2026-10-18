@@ -13,7 +13,7 @@ from its findings, not invented here.
 
 ## Cuts
 
-### UX-1: Heuristic audit (S)
+### UX-1: Heuristic audit (S) — SHIPPED 2026-10-17
 - **In scope:** Nielsen's 10 heuristics across every screen and modal;
   automated cross-checks (contrast ratios from the CSS variables,
   touch-target sizes); a pass of screenshots through a free AI audit tool
@@ -25,7 +25,9 @@ from its findings, not invented here.
   founder vets the ranked list; the top fixes are unambiguous.
 - **Size:** S. **Constitution check:** passes.
 
-### UX-2+: Fix cuts (ranked from UX-1)
+### UX-2+: Fix cuts (ranked from UX-1) — SHIPPED 2026-10-17
+- 7 fixes shipped: outfits header wrap, faint contrast, 44px chips/icons,
+  hero compaction, FAB redesign as labeled pair, "Ask the stylist" label.
 - Defined from the audit's ranked findings. Obvious fixes execute on
   Bramble's judgment per the delegation; opinion-needing calls go to the
   founder first. Each fix ships via CI like any cut.
