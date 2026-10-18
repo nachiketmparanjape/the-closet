@@ -351,12 +351,12 @@
         <h2>Outfits</h2>
         <span class="count" id="outfitCount">0 outfits</span>
         <button class="secondary" id="buildOutfitBtn" type="button" style="margin-left:auto">+ Build</button>
-        <button class="secondary" id="photoParseBtn" type="button">From photo</button>
-        <button class="secondary" id="photoParseCameraBtn" type="button">Take photo</button>
+        <button class="secondary" id="photoParseBtn" type="button">Match a photo</button>
+        <button class="secondary" id="photoParseCameraBtn" type="button">Match with camera</button>
         <input type="file" id="photoParseInput" accept="image/*" hidden>
         <input type="file" id="photoParseInputCamera" accept="image/*" capture="environment" hidden>
       </div>
-      <p class="hint" id="outfitsHint">Ask the stylist for an outfit, or build one yourself — saved outfits land here.</p>
+      <p class="hint" id="outfitsHint">Ask the stylist, build one yourself, or match a photo of an outfit — saved outfits land here.</p>
       <div class="gallery" id="outfitsGallery"></div>
     </section>
   </main>
@@ -614,7 +614,7 @@
           <input type="date" id="outfitWearDate" aria-label="Wear date" title="When did you wear this?" />
           <button class="secondary" id="outfitFavBtn" type="button">☆ Favorite</button>
           <button class="secondary" id="outfitRenameBtn" type="button">Rename</button>
-          <button class="secondary" id="outfitCritiqueBtn" type="button">AI take</button>
+          <button class="secondary" id="outfitCritiqueBtn" type="button">AI critique</button>
           <button class="secondary" id="outfitPhotoBtn" type="button">Add photo</button>
           <button class="secondary" id="outfitPhotoCameraBtn" type="button">Take photo</button>
           <input type="file" id="outfitPhotoInput" accept="image/*" hidden>
@@ -2349,7 +2349,7 @@
 
       function handlePhotoParseFile(file) {
         if (!file || !currentUser) return;
-        showToast("Analyzing photo…");
+        showToast("Matching your photo…");
         var safeName = Date.now() + "-" + file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
         var storagePath = "users/" + currentUser.uid + "/outfit-photos/" + safeName;
         var fileRef = storage.ref().child(storagePath);
@@ -2587,22 +2587,22 @@
           body.appendChild(reason);
         }
 
-        // PC-27: "AI take" button — manual/photo outfits only. Stylist picks
+        // PC-27: "AI critique" button — manual/photo outfits only. Stylist picks
         // already carry scores; critiquing them would be noise.
         var critiqueBtn = document.getElementById("outfitCritiqueBtn");
         critiqueBtn.style.display = o.source === "stylist" ? "none" : "";
-        critiqueBtn.textContent = "AI take";
+        critiqueBtn.textContent = "AI critique";
         critiqueBtn.disabled = false;
         critiqueBtn.onclick = function () {
           critiqueBtn.disabled = true;
           critiqueBtn.textContent = "Thinking…";
           functions.httpsCallable("critiqueOutfit")({ outfitId: o.id }).then(function (res) {
             renderCritique(res.data || {});
-            critiqueBtn.textContent = "AI take";
+            critiqueBtn.textContent = "AI critique";
             critiqueBtn.disabled = false;
           }).catch(function (err) {
             showToast(friendlyError(err));
-            critiqueBtn.textContent = "AI take";
+            critiqueBtn.textContent = "AI critique";
             critiqueBtn.disabled = false;
           });
         };
@@ -2775,7 +2775,7 @@
       document.getElementById("photoParseInput").addEventListener("change", function () {
         handlePhotoParseFile(this.files && this.files[0]);
       });
-      // Camera variant of "From photo" — same flow, rear camera directly.
+      // Camera variant of photo matching — same flow, rear camera directly.
       document.getElementById("photoParseCameraBtn").addEventListener("click", function () {
         document.getElementById("photoParseInputCamera").click();
       });
