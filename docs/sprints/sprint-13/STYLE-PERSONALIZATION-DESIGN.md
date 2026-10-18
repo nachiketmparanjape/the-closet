@@ -1,3 +1,5 @@
+> Living spec: `docs/PERSONALIZATION.md` (maintained). This file is the Sprint 13 cut record.
+
 # Style-tag personalization design
 
 ## Problem

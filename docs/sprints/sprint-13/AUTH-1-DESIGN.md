@@ -39,6 +39,23 @@ Plain-language, no legalese:
 - Apple sign-in (revisit if iOS users ask).
 - Deleting the anonymous account / data export (small follow-ups).
 
+## Decisions (founder 2026-10-18)
+- **Anonymous allowed**, with a clear, simple warning: browser storage can
+  be wiped (cookies cleared, private mode, new device) and the wardrobe
+  goes with it. Copy direction: "You're browsing as a guest — your
+  wardrobe lives in this browser and can disappear. Connect an account to
+  keep it safe." (Final wording to be simplified in UI copy pass.)
+- **Maximum options via account linking.** One account per email across
+  providers: signing in with an email link as `x@gmail.com` and later
+  with Google as `x@gmail.com` must resolve to the **same** Firebase user,
+  never two accounts. Implementation: on sign-in, `fetchSignInMethodsForEmail`
+  first; on `auth/account-exists-with-different-credential`, complete
+  sign-in with the existing provider then `linkWithCredential` the new
+  one. Settings shows "Connected accounts" (Google ✓ / Email ✓) with
+  link/unlink — both providers stay usable for sign-in afterward.
+- Upgrade nudge after the **first** item added; persistent guest banner
+  until an account is connected.
+
 ## The guest-mode fragility problem (founder 2026-10-18)
 Firebase auth sessions live in browser storage (IndexedDB). Safari can
 evict that: "clear website data", private mode, storage pressure, and
@@ -58,6 +75,6 @@ Design response — treat anonymous as **trial mode**, honestly:
   the fallback is leading with email-link instead of anonymous.
 
 ## Open questions for the founder
-1. Email-link vs Google-only upgrade: is offering both worth the extra
-   UI, or is anonymous → Google enough for v1?
+1. ~~Email-link vs Google-only upgrade~~ — decided 2026-10-18: both, linked
+   to one account per email.
 2. Privacy-note wording — approve the AI-disclosure line above.

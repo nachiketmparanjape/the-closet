@@ -191,6 +191,15 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
 - **Status:** parked for discussion AFTER PC-14 ships (founder's call —
   not urgent, but "a big deal" for onboarding comfort).
 
+### Personalization: exploration vs. exploitation (open modeling question)
+- **Problem:** the vibe profile only learns from what the user wears —
+  untried vibes score ~0, so the stylist never suggests them, so they're
+  never tried. A self-reinforcing loop (selection bias).
+- **Shape (open):** occasional exploratory suggestions, counterfactual
+  logging, or an explicit "surprise me" handle. Deliberately un-designed
+  for v1 — parked until the profile has real data.
+- **Spec:** `docs/PERSONALIZATION.md` ("Open: exploration vs. exploitation").
+
 ### PC-29: Trips — travel packing recommendations (L) — parked for proposal validation
 - **Idea (founder 2026-10-18):** packing for travel is stressful; it needs
   weather × personal taste × local culture. Trips tab; trip objects
