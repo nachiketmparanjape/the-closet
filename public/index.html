@@ -133,6 +133,15 @@
     .shop-thumb { width: 52px; height: 62px; object-fit: cover; border-radius: 6px; background: var(--paper-soft); flex-shrink: 0; }
     .shop-row-title { font-weight: 600; font-size: 14px; }
     .shop-thumbs { display: flex; gap: 8px; margin-bottom: 6px; }
+    /* PC-14 follow-up: the result window opens immediately with a loading
+       state — a lone toast gives no sense that work is happening. */
+    .shop-loading { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 24px 0 8px; gap: 14px; }
+    .shop-loading .shop-photo { width: 120px; height: 144px; }
+    .spinner { width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--ink); animation: spin 0.9s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .shop-loading p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
+    .shop-error { text-align: center; padding: 16px 0; }
+    .shop-error p { color: var(--ink); font-size: 15px; line-height: 1.6; }
     .feedback-text { width: 100%; min-height: 140px; font: inherit; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink); resize: vertical; }
     /* WX-1: shows the weather the stylist is working with. Hidden until a
        reading succeeds — no chip is better than a stale or "unknown" one. */
@@ -3064,27 +3073,95 @@
 
       function handleShopCheckFile(file) {
         if (!file || !currentUser) return;
-        showToast("Checking against your wardrobe…");
-        var safeName = Date.now() + "-" + (file.name || "shop.jpg").replace(/[^a-zA-Z0-9._-]/g, "-");
+        // Open the result window immediately with a loading state — the
+        // analysis takes ~15s and a lone toast gives no sense of progress.
+        if (shopCheckState && shopCheckState.objectUrl) {
+          URL.revokeObjectURL(shopCheckState.objectUrl);
+        }
+        shopCheckState = {
+          file: file,
+          objectUrl: URL.createObjectURL(file),
+          photoUrl: null,
+          fileName: file.name || "shop-check.jpg",
+          fileType: file.type || "image/jpeg",
+          result: null,
+          error: null
+        };
+        renderShopCheckLoading();
+        openOverlay(document.getElementById("shopCheckOverlay"));
+        var safeName = Date.now() + "-" + shopCheckState.fileName.replace(/[^a-zA-Z0-9._-]/g, "-");
         var storagePath = "users/" + currentUser.uid + "/shop-checks/" + safeName;
         var fileRef = storage.ref().child(storagePath);
         fileRef.put(file, { contentType: file.type }).then(function () {
           return fileRef.getDownloadURL();
         }).then(function (url) {
-          return functions.httpsCallable("shopCheck")({ storagePath: storagePath }).then(function (res) {
-            shopCheckState = {
-              photoUrl: url,
-              fileName: file.name || "shop-check.jpg",
-              fileType: file.type || "image/jpeg",
-              result: res.data || {}
-            };
-            renderShopCheckResult();
-            openOverlay(document.getElementById("shopCheckOverlay"));
-          });
+          shopCheckState.photoUrl = url;
+          return functions.httpsCallable("shopCheck")({ storagePath: storagePath });
+        }).then(function (res) {
+          shopCheckState.result = res.data || {};
+          if (shopCheckState.objectUrl) {
+            URL.revokeObjectURL(shopCheckState.objectUrl);
+            shopCheckState.objectUrl = null;
+          }
+          renderShopCheckResult();
         }).catch(function (err) {
           // The photo stays in shop-checks (ephemeral history); the user can retry.
-          showToast(friendlyError(err));
+          shopCheckState.error = err;
+          renderShopCheckError();
         });
+      }
+
+      function renderShopCheckLoading() {
+        var st = shopCheckState;
+        var body = document.getElementById("shopCheckBody");
+        body.textContent = "";
+        var wrap = document.createElement("div");
+        wrap.className = "shop-loading";
+        if (st && st.objectUrl) {
+          var img = document.createElement("img");
+          img.src = st.objectUrl;
+          img.alt = "Shop item photo";
+          img.className = "shop-photo";
+          wrap.appendChild(img);
+        }
+        var spin = document.createElement("div");
+        spin.className = "spinner";
+        spin.setAttribute("role", "status");
+        spin.setAttribute("aria-label", "Analyzing");
+        wrap.appendChild(spin);
+        var p = document.createElement("p");
+        p.textContent = "Analyzing against your wardrobe… takes about 15 seconds.";
+        wrap.appendChild(p);
+        body.appendChild(wrap);
+      }
+
+      function renderShopCheckError() {
+        var st = shopCheckState;
+        var body = document.getElementById("shopCheckBody");
+        body.textContent = "";
+        var wrap = document.createElement("div");
+        wrap.className = "shop-error";
+        var p = document.createElement("p");
+        p.textContent = friendlyError(st && st.error);
+        wrap.appendChild(p);
+        var actions = document.createElement("div");
+        actions.className = "form-actions";
+        var retry = document.createElement("button");
+        retry.type = "button";
+        retry.className = "primary";
+        retry.textContent = "Try again";
+        retry.addEventListener("click", function () {
+          if (st && st.file) handleShopCheckFile(st.file);
+        });
+        actions.appendChild(retry);
+        var done = document.createElement("button");
+        done.type = "button";
+        done.className = "secondary";
+        done.textContent = "Done";
+        done.addEventListener("click", function () { closeOverlay(document.getElementById("shopCheckOverlay")); });
+        actions.appendChild(done);
+        wrap.appendChild(actions);
+        body.appendChild(wrap);
       }
 
       function shopCheckAddToWardrobe() {
