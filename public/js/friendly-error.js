@@ -29,7 +29,17 @@
     "storage/unauthorized": "Please sign in to continue.",
     "storage/retry-limit-exceeded": "Couldn't reach the server. Check your connection and try again.",
     "storage/unknown": "Something went wrong. Try again.",
-    "storage/canceled": "That was cancelled. Try again."
+    "storage/canceled": "That was cancelled. Try again.",
+    // Firebase Auth codes (account linking, popups)
+    "auth/popup-closed-by-user": "That was closed before finishing. Try again.",
+    "auth/popup-blocked": "Your browser blocked the sign-in window. Allow popups and try again.",
+    "auth/cancelled-popup-request": "That was closed before finishing. Try again.",
+    "auth/account-exists-with-different-credential": "That email already has an account with a different sign-in method.",
+    "auth/credential-already-in-use": "That account is already connected elsewhere.",
+    "auth/email-already-in-use": "That email is already connected to an account.",
+    "auth/invalid-email": "That email address doesn't look right. Check and try again.",
+    "auth/user-not-found": "No account found for that email.",
+    "auth/too-many-requests": "Too many attempts right now. Wait a bit and try again."
   };
 
   // Raw network failures that never got a code (fetch, SDK internals).

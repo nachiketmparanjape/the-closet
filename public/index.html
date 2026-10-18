@@ -71,8 +71,10 @@
     .text-button { border: 0; background: transparent; padding: 7px 0; font-weight: 600; font-size: 13px; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
     .auth-button { min-height: 38px; border: 1px solid var(--line-strong); background: var(--paper); border-radius: 4px; padding: 0 13px; font-size: 12px; font-weight: 600; cursor: pointer; }
     .auth-button:disabled { color: var(--muted); cursor: not-allowed; opacity: .75; }
-    .guest-banner { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 10px 0 0; padding: 10px 14px; border: 1px solid var(--line-strong); border-left: 4px solid #b98a1d; border-radius: 6px; background: var(--paper); font-size: 13px; }
+    .guest-banner { position: sticky; top: 0; z-index: 40; display: flex; align-items: center; gap: 10px; margin: 10px 0 0; padding: 11px 14px; background: #fdf6e3; border: 1px solid #e5cf8a; border-radius: 10px; font-size: 13px; color: #6b5312; box-shadow: 0 2px 10px rgba(120, 90, 20, .08); }
     .guest-banner[hidden] { display: none; }
+    .guest-banner .guest-icon { flex: none; width: 22px; height: 22px; }
+    .guest-banner .link-button { color: #6b5312; margin-left: auto; }
     .link-button { background: none; border: none; padding: 0; color: inherit; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; white-space: nowrap; }
 
     .hero { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(260px, .75fr); gap: clamp(32px, 6vw, 90px); align-items: end; padding: clamp(48px, 8vw, 96px) 0 52px; }
@@ -358,7 +360,8 @@
     </div>
 
     <div class="guest-banner" id="guestBanner" hidden>
-      <span>Guest mode — your wardrobe lives in this browser and can disappear.</span>
+      <svg class="guest-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6l7-3z"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="15.5" r="0.6" fill="currentColor" stroke="none"/></svg>
+      <span><strong>Guest mode</strong> — your wardrobe lives in this browser and can disappear.</span>
       <button class="link-button" id="guestConnectBtn" type="button">Connect an account</button>
     </div>
 
@@ -1118,7 +1121,15 @@
           closeOverlay(document.getElementById("accountOverlay"));
           showToast("Connected — your wardrobe is safe.");
         }).catch(function (err) {
-          if (err.code === "auth/account-exists-with-different-credential" && err.email && err.credential) {
+          if (err.code === "auth/credential-already-in-use") {
+            // This Google account already exists (the user's real account):
+            // sign into it, then offer to move the guest wardrobe over —
+            // one account per email.
+            var anonUid = currentUser.uid;
+            auth.signInWithPopup(provider).then(function () {
+              offerMigration(anonUid);
+            }).catch(function (e2) { showToast(friendlyError(e2)); });
+          } else if (err.code === "auth/account-exists-with-different-credential" && err.email && err.credential) {
             // This Google account's email already has an email-link account.
             // Stash the Google credential, sign in via email link, then
             // connect Google too — one account per email.
@@ -1137,7 +1148,7 @@
         if (!email || email.indexOf("@") === -1) { showToast("Enter a valid email address."); return; }
         try { window.localStorage.setItem("emailForSignIn", email); } catch (e) {}
         auth.sendSignInLinkToEmail(email, actionCodeSettings).then(function () {
-          showToast("Sign-in link sent — check your inbox.");
+          showToast("Sign-in link sent — check your inbox (and spam folder).");
         }).catch(function (err) { showToast(friendlyError(err)); });
       }
 
@@ -1241,9 +1252,24 @@
           return e;
         }
         if (isGuest()) {
-          var warn = el("p", "hint", "You're browsing as a guest. Your wardrobe lives in this browser and can disappear if cookies are cleared or you switch devices. Connect an account to keep it safe — your wardrobe moves with you, nothing is lost.");
+          document.getElementById("accountTitle").textContent = "Keep your wardrobe";
+          var hero = el("div", null);
+          hero.style.cssText = "display:flex;align-items:center;justify-content:center;width:56px;height:56px;border-radius:50%;background:#fdf6e3;border:1px solid #e5cf8a;margin:4px 0 12px;";
+          hero.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#6b5312" stroke-width="1.8" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6l7-3z"/></svg>';
+          body.appendChild(hero);
+          var warn = el("p", "hint", "You're browsing as a guest. Your wardrobe lives in this browser and can disappear if cookies are cleared or you switch devices.");
           warn.style.marginTop = "0";
           body.appendChild(warn);
+          var benefits = ["Works on all your devices", "Never lose your wardrobe", "Still private — no ads, no trackers"];
+          var ul = document.createElement("ul");
+          ul.style.cssText = "list-style:none;margin:0 0 16px;padding:0;";
+          benefits.forEach(function (b) {
+            var li = document.createElement("li");
+            li.style.cssText = "padding:3px 0;font-size:14px;";
+            li.textContent = "✓ " + b;
+            ul.appendChild(li);
+          });
+          body.appendChild(ul);
           var g = el("button", "primary", "Continue with Google");
           g.type = "button";
           g.style.width = "100%";
@@ -1254,6 +1280,7 @@
           em.type = "email";
           em.placeholder = "you@example.com";
           em.autocomplete = "email";
+          em.setAttribute("aria-label", "Email address");
           em.style.width = "100%";
           em.style.marginBottom = "8px";
           body.appendChild(em);
@@ -1262,7 +1289,9 @@
           send.style.width = "100%";
           send.addEventListener("click", function () { startEmailLink(em.value); });
           body.appendChild(send);
+          body.appendChild(el("p", "hint", "The link can land in spam — check there if you don't see it."));
         } else {
+          document.getElementById("accountTitle").textContent = "Your account";
           body.appendChild(el("p", "hint", "Signed in as " + (currentUser.displayName || currentUser.email || "you") + "."));
           body.appendChild(h("Connected accounts"));
           var provs = connectedProviders();

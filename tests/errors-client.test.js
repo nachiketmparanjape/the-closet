@@ -49,6 +49,15 @@ describe("friendlyError", () => {
     }
   });
 
+  describe("auth codes (AUTH-1)", () => {
+    it("maps popup and linking failures to human copy", () => {
+      assert.equal(friendlyError({ code: "auth/popup-closed-by-user" }), "That was closed before finishing. Try again.");
+      assert.equal(friendlyError({ code: "auth/popup-blocked" }), "Your browser blocked the sign-in window. Allow popups and try again.");
+      assert.equal(friendlyError({ code: "auth/credential-already-in-use" }), "That account is already connected elsewhere.");
+      assert.equal(friendlyError({ code: "auth/invalid-email" }), "That email address doesn't look right. Check and try again.");
+    });
+  });
+
   describe("offline", () => {
     const realNavigator = globalThis.navigator;
     const realDescriptor = Object.getOwnPropertyDescriptor(globalThis, "navigator");
