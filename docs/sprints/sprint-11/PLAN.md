@@ -2,23 +2,19 @@
 
 **Pulled 2026-10-17** by founder: "plan a sprint around the remaining UI
 fixes that I suggested and PC-14."
-**Status:** planning — UX-11 direction awaiting founder pick; PC-14 design
-doc next.
+**Status:** planning — UX-11 shipped 2026-10-17; PC-14 design doc in progress.
 
 ## Cuts
 
-### UX-11: Outfits "add" affordance (S)
-- **Problem (founder 2026-10-17):** "+ Build", "Match a photo", and
-  "Match with camera" are three ways to *add an outfit*, but the view
-  doesn't convey that — the wording reads as three unrelated actions.
-- **Direction:** founder picks from options (labeled group vs single entry
-  + chooser); recommendation in chat 2026-10-17.
-- **Constraint:** piece-adding ("Add a piece" / "Bulk add") must stay
-  obvious — cataloguing pieces is the bread-and-butter data. It lives in
-  the hero (which now compacts but keeps the buttons); keep it prominent.
-- **Done looks like:** a first-time user can see at a glance where outfits
-  come from (three ways) and where pieces get added.
-- **Size:** S. **Constitution check:** passes.
+### UX-11: Outfits "add" affordance (S) — SHIPPED 2026-10-17
+- **Founder pick (2026-10-17):** option B — single "+ Add outfit" entry with
+  a chooser ("less clutter; optimize with real data later").
+- **Built:** the three header buttons are one "+ Add outfit" button opening
+  a bottom sheet titled "Add an outfit" with three labeled options (Build
+  manually / Match a photo / Match with camera), each with a one-line
+  description; Cancel row; backdrop-tap and Escape dismiss. All three
+  options route to the existing flows unchanged.
+- **Constraint honored:** "Add a piece" / "Bulk add" untouched in the hero.
 
 ### PC-14: Shop compatibility check — design (M)
 - Design doc for founder validation before any build (M-cut rule).
