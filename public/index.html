@@ -142,6 +142,19 @@
     .shop-loading p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
     .shop-error { text-align: center; padding: 16px 0; }
     .shop-error p { color: var(--ink); font-size: 15px; line-height: 1.6; }
+    /* PC-28: shop list cards and detail. */
+    .shop-card { cursor: pointer; }
+    .shop-card .item-image { position: relative; }
+    .shop-score-badge { position: absolute; top: 8px; left: 8px; background: var(--black); color: var(--on-black); font-weight: 700; font-size: 13px; padding: 5px 10px; border-radius: 99px; }
+    .shop-status { display: inline-block; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 99px; margin-top: 6px; }
+    .shop-status.considering { background: var(--accent-soft); color: var(--accent-dark); }
+    .shop-status.bought { background: var(--sage); color: var(--sage-ink); }
+    .shop-status.dismissed { background: var(--paper-soft); color: var(--muted); }
+    .shop-card .shop-card-name { font-weight: 600; font-size: 14px; margin: 8px 0 0; }
+    .shop-card .hint { margin-top: 2px; }
+    .status-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 0; }
+    .link-row { display: flex; gap: 8px; align-items: center; }
+    .link-row a { color: var(--accent-dark); font-size: 14px; word-break: break-all; }
     .feedback-text { width: 100%; min-height: 140px; font: inherit; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink); resize: vertical; }
     /* WX-1: shows the weather the stylist is working with. Hidden until a
        reading succeeds — no chip is better than a stale or "unknown" one. */
@@ -356,6 +369,7 @@
     <div class="tabs" role="tablist" aria-label="Views">
       <button class="tab active" type="button" data-view="wardrobe" role="tab" aria-selected="true">Wardrobe</button>
       <button class="tab" type="button" data-view="outfits" role="tab" aria-selected="false">Outfits</button>
+      <button class="tab" type="button" data-view="shoplist" role="tab" aria-selected="false">Shop list</button>
     </div>
 
     <section aria-label="Wardrobe catalog" id="wardrobeView">
@@ -405,6 +419,15 @@
       </div>
       <p class="hint" id="outfitsHint">Ask the stylist, build one yourself, or match a photo of an outfit — saved outfits land here.</p>
       <div class="gallery" id="outfitsGallery"></div>
+    </section>
+
+    <section aria-label="Shop list" id="shopListView" hidden>
+      <div class="catalog-head">
+        <h2>Shop list</h2>
+        <span class="count" id="shopCheckCount">0 saved</span>
+      </div>
+      <p class="hint">Items you've checked and saved — revisit them here before you buy.</p>
+      <div class="gallery" id="shopListGallery"></div>
     </section>
   </main>
 
@@ -472,6 +495,17 @@
         <button class="icon-button" id="shopCheckClose" type="button" aria-label="Close">×</button>
       </div>
       <div class="modal-body" id="shopCheckBody"></div>
+    </section>
+  </div>
+
+  <!-- PC-28: saved shop check detail. -->
+  <div class="overlay" id="shopCheckDetailOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="shopCheckDetailTitle">
+    <section class="modal">
+      <div class="modal-head">
+        <h2 id="shopCheckDetailTitle">Saved check</h2>
+        <button class="icon-button" id="shopCheckDetailClose" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body" id="shopCheckDetailBody"></div>
     </section>
   </div>
 
@@ -1514,6 +1548,7 @@
           else if (!document.getElementById("addOutfitSheet").hidden) closeOverlay(document.getElementById("addOutfitSheet"));
           else if (!document.getElementById("shopCheckSheet").hidden) closeOverlay(document.getElementById("shopCheckSheet"));
           else if (!document.getElementById("shopCheckOverlay").hidden) closeOverlay(document.getElementById("shopCheckOverlay"));
+          else if (!document.getElementById("shopCheckDetailOverlay").hidden) closeOverlay(document.getElementById("shopCheckDetailOverlay"));
         }
       });
 
@@ -2468,6 +2503,7 @@
         });
         document.getElementById("wardrobeView").hidden = view !== "wardrobe";
         document.getElementById("outfitsView").hidden = view !== "outfits";
+        document.getElementById("shopListView").hidden = view !== "shoplist";
       }
       document.querySelectorAll(".tab").forEach(function (t) {
         t.addEventListener("click", function () { switchView(t.getAttribute("data-view")); });
@@ -3078,19 +3114,21 @@
         if (shopCheckState && shopCheckState.objectUrl) {
           URL.revokeObjectURL(shopCheckState.objectUrl);
         }
+        var safeName = Date.now() + "-" + (file.name || "shop-check.jpg").replace(/[^a-zA-Z0-9._-]/g, "-");
+        var storagePath = "users/" + currentUser.uid + "/shop-checks/" + safeName;
         shopCheckState = {
           file: file,
           objectUrl: URL.createObjectURL(file),
           photoUrl: null,
+          storagePath: storagePath,
           fileName: file.name || "shop-check.jpg",
           fileType: file.type || "image/jpeg",
           result: null,
+          savedId: null,
           error: null
         };
         renderShopCheckLoading();
         openOverlay(document.getElementById("shopCheckOverlay"));
-        var safeName = Date.now() + "-" + shopCheckState.fileName.replace(/[^a-zA-Z0-9._-]/g, "-");
-        var storagePath = "users/" + currentUser.uid + "/shop-checks/" + safeName;
         var fileRef = storage.ref().child(storagePath);
         fileRef.put(file, { contentType: file.type }).then(function () {
           return fileRef.getDownloadURL();
@@ -3183,35 +3221,34 @@
         });
       }
 
-      function renderShopCheckResult() {
-        var st = shopCheckState;
-        var body = document.getElementById("shopCheckBody");
-        body.textContent = "";
-        var r = st ? st.result : null;
-        if (!r) return;
-        function el(tag, cls, text) {
-          var e = document.createElement(tag);
-          if (cls) e.className = cls;
-          if (text != null) e.textContent = text;
-          return e;
-        }
-        function thumbFor(itemId) {
-          var it = itemById(itemId);
-          if (!it) return null;
-          var photos = itemPhotos(it);
-          if (!photos.length) return null;
-          var t = document.createElement("img");
-          t.src = photos[0].url;
-          t.alt = it.name || "";
-          t.className = "shop-thumb";
-          return t;
-        }
+      function shopCheckEl(tag, cls, text) {
+        var e = document.createElement(tag);
+        if (cls) e.className = cls;
+        if (text != null) e.textContent = text;
+        return e;
+      }
+      function shopCheckThumb(itemId) {
+        var it = itemById(itemId);
+        if (!it) return null;
+        var photos = itemPhotos(it);
+        if (!photos.length) return null;
+        var t = document.createElement("img");
+        t.src = photos[0].url;
+        t.alt = it.name || "";
+        t.className = "shop-thumb";
+        return t;
+      }
+      // Shared analysis renderer: ephemeral result modal and saved-check
+      // detail view. savedNote=false hides the "nothing was saved" hint.
+      function appendShopCheckAnalysis(body, r, photoUrl, savedNote) {
+        var el = shopCheckEl;
+        var thumbFor = shopCheckThumb;
         if (r.notClothing) {
           body.appendChild(el("p", null, "That doesn't look like a garment — try a clearer photo of the item."));
         } else {
           var head = el("div", "shop-head");
           var img = document.createElement("img");
-          img.src = st.photoUrl;
+          img.src = photoUrl;
           img.alt = "Shop item photo";
           img.className = "shop-photo";
           head.appendChild(img);
@@ -3263,11 +3300,27 @@
           } else {
             body.appendChild(el("p", "hint", "Not enough wardrobe pieces yet to suggest outfits — add a few staples and check again."));
           }
-          body.appendChild(el("p", "hint", "Nothing was saved — this item isn't in your wardrobe."));
+          if (!savedNote) body.appendChild(el("p", "hint", "Nothing was saved — this item isn't in your wardrobe."));
         }
+      }
+      function renderShopCheckResult() {
+        var st = shopCheckState;
+        var body = document.getElementById("shopCheckBody");
+        body.textContent = "";
+        var r = st ? st.result : null;
+        if (!r) return;
+        var el = shopCheckEl;
+        appendShopCheckAnalysis(body, r, st.photoUrl, false);
         var actions = el("div", "form-actions");
         if (!r.notClothing) {
-          var add = el("button", "primary", "Add it to your wardrobe");
+          var save = el("button", "primary", st.savedId ? "Saved ✓" : "Save to shop list");
+          save.type = "button";
+          save.disabled = !!st.savedId;
+          if (!st.savedId) {
+            save.addEventListener("click", function () { saveShopCheck(st, save); });
+          }
+          actions.appendChild(save);
+          var add = el("button", "secondary", "Add it to your wardrobe");
           add.type = "button";
           add.addEventListener("click", shopCheckAddToWardrobe);
           actions.appendChild(add);
@@ -3278,6 +3331,245 @@
         actions.appendChild(done);
         body.appendChild(actions);
       }
+
+      // PC-28: saved shop checks ("Shop list").
+      var allShopChecks = [];
+      var shopCheckUnsub = null;
+      var STATUS_LABELS = { considering: "Considering", bought: "Bought", dismissed: "Dismissed" };
+
+      function saveShopCheck(st, saveBtn) {
+        if (!currentUser || !st || !st.result || st.savedId || st.result.notClothing) return;
+        var r = st.result;
+        saveBtn.disabled = true;
+        saveBtn.textContent = "Saving…";
+        var ref = db.collection("users").doc(currentUser.uid).collection("shopChecks").doc();
+        ref.set({
+          photoPath: st.storagePath,
+          photoUrl: st.photoUrl || null,
+          item: r.item || null,
+          score: r.score == null ? null : r.score,
+          verdict: r.verdict || "",
+          reasons: r.reasons || [],
+          similarOwned: r.similarOwned || [],
+          outfits: r.outfits || [],
+          userNote: "",
+          link: "",
+          sku: "",
+          status: "considering",
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }).then(function () {
+          st.savedId = ref.id;
+          saveBtn.textContent = "Saved ✓";
+          showToast("Saved to your shop list.");
+        }).catch(function (err) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = "Save to shop list";
+          showToast(friendlyError(err));
+        });
+      }
+
+      function watchShopChecks(user) {
+        if (shopCheckUnsub) { shopCheckUnsub(); shopCheckUnsub = null; }
+        allShopChecks = [];
+        if (!user) { renderShopList(); return; }
+        shopCheckUnsub = db.collection("users").doc(user.uid).collection("shopChecks")
+          .orderBy("createdAt", "desc").limit(200)
+          .onSnapshot(function (snap) {
+            allShopChecks = snap.docs.filter(function (d) { return d.exists; })
+              .map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+            renderShopList();
+          }, function (err) {
+            showToast(friendlyError(err));
+          });
+      }
+
+      function renderShopList() {
+        var gallery = document.getElementById("shopListGallery");
+        var count = document.getElementById("shopCheckCount");
+        gallery.textContent = "";
+        var n = allShopChecks.length;
+        count.textContent = n + (n === 1 ? " saved" : " saved");
+        if (!n) {
+          var empty = document.createElement("p");
+          empty.className = "hint";
+          empty.textContent = "Nothing saved yet — run a shop check and tap Save.";
+          gallery.appendChild(empty);
+          return;
+        }
+        var el = shopCheckEl;
+        // Considering/bought first, dismissed last.
+        var order = { considering: 0, bought: 1, dismissed: 2 };
+        var sorted = allShopChecks.slice().sort(function (a, b) {
+          return (order[a.status] == null ? 0 : order[a.status]) - (order[b.status] == null ? 0 : order[b.status]);
+        });
+        sorted.forEach(function (c) {
+          var card = el("article", "item shop-card");
+          card.setAttribute("role", "button");
+          card.setAttribute("tabindex", "0");
+          var imgWrap = el("div", "item-image");
+          if (c.photoUrl) {
+            var img = document.createElement("img");
+            img.src = c.photoUrl;
+            img.alt = (c.item && c.item.note) || "Saved shop item";
+            img.loading = "lazy";
+            imgWrap.appendChild(img);
+          }
+          if (c.score != null) {
+            imgWrap.appendChild(el("span", "shop-score-badge", String(c.score) + "/10"));
+          }
+          card.appendChild(imgWrap);
+          var name = (c.item && (c.item.note || c.item.category)) || "Shop item";
+          card.appendChild(el("p", "shop-card-name", name));
+          if (c.verdict) card.appendChild(el("p", "hint", c.verdict));
+          card.appendChild(el("span", "shop-status " + (c.status || "considering"), STATUS_LABELS[c.status] || "Considering"));
+          function open() { openShopCheckDetail(c.id); }
+          card.addEventListener("click", open);
+          card.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } });
+          gallery.appendChild(card);
+        });
+      }
+
+      function shopCheckDocRef(id) {
+        return db.collection("users").doc(currentUser.uid).collection("shopChecks").doc(id);
+      }
+
+      function openShopCheckDetail(id) {
+        var c = null;
+        for (var i = 0; i < allShopChecks.length; i++) {
+          if (allShopChecks[i].id === id) { c = allShopChecks[i]; break; }
+        }
+        if (!c) return;
+        var el = shopCheckEl;
+        var body = document.getElementById("shopCheckDetailBody");
+        body.textContent = "";
+        var r = {
+          notClothing: false,
+          item: c.item, score: c.score, verdict: c.verdict,
+          reasons: c.reasons, similarOwned: c.similarOwned, outfits: c.outfits
+        };
+        appendShopCheckAnalysis(body, r, c.photoUrl, true);
+
+        // Your details.
+        body.appendChild(el("h3", "shop-section-title", "Your details"));
+        function field(labelText, inputEl) {
+          var wrap = el("div", "field");
+          var label = el("label", null, labelText);
+          wrap.appendChild(label);
+          wrap.appendChild(inputEl);
+          body.appendChild(wrap);
+          return inputEl;
+        }
+        var note = document.createElement("textarea");
+        note.value = c.userNote || "";
+        note.placeholder = "e.g. saw it at Uniqlo, wait for a sale";
+        note.addEventListener("change", function () {
+          shopCheckDocRef(id).update({ userNote: note.value.slice(0, 500), updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
+            .catch(function (err) { showToast(friendlyError(err)); });
+        });
+        field("Note", note);
+
+        var linkInput = document.createElement("input");
+        linkInput.type = "url";
+        linkInput.value = c.link || "";
+        linkInput.placeholder = "https://…";
+        linkInput.setAttribute("inputmode", "url");
+        function saveLink() {
+          var v = linkInput.value.trim().slice(0, 500);
+          if (v && !/^https?:\/\//i.test(v)) v = "https://" + v;
+          linkInput.value = v;
+          shopCheckDocRef(id).update({ link: v, updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
+            .then(function () { renderLinkRow(); })
+            .catch(function (err) { showToast(friendlyError(err)); });
+        }
+        linkInput.addEventListener("change", saveLink);
+        field("Link", linkInput);
+        var linkRow = el("div", "link-row");
+        body.appendChild(linkRow);
+        function renderLinkRow() {
+          linkRow.textContent = "";
+          var v = linkInput.value.trim();
+          if (v) {
+            var a = document.createElement("a");
+            a.href = v; a.target = "_blank"; a.rel = "noopener";
+            a.textContent = "Open link ↗";
+            linkRow.appendChild(a);
+          }
+        }
+        renderLinkRow();
+
+        var sku = document.createElement("input");
+        sku.type = "text";
+        sku.value = c.sku || "";
+        sku.placeholder = "SKU / style number";
+        sku.maxLength = 100;
+        sku.addEventListener("change", function () {
+          shopCheckDocRef(id).update({ sku: sku.value.trim().slice(0, 100), updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
+            .catch(function (err) { showToast(friendlyError(err)); });
+        });
+        field("SKU", sku);
+
+        body.appendChild(el("h3", "shop-section-title", "Status"));
+        var statusRow = el("div", "status-row");
+        ["considering", "bought", "dismissed"].forEach(function (s) {
+          var chip = el("button", "chip" + (c.status === s ? " active" : ""), STATUS_LABELS[s]);
+          chip.type = "button";
+          chip.addEventListener("click", function () {
+            shopCheckDocRef(id).update({ status: s, updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
+              .then(function () {
+                c.status = s;
+                var chips = statusRow.querySelectorAll(".chip");
+                chips.forEach(function (ch) { ch.classList.remove("active"); });
+                chip.classList.add("active");
+                renderBoughtCta();
+                renderShopList();
+              })
+              .catch(function (err) { showToast(friendlyError(err)); });
+          });
+          statusRow.appendChild(chip);
+        });
+        body.appendChild(statusRow);
+
+        var ctaWrap = el("div", null);
+        body.appendChild(ctaWrap);
+        function renderBoughtCta() {
+          ctaWrap.textContent = "";
+          if (c.status === "bought") {
+            var buy = el("button", "primary", "Add it to your wardrobe");
+            buy.type = "button";
+            buy.style.marginTop = "12px";
+            buy.addEventListener("click", function () {
+              shopCheckState = { photoUrl: c.photoUrl, fileName: "shop-item.jpg", fileType: "image/jpeg" };
+              closeOverlay(document.getElementById("shopCheckDetailOverlay"));
+              shopCheckAddToWardrobe();
+            });
+            ctaWrap.appendChild(buy);
+          }
+        }
+        renderBoughtCta();
+
+        var actions = el("div", "form-actions");
+        var del = el("button", "danger", "Delete");
+        del.type = "button";
+        del.addEventListener("click", function () {
+          if (!window.confirm("Delete this saved check?")) return;
+          shopCheckDocRef(id).delete().then(function () {
+            closeOverlay(document.getElementById("shopCheckDetailOverlay"));
+            showToast("Deleted.");
+          }).catch(function (err) { showToast(friendlyError(err)); });
+        });
+        actions.appendChild(del);
+        var done = el("button", "secondary", "Done");
+        done.type = "button";
+        done.addEventListener("click", function () { closeOverlay(document.getElementById("shopCheckDetailOverlay")); });
+        actions.appendChild(done);
+        body.appendChild(actions);
+
+        openOverlay(document.getElementById("shopCheckDetailOverlay"));
+      }
+      document.getElementById("shopCheckDetailClose").addEventListener("click", function () {
+        closeOverlay(document.getElementById("shopCheckDetailOverlay"));
+      });
       document.getElementById("photoParseInput").addEventListener("change", function () {
         handlePhotoParseFile(this.files && this.files[0]);
       });
@@ -3847,6 +4139,7 @@
             document.getElementById("feedbackFab").hidden = !user;
             watchItems(user);
             watchOutfits(user); // PC-12
+            watchShopChecks(user); // PC-28
           });
         } catch (error) {
           configured = false;

@@ -23,6 +23,35 @@ service cloud.firestore {
       allow read, create, update, delete:
         if request.auth != null && request.auth.uid == userId;
     }
+    // PC-28: saved shop checks. Owner-only. The AI analysis (score,
+    // verdict, reasons, similarOwned, outfits, item) is written once at
+    // save time; updates may only touch the user's own fields
+    // (userNote, link, sku, status, updatedAt).
+    match /users/{userId}/shopChecks/{checkId} {
+      allow read, delete:
+        if request.auth != null && request.auth.uid == userId;
+      allow create:
+        if request.auth != null && request.auth.uid == userId
+        && request.resource.data.photoPath is string
+        && request.resource.data.photoPath.size() > 0
+        && request.resource.data.photoPath.size() <= 300
+        && request.resource.data.status in ["considering", "bought", "dismissed"]
+        && (request.resource.data.score == null
+            || (request.resource.data.score is number
+                && request.resource.data.score >= 0
+                && request.resource.data.score <= 10))
+        && (!("userNote" in request.resource.data) || (request.resource.data.userNote is string && request.resource.data.userNote.size() <= 500))
+        && (!("link" in request.resource.data) || (request.resource.data.link is string && request.resource.data.link.size() <= 500))
+        && (!("sku" in request.resource.data) || (request.resource.data.sku is string && request.resource.data.sku.size() <= 100));
+      allow update:
+        if request.auth != null && request.auth.uid == userId
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(["userNote", "link", "sku", "status", "updatedAt"])
+        && request.resource.data.status in ["considering", "bought", "dismissed"]
+        && (!("userNote" in request.resource.data) || (request.resource.data.userNote is string && request.resource.data.userNote.size() <= 500))
+        && (!("link" in request.resource.data) || (request.resource.data.link is string && request.resource.data.link.size() <= 500))
+        && (!("sku" in request.resource.data) || (request.resource.data.sku is string && request.resource.data.sku.size() <= 100));
+    }
     // FB-1: beta feedback. Any signed-in user can submit; nobody reads via
     // the client (triage happens in the console / admin SDK). Write-only
     // keeps tester identities out of each other's reach.
