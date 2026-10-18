@@ -53,6 +53,14 @@ describe("parseShopCheckJson", () => {
     assert.deepEqual(r, { notClothing: true });
   });
 
+  it("passes through the AI short name", () => {
+    const r = parseShopCheckJson(JSON.stringify({
+      item: { name: "Off-white running hat", category: "Accessories", colors: [], pattern: "solid", note: "An off-white running hat..." },
+      score: 5, verdict: "v",
+    }), ["a"]);
+    assert.equal(r.item.name, "Off-white running hat");
+  });
+
   it("constrains category to the app vocabulary", () => {
     const ok = parseShopCheckJson(JSON.stringify({
       item: { category: "Accessories", colors: [], pattern: "solid", note: "Cap" },

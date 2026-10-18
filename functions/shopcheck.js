@@ -53,7 +53,7 @@ function buildShopCheckRequest(imageBase64, mimeType, items) {
     "their things? Never comment on price, value for money, where to buy it, " +
     "or availability — judge fit with THIS wardrobe only.\n\n" +
     "WARDROBE:\n" + wardrobe + "\n\n" +
-    'Respond with JSON only: {"item": {"category": one of ' + JSON.stringify(CATEGORIES) + ', "colors": ["..."], ' +
+    'Respond with JSON only: {"item": {"name": "short 2-4 word product name", "category": one of ' + JSON.stringify(CATEGORIES) + ', "colors": ["..."], ' +
     '"pattern": "...", "formality": 0.0-1.0, "note": "one-line description"}, ' +
     '"score": 0-10, "verdict": "one honest sentence", ' +
     '"reasons": ["...", "..."], ' +
@@ -129,6 +129,7 @@ function parseShopCheckJson(text, validIds) {
   return {
     notClothing: false,
     item: {
+      name: cleanText(item.name, 60),
       category: oneOf(item.category, CATEGORIES, "Other"),
       colors: Array.isArray(item.colors)
         ? item.colors.filter((c) => typeof c === "string").map((c) => cleanText(c, 30)).filter(Boolean).slice(0, 5)

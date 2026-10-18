@@ -1652,7 +1652,7 @@
         var out = [];
         (allItems || []).forEach(function (it) {
           (it.photos || []).forEach(function (p) {
-            if (p && p.phash) out.push({ hash: p.phash, itemName: it.name || "an item" });
+            if (p && p.phash) out.push({ hash: p.phash, itemId: it.id, itemName: it.name || "an item" });
           });
         });
         return out;
@@ -1665,7 +1665,7 @@
           if (!h) continue;
           for (var i = 0; i < existing.length; i++) {
             if (phashDistance(h, existing[i].hash) <= PHASH_THRESHOLD) {
-              return { fileIndex: f, itemName: existing[i].itemName };
+              return { fileIndex: f, itemId: existing[i].itemId, itemName: existing[i].itemName };
             }
           }
         }
@@ -3328,21 +3328,33 @@
         var newPath = "users/" + currentUser.uid + "/items/" + docRef.id + "/" + safeName;
         fetch(source.photoUrl).then(function (resp) { return resp.blob(); }).then(function (blob) {
           var file = new File([blob], source.fileName || "shop-item.jpg", { type: source.fileType || blob.type || "image/jpeg" });
-          var colorP = loadImageFile(file).then(function (img) {
-            try { return dominantColor(img); } catch (e) { return null; }
-          }).catch(function () { return null; });
-          return storage.ref().child(newPath).put(blob, { contentType: file.type }).then(function () {
-            return Promise.all([colorP, storage.ref().child(newPath).getDownloadURL()]);
+          var analysisP = loadImageFile(file).then(function (img) {
+            var out = {};
+            try { out.color = dominantColor(img); } catch (e) {}
+            try { out.phash = computePHash(img); } catch (e) {}
+            return out;
+          }).catch(function () { return {}; });
+          var uploadP = storage.ref().child(newPath).put(blob, { contentType: file.type }).then(function () {
+            return storage.ref().child(newPath).getDownloadURL();
           });
+          return Promise.all([analysisP, uploadP]);
         }).then(function (vals) {
-          var url = vals[1];
+          var analysis = vals[0] || {}, url = vals[1];
+          // Generic dedup (PC-19): this photo already in the wardrobe?
+          // Link the existing item instead of creating a duplicate.
+          var dupe = analysis.phash ? findPhotoDupe([{ _phash: analysis.phash }]) : null;
+          if (dupe) {
+            // Photo already in the wardrobe — drop the just-uploaded copy.
+            storage.ref().child(newPath).delete().catch(function () {});
+            return { duplicateOf: dupe.itemId, duplicateName: dupe.itemName };
+          }
           var doc = {
             name: shopCheckShortTitle(item),
             category: item.category || "Other",
             imageUrl: url,
             storagePath: newPath,
-            photos: [{ url: url, storagePath: newPath }],
-            colors: buildColorsFromAI({ colors: item.colors }, vals[0]),
+            photos: [{ url: url, storagePath: newPath, phash: analysis.phash || null }],
+            colors: buildColorsFromAI({ colors: item.colors }, analysis.color),
             description: item.note || "",
             pattern: item.pattern || "other",
             fit: "unknown",
@@ -3355,13 +3367,13 @@
             styleTags: [],
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
           };
-          return docRef.set(doc);
-        }).then(function () {
+          return docRef.set(doc).then(function () { return { created: docRef.id }; });
+        }).then(function (outcome) {
           // Record the check: bought via a saved entry, or auto-record the
           // ephemeral check as bought so the shop list keeps the history.
           // addedItemId makes the add idempotent — tapping again goes to
           // the wardrobe item instead of creating a duplicate.
-          var itemId = docRef.id;
+          var itemId = outcome.duplicateOf || outcome.created;
           var recorded = Promise.resolve();
           if (source.savedCheckId) {
             recorded = shopCheckDocRef(source.savedCheckId)
@@ -3380,10 +3392,16 @@
           if (source.onAdded) {
             try { source.onAdded(itemId); } catch (e) {}
           }
-          return recorded;
-        }).then(function () {
-          showToast("Added to your wardrobe.");
+          return recorded.then(function () { return outcome; });
+        }).then(function (outcome) {
           switchView("wardrobe");
+          if (outcome.duplicateOf) {
+            showToast("Already in your wardrobe.");
+            var it = itemById(outcome.duplicateOf);
+            if (it) openItem(it);
+          } else {
+            showToast("Added to your wardrobe.");
+          }
         }).catch(function (err) {
           showToast(friendlyError(err));
         });
@@ -3519,9 +3537,12 @@
       var shopCheckUnsub = null;
       var STATUS_LABELS = { considering: "Considering", bought: "Bought", dismissed: "Dismissed" };
 
-      // Short title from the AI's one-line note:
-      // "An off-white baseball cap with a dark green brim, ..." -> "Off-white baseball cap"
+      // Short title: prefer the AI's short name; fall back to trimming the note.
       function shopCheckShortTitle(item) {
+        if (item.name && item.name.trim()) {
+          var n = item.name.trim();
+          return n.length > 60 ? n.slice(0, 57).trim() + "…" : n;
+        }
         var note = (item.note || "").trim().replace(/^(an?|the)\s+/i, "").split(",")[0].trim();
         if (note) {
           var t = note.charAt(0).toUpperCase() + note.slice(1);
