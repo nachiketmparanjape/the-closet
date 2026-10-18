@@ -3202,22 +3202,62 @@
         body.appendChild(wrap);
       }
 
-      function shopCheckAddToWardrobe() {
-        var st = shopCheckState;
+      // One-tap add: the shop-check AI already described the item (category,
+      // colors, pattern, note), so the wardrobe doc is built directly from
+      // that analysis — no empty form, no second AI run. The photo is copied
+      // from the shop-checks folder into the item's own photos path.
+      function shopCheckAddToWardrobe(source) {
         closeOverlay(document.getElementById("shopCheckOverlay"));
-        if (!st) { openOverlay(document.getElementById("uploadOverlay")); return; }
-        // Feed the shop photo through the normal upload flow (preview, AI
-        // suggest, submit) via the camera-capture DataTransfer pattern.
-        fetch(st.photoUrl).then(function (resp) { return resp.blob(); }).then(function (blob) {
-          var file = new File([blob], st.fileName, { type: st.fileType || blob.type || "image/jpeg" });
-          var dt = new DataTransfer();
-          dt.items.add(file);
-          var lib = document.getElementById("photoInput");
-          lib.files = dt.files;
-          lib.dispatchEvent(new Event("change"));
-          openOverlay(document.getElementById("uploadOverlay"));
-        }).catch(function () {
-          openOverlay(document.getElementById("uploadOverlay"));
+        closeOverlay(document.getElementById("shopCheckDetailOverlay"));
+        if (!currentUser || !source || !source.photoUrl) {
+          showToast("Couldn't add that — try again.");
+          return;
+        }
+        showToast("Adding to your wardrobe…");
+        var item = source.item || {};
+        var docRef = db.collection("users").doc(currentUser.uid).collection("items").doc();
+        var safeName = Date.now() + "-" + (source.fileName || "shop-item.jpg").replace(/[^a-zA-Z0-9._-]/g, "-");
+        var newPath = "users/" + currentUser.uid + "/items/" + docRef.id + "/" + safeName;
+        fetch(source.photoUrl).then(function (resp) { return resp.blob(); }).then(function (blob) {
+          var file = new File([blob], source.fileName || "shop-item.jpg", { type: source.fileType || blob.type || "image/jpeg" });
+          var colorP = loadImageFile(file).then(function (img) {
+            try { return dominantColor(img); } catch (e) { return null; }
+          }).catch(function () { return null; });
+          return storage.ref().child(newPath).put(blob, { contentType: file.type }).then(function () {
+            return Promise.all([colorP, storage.ref().child(newPath).getDownloadURL()]);
+          });
+        }).then(function (vals) {
+          var url = vals[1];
+          var doc = {
+            name: item.note || item.category || "Untitled item",
+            category: item.category || "Other",
+            imageUrl: url,
+            storagePath: newPath,
+            photos: [{ url: url, storagePath: newPath }],
+            colors: buildColorsFromAI({ colors: item.colors }, vals[0]),
+            description: item.note || "",
+            pattern: item.pattern || "other",
+            fit: "unknown",
+            fabricGuess: "unknown",
+            formality: "casual",
+            warmth: "light",
+            brand: null,
+            brandKey: null,
+            subtype: null,
+            styleTags: [],
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          };
+          return docRef.set(doc);
+        }).then(function () {
+          if (source.savedCheckId) {
+            shopCheckDocRef(source.savedCheckId)
+              .update({ status: "bought", updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
+              .catch(function () {});
+          }
+          showToast("Added to your wardrobe.");
+          switchView("wardrobe");
+        }).catch(function (err) {
+          showToast(friendlyError(err));
         });
       }
 
@@ -3322,7 +3362,15 @@
           actions.appendChild(save);
           var add = el("button", "secondary", "Add it to your wardrobe");
           add.type = "button";
-          add.addEventListener("click", shopCheckAddToWardrobe);
+          add.addEventListener("click", function () {
+            var st = shopCheckState;
+            shopCheckAddToWardrobe({
+              photoUrl: st ? st.photoUrl : null,
+              item: st && st.result ? st.result.item : null,
+              fileName: st ? st.fileName : null,
+              fileType: st ? st.fileType : null
+            });
+          });
           actions.appendChild(add);
         }
         var done = el("button", "secondary", "Done");
@@ -3539,9 +3587,13 @@
             buy.type = "button";
             buy.style.marginTop = "12px";
             buy.addEventListener("click", function () {
-              shopCheckState = { photoUrl: c.photoUrl, fileName: "shop-item.jpg", fileType: "image/jpeg" };
-              closeOverlay(document.getElementById("shopCheckDetailOverlay"));
-              shopCheckAddToWardrobe();
+              shopCheckAddToWardrobe({
+                photoUrl: c.photoUrl,
+                item: c.item,
+                fileName: "shop-item.jpg",
+                fileType: "image/jpeg",
+                savedCheckId: id
+              });
             });
             ctaWrap.appendChild(buy);
           }
