@@ -126,40 +126,6 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
 - **Known risk:** score calibration — label it "wardrobe fit", always
   show the reasoning, never a bare number.
 
-### PC-18: Outfit dedup — one canonical record per unique combination (S/M)
-- **Problem (founder 2026-10-16):** nothing identifies identical outfits.
-  Saving the same pick twice mints two unrelated docs — wear history,
-  ratings, and version chains fragment across duplicates.
-- **Shape:** content hash over sorted itemIds (+ source) at save time;
-  "you already saved this exact combination" nudge instead of a silent
-  duplicate. Interacts with versioning (edits create new versions — a
-  re-save of an identical version is the dup case).
-- **Not yet sized** — candidate for prioritization.
-
-### PC-20: Log a wear on a chosen date (S)
-- **Problem (founder 2026-10-16):** "I wore this" stamps today only — no
-  way to log a wear on a past date (e.g. yesterday's outfit remembered
-  today).
-- **Shape:** date picker on the wear action, defaulting to today; wear
-  history shows the chosen date. Backfill-safe: existing entries keep
-  their server timestamps.
-
-### PC-21: Delete a wear history entry (S)
-- **Problem (founder 2026-10-16):** no way to remove a wear entry — a
-  mis-tap appends forever, polluting wear counts and per-article stats.
-- **Shape:** swipe/tap-to-delete on wear history rows, with confirm.
-  Deleting a wear un-counts it from article stats (derived, so automatic).
-
-### PC-22: Reference articles/outfits in chat (M/L) — future component
-- **Idea (founder 2026-10-16):** a referencing mechanism so the chat has
-  context: "@ this outfit but slightly warmer", "design the rest around
-  this navy tee". A reusable component for many future features.
-- **Shape:** reference chips in the chat input (@-mention style); payload
-  carries `{articleIds, outfitIds}`; server resolves to wardrobe lines +
-  outfit context. Generalizes PC-16's previousPick (which only knows the
-  last pick, implicitly).
-- **Not yet sized** — candidate for prioritization.
-
 ### PC-23: Archive layer for outfits/articles (M) — parked
 - **Idea (founder 2026-10-16):** soft-delete instead of hard-delete across
   objects — archived items hidden from views but restorable, old outfits
