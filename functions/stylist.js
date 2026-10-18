@@ -253,6 +253,40 @@ function sanitizeReferences(value, items) {
   return out;
 }
 
+// Sprint 13: the vibe vocabulary. Keep in sync with STYLE_TAGS in
+// describe.js (the AI's tag vocabulary) — the client detects these in
+// chat input and the profile learns them from wears/ratings.
+const VIBE_TAGS = ["classic", "minimalist", "preppy", "streetwear", "vintage", "bohemian", "edgy", "romantic", "sporty", "rugged", "refined", "avant-garde"];
+
+// Explicit vibe from the chat request ("dress me streetwear tonight").
+// Client-side detection; the server only accepts exact vocabulary hits.
+function sanitizeVibe(v) {
+  if (typeof v !== "string") return null;
+  const t = v.trim().toLowerCase();
+  return VIBE_TAGS.indexOf(t) !== -1 ? t : null;
+}
+
+// Learned vibe profile, read server-side from users/{uid}.vibeProfile
+// (best-effort like styleProfile). Shape: {tags: {tag: 0..1}, evidence:
+// {tag: n}}. Returns {tags, confidence} or null when unusable.
+function sanitizeVibeProfile(vp) {
+  if (!vp || typeof vp !== "object") return null;
+  const tags = {};
+  const raw = vp.tags && typeof vp.tags === "object" ? vp.tags : {};
+  for (const t of VIBE_TAGS) {
+    const s = Number(raw[t]);
+    if (Number.isFinite(s)) tags[t] = Math.min(1, Math.max(0, s));
+  }
+  if (!Object.keys(tags).length) return null;
+  let evidence = 0;
+  const ev = vp.evidence && typeof vp.evidence === "object" ? vp.evidence : {};
+  for (const t of VIBE_TAGS) {
+    const n = Number(ev[t]);
+    if (Number.isFinite(n) && n > 0) evidence += n;
+  }
+  return { tags: tags, confidence: Math.min(1, evidence / 40) };
+}
+
 // User-confirmed style preferences (PC-12). Plain strings, capped.
 function sanitizeStyleProfile(prefs) {
   if (!Array.isArray(prefs)) return [];
@@ -351,10 +385,12 @@ function parseStylistJson(text) {
 // styleProfile: sanitized preference strings (may be empty).
 // previousPick: sanitized {itemIds} from sanitizePreviousPick, or null.
 // references: sanitized {articles, outfits} from sanitizeReferences, or null.
+// vibe: sanitized explicit vibe tag from sanitizeVibe, or null.
+// vibeProfile: sanitized {tags, confidence} from sanitizeVibeProfile, or null.
 // Build the exact model request askStylist sends. Exported so the
 // benchmark runner (tests/benchmark) exercises the real prompt —
 // prompt changes and benchmark stay in sync by construction.
-function buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext) {
+function buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile) {
   const model = process.env.GEMINI_MODEL || MODEL_VERSION;
   const wardrobe = items.map((it, i) => itemLine(it, i)).join("\n");
   let system = SYSTEM;
@@ -417,6 +453,29 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
   const contents = [
     { role: "user", parts: [{ text: "WARDROBE (pick only from these items):\n" + wardrobe }] },
   ];
+  // Sprint 13: explicit vibe outranks everything. The user named it — honor
+  // it strongly and say so in the reply.
+  if (vibe) {
+    system += "\n\nREQUESTED VIBE — the user asked for \"" + vibe + "\" outfits.\n" +
+      "- Strongly prefer items carrying the \"" + vibe + "\" style tag.\n" +
+      "- Name the vibe you honored in your reply (e.g. \"Went " + vibe + ":\").\n" +
+      "- This overrides the wearer vibe profile below when they conflict.";
+  }
+  // Sprint 13: learned vibe profile — a soft prior, only when confident,
+  // and only when no explicit vibe was requested.
+  if (!vibe && vibeProfile && vibeProfile.confidence >= 0.3) {
+    const top = Object.keys(vibeProfile.tags)
+      .map((t) => ({ tag: t, score: vibeProfile.tags[t] }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3)
+      .map((e) => e.tag + " " + e.score.toFixed(1))
+      .join(", ");
+    system += "\n\nWEARER VIBE PROFILE (confidence " + vibeProfile.confidence.toFixed(1) +
+      ") — learned from what this person wears and rates: " + top + ".\n" +
+      "- With no explicit vibe requested, gently favor items matching these tags.\n" +
+      "- A bias, never a filter: a great non-matching outfit still beats a mediocre matching one.\n" +
+      "- You may acknowledge it at most once per conversation; never lecture about it.";
+  }
   for (const m of messages) {
     contents.push({ role: m.role, parts: [{ text: m.text }] });
   }
@@ -457,9 +516,11 @@ function confidenceFromScores(scores) {
 // styleProfile: sanitized preference strings (may be empty).
 // previousPick: sanitized {itemIds} or null (PC-16 iteration).
 // references: sanitized {articles, outfits} or null (PC-22 @-mentions).
+// vibe: sanitized explicit vibe tag or null (Sprint 13).
+// vibeProfile: sanitized {tags, confidence} or null (Sprint 13).
 // Returns { reply, outfit: { itemIds, confidence, reasoning, scores } | null }.
-async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext) {
-  const { model, contents, config } = buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext);
+async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile) {
+  const { model, contents, config } = buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile);
   const ai = getClient();
   let parsed = await callStylistModel(ai, model, contents, config, "askStylist");
 
@@ -497,4 +558,4 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
   };
 }
 
-module.exports = { askStylist, buildStylistRequest, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeReferences, sanitizeStyleProfile, sanitizeWeatherContext, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM };
+module.exports = { askStylist, buildStylistRequest, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM, VIBE_TAGS };

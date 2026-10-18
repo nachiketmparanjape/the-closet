@@ -53,6 +53,22 @@ service cloud.firestore {
         && (!("sku" in request.resource.data) || (request.resource.data.sku is string && request.resource.data.sku.size() <= 100))
         && (!("addedItemId" in request.resource.data) || (request.resource.data.addedItemId is string && request.resource.data.addedItemId.size() <= 100));
     }
+    // Sprint 13: the learned vibe profile lives on the user doc itself
+    // (users/{userId}). Owner-only; only the vibeProfile map may be
+    // written, so the doc can't become a junk drawer. Does not affect
+    // subcollections — more specific matches win.
+    match /users/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create:
+        if request.auth != null && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(["vibeProfile", "updatedAt"])
+        && request.resource.data.vibeProfile is map;
+      allow update:
+        if request.auth != null && request.auth.uid == userId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["vibeProfile", "updatedAt"])
+        && (!("vibeProfile" in request.resource.data) || request.resource.data.vibeProfile is map);
+      allow delete: if false;
+    }
     // FB-1: beta feedback. Any signed-in user can submit; nobody reads via
     // the client (triage happens in the console / admin SDK). Write-only
     // keeps tester identities out of each other's reach.

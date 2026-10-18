@@ -17,7 +17,7 @@ const { initializeApp } = require("firebase-admin/app");
 const { getStorage } = require("firebase-admin/storage");
 const { getFirestore } = require("firebase-admin/firestore");
 const { describeImage } = require("./describe");
-const { askStylist, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeReferences, sanitizeStyleProfile, sanitizeWeatherContext } = require("./stylist");
+const { askStylist, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext } = require("./stylist");
 const { reflectOutfit } = require("./reflect");
 const { critiqueOutfit } = require("./critique");
 const { parseOutfitPhoto } = require("./photo");
@@ -121,6 +121,19 @@ exports.askStylist = onCall(
       const previousPick = sanitizePreviousPick(data.previousPick);
       const references = sanitizeReferences(data.references, items);
       const weatherContext = sanitizeWeatherContext(data.weatherContext);
+      const vibe = sanitizeVibe(data.vibe);
+      // Sprint 13: learned vibe profile, read server-side (best-effort like
+      // styleProfile — a failed read never blocks the chat). The client
+      // never sends it; the server is the source of truth.
+      let vibeProfile = null;
+      try {
+        const userSnap = await getFirestore().collection("users").doc(uid).get();
+        if (userSnap.exists) {
+          vibeProfile = sanitizeVibeProfile(userSnap.data().vibeProfile);
+        }
+      } catch (e) {
+        logError("askStylist.vibeProfile", e, { uid: uid, correlationId: correlationId });
+      }
       if (!items.length) {
         fail("EMPTY_WARDROBE");
       }
@@ -142,7 +155,7 @@ exports.askStylist = onCall(
       } catch (e) {
         logError("askStylist.styleProfile", e, { uid: uid, correlationId: correlationId });
       }
-      return await askStylist(items, messages, styleProfile, previousPick, references, weatherContext);
+      return await askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile);
     } catch (err) {
       // Any failure inside askStylist is a downstream AI failure.
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";

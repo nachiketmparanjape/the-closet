@@ -50,9 +50,9 @@ ones reveals the preference without per-item attribution.
 | Event | Delta per tag | Code pointer |
 |---|---|---|
 | Wear an item | +0.04 (weak — wearing ≠ loving) | `outfitWearBtn` handler → `users/{uid}/wear_events` (`public/index.html`) |
-| Outfit rated 4–5★ | +0.06 to each tag on each item | `saveRating()` → `users/{uid}/ratings` (`public/index.html`) |
-| Outfit rated 1–2★ | −0.06 | same |
-| 3★ / unrated | 0 (neutral is not a signal) | same |
+| Outfit rated 8–10 | +0.06 to each tag on each item | `saveRating()` → `users/{uid}/ratings` (`public/index.html`; scale is 0–10) |
+| Outfit rated 0–3 | −0.06 | same |
+| Rated 4–7 | 0 (neutral is not a signal) | same |
 | Save a stylist pick | +0.03 | `saveChatOutfit()` (`public/index.html`) |
 | Shop-check bought/dismissed | not a signal (noisy; bought items earn wears naturally) | — |
 

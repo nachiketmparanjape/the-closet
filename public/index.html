@@ -71,6 +71,9 @@
     .text-button { border: 0; background: transparent; padding: 7px 0; font-weight: 600; font-size: 13px; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
     .auth-button { min-height: 38px; border: 1px solid var(--line-strong); background: var(--paper); border-radius: 4px; padding: 0 13px; font-size: 12px; font-weight: 600; cursor: pointer; }
     .auth-button:disabled { color: var(--muted); cursor: not-allowed; opacity: .75; }
+    .guest-banner { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 10px 0 0; padding: 10px 14px; border: 1px solid var(--line-strong); border-left: 4px solid #b98a1d; border-radius: 6px; background: var(--paper); font-size: 13px; }
+    .guest-banner[hidden] { display: none; }
+    .link-button { background: none; border: none; padding: 0; color: inherit; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; white-space: nowrap; }
 
     .hero { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(260px, .75fr); gap: clamp(32px, 6vw, 90px); align-items: end; padding: clamp(48px, 8vw, 96px) 0 52px; }
     h1 { margin: 0; max-width: 760px; font-family: "Closet Serif", serif; font-weight: 500; font-size: clamp(44px, 7.8vw, 104px); line-height: .94; letter-spacing: -.045em; }
@@ -352,6 +355,11 @@
       <div class="top-actions">
         <button class="auth-button" id="authButton" type="button" disabled title="Complete Firebase setup to enable Google sign-in">Sign in with Google · setup needed</button>
       </div>
+    </div>
+
+    <div class="guest-banner" id="guestBanner" hidden>
+      <span>Guest mode — your wardrobe lives in this browser and can disappear.</span>
+      <button class="link-button" id="guestConnectBtn" type="button">Connect an account</button>
     </div>
 
     <section class="hero" aria-labelledby="heroTitle">
@@ -752,8 +760,17 @@
     </section>
   </div>
 
-  <div class="overlay" id="outfitOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="outfitTitle">
+  <div class="overlay" id="accountOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="accountTitle">
     <section class="modal">
+      <div class="modal-head">
+        <h2 id="accountTitle">Your account</h2>
+        <button class="icon-button" id="accountClose" type="button" aria-label="Close account">×</button>
+      </div>
+      <div class="modal-body" id="accountBody"></div>
+    </section>
+  </div>
+
+  <div class="overlay" id="outfitOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="outfitTitle">    <section class="modal">
       <div class="modal-head">
         <h2 id="outfitTitle">Outfit</h2>
         <button class="icon-button" id="outfitClose" type="button" aria-label="Close outfit">×</button>
@@ -900,6 +917,71 @@
       var itemStyleTagsBox = document.getElementById("itemStyleTags");
       // Sprint 5: controlled style-tag vocabulary (mirrors STYLE_TAGS in functions/describe.js).
       var STYLE_TAGS = ["classic", "minimalist", "preppy", "streetwear", "vintage", "bohemian", "edgy", "romantic", "sporty", "rugged", "refined", "avant-garde"];
+      // Sprint 13: vibe detection + learned-profile math. Pure functions —
+      // extracted by tests/vibe-client.test.js (multi-line, 6-space indent).
+      // Synonym map: hand-curated, ≤4 per tag, each maps to exactly one tag.
+      var VIBE_SYNONYMS = {
+        classic: ["timeless", "traditional"],
+        minimalist: ["simple", "clean", "understated"],
+        preppy: ["ivy", "collegiate"],
+        streetwear: ["urban", "skate"],
+        vintage: ["retro", "throwback", "y2k"],
+        bohemian: ["boho", "hippie"],
+        edgy: ["grunge", "punk", "goth"],
+        romantic: ["dreamy", "soft"],
+        sporty: ["athletic", "gym"],
+        rugged: ["workwear", "outdoorsy", "tough"],
+        refined: ["elegant", "polished", "dressy"],
+        "avant-garde": ["experimental", "runway"]
+      };
+      function detectVibeTag(text) {
+        var t = (" " + (text || "").toLowerCase() + " ");
+        var i, s;
+        for (i = 0; i < STYLE_TAGS.length; i++) {
+          if (t.indexOf(" " + STYLE_TAGS[i] + " ") !== -1) return STYLE_TAGS[i];
+        }
+        var tags = Object.keys(VIBE_SYNONYMS);
+        for (i = 0; i < tags.length; i++) {
+          var syns = VIBE_SYNONYMS[tags[i]];
+          for (s = 0; s < syns.length; s++) {
+            if (t.indexOf(" " + syns[s] + " ") !== -1) return tags[i];
+          }
+        }
+        return null;
+      }
+      // Vibe intent with no vocabulary match — candidates for the synonym
+      // map review (logged client-side, never sent anywhere).
+      function vibeIntentWithoutMatch(text) {
+        if (detectVibeTag(text)) return false;
+        return /vibe|aesthetic|dress me|style|outfit for|look for|something /.test((text || "").toLowerCase());
+      }
+      // Learned-profile math. profile: {tags: {tag: score}, evidence: {tag: n}}.
+      // deltas: {tag: delta}. Returns a NEW profile; decay applied every update.
+      function vibeProfileUpdate(profile, deltas) {
+        var tags = {}, evidence = {}, t;
+        var p = profile || {};
+        for (t in (p.tags || {})) tags[t] = p.tags[t];
+        for (t in (p.evidence || {})) evidence[t] = p.evidence[t];
+        for (t in tags) tags[t] = Math.min(1, Math.max(0, tags[t] * 0.995));
+        for (t in (deltas || {})) {
+          if (STYLE_TAGS.indexOf(t) === -1) continue;
+          tags[t] = Math.min(1, Math.max(0, (tags[t] || 0) + deltas[t]));
+          evidence[t] = (evidence[t] || 0) + 1;
+        }
+        return { tags: tags, evidence: evidence };
+      }
+      function vibeConfidence(profile) {
+        var total = 0, t;
+        var ev = (profile && profile.evidence) || {};
+        for (t in ev) total += ev[t];
+        return Math.min(1, total / 40);
+      }
+      function vibeTopTags(profile, n) {
+        var tags = (profile && profile.tags) || {};
+        return Object.keys(tags).map(function (t) { return { tag: t, score: tags[t] }; })
+          .sort(function (a, b) { return b.score - a.score; })
+          .slice(0, n || 3);
+      }
       function renderStyleTagChecks(selected) {
         itemStyleTagsBox.innerHTML = "";
         STYLE_TAGS.forEach(function (tag) {
@@ -992,17 +1074,316 @@
       // configured). The !configured guards below stay as a safety net.
       function setupRequired() { showToast("The app isn't connected — reload and try again."); }
 
-      function signIn() {
-        if (!configured) { setupRequired(); return; }
-        var provider = new firebase.auth.GoogleAuthProvider();
-        auth.signInWithPopup(provider).catch(function (error) {
-          showToast(friendlyError(error));
+      // AUTH-1: anonymous-first auth. The app always has a user — anonymous
+      // on first launch, upgraded via Google or email link when the user
+      // wants persistence. Upgrades use linkWith*, so the uid never
+      // changes and no data migrates. One account per email: sign-in
+      // conflicts resolve by linking, never by minting a second account.
+      var actionCodeSettings = { url: window.location.origin + window.location.pathname, handleCodeInApp: true };
+      var pendingLinkCred = null; // Google credential stashed during an email-link conflict dance
+      var upgradeNudged = false;
+
+      function isGuest() { return !!(currentUser && currentUser.isAnonymous); }
+
+      function updateGuestBanner() {
+        document.getElementById("guestBanner").hidden = !isGuest();
+      }
+
+      function maybeNudgeUpgrade() {
+        if (!isGuest() || upgradeNudged) return;
+        upgradeNudged = true;
+        try {
+          if (window.localStorage.getItem("upgradeNudged")) return;
+          window.localStorage.setItem("upgradeNudged", "1");
+        } catch (e) {}
+        openAccountOverlay();
+      }
+
+      function connectedProviders() {
+        var out = [];
+        ((currentUser && currentUser.providerData) || []).forEach(function (p) {
+          if (p && out.indexOf(p.providerId) === -1) out.push(p.providerId);
         });
+        return out;
+      }
+      function providerLabel(pid) {
+        return pid === "google.com" ? "Google" : pid === "password" ? "Email link" : pid;
+      }
+
+      function upgradeWithGoogle() {
+        if (!configured || !currentUser) return;
+        var provider = new firebase.auth.GoogleAuthProvider();
+        var op = isGuest() ? currentUser.linkWithPopup(provider) : auth.signInWithPopup(provider);
+        op.then(function () {
+          closeOverlay(document.getElementById("accountOverlay"));
+          showToast("Connected — your wardrobe is safe.");
+        }).catch(function (err) {
+          if (err.code === "auth/account-exists-with-different-credential" && err.email && err.credential) {
+            // This Google account's email already has an email-link account.
+            // Stash the Google credential, sign in via email link, then
+            // connect Google too — one account per email.
+            pendingLinkCred = err.credential;
+            startEmailLink(err.email);
+            showToast("That email already has an account — check your inbox, then we'll connect Google too.");
+          } else {
+            showToast(friendlyError(err));
+          }
+        });
+      }
+
+      function startEmailLink(email) {
+        if (!configured) return;
+        email = (email || "").trim();
+        if (!email || email.indexOf("@") === -1) { showToast("Enter a valid email address."); return; }
+        try { window.localStorage.setItem("emailForSignIn", email); } catch (e) {}
+        auth.sendSignInLinkToEmail(email, actionCodeSettings).then(function () {
+          showToast("Sign-in link sent — check your inbox.");
+        }).catch(function (err) { showToast(friendlyError(err)); });
+      }
+
+      function completeEmailLink(email, href) {
+        try { window.localStorage.removeItem("emailForSignIn"); } catch (e) {}
+        var anonUid = isGuest() ? currentUser.uid : null;
+        var op = anonUid ? currentUser.linkWithEmailLink(email, href) : auth.signInWithEmailLink(email, href);
+        op.then(function () {
+          if (pendingLinkCred && currentUser) {
+            var cred = pendingLinkCred; pendingLinkCred = null;
+            return currentUser.linkWithCredential(cred).catch(function () {});
+          }
+        }).then(function () {
+          closeOverlay(document.getElementById("accountOverlay"));
+          showToast("Connected — your wardrobe is safe.");
+        }).catch(function (err) {
+          if ((err.code === "auth/email-already-in-use" ||
+               err.code === "auth/credential-already-in-use" ||
+               err.code === "auth/account-exists-with-different-credential") && anonUid) {
+            // The email belongs to an existing account: sign into it, then
+            // offer to move the guest wardrobe over (one account per email).
+            auth.signInWithEmailLink(email, href).then(function () {
+              offerMigration(anonUid);
+            }).catch(function (e2) { showToast(friendlyError(e2)); });
+          } else {
+            showToast(friendlyError(err));
+          }
+        });
+      }
+
+      // One account per email: move a guest wardrobe into the account the
+      // user just signed into. Copies every collection doc + the vibe
+      // profile; the anonymous account is left orphaned (harmless).
+      function offerMigration(anonUid) {
+        if (!anonUid || !currentUser || anonUid === currentUser.uid) return;
+        if (!window.confirm("Move your guest wardrobe into this account?")) return;
+        var cols = ["items", "outfits", "wear_events", "ratings", "shopChecks"];
+        var to = currentUser.uid;
+        var chain = Promise.resolve();
+        var moved = 0;
+        cols.forEach(function (c) {
+          chain = chain.then(function () {
+            return db.collection("users").doc(anonUid).collection(c).get();
+          }).then(function (snap) {
+            if (snap.empty) return;
+            var batch = db.batch();
+            snap.forEach(function (d) {
+              batch.set(db.collection("users").doc(to).collection(c).doc(d.id), d.data());
+            });
+            moved += snap.size;
+            return batch.commit();
+          });
+        });
+        chain = chain.then(function () {
+          return db.collection("users").doc(anonUid).get();
+        }).then(function (snap) {
+          if (snap.exists && snap.data().vibeProfile) {
+            return db.collection("users").doc(to).set({
+              vibeProfile: snap.data().vibeProfile,
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+          }
+        }).then(function () {
+          showToast(moved ? "Moved " + moved + " records into this account." : "Nothing to move.");
+        }).catch(function (err) { showToast(friendlyError(err)); });
+      }
+
+      function unlinkProvider(pid) {
+        if (connectedProviders().length <= 1) {
+          showToast("Connect another sign-in method first — you need at least one.");
+          return;
+        }
+        currentUser.unlink(pid).then(function () {
+          renderAccountBody();
+          showToast("Disconnected.");
+        }).catch(function (err) { showToast(friendlyError(err)); });
+      }
+
+      function signOutAccount() {
+        if (isGuest()) {
+          if (!window.confirm("Sign out of guest mode? Your wardrobe on this browser will be lost.")) return;
+        }
+        closeOverlay(document.getElementById("accountOverlay"));
+        auth.signOut();
+      }
+
+      function openAccountOverlay() {
+        if (!configured || !currentUser) { showToast("Still starting — one moment."); return; }
+        renderAccountBody();
+        openOverlay(document.getElementById("accountOverlay"));
+      }
+
+      function renderAccountBody() {
+        var el = shopCheckEl;
+        var body = document.getElementById("accountBody");
+        body.textContent = "";
+        function h(t) {
+          var e = document.createElement("h3");
+          e.textContent = t;
+          e.style.margin = "18px 0 8px";
+          return e;
+        }
+        if (isGuest()) {
+          var warn = el("p", "hint", "You're browsing as a guest. Your wardrobe lives in this browser and can disappear if cookies are cleared or you switch devices. Connect an account to keep it safe — your wardrobe moves with you, nothing is lost.");
+          warn.style.marginTop = "0";
+          body.appendChild(warn);
+          var g = el("button", "primary", "Continue with Google");
+          g.type = "button";
+          g.style.width = "100%";
+          g.addEventListener("click", upgradeWithGoogle);
+          body.appendChild(g);
+          body.appendChild(h("Or use email"));
+          var em = document.createElement("input");
+          em.type = "email";
+          em.placeholder = "you@example.com";
+          em.autocomplete = "email";
+          em.style.width = "100%";
+          em.style.marginBottom = "8px";
+          body.appendChild(em);
+          var send = el("button", "secondary", "Email me a sign-in link");
+          send.type = "button";
+          send.style.width = "100%";
+          send.addEventListener("click", function () { startEmailLink(em.value); });
+          body.appendChild(send);
+        } else {
+          body.appendChild(el("p", "hint", "Signed in as " + (currentUser.displayName || currentUser.email || "you") + "."));
+          body.appendChild(h("Connected accounts"));
+          var provs = connectedProviders();
+          [["google.com", "Google"], ["password", "Email link"]].forEach(function (pair) {
+            var pid = pair[0], label = pair[1];
+            var row = el("div", null);
+            row.style.display = "flex";
+            row.style.alignItems = "center";
+            row.style.justifyContent = "space-between";
+            row.style.padding = "8px 0";
+            row.style.borderBottom = "1px solid var(--line)";
+            row.appendChild(el("span", null, (provs.indexOf(pid) !== -1 ? "✓ " : "") + label));
+            var b = el("button", "secondary", provs.indexOf(pid) !== -1 ? "Disconnect" : "Connect");
+            b.type = "button";
+            b.addEventListener("click", function () {
+              if (provs.indexOf(pid) !== -1) unlinkProvider(pid);
+              else if (pid === "google.com") upgradeWithGoogle();
+              else {
+                var email = currentUser.email || window.prompt("Which email address?");
+                startEmailLink(email);
+              }
+            });
+            row.appendChild(b);
+            body.appendChild(row);
+          });
+          var so = el("button", "secondary", "Sign out");
+          so.type = "button";
+          so.style.marginTop = "16px";
+          so.addEventListener("click", signOutAccount);
+          body.appendChild(so);
+        }
+        renderVibeSection(body);
+        body.appendChild(h("Privacy"));
+        body.appendChild(el("p", "hint", "Your wardrobe and photos are private to your account — no ads, no trackers, nothing sold. When you add a photo, it's sent to Google's AI service to generate the description and tags."));
+      }
+
+      function signIn() {
+        // Legacy entry point — the account overlay is the sign-in surface now.
+        openAccountOverlay();
+      }
+
+      // Sprint 13 personalization wiring. The learned profile lives at
+      // users/{uid}.vibeProfile (see docs/PERSONALIZATION.md); the server
+      // reads it directly, the client keeps a cache for the Settings view.
+      var vibeProfileCache = null;
+      function loadVibeProfile() {
+        vibeProfileCache = null;
+        if (!currentUser) return;
+        db.collection("users").doc(currentUser.uid).get().then(function (snap) {
+          if (snap.exists && snap.data().vibeProfile) vibeProfileCache = snap.data().vibeProfile;
+        }).catch(function () {});
+      }
+      // deltas: {tag: delta}. Applies the update locally and persists
+      // best-effort — learning never blocks the UI.
+      function recordVibeSignal(deltas) {
+        if (!currentUser || !deltas) return;
+        vibeProfileCache = vibeProfileUpdate(vibeProfileCache, deltas);
+        db.collection("users").doc(currentUser.uid).set({
+          vibeProfile: vibeProfileCache,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true }).catch(function () {});
+      }
+      function vibeDeltasForItems(itemIds, delta) {
+        var out = {};
+        (itemIds || []).forEach(function (id) {
+          var it = itemById(id);
+          var tags = it ? (it.styleTags || it.style_tags || []) : [];
+          tags.forEach(function (t) {
+            if (STYLE_TAGS.indexOf(t) !== -1) out[t] = (out[t] || 0) + delta;
+          });
+        });
+        return out;
+      }
+      function logVibeMiss(text) {
+        try {
+          var key = "vibeMisses";
+          var log = JSON.parse(window.localStorage.getItem(key) || "{}");
+          var phrase = (text || "").toLowerCase().slice(0, 80);
+          log[phrase] = (log[phrase] || 0) + 1;
+          var keys = Object.keys(log);
+          if (keys.length > 50) delete log[keys[0]];
+          window.localStorage.setItem(key, JSON.stringify(log));
+        } catch (e) {}
+      }
+      function renderVibeSection(body) {
+        var el = shopCheckEl;
+        var h = document.createElement("h3");
+        h.textContent = "Your vibe";
+        h.style.margin = "18px 0 8px";
+        body.appendChild(h);
+        if (vibeConfidence(vibeProfileCache) < 0.3) {
+          body.appendChild(el("p", "hint", "Not enough wears yet — your vibe appears here once the app gets to know your taste."));
+          return;
+        }
+        var row = el("div", null);
+        vibeTopTags(vibeProfileCache, 3).forEach(function (e) {
+          var chip = el("span", "chip active", e.tag);
+          chip.style.marginRight = "6px";
+          chip.style.cursor = "default";
+          row.appendChild(chip);
+        });
+        body.appendChild(row);
+        var reset = el("button", "secondary", "Reset my vibe");
+        reset.type = "button";
+        reset.style.marginTop = "10px";
+        reset.addEventListener("click", function () {
+          if (!window.confirm("Clear what the app has learned about your taste?")) return;
+          vibeProfileCache = null;
+          db.collection("users").doc(currentUser.uid).set({
+            vibeProfile: firebase.firestore.FieldValue.delete(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          }, { merge: true }).then(function () {
+            renderAccountBody();
+          }).catch(function (err) { showToast(friendlyError(err)); });
+        });
+        body.appendChild(reset);
       }
 
       function beginAdd() {
         if (!configured) { setupRequired(); return; }
-        if (!currentUser) { signIn(); return; }
+        if (!currentUser) { showToast("Still starting — one moment."); return; }
         openOverlay(uploadOverlay);
       }
 
@@ -1018,13 +1399,19 @@
         }
         authButton.disabled = false;
         if (user) {
-          label.textContent = "Signed in as " + (user.displayName || user.email || "you");
-          statusDot.classList.add("ready");
-          authButton.textContent = "Sign out";
+          if (user.isAnonymous) {
+            label.textContent = "Guest mode — connect to keep your wardrobe";
+            statusDot.classList.remove("ready");
+            authButton.textContent = "Connect account";
+          } else {
+            label.textContent = "Signed in as " + (user.displayName || user.email || "you");
+            statusDot.classList.add("ready");
+            authButton.textContent = "Account";
+          }
         } else {
-          label.textContent = "Ready to sign in";
+          label.textContent = "Starting…";
           statusDot.classList.remove("ready");
-          authButton.textContent = "Sign in with Google";
+          authButton.textContent = "Account";
         }
       }
 
@@ -1544,8 +1931,11 @@
 
       document.getElementById("authButton").addEventListener("click", function () {
         if (!configured) return;
-        if (currentUser) auth.signOut();
-        else signIn();
+        openAccountOverlay();
+      });
+      document.getElementById("guestConnectBtn").addEventListener("click", openAccountOverlay);
+      document.getElementById("accountClose").addEventListener("click", function () {
+        closeOverlay(document.getElementById("accountOverlay"));
       });
       document.getElementById("uploadClose").addEventListener("click", function () { closeOverlay(uploadOverlay); });
       document.getElementById("uploadCancel").addEventListener("click", function () { closeOverlay(uploadOverlay); });
@@ -1924,6 +2314,7 @@
             uploadSubmit.disabled = false;
             closeOverlay(uploadOverlay);
             showToast("Piece added to your wardrobe.");
+            maybeNudgeUpgrade();
           }).catch(function (error) {
             cleanupUploads();
             progress.hidden = true;
@@ -2429,6 +2820,9 @@
           items: stylistItems(),
           messages: stylistMessages.filter(function (m) { return !m.thinking; }),
           previousPick: previousPick,
+          // Sprint 13: explicit vibe handle ("dress me streetwear tonight").
+          // Server accepts exact vocabulary hits only.
+          vibe: detectVibeTag(text),
           weatherContext: weatherContext,
           // PC-22: explicit @-references ride along as structured ids.
           // Outfit contents are resolved client-side (it already has them);
@@ -2443,6 +2837,7 @@
           }
         };
         chatRefs = { articles: [], outfits: [] }; // per-message; PC-16 carries continuity
+        if (!payload.vibe && vibeIntentWithoutMatch(text)) logVibeMiss(text);
         renderRefChips();
         functions.httpsCallable("askStylist")(payload).then(function (res) {
           thinking.thinking = false;
@@ -3977,6 +4372,7 @@
           createdAt: firebase.firestore.FieldValue.serverTimestamp()
         }).then(function () {
           showToast("Logged — enjoy the fit.");
+          recordVibeSignal(vibeDeltasForItems(o.itemIds, 0.04)); // Sprint 13: weak implicit signal
           renderRateSection(o, ref.id);
           renderWearHistory(o);
         }).catch(function (err) {
@@ -4036,6 +4432,9 @@
           note: noteText || "",
           createdAt: firebase.firestore.FieldValue.serverTimestamp()
         }).then(function () {
+          // Sprint 13: explicit signal — 8-10 positive, 0-3 negative, 4-7 neutral.
+          var delta = score >= 8 ? 0.06 : score <= 3 ? -0.06 : 0;
+          if (delta) recordVibeSignal(vibeDeltasForItems(outfit.itemIds, delta));
           renderReflectionLoading();
           functions.httpsCallable("reflectOutfit")({ ratingId: ref.id }).then(function (res) {
             renderReflection(res.data || {});
@@ -4309,6 +4708,7 @@
             o.savedId = ref.id;
             renderChat();
             showToast("Outfit saved.");
+            recordVibeSignal(vibeDeltasForItems(o.itemIds, 0.03)); // Sprint 13: endorsement, weakest signal
           }).catch(function (err) {
             showToast(friendlyError(err));
           });
@@ -4378,11 +4778,28 @@
           db = firebase.firestore();
           storage = firebase.storage();
           functions = firebase.app().functions("us-central1");
+          // AUTH-1: complete an email-link return BEFORE the listener — the
+          // return URL is a one-shot credential. Then the app always has a
+          // user: anonymous-first, upgraded via the account overlay.
+          if (auth.isSignInWithEmailLink(window.location.href)) {
+            var linkEmail = null;
+            try { linkEmail = window.localStorage.getItem("emailForSignIn"); } catch (e) {}
+            if (!linkEmail) linkEmail = window.prompt("Which email address did you use for the sign-in link?");
+            if (linkEmail) completeEmailLink(linkEmail, window.location.href);
+            else showToast("Couldn't finish signing in — no email address found.");
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
           auth.onAuthStateChanged(function (user) {
+            if (!user) {
+              auth.signInAnonymously().catch(function (err) { showToast(friendlyError(err)); });
+              return;
+            }
             currentUser = user;
             setStatus(user);
+            updateGuestBanner();
             // FB-1: feedback needs a signed-in user (create-only rules).
             document.getElementById("feedbackFab").hidden = !user;
+            loadVibeProfile(); // Sprint 13 personalization
             watchItems(user);
             watchOutfits(user); // PC-12
             watchShopChecks(user); // PC-28
