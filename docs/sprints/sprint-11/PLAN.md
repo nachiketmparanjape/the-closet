@@ -2,7 +2,7 @@
 
 **Pulled 2026-10-17** by founder: "plan a sprint around the remaining UI
 fixes that I suggested and PC-14."
-**Status:** planning — UX-11 shipped 2026-10-17; PC-14 design doc in progress.
+**Status:** PC-14 shipped 2026-10-17; sprint complete pending founder testing.
 
 ## Cuts
 
@@ -22,5 +22,15 @@ fixes that I suggested and PC-14."
   wardrobe-fit score + gaps-vs-duplication + 2–3 outfits from owned
   pieces. No price/value judgment, no purchase links, no availability.
 
-### PC-14: Shop compatibility check — build (M)
-- After the founder approves the design. Size re-confirmed at build time.
+### PC-14: Shop compatibility check — build (M) — SHIPPED 2026-10-17
+- **Built:** `functions/shopcheck.js` (callable `shopCheck`; path guard
+  `users/{uid}/shop-checks/`; one Gemini call — describe + score +
+  dup-check + 2–3 outfits; returned IDs re-validated, hallucinations
+  dropped; no price/availability talk), registered in `functions/index.js`,
+  deployed via `deploy-create.js` with the public invoker binding (endpoint
+  verified: no 403). Storage rules gained the `shop-checks/` owner-only
+  block (deployed via REST). Client: "Shop check" hero button → photo
+  sheet (take/upload) → result modal (score, verdict, reasons, similar
+  owned with thumbnails, outfits from owned pieces, "nothing saved" note,
+  "Add it to your wardrobe" CTA feeding the upload flow). Tests:
+  `tests/shopcheck.test.js` (7). Full suite green; live app verified.
