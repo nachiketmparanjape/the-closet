@@ -39,6 +39,24 @@ Plain-language, no legalese:
 - Apple sign-in (revisit if iOS users ask).
 - Deleting the anonymous account / data export (small follow-ups).
 
+## The guest-mode fragility problem (founder 2026-10-18)
+Firebase auth sessions live in browser storage (IndexedDB). Safari can
+evict that: "clear website data", private mode, storage pressure, and
+the ITP 7-day rule. The key distinction: a **Google/email session is
+recoverable** (sign in again → same uid → wardrobe back). An
+**anonymous session is not** — the uid is random and unrecoverable. No
+technical mitigation exists; it's inherent to web storage.
+
+Design response — treat anonymous as **trial mode**, honestly:
+- Persistent guest banner (not one-time-dismissible): "Guest mode — your
+  wardrobe lives in this browser only. Connect an account to keep it."
+  One tap → upgrade sheet.
+- Upgrade nudge after the **first** item added (not the fifth) — the
+  earlier the conversion, the less there is to lose.
+- Privacy note states it plainly.
+- If guest-wardrobe loss ever shows up as a real complaint, revisit:
+  the fallback is leading with email-link instead of anonymous.
+
 ## Open questions for the founder
 1. Email-link vs Google-only upgrade: is offering both worth the extra
    UI, or is anonymous → Google enough for v1?

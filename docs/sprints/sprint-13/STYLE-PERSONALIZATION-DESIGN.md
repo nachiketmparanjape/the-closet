@@ -18,31 +18,70 @@ This cut makes them earn their keep, in two parts.
 - **No-vibe default:** unchanged behavior.
 
 ## Part 2 — learn the wearer's aesthetic profile (the quiet half)
-The app notices what you actually wear and like.
+The app notices what you actually wear and like. Designed tag-level, not
+item-level, for a specific reason (see "credit assignment" below).
 
-- **Signal:** wear events + ratings, joined to each item's `styleTags`.
-- **Model:** `users/{uid}/styleProfile` → `{ tags: { minimalist: 0.82,
-  streetwear: 0.61, … }, updatedAt }`. Incremental update on each
-  wear/rate: tags on the item get a bump (rating-weighted; wears count
-  less than 5-star ratings), everything decays slightly so tastes can
-  drift. Additive field — no migration, no backfill required (profile
-  starts empty and fills in).
-- **Use:** soft prior in the stylist. When no vibe is requested, items
-  matching the profile's top tags get a gentle boost; the stylist may
-  name it once ("leaning minimalist, as usual") but never lectures.
-- **Visibility:** a small "Your vibe" row in Settings showing the top 3
-  tags with a reset button. The profile is the user's data — inspectable
-  and clearable.
+### Signals and weights (per event)
+- Wear an item: **+0.04** to each of its tags (weak — wearing ≠ loving).
+- Outfit rated 4–5★: **+0.06** to each tag on each item in the outfit.
+- Outfit rated 1–2★: **−0.06**.
+- 3★ or unrated: no change (neutral is not a signal).
+- Save a stylist pick: **+0.03** (endorsement, weaker than a rating).
+- Shop-check bought/dismissed: **not a signal** — noisy, and bought items
+  earn their wears naturally afterward.
+
+### Why tag-level: the credit-assignment problem
+A 5★ outfit has 4 items — which one earned the stars? At item level that
+stays noisy forever. Tags are shared across items, so repeated evidence
+converges: if "minimalist" keeps showing up in 5★ outfits and "streetwear"
+keeps showing up in 2★ ones, the profile learns the truth without ever
+solving per-item attribution.
+
+### Representation
+`users/{uid}/styleProfile`:
+```json
+{ "tags": { "minimalist": 0.82, "streetwear": 0.61 },
+  "evidence": { "minimalist": 34, "streetwear": 21 },
+  "updatedAt": "<ts>" }
+```
+Scores clamped 0–1. Additive field — no migration; the profile starts
+empty and fills in. Client-side update on wear/rate/save (single user,
+low frequency — last-write-wins race risk noted and accepted for v1).
+
+### Update rule
+`score = clamp(score + delta)`, then a global slow decay (`× 0.995` per
+update) so tastes can drift — nothing is permanent. Evidence counters
+only grow.
+
+### Confidence and cold start
+`confidence = min(1, totalEvidence / 40)`. Below 0.3 the profile is
+hidden and the stylist ignores it entirely — no "we think you're
+minimalist" after one wear. 0.3+ → soft prior. The empty profile means
+exactly what it says: we don't know yet.
+
+### Use in the stylist
+One prompt line: "Wearer vibe profile (confidence 0.5): minimalist 0.8,
+streetwear 0.6." Instruction: when no vibe is requested, gently favor
+matching items; an explicit vibe request always wins; acknowledge the
+profile at most once per conversation, never lecture.
+
+### Visibility and control
+Settings → "Your vibe": top 3 tags as chips + a reset button. The profile
+is the user's data — inspectable and clearable. (Open question below: day
+one or after confidence crosses 0.3?)
 
 ## Deliberate non-goals
-- No vibe inference from photos or names — the profile learns from
-  behavior (wears/ratings) only.
-- No hard filtering ("only show me minimalist") — vibes bias, they don't
-  gate. The user can always override per request.
-- No cross-user learning — the profile is per-uid, never pooled.
+- No vibe inference from photos or names — behavior (wears/ratings/saves)
+  only, never appearance.
+- No hard filtering ("only show me minimalist") — vibes bias, never gate.
+  Explicit per-request override always wins.
+- No cross-user learning — per-uid, never pooled.
+- No permanent labels — decay means the profile follows taste drift.
 
 ## Open questions for the founder
 1. Should the "Your vibe" profile be visible in Settings from day one,
-   or stay invisible until it's learned enough to be interesting?
+   or only once confidence crosses 0.3?
 2. Vibe synonyms: fine with a small hardcoded map, or keep it to the
    12 literal tags only?
+3. Signal weights above — do the magnitudes feel right? (Wears deliberately
+   weak, ratings strong, saves weakest.)
