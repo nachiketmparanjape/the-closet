@@ -3359,10 +3359,13 @@
         }).then(function () {
           // Record the check: bought via a saved entry, or auto-record the
           // ephemeral check as bought so the shop list keeps the history.
+          // addedItemId makes the add idempotent — tapping again goes to
+          // the wardrobe item instead of creating a duplicate.
+          var itemId = docRef.id;
           var recorded = Promise.resolve();
           if (source.savedCheckId) {
             recorded = shopCheckDocRef(source.savedCheckId)
-              .update({ status: "bought", updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
+              .update({ status: "bought", addedItemId: itemId, updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
               .catch(function () {});
           } else if (source.result && !source.result.notClothing && source.storagePath) {
             var r = source.result;
@@ -3370,8 +3373,12 @@
               photoPath: source.storagePath,
               photoUrl: source.photoUrl,
               item: r.item, score: r.score, verdict: r.verdict,
-              reasons: r.reasons, similarOwned: r.similarOwned, outfits: r.outfits
+              reasons: r.reasons, similarOwned: r.similarOwned, outfits: r.outfits,
+              addedItemId: itemId
             }, "bought").catch(function () {});
+          }
+          if (source.onAdded) {
+            try { source.onAdded(itemId); } catch (e) {}
           }
           return recorded;
         }).then(function () {
@@ -3450,10 +3457,14 @@
             r.outfits.forEach(function (o) {
               var card = el("div", "outfit-card");
               var thumbs = el("div", "shop-thumbs");
+              var rendered = 0;
               o.pieces.forEach(function (pid) {
                 var t = thumbFor(pid);
-                if (t) thumbs.appendChild(t);
+                if (t) { thumbs.appendChild(t); rendered++; }
               });
+              // A piece can go missing between check and view (deleted
+              // item) — never render a fragment as an "outfit".
+              if (rendered < 2) return;
               card.appendChild(thumbs);
               if (o.note) card.appendChild(el("p", "hint", o.note));
               body.appendChild(card);
@@ -3521,7 +3532,7 @@
 
       function writeShopCheckDoc(d, status) {
         var ref = db.collection("users").doc(currentUser.uid).collection("shopChecks").doc();
-        return ref.set({
+        var doc = {
           photoPath: d.photoPath,
           photoUrl: d.photoUrl || null,
           item: d.item || null,
@@ -3536,7 +3547,9 @@
           status: status,
           createdAt: firebase.firestore.FieldValue.serverTimestamp(),
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        }).then(function () { return ref.id; });
+        };
+        if (d.addedItemId) doc.addedItemId = d.addedItemId;
+        return ref.set(doc).then(function () { return ref.id; });
       }
 
       function saveShopCheck(st, saveBtn) {
@@ -3725,7 +3738,19 @@
         body.appendChild(ctaWrap);
         function renderBoughtCta() {
           ctaWrap.textContent = "";
-          if (c.status === "bought") {
+          if (c.addedItemId) {
+            var view = el("button", "secondary", "View in wardrobe");
+            view.type = "button";
+            view.style.marginTop = "12px";
+            view.addEventListener("click", function () {
+              var it = itemById(c.addedItemId);
+              closeOverlay(document.getElementById("shopCheckDetailOverlay"));
+              switchView("wardrobe");
+              if (it) openItem(it);
+              else showToast("That item isn't in your wardrobe anymore.");
+            });
+            ctaWrap.appendChild(view);
+          } else if (c.status === "bought") {
             var buy = el("button", "primary", "Add it to your wardrobe");
             buy.type = "button";
             buy.style.marginTop = "12px";
@@ -3735,7 +3760,12 @@
                 item: c.item,
                 fileName: "shop-item.jpg",
                 fileType: "image/jpeg",
-                savedCheckId: id
+                savedCheckId: id,
+                onAdded: function (itemId) {
+                  c.addedItemId = itemId;
+                  renderBoughtCta();
+                  renderShopList();
+                }
               });
             });
             ctaWrap.appendChild(buy);
