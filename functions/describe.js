@@ -28,7 +28,7 @@ const FORMALITIES = ["casual", "smart-casual", "formal"];
 const WARMTHS = ["light", "medium", "heavy"];
 // Sprint 5: controlled style-tag vocabulary. Each tag must earn its place —
 // these are the ones that change outfit decisions.
-const STYLE_TAGS = ["classic", "minimalist", "preppy", "streetwear", "workwear", "athleisure", "bohemian", "formal"];
+const STYLE_TAGS = ["classic", "minimalist", "preppy", "streetwear", "vintage", "bohemian", "edgy", "romantic", "sporty", "rugged", "refined", "avant-garde"];
 const MODEL_VERSION = "gemini-3.8-flash"; // 2.5-flash retires 2026-10-20 (Google lifecycle page)
 
 const PROMPT = `You are cataloguing one garment from its photo for a personal wardrobe app.
