@@ -201,6 +201,14 @@ function sanitizeMessages(messages) {
   return out;
 }
 
+// WX-1: weather context measured client-side (Open-Meteo, no key). A short
+// human string like "68°F, clear" — the model never sees lat/lng.
+function sanitizeWeatherContext(value) {
+  if (typeof value !== "string") return null;
+  const s = cleanText(value, 200);
+  return s ? s : null;
+}
+
 // PC-16: the client's latest pick, for in-chat iteration ("swap the
 // shorts"). Just item ids — the server resolves them to wardrobe handles.
 function sanitizePreviousPick(value) {
@@ -346,7 +354,7 @@ function parseStylistJson(text) {
 // Build the exact model request askStylist sends. Exported so the
 // benchmark runner (tests/benchmark) exercises the real prompt —
 // prompt changes and benchmark stay in sync by construction.
-function buildStylistRequest(items, messages, styleProfile, previousPick, references) {
+function buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext) {
   const model = process.env.GEMINI_MODEL || MODEL_VERSION;
   const wardrobe = items.map((it, i) => itemLine(it, i)).join("\n");
   let system = SYSTEM;
@@ -354,6 +362,14 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
   if (prefs.length) {
     system += "\n\nSTYLE PROFILE — the user's confirmed preferences. Honor them when recommending:\n" +
       prefs.map((p) => "- " + p).join("\n");
+  }
+  // WX-1: measured local weather. The user's stated weather always wins;
+  // this fills the WEATHER sub-score when they haven't mentioned any.
+  if (weatherContext) {
+    system += "\n\nCURRENT WEATHER — measured at the user's location just now: " +
+      weatherContext + ".\n" +
+      "- Use it for the WEATHER sub-score and layering choices when the user hasn't stated different weather.\n" +
+      "- If the user states weather explicitly, theirs wins.";
   }
   // PC-16: iteration. The user is refining the previous pick, not starting
   // over — resolve its ids to wardrobe handles so the model can address
@@ -442,8 +458,8 @@ function confidenceFromScores(scores) {
 // previousPick: sanitized {itemIds} or null (PC-16 iteration).
 // references: sanitized {articles, outfits} or null (PC-22 @-mentions).
 // Returns { reply, outfit: { itemIds, confidence, reasoning, scores } | null }.
-async function askStylist(items, messages, styleProfile, previousPick, references) {
-  const { model, contents, config } = buildStylistRequest(items, messages, styleProfile, previousPick, references);
+async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext) {
+  const { model, contents, config } = buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext);
   const ai = getClient();
   let parsed = await callStylistModel(ai, model, contents, config, "askStylist");
 
@@ -481,4 +497,4 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
   };
 }
 
-module.exports = { askStylist, buildStylistRequest, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeReferences, sanitizeStyleProfile, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM };
+module.exports = { askStylist, buildStylistRequest, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeReferences, sanitizeStyleProfile, sanitizeWeatherContext, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM };

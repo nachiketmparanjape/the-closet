@@ -104,6 +104,9 @@
     .feedback-fab { position: fixed; left: 18px; bottom: max(18px, env(safe-area-inset-bottom)); z-index: 15; padding: 12px 18px; border-radius: 999px; background: var(--paper); color: var(--ink); border: 1px solid var(--line); box-shadow: var(--shadow); font-size: 14px; font-weight: 600; cursor: pointer; }
     .feedback-fab:hover { border-color: var(--ink); }
     .feedback-text { width: 100%; min-height: 140px; font: inherit; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink); resize: vertical; }
+    /* WX-1: shows the weather the stylist is working with. Hidden until a
+       reading succeeds — no chip is better than a stale or "unknown" one. */
+    .weather-chip { display: inline-block; font-size: 13px; font-weight: 400; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; margin-left: 10px; vertical-align: middle; white-space: nowrap; }
     .chat-list { display: flex; flex-direction: column; gap: 8px; max-height: 52vh; overflow-y: auto; margin: 0 0 12px; }
     .chat-msg { max-width: 88%; padding: 9px 13px; border-radius: 14px; font-size: 14px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: break-word; }
     .chat-msg.user { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
@@ -474,7 +477,7 @@
   <div class="overlay" id="chatOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="chatTitle">
     <section class="modal">
       <div class="modal-head">
-        <h2 id="chatTitle">Stylist</h2>
+        <h2 id="chatTitle">Stylist <span class="weather-chip" id="weatherChip" hidden></span></h2>
         <button class="icon-button" id="chatClose" type="button" aria-label="Close stylist chat">×</button>
       </div>
       <div class="modal-body">
@@ -2041,6 +2044,7 @@
         }
         renderChat();
         openOverlay(chatOverlay);
+        refreshWeatherChip(); // WX-1: show what the stylist knows
         window.setTimeout(function () { chatInput.focus(); }, 60);
       }
 
@@ -2154,13 +2158,16 @@
         }
       });
 
-      function sendChat(event) {
+      async function sendChat(event) {
         event.preventDefault();
         if (chatBusy || !currentUser) return;
         var text = chatInput.value.trim();
         if (!text) return;
         if (!functions) { showToast("The stylist isn't ready yet — reload and try again."); return; }
         chatInput.value = "";
+        // WX-1: measured local weather rides along as context (cached 30
+        // min; null when location is denied/unavailable — server ignores it).
+        var weatherContext = await getWeatherSummary();
         // PC-22: keep the referenced labels on the message so the thread
         // shows what was pointed at (the chips above the input clear on send).
         var refLabels = chatRefs.articles.concat(chatRefs.outfits).map(function (r) {
@@ -2188,6 +2195,7 @@
           items: stylistItems(),
           messages: stylistMessages.filter(function (m) { return !m.thinking; }),
           previousPick: previousPick,
+          weatherContext: weatherContext,
           // PC-22: explicit @-references ride along as structured ids.
           // Outfit contents are resolved client-side (it already has them);
           // the server re-validates every id against the real wardrobe.
@@ -2280,6 +2288,79 @@
           showToast(friendlyError(err));
         });
       });
+
+      // WX-1: local weather for the stylist. Geolocation → Open-Meteo
+      // (free, no key), client-side only: lat/lng never leaves the device,
+      // only the human summary ("68°F, clear") rides to the model.
+      var weatherCache = { summary: null, at: 0 };
+      var WEATHER_TTL_MS = 30 * 60 * 1000;
+      function weatherCodeToWord(code) {
+        var c = Number(code);
+        if (c === 0) return "clear";
+        if (c === 1) return "mostly clear";
+        if (c === 2) return "partly cloudy";
+        if (c === 3) return "overcast";
+        if (c === 45 || c === 48) return "foggy";
+        if (c === 51 || c === 53 || c === 55) return "drizzle";
+        if (c === 56 || c === 57) return "freezing drizzle";
+        if (c === 61) return "light rain";
+        if (c === 63) return "rain";
+        if (c === 65) return "heavy rain";
+        if (c === 66 || c === 67) return "freezing rain";
+        if (c === 71) return "light snow";
+        if (c === 73) return "snow";
+        if (c === 75) return "heavy snow";
+        if (c === 77) return "snow grains";
+        if (c === 80) return "light showers";
+        if (c === 81) return "showers";
+        if (c === 82) return "heavy showers";
+        if (c === 85 || c === 86) return "snow showers";
+        if (c === 95) return "thunderstorm";
+        if (c === 96 || c === 99) return "thunderstorm with hail";
+        return "";
+      }
+      function formatWeatherSummary(current) {
+        if (!current || typeof current.temperature_2m !== "number") return null;
+        var word = weatherCodeToWord(current.weather_code);
+        return Math.round(current.temperature_2m) + "°F" + (word ? ", " + word : "");
+      }
+      function getUserPosition() {
+        return new Promise(function (resolve) {
+          if (!navigator.geolocation) return resolve(null);
+          navigator.geolocation.getCurrentPosition(
+            function (pos) { resolve(pos.coords); },
+            function () { resolve(null); }, // denied/unavailable: degrade gracefully
+            { timeout: 10000, maximumAge: 600000 }
+          );
+        });
+      }
+      function getWeatherSummary() {
+        var now = Date.now();
+        if (weatherCache.summary && now - weatherCache.at < WEATHER_TTL_MS) {
+          return Promise.resolve(weatherCache.summary);
+        }
+        return getUserPosition().then(function (coords) {
+          if (!coords) return null;
+          var url = "https://api.open-meteo.com/v1/forecast?latitude=" +
+            coords.latitude.toFixed(3) + "&longitude=" + coords.longitude.toFixed(3) +
+            "&current=temperature_2m,weather_code&temperature_unit=fahrenheit&timezone=auto";
+          return fetch(url).then(function (res) {
+            if (!res.ok) return null;
+            return res.json();
+          }).then(function (data) {
+            var summary = formatWeatherSummary(data && data.current);
+            if (summary) weatherCache = { summary: summary, at: Date.now() };
+            return summary;
+          }).catch(function () { return null; });
+        });
+      }
+      function refreshWeatherChip() {
+        var chip = document.getElementById("weatherChip");
+        getWeatherSummary().then(function (summary) {
+          if (summary) { chip.textContent = summary; chip.hidden = false; }
+          else { chip.hidden = true; }
+        });
+      }
 
       // PC-12: outfits — first-class objects with versions, wear history,
       // ratings, and learned style preferences.

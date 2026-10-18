@@ -17,7 +17,7 @@ const { initializeApp } = require("firebase-admin/app");
 const { getStorage } = require("firebase-admin/storage");
 const { getFirestore } = require("firebase-admin/firestore");
 const { describeImage } = require("./describe");
-const { askStylist, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeReferences, sanitizeStyleProfile } = require("./stylist");
+const { askStylist, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeReferences, sanitizeStyleProfile, sanitizeWeatherContext } = require("./stylist");
 const { reflectOutfit } = require("./reflect");
 const { critiqueOutfit } = require("./critique");
 const { parseOutfitPhoto } = require("./photo");
@@ -114,6 +114,7 @@ exports.askStylist = onCall(
       const messages = sanitizeMessages(data.messages);
       const previousPick = sanitizePreviousPick(data.previousPick);
       const references = sanitizeReferences(data.references, items);
+      const weatherContext = sanitizeWeatherContext(data.weatherContext);
       if (!items.length) {
         fail("EMPTY_WARDROBE");
       }
@@ -135,7 +136,7 @@ exports.askStylist = onCall(
       } catch (e) {
         logError("askStylist.styleProfile", e, { uid: uid, correlationId: correlationId });
       }
-      return await askStylist(items, messages, styleProfile, previousPick, references);
+      return await askStylist(items, messages, styleProfile, previousPick, references, weatherContext);
     } catch (err) {
       // Any failure inside askStylist is a downstream AI failure.
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
