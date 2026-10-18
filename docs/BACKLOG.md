@@ -224,3 +224,15 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
   plus a visible privacy-safety note in the app.
 - **Status:** parked for discussion AFTER PC-14 ships (founder's call —
   not urgent, but "a big deal" for onboarding comfort).
+
+### PC-29: Trips — travel packing recommendations (L) — parked for proposal validation
+- **Idea (founder 2026-10-18):** packing for travel is stressful; it needs
+  weather × personal taste × local culture. Trips tab; trip objects
+  (destinations + dates + notes, multi-leg in the model); packing list
+  from the wardrobe scored per leg against forecasts; outfits per leg;
+  trip-aware chat and trip-aware shop check ("will this earn a place *for
+  this trip*?").
+- **Proposal:** `docs/sprints/sprint-13/TRIPS-PROPOSAL.md` — 3 phases,
+  4 open questions for the founder.
+- **Status:** parked until the founder validates the proposal. Revisit
+  trigger: founder says "let's scope trips" or answers the open questions.
