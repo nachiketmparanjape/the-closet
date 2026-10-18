@@ -76,6 +76,12 @@
     h1 { margin: 0; max-width: 760px; font-family: "Closet Serif", serif; font-weight: 500; font-size: clamp(44px, 7.8vw, 104px); line-height: .94; letter-spacing: -.045em; }
     .hero-copy { padding-bottom: 7px; }
     .hero-copy p { margin: 0 0 24px; max-width: 420px; color: var(--muted); font-size: 16px; line-height: 1.65; }
+    /* Sprint 10 UX: once the wardrobe is non-empty the hero compacts to a
+       slim header — the full statement is for the empty state only. */
+    .hero.hero-compact { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 24px; padding: 30px 0 10px; }
+    .hero.hero-compact h1 { font-size: clamp(26px, 4vw, 38px); max-width: none; }
+    .hero.hero-compact .hero-copy { padding-bottom: 0; display: flex; gap: 10px; margin-left: auto; }
+    .hero.hero-compact .hero-copy p { display: none; }
     .primary { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 48px; border: 1px solid var(--black); background: var(--black); color: var(--on-black); border-radius: 5px; padding: 0 19px; font-weight: 600; cursor: pointer; transition: background .18s ease, color .18s ease, border-color .18s ease; }
     .primary:hover { background: var(--accent-dark); border-color: var(--accent-dark); color: #fff; }
     .primary:disabled { cursor: not-allowed; opacity: .48; }
@@ -97,7 +103,9 @@
     .bulk-row .bulk-status.st-done { color: var(--accent-dark); }
     .bulk-row .bulk-status.st-failed { color: var(--danger); }
     .bulk-retry { font-size: 12px; padding: 4px 10px; border-radius: 99px; border: 1px solid var(--line-strong); background: transparent; color: var(--ink); cursor: pointer; white-space: nowrap; }
-    .chat-fab { position: fixed; right: 18px; bottom: max(18px, env(safe-area-inset-bottom)); width: 56px; height: 56px; border-radius: 50%; background: var(--accent); color: #fff; border: none; box-shadow: var(--shadow); font-size: 22px; cursor: pointer; z-index: 15; display: flex; align-items: center; justify-content: center; }
+    /* Sprint 10 UX: the two floating actions are a consistent labeled pair —
+       chat is the primary (ink), feedback the secondary (paper). */
+    .chat-fab { position: fixed; right: 18px; bottom: max(18px, env(safe-area-inset-bottom)); z-index: 15; display: inline-flex; align-items: center; gap: 8px; padding: 14px 20px; border-radius: 999px; background: var(--black); color: var(--on-black); border: 1px solid var(--black); box-shadow: var(--shadow); font-size: 15px; font-weight: 600; cursor: pointer; }
     /* FB-1: always-visible feedback entry point. Bottom-left so it never
        collides with the chat FAB; a word, not an icon, so its purpose is
        obvious without a tutorial. */
@@ -608,7 +616,7 @@
     </section>
   </div>
 
-  <button class="chat-fab" id="chatFab" type="button" aria-label="Ask the stylist">✨</button>
+  <button class="chat-fab" id="chatFab" type="button"><span aria-hidden="true">✨</span><span>Ask the stylist</span></button>
   <button class="feedback-fab" id="feedbackFab" type="button" hidden>Feedback</button>
 
   <div class="overlay" id="feedbackOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="feedbackTitle">
@@ -1379,6 +1387,8 @@
           visible.forEach(function (item) { gallery.appendChild(createItemCard(item)); });
         }
         itemCount.textContent = visible.length + (visible.length === 1 ? " piece" : " pieces");
+        var hero = document.querySelector(".hero");
+        if (hero) { hero.classList.toggle("hero-compact", allItems.length > 0); }
       }
 
       function watchItems(user) {
