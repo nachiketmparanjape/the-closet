@@ -19,3 +19,9 @@
   analysis renderer + note/link/SKU fields + considering/bought/dismissed
   status + delete, "Add it to your wardrobe" on bought items, owner-only
   Firestore rules with analysis-write-once/update-user-fields-only.
+
+### PC-19: Perceptual-hash photo dedup (S) — SHIPPED 2026-10-18
+- Pulled from parked backlog at founder's request ("let's size and scope
+  the hash dedup"). 63-bit DCT pHash, Hamming ≤ 5, warn-don't-block on
+  single + bulk upload; `phash` stored on photo entries; 7 unit tests;
+  backfilled all 14 existing photos via scripts/backfill-phash.js.

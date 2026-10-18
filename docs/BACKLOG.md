@@ -136,17 +136,6 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
   re-save of an identical version is the dup case).
 - **Not yet sized** — candidate for prioritization.
 
-### PC-19: Article duplicate detection — warn, don't block (M)
-- **Problem (founder 2026-10-16):** the same photo uploaded twice creates
-  two items; nothing detects it. Soft problem, not high priority — but the
-  data model must *allow* two of the same article (owning two identical
-  black tees is legitimate).
-- **Shape:** same-image detection at upload (exact byte hash minimum;
-  perceptual hash if re-exports matter) that *warns* ("this looks like
-  your Navy Tee — add anyway?") rather than blocking. Possible
-  `duplicateOf` link or quantity field later.
-- **Not yet sized** — parked; on our mind per founder.
-
 ### PC-20: Log a wear on a chosen date (S)
 - **Problem (founder 2026-10-16):** "I wore this" stamps today only — no
   way to log a wear on a past date (e.g. yesterday's outfit remembered

@@ -2,6 +2,17 @@
 
 What went live. Momentum you can see.
 
+## Sprint 12 (2026-10-17 → )
+- **PC-28: Saved shop checks ("Shop list")** — shipped 2026-10-17/18.
+  Save button in the shop-check result; Shop list tab with score badges
+  and status chips; detail view with note/link/SKU + considering/bought/
+  dismissed + delete; one-tap "Add it to your wardrobe" (no empty form, no
+  second AI run) from both the result and saved checks. Founder-tested.
+- **PC-19: Perceptual-hash photo dedup** — shipped 2026-10-18. 63-bit
+  pHash computed at photo selection, stored on photo entries, Hamming
+  distance ≤ 5 warns ("this looks like one already on 'X' — upload
+  anyway?") on single + bulk upload; all 14 existing photos backfilled.
+
 ## Sprint 1 (2026-09-30 → 2026-10-14)
 
 - **PC-1: Delete a wardrobe piece** — shipped 2026-09-30 (PR #1).
