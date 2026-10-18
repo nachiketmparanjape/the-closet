@@ -26,7 +26,12 @@ const { shopCheck } = require("./shopcheck");
 // path logs with a correlation ID.
 const { fail, newCorrelationId, logError } = require("./errors");
 
-initializeApp();
+// The default bucket is closet-404e9.firebasestorage.app (the appspot.com
+// bucket exists but the client writes to firebasestorage.app). Without an
+// explicit storageBucket, getStorage().bucket() throws "Bucket name not
+// specified or invalid" — this broke shopCheck and parseOutfitPhoto, whose
+// storage reads were never exercised before (describeItem sends base64).
+initializeApp({ storageBucket: "closet-404e9.firebasestorage.app" });
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB — phone photos, pre-resize
 
