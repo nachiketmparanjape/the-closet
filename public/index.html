@@ -352,7 +352,9 @@
         <span class="count" id="outfitCount">0 outfits</span>
         <button class="secondary" id="buildOutfitBtn" type="button" style="margin-left:auto">+ Build</button>
         <button class="secondary" id="photoParseBtn" type="button">From photo</button>
+        <button class="secondary" id="photoParseCameraBtn" type="button">Take photo</button>
         <input type="file" id="photoParseInput" accept="image/*" hidden>
+        <input type="file" id="photoParseInputCamera" accept="image/*" capture="environment" hidden>
       </div>
       <p class="hint" id="outfitsHint">Ask the stylist for an outfit, or build one yourself — saved outfits land here.</p>
       <div class="gallery" id="outfitsGallery"></div>
@@ -492,8 +494,10 @@
         <div class="thumb-strip" id="thumbStrip" hidden></div>
         <div class="photo-manage">
           <button class="secondary" id="addPhotosBtn" type="button">Add photos</button>
+          <button class="secondary" id="addPhotoCameraBtn" type="button">Take photo</button>
           <button class="secondary" id="setCoverBtn" type="button">Set as cover</button>
           <input id="addPhotoInput" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden />
+          <input id="addPhotoInputCamera" type="file" accept="image/*" capture="environment" hidden />
         </div>
         <p class="hint" id="itemWearStats" hidden></p>
         <div class="field">
@@ -612,7 +616,9 @@
           <button class="secondary" id="outfitRenameBtn" type="button">Rename</button>
           <button class="secondary" id="outfitCritiqueBtn" type="button">AI take</button>
           <button class="secondary" id="outfitPhotoBtn" type="button">Add photo</button>
+          <button class="secondary" id="outfitPhotoCameraBtn" type="button">Take photo</button>
           <input type="file" id="outfitPhotoInput" accept="image/*" hidden>
+          <input type="file" id="outfitPhotoInputCamera" accept="image/*" capture="environment" hidden>
           <button class="danger" id="outfitDelete" type="button">Delete</button>
         </div>
         <div id="outfitRateSection"></div>
@@ -1156,6 +1162,26 @@
           return;
         }
         document.getElementById("addPhotoInput").click();
+      });
+      // Camera variant: the captured shot is funneled into the library
+      // input so the existing multi-file handler runs unchanged.
+      document.getElementById("addPhotoCameraBtn").addEventListener("click", function () {
+        if (!activeItem) return;
+        if (itemPhotos(activeItem).length >= MAX_PHOTOS) {
+          showToast("Already at " + MAX_PHOTOS + " photos.");
+          return;
+        }
+        document.getElementById("addPhotoInputCamera").click();
+      });
+      document.getElementById("addPhotoInputCamera").addEventListener("change", function () {
+        var file = this.files && this.files[0];
+        this.value = "";
+        if (!file) return;
+        var dt = new DataTransfer();
+        dt.items.add(file);
+        var lib = document.getElementById("addPhotoInput");
+        lib.files = dt.files;
+        lib.dispatchEvent(new Event("change"));
       });
 
       document.getElementById("addPhotoInput").addEventListener("change", function () {
@@ -2609,6 +2635,15 @@
           handleOutfitPhotoFile(this.files && this.files[0], o);
           this.value = "";
         };
+        var outfitPhotoInputCamera = document.getElementById("outfitPhotoInputCamera");
+        document.getElementById("outfitPhotoCameraBtn").onclick = function () {
+          outfitPhotoInputCamera.click();
+        };
+        outfitPhotoInputCamera.onchange = function () {
+          var file = this.files && this.files[0];
+          this.value = "";
+          handleOutfitPhotoFile(file, o);
+        };
 
         // Phase 3: fresh rating section + wear history per open.
         document.getElementById("outfitRateSection").textContent = "";
@@ -2739,6 +2774,15 @@
       document.getElementById("photoParseBtn").addEventListener("click", openPhotoParse);
       document.getElementById("photoParseInput").addEventListener("change", function () {
         handlePhotoParseFile(this.files && this.files[0]);
+      });
+      // Camera variant of "From photo" — same flow, rear camera directly.
+      document.getElementById("photoParseCameraBtn").addEventListener("click", function () {
+        document.getElementById("photoParseInputCamera").click();
+      });
+      document.getElementById("photoParseInputCamera").addEventListener("change", function () {
+        var file = this.files && this.files[0];
+        this.value = "";
+        if (file) handlePhotoParseFile(file);
       });
       document.getElementById("photoParseClose").addEventListener("click", function () { closePhotoParse(true); });
       document.getElementById("photoParseCancel").addEventListener("click", function () { closePhotoParse(true); });
