@@ -81,24 +81,14 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
   descriptions, reusing the PC-6 proxy. The v1 core loop's second half —
   **in Sprint 3 (approved 2026-10-14).**
 
-### PC-13: Outfit photo parsing (M/L) — Sprint 5+ candidate
-
-- **Problem:** Logging what you wore (or capturing an outfit you like)
-  is manual assembly today. The fastest capture is a photo — mirror
-  selfie or flat-lay — but there's no path from photo to outfit object.
-- **In scope:** user takes/uploads an outfit photo; AI identifies each
-  visible article (type, colors, pattern); user confirms each against
-  wardrobe items via a shortlist picker (human-in-the-loop matching —
-  auto visual-matching is the hard part, deferred); creates the outfit
-  doc (source: "photo") and optionally logs a wear in the same flow.
-  Doubles as the lowest-friction wear logging: photograph today's
-  outfit, ~30 seconds.
-- **Out of scope:** fully automatic visual similarity matching;
-  parsing outfits on other people.
-- **Done looks like:** founder photographs today's outfit, confirms 3
-  articles from shortlists, taps save — outfit in history, wear logged.
-- **Dependencies:** PC-12 (outfit object, wear events).
-- **Known risk:** multi-garment parsing accuracy. Cost ~$0.001/photo.
+### PC-13 (remaining): wear logging in the photo-parse flow (S) — Sprint 14
+- **Status 2026-10-18:** the photo half shipped ("Match a photo" — AI
+  identifies articles, user confirms from shortlists, saves outfit with
+  source "photo"; see SHIPPED.md). What remains: logging the wear in the
+  same flow — today it's photo → save → open outfit → "I wore this"
+  (three steps, two screens). The cut: "Save & log as worn today" in one
+  tap, doubling photo-parse as the lowest-friction wear logger.
+- Original full-scope card archived in git history; this is the remainder.
 
 ### PC-14: Shop compatibility check (M) — Sprint 5+ candidate
 
@@ -190,14 +180,15 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   for v1 — parked until the profile has real data.
 - **Spec:** `docs/PERSONALIZATION.md` ("Open: exploration vs. exploitation").
 
-### PC-29: Trips — travel packing recommendations (L) — parked for proposal validation
+### PC-29: Trips — travel packing recommendations (L) — VALIDATED, Sprint 15 candidate
 - **Idea (founder 2026-10-18):** packing for travel is stressful; it needs
   weather × personal taste × local culture. Trips tab; trip objects
   (destinations + dates + notes, multi-leg in the model); packing list
   from the wardrobe scored per leg against forecasts; outfits per leg;
   trip-aware chat and trip-aware shop check ("will this earn a place *for
   this trip*?").
-- **Proposal:** `docs/proposals/TRIPS-PROPOSAL.md` — 3 phases,
-  4 open questions for the founder.
-- **Status:** parked until the founder validates the proposal. Revisit
-  trigger: founder says "let's scope trips" or answers the open questions.
+- **Proposal:** `docs/proposals/TRIPS-PROPOSAL.md` — founder decisions
+  recorded 2026-10-18 (articles + outfits lists, day-by-day optional,
+  simple UI; chat mode; single destination v1; trip-tagged shop items).
+  Open thread: trip preference curation (bloat-aware design).
+- **Status:** validated; ready for scoping as Sprint 15.

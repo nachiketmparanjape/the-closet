@@ -2,6 +2,23 @@
 
 What went live. Momentum you can see.
 
+## Sprint 13 (2026-10-18 → )
+- **AUTH-1: Privacy-friendlier sign-in** — shipped 2026-10-18, in founder
+  phone validation. Anonymous-first auth (app always has a user), upgrade
+  via Google or email link with one-account-per-email linking, persistent
+  guest banner, account sheet (connected accounts, Your vibe, privacy
+  note), upgrade nudge after first item.
+- **Style-tag personalization** — shipped 2026-10-18, in founder phone
+  validation. Vibe as a chat handle ("dress me streetwear tonight") with
+  a curated synonym map + miss log; learned `vibeProfile`
+  (wears/ratings/saves → tag-level EMA with decay, confidence-gated at
+  0.3) as a soft prior in the stylist. Living spec: `docs/PERSONALIZATION.md`.
+- **PC-13 (photo half): photo → outfit matching ("Match a photo")** —
+  shipped earlier; became functional 2026-10-17 with the storageBucket
+  fix. AI identifies articles in an outfit photo, user confirms each from
+  a shortlist, saves the outfit (source: "photo"). **Wear-logging half
+  NOT shipped** — re-filed as its own cut (Sprint 14).
+
 ## Sprint 12 (2026-10-17 → )
 - **PC-28: Saved shop checks ("Shop list")** — shipped 2026-10-17/18.
   Save button in the shop-check result; Shop list tab with score badges

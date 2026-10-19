@@ -1,7 +1,7 @@
 # Proposal: Trips — travel packing recommendations
 
-**Status:** proposed 2026-10-18 — awaiting founder validation. NOT scoped for
-build until approved.
+**Status:** founder validated 2026-10-18 — answers below. Ready for scoping
+(Sprint 15 candidate).
 **Origin:** founder brain dump 2026-10-18 — packing for travel is stressful;
 it needs weather × personal taste × local culture. The app already holds two
 of those (wardrobe, weather via WX-1); the model knows the third.
@@ -56,7 +56,48 @@ founder's example is exactly the demo.
 2. **Trip-scoped chat** — active-trip context in the stylist chat.
 3. **Trip-scoped shop check** — "for this trip" mode.
 
+## Founder decisions (2026-10-18)
+
+1. **Packing output: BOTH a list of articles and a list of outfits;**
+   day-by-day outfits optional. Hard constraint: **clean, simple UI/UX is
+   the priority** — a more complex experience needs UI/UX expertise the
+   founder doesn't have, so v1 stays deliberately plain (two flat lists,
+   no fancy itinerary views).
+2. **Trip chat: a mode of the existing chat** (as recommended).
+3. **Single destination in v1 UI** (a city or a country — the experience
+   must be designed to handle both gracefully); multi-leg stays in the
+   data model only.
+4. **Trip-tagged shop items:** shop-list items can be tagged to a trip;
+   they show up in the generic Shop list AND in a unified trip view.
+
+## Open design topic: trip preference curation (founder 2026-10-18)
+
+The founder's idea: a systematic, curated record of the person's
+preferences *for a specific trip* — and more generally, as part of
+personalization. Sketch: a per-trip preference note (structured, human-
+readable — e.g. a markdown-like record) that the app builds up from the
+trip's chats, packing choices, and shop checks, and that the stylist
+reads back as context.
+
+**The bloat risk (founder's own flag):** AI-auto-maintained md/skill files
+without human curation tend to bloat into uselessness over time. Design
+constraints for whenever this is scoped:
+- The record must have a **curation mechanism**: human-editable,
+  human-deletable, with the AI proposing additions rather than silently
+  appending. Nothing accumulates without a path to removal.
+- Prefer **deriving from the existing learning substrate** (vibeProfile,
+  wear/ratings, `docs/PERSONALIZATION.md`) over a parallel free-text
+  system — the trip layer should be a *scoped view* on what the app
+  already knows, plus trip-specific overrides, not a second brain.
+- Size cap: if the record can't stay useful in under ~20 lines, the
+  design is wrong.
+- Not for v1 — parked until trip chat exists and shows what actually
+  needs remembering.
+
 ## Open questions for the founder
+
+*(All four original questions answered 2026-10-18 — see Founder decisions
+above. The trip-preference curation topic is the remaining open thread.)*
 
 1. Packing output: flat packable list, day-by-day outfits, or both?
    (Recommend both — list for the suitcase, outfits for the mornings.)
