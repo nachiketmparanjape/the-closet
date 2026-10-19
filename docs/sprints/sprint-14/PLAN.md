@@ -10,7 +10,11 @@ and split during the walk.
 Design: `COMPOSER-DESIGN.md`. One-tap morning pick: occasion chips +
 WX-1 weather + vibe profile → one outfit + 2 alternates, reusing the
 existing `askStylist` callable (client orchestration, no new function).
-Status: design written, awaiting founder validation before build.
+**Built 2026-10-18 with the recommended defaults** (founder green-lit
+the sprint without overriding): hero placement, Work/Casual/Dinner
+out/Workout + none chips, main pick + "show another option" up to 2
+alternates (previousPick iteration), same saveable card component as
+chat, alternates carry the model's one-line reasoning as a caption.
 
 ### 2. PC-13 (remaining): wear logging in the photo-parse flow (S)
 "Save & log as worn today" in the photo-parse confirmation — one tap

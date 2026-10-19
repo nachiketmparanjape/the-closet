@@ -375,6 +375,7 @@
         </button>
         <button class="secondary" id="bulkButton" type="button">Bulk add</button>
         <button class="secondary" id="shopCheckButton" type="button">Shop check</button>
+        <button class="secondary" id="composerButton" type="button" style="border-color:var(--accent);color:var(--accent-dark)">✨ Dress me today</button>
       </div>
     </section>
 
@@ -427,7 +428,8 @@
       <div class="catalog-head">
         <h2>Outfits</h2>
         <span class="count" id="outfitCount">0 outfits</span>
-        <button class="secondary" id="addOutfitBtn" type="button" style="margin-left:auto">+ Add outfit</button>
+        <button class="secondary" id="surpriseBtn" type="button" style="margin-left:auto" title="Surprise me">🎲</button>
+        <button class="secondary" id="addOutfitBtn" type="button">+ Add outfit</button>
         <input type="file" id="photoParseInput" accept="image/*" hidden>
         <input type="file" id="photoParseInputCamera" accept="image/*" capture="environment" hidden>
       </div>
@@ -460,7 +462,42 @@
       <div class="form-actions">
         <button class="secondary" id="photoParseCancel" type="button">Cancel</button>
         <button class="primary" id="photoParseSave" type="button">Save outfit</button>
+        <button class="primary" id="photoParseSaveWear" type="button" style="margin-left:8px" title="Save the outfit and log it as worn today">Save + log worn today</button>
       </div>
+    </section>
+  </div>
+
+  <!-- Sprint 14: "Dress me today" — one-tap morning pick. Client
+       orchestration around the existing askStylist callable; no new
+       function. Occasion chips + WX-1 weather + vibe profile (server). -->
+  <div class="overlay" id="composerOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="composerTitle">
+    <section class="modal">
+      <div class="modal-head">
+        <h2 id="composerTitle">Dress me today</h2>
+        <button class="icon-button" id="composerClose" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="hint" id="composerWeather" style="margin-top:0" hidden></p>
+        <div id="composerOccasions" style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 12px;" role="group" aria-label="Occasion"></div>
+        <button class="primary" id="composerPick" type="button" style="width:100%">Pick my outfit</button>
+        <div id="composerThinking" class="hint" hidden style="margin-top:10px">Putting it together…</div>
+        <div id="composerResults" style="margin-top:4px"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Sprint 14: "Surprise me" — two flavors. Rewear: weighted-random
+       from saved outfits (free, favors not-recently-worn). Something new:
+       stylist-generated with an exploration lean (one AI call). -->
+  <div class="overlay sheet-overlay" id="surpriseSheet" hidden role="dialog" aria-modal="true" aria-labelledby="surpriseSheetTitle">
+    <section class="sheet">
+      <h2 class="sheet-title" id="surpriseSheetTitle">Surprise me</h2>
+      <button class="sheet-option" id="surpriseRewear" type="button">
+        <span><span class="opt-title">🎲 Rewear something</span><span class="opt-sub">a random pick from your saved outfits, favoring ones you haven't worn in a while</span></span>
+      </button>
+      <button class="sheet-option" id="surpriseNew" type="button">
+        <span><span class="opt-title">✨ Something new</span><span class="opt-sub">the stylist picks an outfit in a vibe you rarely wear</span></span>
+      </button>
     </section>
   </div>
 
@@ -2898,6 +2935,186 @@
       document.getElementById("chatClose").addEventListener("click", function () { closeOverlay(chatOverlay); });
       chatForm.addEventListener("submit", sendChat);
 
+      // Sprint 14: "Dress me today" — one-tap morning pick. Client
+      // orchestration around the existing askStylist callable (no new
+      // function): occasion chips + WX-1 weather + vibe profile (server)
+      // → outfit card + up to 2 alternates. Save reuses saveChatOutfit
+      // with the onDone callback to refresh the results area.
+      var composerOccasion = null;
+      var composerBusy = false;
+      var composerPicks = []; // [{ outfit }] wrappers, rendered via renderOutfitCard
+      var composerOccasions = ["Work", "Casual", "Dinner out", "Workout"];
+      function openComposer() {
+        if (!currentUser) return;
+        composerOccasion = null;
+        composerPicks = [];
+        renderComposerOccasions();
+        var res = document.getElementById("composerResults");
+        res.textContent = "";
+        var wline = document.getElementById("composerWeather");
+        wline.hidden = true;
+        wline.textContent = "";
+        getWeatherSummary().then(function (w) {
+          if (w) { wline.textContent = "Today: " + w; wline.hidden = false; }
+        }).catch(function () { /* weather is a bonus */ });
+        openOverlay(document.getElementById("composerOverlay"));
+      }
+      function renderComposerOccasions() {
+        var wrap = document.getElementById("composerOccasions");
+        wrap.textContent = "";
+        composerOccasions.forEach(function (occ) {
+          var b = document.createElement("button");
+          b.type = "button";
+          b.className = "secondary";
+          b.textContent = occ;
+          if (occ === composerOccasion) {
+            b.style.borderColor = "var(--accent)";
+            b.style.color = "var(--accent-dark)";
+            b.style.fontWeight = "600";
+          }
+          b.addEventListener("click", function () {
+            composerOccasion = (composerOccasion === occ) ? null : occ;
+            renderComposerOccasions();
+          });
+          wrap.appendChild(b);
+        });
+      }
+      function renderComposerResults() {
+        var res = document.getElementById("composerResults");
+        res.textContent = "";
+        composerPicks.forEach(function (wrap, i) {
+          var lbl = document.createElement("p");
+          lbl.className = "hint";
+          lbl.style.margin = "12px 0 0";
+          lbl.textContent = i === 0 ? "Today's pick" : "Another option";
+          res.appendChild(lbl);
+          res.appendChild(renderOutfitCard(wrap, renderComposerResults));
+          if (wrap.note) {
+            var n = document.createElement("p");
+            n.className = "hint";
+            n.style.margin = "4px 0 0";
+            n.textContent = wrap.note;
+            res.appendChild(n);
+          }
+        });
+        if (composerPicks.length && composerPicks.length < 3) {
+          var more = document.createElement("button");
+          more.type = "button";
+          more.className = "secondary";
+          more.style.marginTop = "10px";
+          more.textContent = "↻ Show another option";
+          more.addEventListener("click", composerPick);
+          res.appendChild(more);
+        }
+      }
+      function composerPick() {
+        if (composerBusy || !currentUser || !functions) return;
+        composerBusy = true;
+        document.getElementById("composerPick").disabled = true;
+        document.getElementById("composerThinking").hidden = false;
+        var parts = ["Dress me for today."];
+        if (composerOccasion) parts.push("Occasion: " + composerOccasion + ".");
+        parts.push("Pick one complete outfit from my wardrobe. Be decisive — this is the morning rush.");
+        var text = parts.join(" ");
+        getWeatherSummary().then(function (weather) {
+          var previousPick = null;
+          if (composerPicks.length) {
+            var last = composerPicks[composerPicks.length - 1].outfit;
+            if (last && last.itemIds) previousPick = { itemIds: last.itemIds.slice() };
+          }
+          return functions.httpsCallable("askStylist")({
+            items: stylistItems(),
+            messages: [{ role: "user", text: text }],
+            previousPick: previousPick,
+            vibe: detectVibeTag(text),
+            weatherContext: weather,
+            references: { articleIds: [], outfits: [] }
+          });
+        }).then(function (callRes) {
+          var outfit = callRes.data && callRes.data.outfit;
+          if (outfit && outfit.itemIds && outfit.itemIds.length >= 2) {
+            var wrap = { outfit: outfit };
+            var reply = callRes.data && callRes.data.reply;
+            if (reply) wrap.note = reply.length > 220 ? reply.slice(0, 220) + "…" : reply;
+            composerPicks.push(wrap);
+            renderComposerResults();
+          } else {
+            showToast("Hmm, couldn't put that together — try again?");
+          }
+        }).catch(function (err) {
+          showToast(friendlyError(err));
+        }).then(function () {
+          composerBusy = false;
+          document.getElementById("composerPick").disabled = false;
+          document.getElementById("composerThinking").hidden = true;
+        });
+      }
+      document.getElementById("composerButton").addEventListener("click", openComposer);
+      document.getElementById("composerClose").addEventListener("click", function () {
+        closeOverlay(document.getElementById("composerOverlay"));
+      });
+      document.getElementById("composerPick").addEventListener("click", composerPick);
+
+      // Sprint 14: "Surprise me" — two flavors, per founder decision.
+      // Rewear: weighted-random saved outfit, weight = days since last
+      // worn (never-worn = 365). Something new: chat, prefilled with an
+      // exploration-leaning prompt, auto-sent.
+      function surpriseWeight(lastWornMs) {
+        if (!lastWornMs) return 365; // never worn — strong candidate
+        var days = (Date.now() - lastWornMs) / 86400000;
+        return Math.max(1, days);
+      }
+      function surpriseRewear() {
+        if (!currentUser) return;
+        // latestOutfits(): latest version per versionGroup — no stale versions.
+        var cands = (typeof latestOutfits === "function" ? latestOutfits() : []).filter(function (o) {
+          return o && o.id && o.itemIds && o.itemIds.length >= 2;
+        });
+        if (!cands.length) { showToast("Save an outfit first — then I'll surprise you."); return; }
+        showToast("Picking from your saved outfits…");
+        db.collection("users").doc(currentUser.uid).collection("wear_events")
+          .orderBy("wornAt", "desc").limit(500).get()
+          .then(function (snap) {
+            var lastWorn = {};
+            snap.forEach(function (d) {
+              var w = d.data();
+              var oid = w.outfitId;
+              if (!oid || lastWorn[oid]) return;
+              var t = w.wornAt && w.wornAt.toDate ? w.wornAt.toDate().getTime() : 0;
+              if (t) lastWorn[oid] = t;
+            });
+            var total = 0;
+            var weights = cands.map(function (o) {
+              var w = surpriseWeight(lastWorn[o.id] || lastWorn[o.versionGroup]);
+              total += w;
+              return w;
+            });
+            var r = Math.random() * total;
+            var pick = cands[0];
+            for (var i = 0; i < cands.length; i++) {
+              r -= weights[i];
+              if (r <= 0) { pick = cands[i]; break; }
+            }
+            switchView("outfits");
+            openOutfit(pick.id);
+          })
+          .catch(function (err) { showToast(friendlyError(err)); });
+      }
+      document.getElementById("surpriseBtn").addEventListener("click", function () {
+        openOverlay(document.getElementById("surpriseSheet"));
+      });
+      document.getElementById("surpriseRewear").addEventListener("click", function () {
+        closeOverlay(document.getElementById("surpriseSheet"));
+        surpriseRewear();
+      });
+      document.getElementById("surpriseNew").addEventListener("click", function () {
+        closeOverlay(document.getElementById("surpriseSheet"));
+        openChat();
+        document.getElementById("chatInput").value =
+          "Surprise me — pick an outfit in a vibe I rarely wear, something unexpected.";
+        document.getElementById("chatForm").requestSubmit();
+      });
+
       // FB-1: in-app feedback. One textarea, autofocused so the keyboard
       // (and its dictation mic) is one tap away. Context is captured
       // automatically — the tester only writes what happened.
@@ -3279,9 +3496,10 @@
         var unk = document.getElementById("photoParseUnknown");
         unk.textContent = st.unknown.length ? "Not in your wardrobe: " + st.unknown.join("; ") : "";
         document.getElementById("photoParseSave").disabled = kept.length < 1;
+        document.getElementById("photoParseSaveWear").disabled = kept.length < 1;
       }
 
-      function savePhotoParseOutfit() {
+      function savePhotoParseOutfit(logWear) {
         var st = photoParseState;
         if (!st) return;
         var sel = st.matches.filter(function (m) { return !m.removed; }).map(function (m) { return m.itemId; });
@@ -3296,12 +3514,13 @@
             return;
           }
           var ref = db.collection("users").doc(currentUser.uid).collection("outfits").doc();
+          var names = sel.map(function (id) { var it = itemById(id); return it ? it.name : "Unknown item"; });
           ref.set({
             versionGroup: ref.id,
             version: 1,
             supersedes: null,
             itemIds: sel,
-            itemNames: sel.map(function (id) { var it = itemById(id); return it ? it.name : "Unknown item"; }),
+            itemNames: names,
             source: "photo",
             name: defaultOutfitName(sel),
             occasion: null,
@@ -3314,7 +3533,21 @@
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
           }).then(function () {
             closePhotoParse(false);
-            showToast("Outfit saved.");
+            showToast(logWear ? "Outfit saved — logged as worn today." : "Outfit saved.");
+            // Sprint 14: PC-13 remainder — photo doubles as the lowest-friction
+            // wear logger. Wear uses the same shape as the outfit view's wear button.
+            if (logWear) {
+              db.collection("users").doc(currentUser.uid).collection("wear_events").doc().set({
+                wornAt: firebase.firestore.FieldValue.serverTimestamp(),
+                articleIds: sel,
+                articleNames: names,
+                outfitId: ref.id,
+                occasion: null,
+                note: "",
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+              }).catch(function (err) { showToast(friendlyError(err)); });
+              recordVibeSignal(vibeDeltasForItems(sel, 0.04)); // Sprint 13: weak implicit signal
+            }
             switchView("outfits");
             openOutfit(ref.id);
           }).catch(function (err) {
@@ -4262,7 +4495,8 @@
       });
       document.getElementById("photoParseClose").addEventListener("click", function () { closePhotoParse(true); });
       document.getElementById("photoParseCancel").addEventListener("click", function () { closePhotoParse(true); });
-      document.getElementById("photoParseSave").addEventListener("click", savePhotoParseOutfit);
+      document.getElementById("photoParseSave").addEventListener("click", function () { savePhotoParseOutfit(false); });
+      document.getElementById("photoParseSaveWear").addEventListener("click", function () { savePhotoParseOutfit(true); });
       document.getElementById("builderClose").addEventListener("click", closeBuilder);
       document.getElementById("builderCancel").addEventListener("click", closeBuilder);
       document.getElementById("builderSave").addEventListener("click", function () {
@@ -4710,7 +4944,7 @@
         return "Outfit · " + new Date().toLocaleDateString(undefined, { month: "short", day: "numeric" });
       }
 
-      function saveChatOutfit(msg) {
+      function saveChatOutfit(msg, onDone) {
         var o = msg.outfit;
         if (!currentUser || !o || o.savedId || !o.itemIds) return;
         // PC-18: identical combination already saved → link to the existing
@@ -4748,6 +4982,7 @@
             renderChat();
             showToast("Outfit saved.");
             recordVibeSignal(vibeDeltasForItems(o.itemIds, 0.03)); // Sprint 13: endorsement, weakest signal
+            if (typeof onDone === "function") onDone();
           }).catch(function (err) {
             showToast(friendlyError(err));
           });
@@ -4756,7 +4991,7 @@
         });
       }
 
-      function renderOutfitCard(msg) {
+      function renderOutfitCard(msg, onSaved) {
         var o = msg.outfit;
         var card = document.createElement("div");
         card.className = "outfit-card";
@@ -4795,10 +5030,12 @@
         btn.className = o.savedId ? "secondary" : "primary";
         btn.textContent = o.savedId ? "Saved ✓ — view in Outfits" : "Save outfit";
         if (!o.savedId) {
-          btn.addEventListener("click", function () { saveChatOutfit(msg); });
+          btn.addEventListener("click", function () { saveChatOutfit(msg, onSaved); });
         } else {
           btn.addEventListener("click", function () {
             closeOverlay(chatOverlay);
+            var comp = document.getElementById("composerOverlay");
+            if (comp) closeOverlay(comp); // Sprint 14: same card reused by the composer
             switchView("outfits");
             openOutfit(o.savedId); // v1: versionGroup == doc id
           });
