@@ -375,7 +375,7 @@
         </button>
         <button class="secondary" id="bulkButton" type="button">Bulk add</button>
         <button class="secondary" id="shopCheckButton" type="button">Shop check</button>
-        <button class="secondary" id="composerButton" type="button" style="border-color:var(--accent);color:var(--accent-dark)">✨ Dress me today</button>
+        <button class="secondary" id="composerButton" type="button" style="border-color:var(--accent);color:var(--accent-dark)">✨ Pick an outfit</button>
       </div>
     </section>
 
@@ -432,22 +432,6 @@
         <input type="file" id="photoParseInput" accept="image/*" hidden>
         <input type="file" id="photoParseInputCamera" accept="image/*" capture="environment" hidden>
       </div>
-      <!-- Sprint 14: "What should I wear?" — the wear-the-wardrobe cluster.
-           Three jobs, labeled by intent: taste (composer), memory (rewear),
-           anti-taste (surprise). Icon-only dice retired — labels carry the
-           meaning. -->
-      <div id="wearCluster" style="margin:4px 0 12px;">
-        <p class="hint" style="margin:0 0 6px;">What should I wear?</p>
-        <button class="sheet-option" id="wearDressMe" type="button">
-          <span><span class="opt-title">✨ Dress me today</span><span class="opt-sub">A fresh pick for today's weather and your plans</span></span>
-        </button>
-        <button class="sheet-option" id="wearRewear" type="button">
-          <span><span class="opt-title">🎲 Rewear something</span><span class="opt-sub">Something you own but haven't worn in a while</span></span>
-        </button>
-        <button class="sheet-option" id="wearSurprise" type="button">
-          <span><span class="opt-title">🌀 Surprise me</span><span class="opt-sub">An unexpected pick, outside your usual vibe</span></span>
-        </button>
-      </div>
       <p class="hint" id="outfitsHint">Ask the stylist, build one yourself, or match a photo of an outfit — saved outfits land here.</p>
       <div class="gallery" id="outfitsGallery"></div>
     </section>
@@ -482,13 +466,13 @@
     </section>
   </div>
 
-  <!-- Sprint 14: "Dress me today" — one-tap morning pick. Client
+  <!-- Sprint 14: outfit composer ("Pick an outfit") — one-tap morning pick. Client
        orchestration around the existing askStylist callable; no new
        function. Occasion chips + WX-1 weather + vibe profile (server). -->
   <div class="overlay" id="composerOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="composerTitle">
     <section class="modal">
       <div class="modal-head">
-        <h2 id="composerTitle">Dress me today</h2>
+        <h2 id="composerTitle">Pick today's outfit</h2>
         <button class="icon-button" id="composerClose" type="button" aria-label="Close">×</button>
       </div>
       <div class="modal-body">
@@ -498,6 +482,23 @@
         <div id="composerThinking" class="hint" hidden style="margin-top:10px">Putting it together…</div>
         <div id="composerResults" style="margin-top:4px"></div>
       </div>
+    </section>
+  </div>
+
+  <!-- Sprint 14: hero "Pick an outfit" opens this — one entry point,
+       three labeled jobs (taste / memory / anti-taste). -->
+  <div class="overlay sheet-overlay" id="wearSheet" hidden role="dialog" aria-modal="true" aria-labelledby="wearSheetTitle">
+    <section class="sheet">
+      <h2 class="sheet-title" id="wearSheetTitle">What should I wear?</h2>
+      <button class="sheet-option" id="wearDressMe" type="button">
+        <span><span class="opt-title">✨ Pick today's outfit</span><span class="opt-sub">A fresh pick for today's weather and your plans</span></span>
+      </button>
+      <button class="sheet-option" id="wearRewear" type="button">
+        <span><span class="opt-title">🎲 Rewear something</span><span class="opt-sub">Something you own but haven't worn in a while</span></span>
+      </button>
+      <button class="sheet-option" id="wearSurprise" type="button">
+        <span><span class="opt-title">🌀 Surprise me</span><span class="opt-sub">An unexpected pick, outside your usual vibe</span></span>
+      </button>
     </section>
   </div>
 
@@ -2935,7 +2936,7 @@
       document.getElementById("chatClose").addEventListener("click", function () { closeOverlay(chatOverlay); });
       chatForm.addEventListener("submit", sendChat);
 
-      // Sprint 14: "Dress me today" — one-tap morning pick. Client
+      // Sprint 14: outfit composer ("Pick an outfit") — one-tap morning pick. Client
       // orchestration around the existing askStylist callable (no new
       // function): occasion chips + WX-1 weather + vibe profile (server)
       // → outfit card + up to 2 alternates. Save reuses saveChatOutfit
@@ -3049,7 +3050,6 @@
           document.getElementById("composerThinking").hidden = true;
         });
       }
-      document.getElementById("composerButton").addEventListener("click", openComposer);
       document.getElementById("composerClose").addEventListener("click", function () {
         closeOverlay(document.getElementById("composerOverlay"));
       });
@@ -3098,12 +3098,23 @@
           })
           .catch(function (err) { showToast(friendlyError(err)); });
       }
-      // Sprint 14: "What should I wear?" cluster — three jobs, one family.
-      // Taste: composer (hero button doubles as the front-door entry).
-      // Memory: weighted-random rewear. Anti-taste: exploration via chat.
-      document.getElementById("wearDressMe").addEventListener("click", openComposer);
-      document.getElementById("wearRewear").addEventListener("click", surpriseRewear);
+      // Sprint 14: "What should I wear?" — one entry point (hero button),
+      // three labeled jobs: taste (composer), memory (rewear),
+      // anti-taste (surprise via chat).
+      document.getElementById("composerButton").addEventListener("click", function () {
+        openOverlay(document.getElementById("wearSheet"));
+      });
+      function closeWearSheet() { closeOverlay(document.getElementById("wearSheet")); }
+      document.getElementById("wearDressMe").addEventListener("click", function () {
+        closeWearSheet();
+        openComposer();
+      });
+      document.getElementById("wearRewear").addEventListener("click", function () {
+        closeWearSheet();
+        surpriseRewear();
+      });
       document.getElementById("wearSurprise").addEventListener("click", function () {
+        closeWearSheet();
         openChat();
         document.getElementById("chatInput").value =
           "Surprise me — pick an outfit in a vibe I rarely wear, something unexpected.";
