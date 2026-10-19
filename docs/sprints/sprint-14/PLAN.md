@@ -21,13 +21,13 @@ chat, alternates carry the model's one-line reasoning as a caption.
 instead of photo → save → open outfit → "I wore this". Spec is in this
 plan; no separate design doc (small, no open questions).
 
-### 3. "Surprise me" (S)
-Dice button in the Outfits tab header. Founder decision 2026-10-18: both
-behaviors — (a) random rewear from saved outfits, weighted toward
-not-recently-worn (free, instant, serves the wear loop); (b) "something
-new" → stylist-generated with an exploration lean (one AI call). Dice
-does (a); the result card links to (b). Design detail: weighting formula
-(recency decay) and the exploration prompt line.
+### 3. "What should I wear?" cluster (S)
+Outfits tab: three labeled buttons — **Dress me today** (composer),
+**Rewear something** (weighted-random saved outfit, weight = days since
+worn, never-worn = 365), **Surprise me** (chat, exploration-leaning
+prompt, auto-sent). Founder design call 2026-10-18: icon-only dice
+retired (ambiguous), intent labeled before the tap; hero keeps its
+"Dress me today" as the front-door entry. Needs founder phone test.
 
 ## Needs-founder (not builds)
 - PC-29 Trips: validated 2026-10-18 — Sprint 15 candidate, ready for scoping.

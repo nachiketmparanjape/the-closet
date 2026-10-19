@@ -26,10 +26,11 @@ What went live. Momentum you can see.
 - **PC-13 remainder: photo-parse wear logging** — "Save + log worn
   today" in the photo-parse confirmation; same wear_event shape as the
   outfit view + vibe signal. Needs founder phone test.
-- **"Surprise me"** — 🎲 in the Outfits header; sheet with two flavors:
-  Rewear (weighted-random saved outfit, weight = days since worn,
-  never-worn = 365) and Something new (chat prefilled with an
-  exploration-leaning prompt, auto-sent). Needs founder phone test.
+- **"What should I wear?" cluster** — Outfits tab: Dress me today
+  (composer), Rewear something (weighted-random, recency decay),
+  Surprise me (chat, exploration-leaning prompt, auto-sent). Icon-only
+  dice retired per founder design call — intent labeled before the tap.
+  Needs founder phone test.
 
 ## Sprint 12 (2026-10-17 → )
 - **PC-28: Saved shop checks ("Shop list")** — shipped 2026-10-17/18.
