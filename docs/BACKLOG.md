@@ -55,6 +55,13 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
 
 ## Ideas (untriaged)
 
+- **Stylist as an agent (founder vision 2026-10-18):** chat as a first-class
+  interface to the whole app — some users live in the UI, others do
+  everything through the stylist (like Muse). Reads first (wardrobe
+  search, wear history), then writes (log wear, save/rate, edit items);
+  tool calls execute client-side against Firestore rules. Sequencing:
+  reads before writes; revisit when the stylist lane is solid. See
+  `docs/VISION.md` ("Long-term: the stylist as an agent").
 - **Bulk upload (one photo per article):** select N photos → N items created
   automatically, AI describes each, user reviews/edits afterwards. Matches
   the real cataloguing behavior (photograph 50 things, curate later) instead
