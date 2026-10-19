@@ -81,6 +81,12 @@
     h1 { margin: 0; max-width: 760px; font-family: "Closet Serif", serif; font-weight: 500; font-size: clamp(44px, 7.8vw, 104px); line-height: .94; letter-spacing: -.045em; }
     .hero-copy { padding-bottom: 7px; }
     .hero-copy p { margin: 0 0 24px; max-width: 420px; color: var(--muted); font-size: 16px; line-height: 1.65; }
+    /* Sprint 14: hero actions are an even row — equal widths, stretched
+       heights — so labels of different lengths (e.g. "Pick an outfit"
+       wrapping to 3 lines) can't make the row ragged. */
+    .hero-copy { display: flex; flex-wrap: wrap; gap: 10px; }
+    .hero-copy p { flex: 1 1 100%; }
+    .hero-copy .primary, .hero-copy .secondary { flex: 1 1 0; min-width: 0; }
     /* Sprint 10 UX: once the wardrobe is non-empty the hero compacts to a
        slim header — the full statement is for the empty state only. */
     .hero.hero-compact { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 24px; padding: 30px 0 10px; }
