@@ -505,6 +505,9 @@
       <button class="sheet-option" id="wearSurprise" type="button">
         <span><span class="opt-title">🌀 Surprise me</span><span class="opt-sub">An unexpected pick, outside your usual vibe</span></span>
       </button>
+      <button class="sheet-option sheet-cancel" id="wearCancel" type="button">
+        <span><span class="opt-title">Cancel</span></span>
+      </button>
     </section>
   </div>
 
@@ -3111,6 +3114,7 @@
         openOverlay(document.getElementById("wearSheet"));
       });
       function closeWearSheet() { closeOverlay(document.getElementById("wearSheet")); }
+      document.getElementById("wearCancel").addEventListener("click", closeWearSheet);
       document.getElementById("wearDressMe").addEventListener("click", function () {
         closeWearSheet();
         openComposer();
