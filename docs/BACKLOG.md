@@ -187,7 +187,7 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   for v1 — parked until the profile has real data.
 - **Spec:** `docs/PERSONALIZATION.md` ("Open: exploration vs. exploitation").
 
-### PC-29: Trips — travel packing recommendations (L) — Phase 1 IN SPRINT 15
+### PC-29: Trips — travel packing recommendations (L)
 - **Idea (founder 2026-10-18):** packing for travel is stressful; it needs
   weather × personal taste × local culture. Trips tab; trip objects
   (destinations + dates + notes, multi-leg in the model); packing list
@@ -198,10 +198,12 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   recorded 2026-10-18 (articles + outfits lists, day-by-day optional,
   simple UI; chat mode; single destination v1; trip-tagged shop items).
   Open thread: trip preference curation (bloat-aware design).
-- **Status:** Phase 1 shipped in Sprint 15 and founder-validated
-  2026-10-19 (design: `docs/sprints/sprint-15/TRIPS-PHASE1-DESIGN.md`).
-  **Phase 2 = next Trips update (founder, 2026-10-19):** packing
-  iteration is conversational — trip chat with a "talk to me for
-  changes" CTA on the trip detail replaces the blind Re-plan button;
-  re-plan prompts and keep/remove piece constraints are expressed in
-  chat, not as detail-view UI (design decision in the proposal).
+- **Status:** Phase 1 shipped in Sprint 15 and Phase 2 shipped in
+  Sprint 16 (both founder-validated 2026-10-19). Packing iteration is
+  conversational: the trip detail CTA "💬 Talk to me for changes" opens
+  trip chat, which rewrites the plan via the `updateTripPacking` tool
+  call; the blind Re-plan button is gone. Remaining: Phase 3
+  (trip-tagged shop items + unified trip view) and the trip-preference
+  curation open thread. Designs: `docs/sprints/sprint-15/
+  TRIPS-PHASE1-DESIGN.md`, `docs/sprints/sprint-16/
+  PHASE2-TRIP-CHAT-DESIGN.md`.
