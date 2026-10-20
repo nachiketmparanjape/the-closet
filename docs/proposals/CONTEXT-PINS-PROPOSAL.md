@@ -88,7 +88,44 @@ trip-scoped pins instead of a parallel system.
 
 ## Open questions
 
-1. Scope: locations/weather only, or general facts (trip, notes)
-   from the start?
-2. Confirm UX: inline chat card (recommended) vs. a quieter banner?
-3. Name in UI: "Current context"? Something else?
+*(Resolved with founder 2026-10-19 — see "Resolved scope" below.)*
+
+1. ~~Scope: locations/weather only, or general facts (trip, notes)
+   from the start?~~
+2. ~~Confirm UX: inline chat card (recommended) vs. a quieter banner?~~
+3. ~~Name in UI: "Current context"? Something else?~~
+4. ~~Trip auto-pinning: when you create a trip, should it *propose* a
+   location pin for those dates — or leave that out of v1?~~
+
+## Resolved scope (founder 2026-10-19)
+
+**1. Scope: location + weather + key preferences.** Beyond location
+and weather, the durable, slow-changing facts worth pinning for a
+wardrobe stylist:
+
+- **Temperature comfort** — runs cold / runs hot / neutral
+  (layering decisions).
+- **Default formality bias** — leans casual / leans dressed-up.
+- **Color loves & avoids** — e.g. loves earth tones, avoids neons.
+- **Fit preference** — relaxed / tailored, when relevant.
+- **Packing style** — light / generous (the founder's earlier
+  Paris-vs-Peru idea, now persistent).
+- **"Never suggest" list** — hard no's (e.g. shorts in winter).
+- **Activity kit** — owns ski gear / hiking boots (what's available
+  for trips).
+
+These are *stated* facts — a different layer from the *learned* vibe
+profile (Sprint 13). Stated beats learned when they conflict.
+
+**2. Confirm UX: inline chat card** (Bramble's recommendation,
+founder deferred). The pin is proposed where the conversation is —
+context is fresh, one tap, no navigation. A quieter banner would be
+easier to miss and the feature would die unused. Keep the card
+compact: label + detail + dates, [Save] [Dismiss].
+
+**3. Multiple locations: yes.** The model already holds many pins;
+one is *active* per kind. Trip-scoped pins (`tripId`) can be active
+alongside global ones, and auto-activate during the trip's dates.
+And yes — the app already uses given locations today: (a) phone
+geolocation → WX-1 chat weather, (b) trip destination → packing
+weather. Pins sit above both in the priority order.
