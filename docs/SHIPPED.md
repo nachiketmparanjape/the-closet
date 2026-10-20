@@ -35,7 +35,14 @@ What went live. Momentum you can see.
   📍 chip in the chat header for the active location pin, "Current
   context" list with Remove in the account overlay, quiet listener
   keeps both fresh. Server-side pin read is best-effort (logged to
-  OBS-1 on failure). Tests: `tests/context-pins.test.js` (8).
+  OBS-1 on failure). Tests: `tests/context-pins.test.js` (9) +
+  `tests/context-pins-client.test.js` (5).
+  Fix buffer 2026-10-19 (commit 3cdfbe6): pins can be *retracted*.
+  Proposals carry action save|remove; the prompt teaches the model to
+  propose "remove" with the pin's kind+label when the user says a
+  fact no longer holds (cancelled plans, back early). Client shows a
+  "Forget 'X'?" confirm naming the actual stored target; trip-scoped
+  pins are never touched by chat proposals.
 
 ## Sprint 15 (2026-10-19 → )
 - **PC-29 Phase 1: Trips — trip objects + packing list** — Trips tab;
