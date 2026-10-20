@@ -243,3 +243,19 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
     can be matched to the exact server call.
 - **Status:** Not started. Builds on OBS-1 (Sprint 15 fix buffer).
   Sprint candidate — pull at a planning walk.
+
+### PC-32: Chat threads — side chats per context (M)
+- **Idea (founder 2026-10-19):** one chat for everything mixes
+  contexts (a New York pin surfacing inside the Vancouver trip chat)
+  and breaks continuity (reopening a trip chat re-anchored a fresh
+  conversation). Threads = side chats: a general thread plus one
+  persistent thread per trip, each with its own history and its own
+  context scope — continuation of context at the right place, right
+  time.
+- **Design:** `docs/proposals/THREADS-PROPOSAL.md`. Interim
+  threads-lite shipped 2026-10-19 (session-scoped per-context
+  message lists, anchor-once, trip-mode pin scoping server +
+  chip). The full cut persists threads
+  (`users/{uid}/chat_threads/{threadId}`), resumes them across
+  reloads, and cleans up on trip delete.
+- **Status:** Not started (proposal stage). Sprint candidate.
