@@ -19,6 +19,16 @@ What went live. Momentum you can see.
   a shortlist, saves the outfit (source: "photo"). **Wear-logging half
   NOT shipped** — re-filed as its own cut (Sprint 14).
 
+## Sprint 15 (2026-10-19 → )
+- **PC-29 Phase 1: Trips — trip objects + packing list** — Trips tab;
+  trip CRUD (name, destination with geocoding, dates, notes); new
+  `planPacking` callable (one AI call: ranked articles with reasons +
+  2–3 outfits from packed articles, vibe profile as bias); per-leg
+  Open-Meteo forecast with honest beyond-window banner; packing saved as
+  a snapshot on the trip doc; outfits saveable via the chat's card
+  component. `tripId` field added to shopChecks rules (Phase 3 UI).
+  Needs founder phone test.
+
 ## Sprint 14 (2026-10-18)
 - **Outfit composer ("Dress me today")** — hero button; occasion chips;
   one-tap `askStylist` orchestration with WX-1 weather; main pick + up to

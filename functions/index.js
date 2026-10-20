@@ -22,6 +22,10 @@ const { reflectOutfit } = require("./reflect");
 const { critiqueOutfit } = require("./critique");
 const { parseOutfitPhoto } = require("./photo");
 const { shopCheck } = require("./shopcheck");
+// Sprint 15 (PC-29 Phase 1): trip packing. sanitizeItems/sanitizeVibeProfile
+// come from ./stylist (already imported above); only the trip-specific
+// pieces live here.
+const { planPacking, sanitizeTripInput } = require("./packing");
 // PC-11: every expected failure goes through the catalog; every failure
 // path logs with a correlation ID.
 const { fail, newCorrelationId, logError } = require("./errors");
@@ -273,6 +277,50 @@ exports.shopCheck = onCall(
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
       boundary("shopCheck", correlationId, uid, err);
+    }
+  }
+);
+
+// Sprint 15 (PC-29 Phase 1): trip packing. One AI call: ranked articles +
+// 2–3 outfits from the user's wardrobe for a trip leg. Auth mandatory;
+// the client sends its own item list (same trust model as askStylist).
+exports.planPacking = onCall(
+  {
+    region: "us-central1",
+    timeoutSeconds: 90,
+    memory: "512MiB",
+    maxInstances: 5,
+  },
+  async (request) => {
+    const correlationId = newCorrelationId();
+    const uid = request.auth ? request.auth.uid : null;
+    try {
+      if (!request.auth) {
+        fail("NOT_SIGNED_IN");
+      }
+      const data = request.data || {};
+      const items = sanitizeItems(data.items);
+      const trip = sanitizeTripInput(data);
+      if (!items.length) {
+        fail("EMPTY_WARDROBE");
+      }
+      if (!trip.leg) {
+        fail("BAD_REQUEST");
+      }
+      // Learned vibe profile, server-side best-effort (same as askStylist).
+      let vibeProfile = null;
+      try {
+        const userSnap = await getFirestore().collection("users").doc(uid).get();
+        if (userSnap.exists) {
+          vibeProfile = sanitizeVibeProfile(userSnap.data().vibeProfile);
+        }
+      } catch (e) {
+        logError("planPacking.vibeProfile", e, { uid: uid, correlationId: correlationId });
+      }
+      return await planPacking(items, trip.leg, trip.weatherSummary, trip.notes, vibeProfile);
+    } catch (err) {
+      if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
+      boundary("planPacking", correlationId, uid, err);
     }
   }
 );

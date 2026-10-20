@@ -15,6 +15,13 @@ service cloud.firestore {
       allow read, create, update, delete:
         if request.auth != null && request.auth.uid == userId;
     }
+    // Sprint 15 (PC-29 Phase 1): trips. Owner-only, full CRUD — the packing
+    // object is generated client-side from the planPacking callable and
+    // written as one field, so no per-field write restrictions.
+    match /users/{userId}/trips/{tripId} {
+      allow read, create, update, delete:
+        if request.auth != null && request.auth.uid == userId;
+    }
     match /users/{userId}/ratings/{ratingId} {
       allow read, create, update, delete:
         if request.auth != null && request.auth.uid == userId;
@@ -42,15 +49,18 @@ service cloud.firestore {
                 && request.resource.data.score <= 10))
         && (!("userNote" in request.resource.data) || (request.resource.data.userNote is string && request.resource.data.userNote.size() <= 500))
         && (!("link" in request.resource.data) || (request.resource.data.link is string && request.resource.data.link.size() <= 500))
-        && (!("sku" in request.resource.data) || (request.resource.data.sku is string && request.resource.data.sku.size() <= 100));
+        && (!("sku" in request.resource.data) || (request.resource.data.sku is string && request.resource.data.sku.size() <= 100))
+        // Sprint 15: trip tag (Phase 3 UI; field exists from day one).
+        && (!("tripId" in request.resource.data) || (request.resource.data.tripId == null || (request.resource.data.tripId is string && request.resource.data.tripId.size() <= 100)));
       allow update:
         if request.auth != null && request.auth.uid == userId
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(["userNote", "link", "sku", "status", "updatedAt", "addedItemId"])
+             .hasOnly(["userNote", "link", "sku", "status", "updatedAt", "addedItemId", "tripId"])
         && request.resource.data.status in ["considering", "bought", "dismissed"]
         && (!("userNote" in request.resource.data) || (request.resource.data.userNote is string && request.resource.data.userNote.size() <= 500))
         && (!("link" in request.resource.data) || (request.resource.data.link is string && request.resource.data.link.size() <= 500))
         && (!("sku" in request.resource.data) || (request.resource.data.sku is string && request.resource.data.sku.size() <= 100))
+        && (!("tripId" in request.resource.data) || (request.resource.data.tripId == null || (request.resource.data.tripId is string && request.resource.data.tripId.size() <= 100)))
         && (!("addedItemId" in request.resource.data) || (request.resource.data.addedItemId is string && request.resource.data.addedItemId.size() <= 100));
     }
     // Sprint 13: the learned vibe profile lives on the user doc itself

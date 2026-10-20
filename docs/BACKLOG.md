@@ -187,7 +187,7 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   for v1 — parked until the profile has real data.
 - **Spec:** `docs/PERSONALIZATION.md` ("Open: exploration vs. exploitation").
 
-### PC-29: Trips — travel packing recommendations (L) — VALIDATED, Sprint 15 candidate
+### PC-29: Trips — travel packing recommendations (L) — Phase 1 IN SPRINT 15
 - **Idea (founder 2026-10-18):** packing for travel is stressful; it needs
   weather × personal taste × local culture. Trips tab; trip objects
   (destinations + dates + notes, multi-leg in the model); packing list
@@ -198,4 +198,5 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   recorded 2026-10-18 (articles + outfits lists, day-by-day optional,
   simple UI; chat mode; single destination v1; trip-tagged shop items).
   Open thread: trip preference curation (bloat-aware design).
-- **Status:** validated; ready for scoping as Sprint 15.
+- **Status:** Phase 1 building in Sprint 15 (design:
+  `docs/sprints/sprint-15/TRIPS-PHASE1-DESIGN.md`, validated 2026-10-19).

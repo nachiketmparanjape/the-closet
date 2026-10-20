@@ -92,8 +92,24 @@ plan").
 
 ## Open questions for the founder
 
-1. 4th tab for Trips, or does it live somewhere else?
-2. Outfits in the packing: saveable (recommend — the component exists)
-   or display-only?
-3. Beyond-forecast trips: pack on climate normals with the honest banner
-   (recommend), or block until the 16-day window?
+*(All resolved 2026-10-19.)*
+
+1. 4th tab for Trips — **yes** (founder: clutter-concern noted, but it's
+   the right home; if a 5th top-level concept appears, nav gets
+   rethought then — not this sprint's problem).
+2. Outfits in the packing: **saveable**, same pattern as shop-check
+   outfits (founder: "similar to shop object").
+3. Beyond-forecast trips: **pack on climate normals with the honest
+   banner** — see explanation below.
+
+### What "beyond-forecast" means (founder asked 2026-10-19)
+
+Open-Meteo only forecasts ~16 days out. If the trip is further away
+(e.g. 2 months), there is no forecast to fetch. Two options were:
+(a) generate packing anyway from what the model knows about typical
+weather there ("Paris in November is usually 45–55°F and rainy"), with
+a banner saying the forecast isn't available yet — or (b) refuse until
+the trip is inside the 16-day window. Going with (a): blocking the whole
+feature for a far-off trip is the worse UX, and the banner keeps it
+honest. Re-tapping "Plan packing" closer to the date refreshes with the
+real forecast.

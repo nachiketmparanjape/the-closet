@@ -389,6 +389,7 @@
       <button class="tab active" type="button" data-view="wardrobe" role="tab" aria-selected="true">Wardrobe</button>
       <button class="tab" type="button" data-view="outfits" role="tab" aria-selected="false">Outfits</button>
       <button class="tab" type="button" data-view="shoplist" role="tab" aria-selected="false">Shop list</button>
+      <button class="tab" type="button" data-view="trips" role="tab" aria-selected="false">Trips</button>
     </div>
 
     <section aria-label="Wardrobe catalog" id="wardrobeView">
@@ -450,6 +451,16 @@
       <p class="hint">Items you've checked and saved — revisit them here before you buy.</p>
       <div class="gallery" id="shopListGallery"></div>
     </section>
+
+    <section aria-label="Trips" id="tripsView" hidden>
+      <div class="catalog-head">
+        <h2>Trips</h2>
+        <span class="count" id="tripCount">0 trips</span>
+        <button class="secondary" id="addTripBtn" type="button" style="margin-left:auto">+ New trip</button>
+      </div>
+      <p class="hint" id="tripsHint">Packing lists from your wardrobe, tuned to the weather where you're going.</p>
+      <div class="gallery" id="tripsGallery"></div>
+    </section>
   </main>
 
 
@@ -508,6 +519,68 @@
       <button class="sheet-option sheet-cancel" id="wearCancel" type="button">
         <span><span class="opt-title">Cancel</span></span>
       </button>
+    </section>
+  </div>
+
+  <!-- Sprint 15 (PC-29 Phase 1): trip create/edit. Destination is
+       geocoded on blur; the resolved name is shown for confirmation. -->
+  <div class="overlay" id="tripOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="tripTitle">
+    <section class="modal">
+      <div class="modal-head">
+        <h2 id="tripTitle">New trip</h2>
+        <button class="icon-button" id="tripClose" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="field">
+          <label for="tripName">Name</label>
+          <input id="tripName" type="text" placeholder="Paris Nov" maxlength="60" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="tripDest">Destination</label>
+          <input id="tripDest" type="text" placeholder="Paris" maxlength="120" autocomplete="off">
+        </div>
+        <p class="hint" id="tripResolved" hidden style="margin-top:-6px"></p>
+        <div style="display:flex;gap:8px;">
+          <div class="field" style="flex:1">
+            <label for="tripStart">Start</label>
+            <input id="tripStart" type="date">
+          </div>
+          <div class="field" style="flex:1">
+            <label for="tripEnd">End</label>
+            <input id="tripEnd" type="date">
+          </div>
+        </div>
+        <div class="field">
+          <label for="tripNotes">Notes</label>
+          <textarea id="tripNotes" rows="2" placeholder="client dinners, lots of walking" maxlength="500"></textarea>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <button class="secondary" id="tripCancel" type="button">Cancel</button>
+          <button class="primary" id="tripSave" type="button" style="flex:1">Save trip</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Sprint 15: trip detail — two flat lists (articles to pack, outfits),
+       per the founder's simplicity constraint. -->
+  <div class="overlay" id="tripDetailOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="tripDetailTitle">
+    <section class="modal">
+      <div class="modal-head">
+        <h2 id="tripDetailTitle">Trip</h2>
+        <button class="icon-button" id="tripDetailClose" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="hint" id="tripDetailMeta" style="margin-top:0"></p>
+        <p class="hint" id="tripDetailNotes" hidden></p>
+        <p class="hint" id="tripDetailWeather" hidden></p>
+        <div style="display:flex;gap:8px;margin:10px 0;">
+          <button class="primary" id="tripPlanBtn" type="button" style="flex:1">Plan packing</button>
+          <button class="secondary" id="tripDeleteBtn" type="button">Delete</button>
+        </div>
+        <div id="tripPlanThinking" class="hint" hidden>Planning your packing…</div>
+        <div id="tripPacking"></div>
+      </div>
     </section>
   </div>
 
@@ -3131,6 +3204,412 @@
         document.getElementById("chatForm").requestSubmit();
       });
 
+      // Sprint 15 (PC-29 Phase 1): trips. Trip objects + one-call packing.
+      // v1 UI is single-destination; legs is an array in the model from day one.
+      var allTrips = [];
+      var tripUnsub = null;
+      var activeTripId = null;
+      var tripGeo = null; // {name, lat, lng} from the last geocode
+      var tripGeoFor = ""; // destination text the geocode belongs to
+      var tripEditingId = null;
+
+      function watchTrips(user) {
+        if (tripUnsub) { tripUnsub(); tripUnsub = null; }
+        allTrips = [];
+        if (!user) { renderTrips(); return; }
+        tripUnsub = db.collection("users").doc(user.uid).collection("trips")
+          .orderBy("createdAt", "desc").limit(100)
+          .onSnapshot(function (snap) {
+            allTrips = snap.docs.filter(function (d) { return d.exists; })
+              .map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+            renderTrips();
+            if (activeTripId) renderTripDetail();
+          }, function (err) {
+            showToast(friendlyError(err));
+          });
+      }
+
+      function tripById(id) {
+        for (var i = 0; i < allTrips.length; i++) {
+          if (allTrips[i].id === id) return allTrips[i];
+        }
+        return null;
+      }
+
+      function fmtTripDates(leg) {
+        if (!leg || !leg.startDate) return "";
+        var s = new Date(leg.startDate + "T12:00:00");
+        var e = leg.endDate ? new Date(leg.endDate + "T12:00:00") : null;
+        var opts = { month: "short", day: "numeric" };
+        var out = s.toLocaleDateString(undefined, opts);
+        if (e && leg.endDate !== leg.startDate) out += " → " + e.toLocaleDateString(undefined, opts);
+        return out;
+      }
+
+      function renderTrips() {
+        var gallery = document.getElementById("tripsGallery");
+        var count = document.getElementById("tripCount");
+        gallery.textContent = "";
+        var n = allTrips.length;
+        count.textContent = n + (n === 1 ? " trip" : " trips");
+        document.getElementById("tripsHint").hidden = n > 0;
+        allTrips.forEach(function (t) {
+          var leg = (t.legs && t.legs[0]) || {};
+          var card = document.createElement("article");
+          card.className = "item";
+          card.setAttribute("role", "button");
+          card.setAttribute("tabindex", "0");
+          var title = document.createElement("h3");
+          title.textContent = t.name || "Untitled trip";
+          card.appendChild(title);
+          var sub = document.createElement("p");
+          sub.className = "hint";
+          sub.style.margin = "4px 0 0";
+          var bits = [];
+          if (leg.resolvedName || leg.location) bits.push(leg.resolvedName || leg.location);
+          var dates = fmtTripDates(leg);
+          if (dates) bits.push(dates);
+          if (t.packing && t.packing.articleIds) bits.push(t.packing.articleIds.length + " pieces packed");
+          sub.textContent = bits.join(" · ");
+          card.appendChild(sub);
+          function open() { openTripDetail(t.id); }
+          card.addEventListener("click", open);
+          card.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); }
+          });
+          gallery.appendChild(card);
+        });
+      }
+
+      // Open-Meteo geocoding (free, no key). Returns {name, lat, lng} or null.
+      function geocodeDestination(q) {
+        var url = "https://geocoding-api.open-meteo.com/v1/search?name=" +
+          encodeURIComponent(q) + "&count=1&language=en&format=json";
+        return fetch(url).then(function (res) {
+          if (!res.ok) return null;
+          return res.json();
+        }).then(function (data) {
+          var r = data && data.results && data.results[0];
+          if (!r) return null;
+          return {
+            name: r.name + (r.country && r.country !== r.name ? ", " + r.country : ""),
+            lat: r.latitude,
+            lng: r.longitude
+          };
+        }).catch(function () { return null; });
+      }
+
+      function renderTripResolved() {
+        var el = document.getElementById("tripResolved");
+        var dest = document.getElementById("tripDest").value.trim();
+        if (tripGeo && tripGeoFor === dest) {
+          el.textContent = "📍 " + tripGeo.name;
+          el.hidden = false;
+        } else {
+          el.hidden = true;
+        }
+      }
+
+      function openTripEditor(trip) {
+        tripEditingId = trip ? trip.id : null;
+        tripGeo = null;
+        tripGeoFor = "";
+        document.getElementById("tripTitle").textContent = trip ? "Edit trip" : "New trip";
+        var leg = (trip && trip.legs && trip.legs[0]) || {};
+        document.getElementById("tripName").value = trip ? (trip.name || "") : "";
+        document.getElementById("tripDest").value = leg.location || "";
+        document.getElementById("tripStart").value = leg.startDate || "";
+        document.getElementById("tripEnd").value = leg.endDate || "";
+        document.getElementById("tripNotes").value = trip ? (trip.notes || "") : "";
+        if (trip && leg.lat != null) {
+          tripGeo = { name: leg.resolvedName || leg.location, lat: leg.lat, lng: leg.lng };
+          tripGeoFor = leg.location || "";
+        }
+        renderTripResolved();
+        openOverlay(document.getElementById("tripOverlay"));
+      }
+
+      function saveTrip() {
+        if (!currentUser) return;
+        var name = document.getElementById("tripName").value.trim();
+        var dest = document.getElementById("tripDest").value.trim();
+        var start = document.getElementById("tripStart").value;
+        var end = document.getElementById("tripEnd").value || start;
+        var notes = document.getElementById("tripNotes").value.trim();
+        if (!dest) { showToast("Add a destination."); return; }
+        if (!start) { showToast("Pick start and end dates."); return; }
+        if (end < start) { showToast("End date is before the start date."); return; }
+        if (!name) name = dest;
+        var btn = document.getElementById("tripSave");
+        btn.disabled = true;
+        function done(geo) {
+          if (!geo) {
+            btn.disabled = false;
+            showToast("Couldn't find that place — check the spelling?");
+            return;
+          }
+          var leg = {
+            location: dest,
+            resolvedName: geo.name,
+            lat: geo.lat,
+            lng: geo.lng,
+            startDate: start,
+            endDate: end
+          };
+          var col = db.collection("users").doc(currentUser.uid).collection("trips");
+          var payload = {
+            name: name,
+            legs: [leg],
+            notes: notes,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          };
+          var op = tripEditingId
+            ? col.doc(tripEditingId).update(payload)
+            : col.add(Object.assign({
+                packing: null,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+              }, payload));
+          op.then(function () {
+            closeOverlay(document.getElementById("tripOverlay"));
+            showToast(tripEditingId ? "Trip updated." : "Trip saved.");
+          }).catch(function (err) {
+            showToast(friendlyError(err));
+          }).then(function () {
+            btn.disabled = false;
+          });
+        }
+        if (tripGeo && tripGeoFor === dest) {
+          done(tripGeo);
+        } else {
+          showToast("Finding " + dest + "…");
+          geocodeDestination(dest).then(done);
+        }
+      }
+
+      function openTripDetail(id) {
+        activeTripId = id;
+        renderTripDetail();
+        openOverlay(document.getElementById("tripDetailOverlay"));
+      }
+
+      function renderTripDetail() {
+        var trip = tripById(activeTripId);
+        var overlay = document.getElementById("tripDetailOverlay");
+        if (!trip) { closeOverlay(overlay); return; }
+        var leg = (trip.legs && trip.legs[0]) || {};
+        document.getElementById("tripDetailTitle").textContent = trip.name || "Trip";
+        var meta = [];
+        if (leg.resolvedName || leg.location) meta.push("📍 " + (leg.resolvedName || leg.location));
+        var dates = fmtTripDates(leg);
+        if (dates) meta.push(dates);
+        document.getElementById("tripDetailMeta").textContent = meta.join(" · ");
+        var notesEl = document.getElementById("tripDetailNotes");
+        if (trip.notes) { notesEl.textContent = trip.notes; notesEl.hidden = false; }
+        else notesEl.hidden = true;
+        var wEl = document.getElementById("tripDetailWeather");
+        if (trip.packing && trip.packing.weatherSnapshot) {
+          wEl.textContent = "🌤 " + trip.packing.weatherSnapshot;
+          wEl.hidden = false;
+        } else wEl.hidden = true;
+        document.getElementById("tripPlanBtn").textContent =
+          trip.packing ? "Re-plan packing" : "Plan packing";
+        renderTripPacking(trip);
+      }
+
+      function renderTripPacking(trip) {
+        var el = document.getElementById("tripPacking");
+        el.textContent = "";
+        var p = trip.packing;
+        if (!p || !p.articleIds || !p.articleIds.length) {
+          var empty = document.createElement("p");
+          empty.className = "hint";
+          empty.textContent = "No packing plan yet — tap “Plan packing”.";
+          el.appendChild(empty);
+          return;
+        }
+        if (p.reply) {
+          var reply = document.createElement("p");
+          reply.className = "hint";
+          reply.style.fontStyle = "italic";
+          reply.textContent = p.reply.length > 280 ? p.reply.slice(0, 280) + "…" : p.reply;
+          el.appendChild(reply);
+        }
+        var h1 = document.createElement("h3");
+        h1.style.margin = "12px 0 6px";
+        h1.textContent = "To pack (" + p.articleIds.length + ")";
+        el.appendChild(h1);
+        var reasons = p.articleReasons || {};
+        p.articleIds.forEach(function (id) {
+          var it = itemById(id);
+          if (!it) return;
+          var row = document.createElement("div");
+          row.style.cssText = "display:flex;gap:10px;align-items:center;margin:6px 0;";
+          var photos = itemPhotos(it);
+          if (photos.length && photos[0].url) {
+            var img = document.createElement("img");
+            img.src = photos[0].url;
+            img.alt = it.name || "item photo";
+            img.loading = "lazy";
+            img.style.cssText = "width:44px;height:44px;object-fit:cover;border-radius:8px;flex:none;";
+            row.appendChild(img);
+          }
+          var txt = document.createElement("div");
+          var nm = document.createElement("div");
+          nm.style.fontWeight = "600";
+          nm.textContent = it.name || "Untitled item";
+          txt.appendChild(nm);
+          if (reasons[id]) {
+            var rs = document.createElement("div");
+            rs.className = "hint";
+            rs.style.margin = "2px 0 0";
+            rs.textContent = reasons[id];
+            txt.appendChild(rs);
+          }
+          row.appendChild(txt);
+          el.appendChild(row);
+        });
+        var outfits = p.outfits || [];
+        if (outfits.length) {
+          var h2 = document.createElement("h3");
+          h2.style.margin = "16px 0 6px";
+          h2.textContent = "Outfits";
+          el.appendChild(h2);
+          outfits.forEach(function (o, i) {
+            var lbl = document.createElement("p");
+            lbl.className = "hint";
+            lbl.style.margin = "10px 0 0";
+            lbl.textContent = "Option " + (i + 1);
+            el.appendChild(lbl);
+            var wrap = { outfit: { itemIds: o.itemIds, reasoning: o.reasoning } };
+            el.appendChild(renderOutfitCard(wrap, renderTripDetail));
+            if (o.reasoning) {
+              var rc = document.createElement("p");
+              rc.className = "hint";
+              rc.style.margin = "4px 0 0";
+              rc.textContent = o.reasoning;
+              el.appendChild(rc);
+            }
+          });
+        }
+      }
+
+      // Open-Meteo daily forecast for the leg. Null when out of range
+      // (>16 days out) or on any failure — the server packs from climate
+      // normals then, with an honest banner.
+      function fetchLegWeather(leg) {
+        var today = new Date();
+        today.setHours(0, 0, 0, 0);
+        var start = new Date(leg.startDate + "T12:00:00");
+        if (Math.round((start - today) / 86400000) > 16) return Promise.resolve(null);
+        var url = "https://api.open-meteo.com/v1/forecast?latitude=" + leg.lat.toFixed(3) +
+          "&longitude=" + leg.lng.toFixed(3) +
+          "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max" +
+          "&temperature_unit=fahrenheit&timezone=auto" +
+          "&start_date=" + leg.startDate + "&end_date=" + leg.endDate;
+        return fetch(url).then(function (res) {
+          if (!res.ok) return null;
+          return res.json();
+        }).then(function (data) {
+          var d = data && data.daily;
+          if (!d || !d.temperature_2m_max || !d.temperature_2m_max.length) return null;
+          var hi = Math.round(Math.max.apply(null, d.temperature_2m_max));
+          var lo = Math.round(Math.min.apply(null, d.temperature_2m_min));
+          var rain = Math.max.apply(null, d.precipitation_probability_max || [0]);
+          var s = "highs " + hi + "°F, lows " + lo + "°F";
+          if (rain >= 40) s += ", rain likely";
+          else if (rain >= 20) s += ", slight rain chance";
+          return { summary: s };
+        }).catch(function () { return null; });
+      }
+
+      function planPackingForTrip() {
+        var trip = tripById(activeTripId);
+        if (!trip || !currentUser || !functions) return;
+        var leg = (trip.legs && trip.legs[0]) || {};
+        if (leg.lat == null) { showToast("This trip has no location."); return; }
+        if (trip.packing && !window.confirm("Replace the current packing plan?")) return;
+        var btn = document.getElementById("tripPlanBtn");
+        btn.disabled = true;
+        document.getElementById("tripPlanThinking").hidden = false;
+        fetchLegWeather(leg).then(function (w) {
+          var weatherSummary = w ? w.summary : null;
+          return functions.httpsCallable("planPacking")({
+            items: stylistItems(),
+            leg: {
+              location: leg.location,
+              resolvedName: leg.resolvedName,
+              lat: leg.lat,
+              lng: leg.lng,
+              startDate: leg.startDate,
+              endDate: leg.endDate
+            },
+            weatherSummary: weatherSummary,
+            notes: trip.notes || ""
+          }).then(function (res) {
+            var articles = (res.data && res.data.articles) || [];
+            var reasons = {};
+            articles.forEach(function (a) { reasons[a.id] = a.reason || ""; });
+            var packing = {
+              articleIds: articles.map(function (a) { return a.id; }),
+              articleReasons: reasons,
+              outfits: (res.data && res.data.outfits) || [],
+              reply: (res.data && res.data.reply) || "",
+              weatherSnapshot: weatherSummary ||
+                "Forecast not available yet — packed for typical weather",
+              forecastAvailable: !!w,
+              generatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            return db.collection("users").doc(currentUser.uid)
+              .collection("trips").doc(trip.id)
+              .update({
+                packing: packing,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+              });
+          });
+        }).then(function () {
+          showToast("Packing plan ready.");
+        }).catch(function (err) {
+          showToast(friendlyError(err));
+        }).then(function () {
+          btn.disabled = false;
+          document.getElementById("tripPlanThinking").hidden = true;
+        });
+      }
+
+      document.getElementById("addTripBtn").addEventListener("click", function () { openTripEditor(null); });
+      document.getElementById("tripClose").addEventListener("click", function () { closeOverlay(document.getElementById("tripOverlay")); });
+      document.getElementById("tripCancel").addEventListener("click", function () { closeOverlay(document.getElementById("tripOverlay")); });
+      document.getElementById("tripSave").addEventListener("click", saveTrip);
+      document.getElementById("tripDest").addEventListener("change", function () {
+        var q = document.getElementById("tripDest").value.trim();
+        if (!q) { tripGeo = null; renderTripResolved(); return; }
+        showToast("Finding " + q + "…");
+        geocodeDestination(q).then(function (g) {
+          tripGeo = g;
+          tripGeoFor = q;
+          renderTripResolved();
+          if (!g) showToast("Couldn't find that place — check the spelling?");
+        });
+      });
+      document.getElementById("tripDetailClose").addEventListener("click", function () {
+        activeTripId = null;
+        closeOverlay(document.getElementById("tripDetailOverlay"));
+      });
+      document.getElementById("tripPlanBtn").addEventListener("click", planPackingForTrip);
+      document.getElementById("tripDeleteBtn").addEventListener("click", function () {
+        var trip = tripById(activeTripId);
+        if (!trip || !currentUser) return;
+        if (!window.confirm('Delete "' + (trip.name || "this trip") + '"?')) return;
+        db.collection("users").doc(currentUser.uid).collection("trips").doc(trip.id).delete()
+          .then(function () {
+            activeTripId = null;
+            closeOverlay(document.getElementById("tripDetailOverlay"));
+            showToast("Trip deleted.");
+          }).catch(function (err) {
+            showToast(friendlyError(err));
+          });
+      });
+
       // FB-1: in-app feedback. One textarea, autofocused so the keyboard
       // (and its dictation mic) is one tap away. Context is captured
       // automatically — the tester only writes what happened.
@@ -3279,6 +3758,7 @@
         document.getElementById("wardrobeView").hidden = view !== "wardrobe";
         document.getElementById("outfitsView").hidden = view !== "outfits";
         document.getElementById("shopListView").hidden = view !== "shoplist";
+        document.getElementById("tripsView").hidden = view !== "trips";
       }
       document.querySelectorAll(".tab").forEach(function (t) {
         t.addEventListener("click", function () { switchView(t.getAttribute("data-view")); });
@@ -5098,6 +5578,7 @@
             watchItems(user);
             watchOutfits(user); // PC-12
             watchShopChecks(user); // PC-28
+            watchTrips(user); // Sprint 15 (PC-29 Phase 1)
           });
         } catch (error) {
           configured = false;
