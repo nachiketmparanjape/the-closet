@@ -3531,20 +3531,25 @@
         var btn = document.getElementById("tripPlanBtn");
         btn.disabled = true;
         document.getElementById("tripPlanThinking").hidden = false;
-        fetchLegWeather(leg).then(function (w) {
-          var weatherSummary = w ? w.summary : null;
-          return functions.httpsCallable("planPacking")({
-            items: stylistItems(),
-            leg: {
-              location: leg.location,
-              resolvedName: leg.resolvedName,
-              lat: leg.lat,
-              lng: leg.lng,
-              startDate: leg.startDate,
-              endDate: leg.endDate
-            },
-            weatherSummary: weatherSummary,
-            notes: trip.notes || ""
+        // One automatic retry: a brand-new function's cold start can fail
+        // opaquely at the transport layer; the second attempt is warm.
+        function attempt(retried) {
+          var weather = null;
+          return fetchLegWeather(leg).then(function (w) {
+            weather = w;
+            return functions.httpsCallable("planPacking")({
+              items: stylistItems(),
+              leg: {
+                location: leg.location,
+                resolvedName: leg.resolvedName,
+                lat: leg.lat,
+                lng: leg.lng,
+                startDate: leg.startDate,
+                endDate: leg.endDate
+              },
+              weatherSummary: w ? w.summary : null,
+              notes: trip.notes || ""
+            });
           }).then(function (res) {
             var articles = (res.data && res.data.articles) || [];
             var reasons = {};
@@ -3554,9 +3559,9 @@
               articleReasons: reasons,
               outfits: (res.data && res.data.outfits) || [],
               reply: (res.data && res.data.reply) || "",
-              weatherSnapshot: weatherSummary ||
+              weatherSnapshot: (weather && weather.summary) ||
                 "Forecast not available yet — packed for typical weather",
-              forecastAvailable: !!w,
+              forecastAvailable: !!weather,
               generatedAt: firebase.firestore.FieldValue.serverTimestamp()
             };
             return db.collection("users").doc(currentUser.uid)
@@ -3565,10 +3570,15 @@
                 packing: packing,
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
               });
+          }).catch(function (err) {
+            if (!retried) return attempt(true);
+            throw err;
           });
-        }).then(function () {
+        }
+        attempt(false).then(function () {
           showToast("Packing plan ready.");
         }).catch(function (err) {
+          if (typeof reportError === "function") reportError("planPackingForTrip", err);
           showToast(friendlyError(err));
         }).then(function () {
           btn.disabled = false;

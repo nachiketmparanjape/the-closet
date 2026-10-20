@@ -287,7 +287,9 @@ exports.shopCheck = onCall(
 exports.planPacking = onCall(
   {
     region: "us-central1",
-    timeoutSeconds: 90,
+    // Packing is not latency-sensitive: generous timeout for cold starts
+    // (first invocation loads the model SDK) plus the model call itself.
+    timeoutSeconds: 300,
     memory: "512MiB",
     maxInstances: 5,
   },
