@@ -421,7 +421,12 @@ function sanitizePinProposal(obj) {
   if (!kinds[kind]) return null;
   const label = cleanText(obj.label || "", 80);
   if (!label) return null;
+  // Sprint 17 fix buffer: proposals can retract as well as save. "remove"
+  // targets a pin the user says no longer holds (cancelled plans, back
+  // early) — the client always confirms before deleting.
+  const action = obj.action === "remove" ? "remove" : "save";
   return {
+    action: action,
     kind: kind,
     label: label,
     detail: cleanText(obj.detail || "", 200),
@@ -438,8 +443,9 @@ const PIN_CONTEXT_DECL = {
   parameters: {
     type: "OBJECT",
     properties: {
+      action: { type: "STRING", description: "\"save\" to remember a fact, \"remove\" when the user says a pinned fact no longer holds (cancelled plans, back early)" },
       kind: { type: "STRING", description: "One of: location, weather, preference" },
-      label: { type: "STRING", description: "Short label, e.g. 'Tahoe'" },
+      label: { type: "STRING", description: "Short label, e.g. 'Tahoe' — for \"remove\", the label of the existing pin from CURRENT CONTEXT" },
       detail: { type: "STRING", description: "What it means, e.g. 'visiting, back Sunday'" },
       weatherSummary: { type: "STRING", description: "Weather for this fact, if relevant, e.g. '28–34°F, snowing'" },
       validUntil: { type: "STRING", description: "Expiry as YYYY-MM-DD, if the fact has an end date" },
@@ -692,13 +698,16 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
   // proposals — the client always confirms before saving.
   if (!tripContext) {
     system += "\n\nCONTEXT PIN PROPOSAL — you may return at most one \"pinProposal\" in the JSON alongside reply/outfit:\n" +
-      "{ \"kind\": \"location|weather|preference\", \"label\": \"<short>\", \"detail\": \"<what it means>\",\n" +
+      "{ \"action\": \"save|remove\", \"kind\": \"location|weather|preference\", \"label\": \"<short>\", \"detail\": \"<what it means>\",\n" +
       "  \"weatherSummary\": \"<if relevant>\", \"validUntil\": \"<YYYY-MM-DD if it ends>\" }.\n" +
-      "- Propose ONLY for NEW durable facts the user just stated and that are NOT already in CURRENT CONTEXT above.\n" +
+      "- \"save\": propose ONLY for NEW durable facts the user just stated and that are NOT already in CURRENT CONTEXT above.\n" +
+      "- \"remove\": if a fact in CURRENT CONTEXT no longer holds — the user says plans were cancelled, they're back " +
+      "early, or the fact changed — propose \"remove\" with that pin's kind and label from CURRENT CONTEXT. " +
+      "If it changed to something new, propose the replacement as \"save\" instead.\n" +
       "- Location/weather: where they'll be / what weather they'll be in. Preference: lasting facts " +
       "(runs cold, leans casual, loves earth tones, never suggest X, packing style, owns ski gear).\n" +
       "- Extract end dates from speech (\"until Sunday\" → that date). Skip trivia and one-off requests.\n" +
-      "- Never propose on your own initiative — only when the user states the fact. Propose, never append.";
+      "- Never propose on your own initiative — only when the user states the fact or its end. Propose, never append.";
   }
   for (const m of messages) {
     contents.push({ role: m.role, parts: [{ text: m.text }] });
@@ -754,8 +763,10 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
       "- WEATHER DEFAULT: score everything against the packing weather above. If the user states different weather " +
       "for this trip, that wins going forward.\n" +
       "- PIN PROPOSAL: if the user states a durable fact (a location they'll be in, weather they'll face, a lasting " +
-      "preference), call the pinContext tool to PROPOSE saving it. The user confirms before anything is saved — " +
-      "you only propose, and only when they state the fact. Never propose on your own initiative.";
+      "preference), call the pinContext tool to PROPOSE saving it (action \"save\"). If a fact in CURRENT CONTEXT no " +
+      "longer holds — plans cancelled, back early — call pinContext with action \"remove\" and that pin's kind + label. " +
+      "The user confirms before anything changes — you only propose, and only when they state the fact or its end. " +
+      "Never propose on your own initiative.";
   }
   const config = {
     systemInstruction: system,

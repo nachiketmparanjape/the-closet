@@ -2907,15 +2907,19 @@
             chatList.appendChild(renderOutfitCard(m));
           }
           // Sprint 17 (CONTEXT PINS): proposal confirm card — propose,
-          // never append. The user taps Save or Dismiss.
-          if (m.pinProposal && m.pinState === "pending") {
+          // never append. The user taps Save or Dismiss. A removal card
+          // only renders if it actually targets a stored pin.
+          if (m.pinProposal && m.pinState === "pending" &&
+              (m.pinProposal.action !== "remove" ||
+               matchingPins(allPins, m.pinProposal).length)) {
             chatList.appendChild(renderPinProposalCard(m));
           }
         });
         chatList.scrollTop = chatList.scrollHeight;
       }
 
-      // Sprint 17: inline confirm card for a pin proposal.
+      // Sprint 17: inline confirm card for a pin proposal. "save" asks to
+      // remember; "remove" asks to forget (cancelled plans, back early).
       function renderPinProposalCard(m) {
         var p = m.pinProposal;
         var card = document.createElement("div");
@@ -2923,14 +2927,23 @@
         var icons = { location: "📍", weather: "🌤", preference: "⚙️" };
         var head = document.createElement("p");
         head.className = "pin-proposal-head";
-        head.textContent = (icons[p.kind] || "📌") + " Remember as current " + p.kind + "?";
-        card.appendChild(head);
-        var body = document.createElement("p");
-        body.className = "hint";
         var bits = [p.label];
         if (p.detail) bits.push(p.detail);
         if (p.weatherSummary) bits.push(p.weatherSummary);
         if (p.validUntil) bits.push("until " + p.validUntil);
+        if (p.action === "remove") {
+          // Name the pins that will actually be deleted — matching can
+          // fall back to a differently-named pin, so show the true target.
+          var targets = matchingPins(allPins, p);
+          head.textContent = "🗑 Forget “" +
+            targets.map(function (t) { return t.label; }).join(", ") + "”?";
+          bits = ["This " + p.kind + " no longer applies."];
+        } else {
+          head.textContent = (icons[p.kind] || "📌") + " Remember as current " + p.kind + "?";
+        }
+        card.appendChild(head);
+        var body = document.createElement("p");
+        body.className = "hint";
         body.textContent = bits.join(" — ");
         card.appendChild(body);
         var row = document.createElement("div");
@@ -2938,7 +2951,7 @@
         var save = document.createElement("button");
         save.className = "primary";
         save.type = "button";
-        save.textContent = "Save";
+        save.textContent = p.action === "remove" ? "Forget it" : "Save";
         save.addEventListener("click", function () { savePinProposal(m); });
         var dismiss = document.createElement("button");
         dismiss.type = "button";
@@ -2953,30 +2966,58 @@
         return card;
       }
 
+      // Sprint 17: which stored pins a proposal targets. Same kind, and
+      // trip-scoped pins are never touched by chat proposals. The label
+      // matches case-insensitively (the model quotes CURRENT CONTEXT, so
+      // it's usually exact); if the label matches nothing but exactly one
+      // pin of that kind exists, that one is the target. Pure — tested.
+      function matchingPins(pins, proposal) {
+        var sameKind = (pins || []).filter(function (p) {
+          return p && p.kind === proposal.kind && !p.tripId;
+        });
+        if (!proposal.label) return sameKind; // save flow: replace all
+        var byLabel = sameKind.filter(function (p) {
+          return String(p.label || "").toLowerCase() === String(proposal.label).toLowerCase();
+        });
+        if (byLabel.length) return byLabel;
+        if (sameKind.length === 1) return sameKind; // fuzzy single
+        return [];
+      }
+
       // Sprint 17: saves a confirmed pin. One active pin per kind — a new
       // global pin replaces same-kind global pins (trip-scoped ones stay).
+      // A "remove" proposal deletes the matching pins instead.
       function savePinProposal(m) {
         var p = m.pinProposal;
         if (!p || !currentUser) return;
         var col = db.collection("users").doc(currentUser.uid).collection("context_pins");
-        var olds = (allPins || []).filter(function (x) {
-          return x.kind === p.kind && !x.tripId;
-        });
-        Promise.all(olds.map(function (x) {
-          return col.doc(x.id).delete().catch(function () {});
-        })).then(function () {
-          return col.add({
-            kind: p.kind,
-            label: p.label,
-            detail: p.detail || "",
-            weatherSummary: p.weatherSummary || "",
-            validUntil: p.validUntil || null,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        var done, failMsg;
+        if (p.action === "remove") {
+          var targets = matchingPins(allPins, p);
+          done = Promise.all(targets.map(function (x) {
+            return col.doc(x.id).delete().catch(function () {});
+          }));
+          failMsg = "Removed — I won't use that anymore.";
+        } else {
+          var olds = matchingPins(allPins, { kind: p.kind });
+          done = Promise.all(olds.map(function (x) {
+            return col.doc(x.id).delete().catch(function () {});
+          })).then(function () {
+            return col.add({
+              kind: p.kind,
+              label: p.label,
+              detail: p.detail || "",
+              weatherSummary: p.weatherSummary || "",
+              validUntil: p.validUntil || null,
+              createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
           });
-        }).then(function () {
+          failMsg = "Saved — I'll remember that.";
+        }
+        done.then(function () {
           m.pinState = "saved";
-          showToast("Saved — I'll remember that.");
+          showToast(failMsg);
         }).catch(function (err) {
           if (typeof reportError === "function") reportError("savePinProposal", err);
           showToast(friendlyError(err));

@@ -47,6 +47,13 @@ describe("sanitizePinProposal", () => {
     assert.equal(sanitizePinProposal({ kind: "mood", label: "x" }), null);
     assert.equal(sanitizePinProposal(null), null);
   });
+  test("action defaults to save; remove is preserved", () => {
+    assert.equal(sanitizePinProposal({ kind: "location", label: "NY" }).action, "save");
+    assert.equal(
+      sanitizePinProposal({ kind: "location", label: "NY", action: "remove" }).action, "remove");
+    assert.equal(
+      sanitizePinProposal({ kind: "location", label: "NY", action: "nuke" }).action, "save");
+  });
 });
 
 describe("pin prompt injection", () => {
@@ -67,9 +74,11 @@ describe("pin prompt injection", () => {
     assert.ok(sys.includes("outranks the measured"));
     assert.ok(sys.includes("Conversation-stated weather still outranks it"));
   });
-  test("normal mode gets the proposal contract", () => {
+  test("normal mode gets the proposal contract, incl. retraction", () => {
     assert.ok(sys.includes("CONTEXT PIN PROPOSAL"));
     assert.ok(sys.includes("pinProposal"));
+    assert.ok(sys.includes("\"remove\""));
+    assert.ok(sys.includes("no longer holds"));
   });
   test("trip mode gets the pinContext tool", () => {
     const req = buildStylistRequest([], [], null, null, null, null, null, null,
