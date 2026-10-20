@@ -11,8 +11,10 @@ curation (founder rule).
 
 ## Cards
 
-1. CONTEXT-1 Context pins — M, shipped, awaiting phone validation
-   (proposal: `docs/proposals/CONTEXT-PINS-PROPOSAL.md`).
+### 1. CONTEXT-1 Context pins (M)
+
+Shipped — awaiting phone validation. Proposal:
+`docs/proposals/CONTEXT-PINS-PROPOSAL.md`.
 
 ## What's in
 
