@@ -17,7 +17,7 @@ const { initializeApp } = require("firebase-admin/app");
 const { getStorage } = require("firebase-admin/storage");
 const { getFirestore } = require("firebase-admin/firestore");
 const { describeImage } = require("./describe");
-const { askStylist, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext } = require("./stylist");
+const { askStylist, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins } = require("./stylist");
 const { reflectOutfit } = require("./reflect");
 const { critiqueOutfit } = require("./critique");
 const { parseOutfitPhoto } = require("./photo");
@@ -152,6 +152,17 @@ exports.askStylist = onCall(
       } catch (e) {
         logError("askStylist.vibeProfile", e, { uid: uid, correlationId: correlationId });
       }
+      // Sprint 17 (CONTEXT PINS): confirmed current facts, read
+      // server-side best-effort like the vibe profile. Expiry filtering
+      // happens in buildStylistRequest (a pin past its date is ignored).
+      let pins = [];
+      try {
+        const pinsSnap = await getFirestore()
+          .collection("users").doc(uid).collection("context_pins").limit(20).get();
+        pins = sanitizePins(pinsSnap.docs.map((d) => d.data()));
+      } catch (e) {
+        logError("askStylist.contextPins", e, { uid: uid, correlationId: correlationId });
+      }
       if (!items.length) {
         fail("EMPTY_WARDROBE");
       }
@@ -173,7 +184,7 @@ exports.askStylist = onCall(
       } catch (e) {
         logError("askStylist.styleProfile", e, { uid: uid, correlationId: correlationId });
       }
-      return finish("askStylist", correlationId, uid, start, await askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext));
+      return finish("askStylist", correlationId, uid, start, await askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins));
     } catch (err) {
       // Any failure inside askStylist is a downstream AI failure.
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";

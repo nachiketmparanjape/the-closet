@@ -379,8 +379,74 @@ function parseStylistJson(text) {
       scores: scores,
     };
   }
-  return { reply: reply, outfit: outfit };
+  // Sprint 17: optional pin proposal — the model may surface one durable
+  // fact per message. Sanitized; the client confirms before saving.
+  const proposal = sanitizePinProposal(obj.pinProposal);
+  return { reply: reply, outfit: outfit, pinProposal: proposal };
 }
+
+// Sprint 17 (CONTEXT PINS): stored current facts the user confirmed.
+// Server-side best-effort read; malformed entries drop.
+function sanitizePins(raw) {
+  if (!Array.isArray(raw)) return [];
+  const kinds = { location: 1, weather: 1, preference: 1 };
+  const out = [];
+  for (const p of raw.slice(0, 20)) {
+    if (!p || typeof p !== "object") continue;
+    const kind = typeof p.kind === "string" ? p.kind : "";
+    if (!kinds[kind]) continue;
+    const label = cleanText(p.label || "", 80);
+    if (!label) continue;
+    const validUntil = /^\d{4}-\d{2}-\d{2}$/.test(p.validUntil || "") ? p.validUntil : "";
+    out.push({
+      kind: kind,
+      label: label,
+      detail: cleanText(p.detail || "", 200),
+      weatherSummary: cleanText(p.weatherSummary || "", 200),
+      validUntil: validUntil,
+      tripId: typeof p.tripId === "string" ? cleanText(p.tripId, 100) : "",
+    });
+  }
+  return out;
+}
+
+// Sprint 17: a proposed pin — from the JSON contract (normal chat) or
+// the pinContext tool call (trip mode). Returns the sanitized proposal
+// or null. The client always confirms before saving: propose, never
+// append.
+function sanitizePinProposal(obj) {
+  if (!obj || typeof obj !== "object") return null;
+  const kinds = { location: 1, weather: 1, preference: 1 };
+  const kind = typeof obj.kind === "string" ? obj.kind : "";
+  if (!kinds[kind]) return null;
+  const label = cleanText(obj.label || "", 80);
+  if (!label) return null;
+  return {
+    kind: kind,
+    label: label,
+    detail: cleanText(obj.detail || "", 200),
+    weatherSummary: cleanText(obj.weatherSummary || "", 200),
+    validUntil: /^\d{4}-\d{2}-\d{2}$/.test(obj.validUntil || "") ? obj.validUntil : "",
+  };
+}
+
+// Sprint 17: the propose-a-pin tool (trip mode). Propose-only — the
+// client shows a confirm card; nothing is ever written by the model.
+const PIN_CONTEXT_DECL = {
+  name: "pinContext",
+  description: "Propose saving a durable current fact about the user (location, weather they'll be in, or a lasting preference). The user confirms before anything is saved — proposing is all you do.",
+  parameters: {
+    type: "OBJECT",
+    properties: {
+      kind: { type: "STRING", description: "One of: location, weather, preference" },
+      label: { type: "STRING", description: "Short label, e.g. 'Tahoe'" },
+      detail: { type: "STRING", description: "What it means, e.g. 'visiting, back Sunday'" },
+      weatherSummary: { type: "STRING", description: "Weather for this fact, if relevant, e.g. '28–34°F, snowing'" },
+      validUntil: { type: "STRING", description: "Expiry as YYYY-MM-DD, if the fact has an end date" },
+    },
+    required: ["kind", "label"],
+  },
+};
 
 // Sprint 16 (TRIPCHAT-1): trip chat context. The client sends the trip
 // + its current packing; everything is length-clamped and the packing
@@ -511,7 +577,7 @@ function handleIndex(handle, items) {
 // Build the exact model request askStylist sends. Exported so the
 // benchmark runner (tests/benchmark) exercises the real prompt —
 // prompt changes and benchmark stay in sync by construction.
-function buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext) {
+function buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins) {
   const model = process.env.GEMINI_MODEL || MODEL_VERSION;
   const wardrobe = items.map((it, i) => itemLine(it, i)).join("\n");
   let system = SYSTEM;
@@ -600,6 +666,40 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
       "- A bias, never a filter: a great non-matching outfit still beats a mediocre matching one.\n" +
       "- You may acknowledge it at most once per conversation; never lecture about it.";
   }
+  // Sprint 17 (CONTEXT PINS): the user's confirmed current facts.
+  // Outrank the measured weather; conversation-stated weather still
+  // outranks them. Expired pins are ignored here (cleanup is quiet).
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const activePins = (Array.isArray(pins) ? pins : []).filter(
+    (p) => !p.validUntil || p.validUntil >= todayStr
+  );
+  if (activePins.length) {
+    const pinLines = activePins.map((p) => {
+      let line = "- [" + p.kind + "] " + p.label;
+      if (p.detail) line += " — " + p.detail;
+      if (p.weatherSummary) line += " (weather: " + p.weatherSummary + ")";
+      if (p.validUntil) line += " [until " + p.validUntil + "]";
+      return line;
+    });
+    system += "\n\nCURRENT CONTEXT — durable facts the user confirmed. " +
+      "Treat them as true for the whole conversation unless the user says otherwise.\n" +
+      pinLines.join("\n") + "\n" +
+      "- An active location/weather pin is the DEFAULT weather and location for scoring — " +
+      "it outranks the measured CURRENT WEATHER above. Conversation-stated weather still outranks it.";
+  }
+  // Sprint 17: pin proposals. The user states durable facts in chat
+  // ("I'm in Tahoe until Sunday", "I run cold"); surface them as
+  // proposals — the client always confirms before saving.
+  if (!tripContext) {
+    system += "\n\nCONTEXT PIN PROPOSAL — you may return at most one \"pinProposal\" in the JSON alongside reply/outfit:\n" +
+      "{ \"kind\": \"location|weather|preference\", \"label\": \"<short>\", \"detail\": \"<what it means>\",\n" +
+      "  \"weatherSummary\": \"<if relevant>\", \"validUntil\": \"<YYYY-MM-DD if it ends>\" }.\n" +
+      "- Propose ONLY for NEW durable facts the user just stated and that are NOT already in CURRENT CONTEXT above.\n" +
+      "- Location/weather: where they'll be / what weather they'll be in. Preference: lasting facts " +
+      "(runs cold, leans casual, loves earth tones, never suggest X, packing style, owns ski gear).\n" +
+      "- Extract end dates from speech (\"until Sunday\" → that date). Skip trivia and one-off requests.\n" +
+      "- Never propose on your own initiative — only when the user states the fact. Propose, never append.";
+  }
   for (const m of messages) {
     contents.push({ role: m.role, parts: [{ text: m.text }] });
   }
@@ -652,7 +752,10 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
       "- After calling, say the whatChanged line in prose too, briefly.\n" +
       "- Questions about the trip (weather, plans, \"will I need a coat?\") → answer in prose. NO tool call.\n" +
       "- WEATHER DEFAULT: score everything against the packing weather above. If the user states different weather " +
-      "for this trip, that wins going forward.";
+      "for this trip, that wins going forward.\n" +
+      "- PIN PROPOSAL: if the user states a durable fact (a location they'll be in, weather they'll face, a lasting " +
+      "preference), call the pinContext tool to PROPOSE saving it. The user confirms before anything is saved — " +
+      "you only propose, and only when they state the fact. Never propose on your own initiative.";
   }
   const config = {
     systemInstruction: system,
@@ -663,7 +766,7 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
   if (tripContext) {
     // Function calling is incompatible with a forced JSON mime type —
     // trip mode answers in prose and/or the tool call instead.
-    config.tools = [{ functionDeclarations: [UPDATE_TRIP_PACKING_DECL] }];
+    config.tools = [{ functionDeclarations: [UPDATE_TRIP_PACKING_DECL, PIN_CONTEXT_DECL] }];
   } else {
     config.responseMimeType = "application/json";
   }
@@ -722,11 +825,17 @@ function confidenceFromScores(scores) {
 // In trip mode the model may call updateTripPacking instead of (or in
 // addition to) answering in prose — handles are mapped to real item ids
 // here; the client re-validates on execute.
-async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext) {
-  const { model, contents, config } = buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext);
+async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins) {
+  const { model, contents, config } = buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins);
   const ai = getClient();
   if (tripContext) {
     const { text, toolCall } = await callStylistModelTrip(ai, model, contents, config);
+    // Sprint 17: a pinContext call returns as a proposal (client
+    // confirms) — it takes the whole turn's tool slot, same as
+    // updateTripPacking. One tool call per turn, by design.
+    if (toolCall && toolCall.name === "pinContext") {
+      return { reply: text, toolCall: null, pinProposal: sanitizePinProposal(toolCall.args) };
+    }
     let mappedCall = null;
     if (toolCall && toolCall.name === "updateTripPacking") {
       const raw = toolCall.args && typeof toolCall.args === "object" ? toolCall.args : {};
@@ -757,7 +866,7 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
         };
       }
     }
-    return { reply: text, toolCall: mappedCall };
+    return { reply: text, toolCall: mappedCall, pinProposal: null };
   }
   let parsed = await callStylistModel(ai, model, contents, config, "askStylist");
 
@@ -781,7 +890,7 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
   }
 
   if (!parsed.outfit || !mapped || problem) {
-    return { reply: parsed.reply, outfit: null };
+    return { reply: parsed.reply, outfit: null, pinProposal: parsed.pinProposal || null };
   }
   return {
     reply: parsed.reply,
@@ -792,7 +901,8 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
       reasoning: parsed.outfit.reasoning,
       scores: parsed.outfit.scores,
     },
+    pinProposal: parsed.pinProposal || null,
   };
 }
 
-module.exports = { askStylist, buildStylistRequest, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, extractToolCall, handleIndex, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM, VIBE_TAGS };
+module.exports = { askStylist, buildStylistRequest, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins, sanitizePinProposal, extractToolCall, handleIndex, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM, VIBE_TAGS };

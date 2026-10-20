@@ -33,6 +33,19 @@ service cloud.firestore {
       allow read, create, update, delete:
         if request.auth != null && request.auth.uid == userId;
     }
+    // Sprint 17 (CONTEXT PINS): confirmed current facts — location,
+    // weather, preferences. Owner-only CRUD; kind is a fixed enum and
+    // the label is short (detail lives in the prose fields).
+    match /users/{userId}/context_pins/{pinId} {
+      allow read, delete:
+        if request.auth != null && request.auth.uid == userId;
+      allow create, update:
+        if request.auth != null && request.auth.uid == userId
+        && request.resource.data.kind in ["location", "weather", "preference"]
+        && request.resource.data.label is string
+        && request.resource.data.label.size() > 0
+        && request.resource.data.label.size() <= 80;
+    }
     match /users/{userId}/ratings/{ratingId} {
       allow read, create, update, delete:
         if request.auth != null && request.auth.uid == userId;

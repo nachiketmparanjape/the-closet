@@ -172,6 +172,12 @@
     .weather-chip { display: inline-block; font-size: 13px; font-weight: 400; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; margin-left: 10px; vertical-align: middle; white-space: nowrap; }
     .trip-chip { display: inline-block; font-size: 13px; font-weight: 500; color: var(--ink); border: 1px solid var(--accent, #e58db1); border-radius: 999px; padding: 3px 10px; margin-left: 8px; vertical-align: middle; white-space: nowrap; }
     .trip-chip button { background: none; border: none; color: inherit; font-size: 13px; cursor: pointer; padding: 0 0 0 6px; }
+    .pin-proposal { background: var(--paper-soft); border: 1px solid var(--accent, #e58db1); border-radius: 10px; padding: 12px 14px; margin-top: 8px; }
+    .pin-proposal-head { margin: 0; font-size: 14px; font-weight: 600; }
+    .pin-proposal .hint { margin: 6px 0 10px; }
+    .pin-proposal-actions { display: flex; gap: 8px; }
+    .pin-proposal-actions button { flex: 1; }
+    .pin-chip { display: inline-block; font-size: 13px; font-weight: 500; color: var(--ink); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; margin-left: 8px; vertical-align: middle; white-space: nowrap; }
     .chat-list { display: flex; flex-direction: column; gap: 8px; max-height: 52vh; overflow-y: auto; margin: 0 0 12px; }
     .chat-msg { max-width: 88%; padding: 9px 13px; border-radius: 14px; font-size: 14px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: break-word; }
     .chat-msg.user { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
@@ -740,7 +746,7 @@
   <div class="overlay" id="chatOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="chatTitle">
     <section class="modal">
       <div class="modal-head">
-        <h2 id="chatTitle">Stylist <span class="weather-chip" id="weatherChip" hidden></span> <span class="trip-chip" id="tripChip" hidden></span></h2>
+        <h2 id="chatTitle">Stylist <span class="weather-chip" id="weatherChip" hidden></span> <span class="trip-chip" id="tripChip" hidden></span> <span class="pin-chip" id="pinChip" hidden></span></h2>
         <button class="icon-button" id="chatClose" type="button" aria-label="Close stylist chat">×</button>
       </div>
       <div class="modal-body">
@@ -1397,6 +1403,53 @@
         openOverlay(document.getElementById("accountOverlay"));
       }
 
+      // Sprint 17 (CONTEXT PINS): the account overlay's list of confirmed
+      // current facts, with remove. Edit-by-remake: dismiss here and
+      // re-state in chat to adjust a pin.
+      function renderContextSection(body) {
+        var el = shopCheckEl;
+        function h(t) {
+          var e = document.createElement("h3");
+          e.textContent = t;
+          e.style.margin = "18px 0 8px";
+          return e;
+        }
+        body.appendChild(h("Current context"));
+        if (!allPins.length) {
+          body.appendChild(el("p", "hint",
+            "Nothing pinned yet. Tell the stylist something like " +
+            "\"I'm in Tahoe until Sunday\" or \"I run cold\" — it'll ask to remember it."));
+          return;
+        }
+        var icons = { location: "📍", weather: "🌤", preference: "⚙️" };
+        allPins.forEach(function (p) {
+          var row = el("div", null);
+          row.style.display = "flex";
+          row.style.alignItems = "center";
+          row.style.justifyContent = "space-between";
+          row.style.padding = "8px 0";
+          row.style.borderBottom = "1px solid var(--line)";
+          var label = el("span", null, (icons[p.kind] || "📌") + " " + p.label);
+          var bits = [];
+          if (p.detail) bits.push(p.detail);
+          if (p.validUntil) bits.push("until " + p.validUntil);
+          if (bits.length) label.textContent += " — " + bits.join(", ");
+          row.appendChild(label);
+          var b = el("button", "secondary", "Remove");
+          b.type = "button";
+          b.addEventListener("click", function () {
+            if (!currentUser) return;
+            db.collection("users").doc(currentUser.uid).collection("context_pins")
+              .doc(p.id).delete().catch(function (err) {
+                if (typeof reportError === "function") reportError("deletePin", err);
+                showToast(friendlyError(err));
+              });
+          });
+          row.appendChild(b);
+          body.appendChild(row);
+        });
+      }
+
       function renderAccountBody() {
         var el = shopCheckEl;
         var body = document.getElementById("accountBody");
@@ -1482,6 +1535,7 @@
           so.addEventListener("click", signOutAccount);
           body.appendChild(so);
         }
+        renderContextSection(body);
         renderVibeSection(body);
         body.appendChild(h("Privacy"));
         var priv = el("p", "hint", "Your wardrobe and photos are private to your account — no ads, no trackers, nothing sold. When you add a photo, it's sent to Google's AI service to generate the description and tags.");
@@ -2852,8 +2906,81 @@
           if (m.outfit && m.outfit.itemIds && m.outfit.itemIds.length >= 2) {
             chatList.appendChild(renderOutfitCard(m));
           }
+          // Sprint 17 (CONTEXT PINS): proposal confirm card — propose,
+          // never append. The user taps Save or Dismiss.
+          if (m.pinProposal && m.pinState === "pending") {
+            chatList.appendChild(renderPinProposalCard(m));
+          }
         });
         chatList.scrollTop = chatList.scrollHeight;
+      }
+
+      // Sprint 17: inline confirm card for a pin proposal.
+      function renderPinProposalCard(m) {
+        var p = m.pinProposal;
+        var card = document.createElement("div");
+        card.className = "pin-proposal";
+        var icons = { location: "📍", weather: "🌤", preference: "⚙️" };
+        var head = document.createElement("p");
+        head.className = "pin-proposal-head";
+        head.textContent = (icons[p.kind] || "📌") + " Remember as current " + p.kind + "?";
+        card.appendChild(head);
+        var body = document.createElement("p");
+        body.className = "hint";
+        var bits = [p.label];
+        if (p.detail) bits.push(p.detail);
+        if (p.weatherSummary) bits.push(p.weatherSummary);
+        if (p.validUntil) bits.push("until " + p.validUntil);
+        body.textContent = bits.join(" — ");
+        card.appendChild(body);
+        var row = document.createElement("div");
+        row.className = "pin-proposal-actions";
+        var save = document.createElement("button");
+        save.className = "primary";
+        save.type = "button";
+        save.textContent = "Save";
+        save.addEventListener("click", function () { savePinProposal(m); });
+        var dismiss = document.createElement("button");
+        dismiss.type = "button";
+        dismiss.textContent = "Dismiss";
+        dismiss.addEventListener("click", function () {
+          m.pinState = "dismissed";
+          renderChat();
+        });
+        row.appendChild(save);
+        row.appendChild(dismiss);
+        card.appendChild(row);
+        return card;
+      }
+
+      // Sprint 17: saves a confirmed pin. One active pin per kind — a new
+      // global pin replaces same-kind global pins (trip-scoped ones stay).
+      function savePinProposal(m) {
+        var p = m.pinProposal;
+        if (!p || !currentUser) return;
+        var col = db.collection("users").doc(currentUser.uid).collection("context_pins");
+        var olds = (allPins || []).filter(function (x) {
+          return x.kind === p.kind && !x.tripId;
+        });
+        Promise.all(olds.map(function (x) {
+          return col.doc(x.id).delete().catch(function () {});
+        })).then(function () {
+          return col.add({
+            kind: p.kind,
+            label: p.label,
+            detail: p.detail || "",
+            weatherSummary: p.weatherSummary || "",
+            validUntil: p.validUntil || null,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        }).then(function () {
+          m.pinState = "saved";
+          showToast("Saved — I'll remember that.");
+        }).catch(function (err) {
+          if (typeof reportError === "function") reportError("savePinProposal", err);
+          showToast(friendlyError(err));
+        }).then(function () { renderChat(); });
       }
 
       // PC-10: flatten items for the stylist prompt. PC-8: reads the v2
@@ -3196,6 +3323,10 @@
             // PC-12: structured outfit attached for the saveable card.
             var outfit = d.outfit;
             thinking.outfit = (outfit && outfit.itemIds && outfit.itemIds.length >= 2) ? outfit : null;
+            // Sprint 17 (CONTEXT PINS): a proposal arrives as a pending
+            // confirm card — never auto-saved.
+            thinking.pinProposal = d.pinProposal || null;
+            thinking.pinState = d.pinProposal ? "pending" : null;
           }
         }).catch(function (err) {
           thinking.thinking = false;
@@ -3405,6 +3536,44 @@
       var tripGeo = null; // {name, lat, lng} from the last geocode
       var tripGeoFor = ""; // destination text the geocode belongs to
       var tripEditingId = null;
+
+      // Sprint 17 (CONTEXT PINS): the user's confirmed current facts.
+      // Small by design (cap ~20) — a quiet listener keeps the chat
+      // header chip and the account list fresh.
+      var allPins = [];
+      var pinUnsub = null;
+      function watchPins(user) {
+        if (pinUnsub) { pinUnsub(); pinUnsub = null; }
+        allPins = [];
+        if (!user) { renderPinChip(); return; }
+        pinUnsub = db.collection("users").doc(user.uid).collection("context_pins")
+          .orderBy("createdAt", "desc").limit(20)
+          .onSnapshot(function (snap) {
+            allPins = snap.docs.filter(function (d) { return d.exists; })
+              .map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+            renderPinChip();
+            if (!document.getElementById("accountOverlay").hidden) renderAccountBody();
+          }, function (err) {
+            if (typeof reportError === "function") reportError("watchPins", err);
+          });
+      }
+
+      function activePin(kind) {
+        var today = new Date().toISOString().slice(0, 10);
+        for (var i = 0; i < allPins.length; i++) {
+          var p = allPins[i];
+          if (p.kind === kind && (!p.validUntil || p.validUntil >= today)) return p;
+        }
+        return null;
+      }
+
+      function renderPinChip() {
+        var el = document.getElementById("pinChip");
+        var pin = activePin("location");
+        if (!pin) { el.hidden = true; el.textContent = ""; return; }
+        el.hidden = false;
+        el.textContent = "📍 " + pin.label + (pin.validUntil ? " · until " + pin.validUntil.slice(5) : "");
+      }
 
       function watchTrips(user) {
         if (tripUnsub) { tripUnsub(); tripUnsub = null; }
@@ -5800,6 +5969,7 @@
             watchOutfits(user); // PC-12
             watchShopChecks(user); // PC-28
             watchTrips(user); // Sprint 15 (PC-29 Phase 1)
+            watchPins(user); // Sprint 17 (context pins)
           });
         } catch (error) {
           configured = false;
