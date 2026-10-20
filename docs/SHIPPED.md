@@ -109,3 +109,22 @@ What went live. Momentum you can see.
   user-confirmed style preferences; manual outfit builder; per-article
   wear stats. Firestore rules for the four new collections deployed.
   Awaiting founder phone test of the full loop.
+- **Sprint 15 fix buffer + OBS-1** — shipped 2026-10-19 (commit 20b2294).
+  **Root cause of the "Something went wrong" packing failure:** the model
+  name `gemini-3.8-flash` does not resolve in Vertex AI us-central1
+  (404 "Publisher model not found" on every call) — ALL AI functions
+  were down, not just planPacking. Verified by direct probes:
+  `gemini-2.5-flash` / `gemini-2.5-flash-lite` / `gemini-2.5-pro` return
+  200; every 3.x name tried returns 404. `MODEL_VERSION` reverted to
+  `gemini-2.5-flash`; all 7 functions redeployed. The earlier
+  cold-start theory was wrong — the 300s timeout + one client retry
+  stay as harmless hardening. **OBS-1 metrics:** every callable now
+  emits a structured success log (`<fn> succeeded` + durationMs) to
+  pair with the existing failure logs; `reportError()` persists client
+  errors to `users/{uid}/client_errors` (owner-create-only rules) so
+  failures are detectable without a user report; local
+  `metrics.js` (gitignored) reports per-function success rates,
+  recent server failures (key + correlationId), and client errors.
+  **UX:** creating a trip now opens its detail (Plan packing as the
+  next step, ✕ to dismiss); trips render as full-width cards
+  (.trip-card) instead of bare tiles.
