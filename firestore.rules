@@ -15,6 +15,17 @@ service cloud.firestore {
       allow read, create, update, delete:
         if request.auth != null && request.auth.uid == userId;
     }
+    // OBS-1: client error reports. Owner can create only — reads happen
+    // admin-side (metrics script / console), never via the app.
+    match /users/{userId}/client_errors/{errorId} {
+      allow create:
+        if request.auth != null && request.auth.uid == userId
+        && request.resource.data.where is string
+        && request.resource.data.where.size() <= 120
+        && (!("code" in request.resource.data) || (request.resource.data.code is string && request.resource.data.code.size() <= 80))
+        && (!("message" in request.resource.data) || (request.resource.data.message is string && request.resource.data.message.size() <= 500));
+      allow read, update, delete: if false;
+    }
     // Sprint 15 (PC-29 Phase 1): trips. Owner-only, full CRUD — the packing
     // object is generated client-side from the planPacking callable and
     // written as one field, so no per-field write restrictions.

@@ -202,6 +202,13 @@
     .tab { flex: 1; border: 1px solid var(--line); background: var(--paper-soft); color: var(--muted); font: inherit; font-size: 14px; font-weight: 600; padding: 10px; border-radius: 10px; cursor: pointer; }
     .tab.active { background: var(--ink); color: var(--paper); border-color: var(--ink); }
     .outfit-card { background: var(--paper-soft); border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-top: 8px; }
+
+/* Trips are few and text-heavy (destination + dates), so they render as
+   full-width list cards — not photo tiles in the item grid. */
+#tripsGallery { grid-template-columns: 1fr; }
+.trip-card { background: var(--paper-soft); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; cursor: pointer; min-width: 0; }
+.trip-card h3 { margin: 0; font-size: 19px; }
+.trip-card .hint { margin: 4px 0 0; }
     .outfit-card h4 { margin: 0 0 6px; font-size: 15px; }
     .outfit-card ul { margin: 6px 0; padding-left: 18px; font-size: 14px; }
     .outfit-card .conf { font-size: 13px; color: var(--muted); margin: 6px 0; }
@@ -1175,11 +1182,35 @@
       // sprint-04 plan, PC-11 notes). Event handlers and async code keep
       // their local try/catch + toast; this is the last resort.
       var clientErrorSeq = 0;
+      var clientErrorPersisted = 0;
+      var clientErrorPersisting = false;
       function reportError(where, err) {
         clientErrorSeq++;
         var id = "c" + Date.now().toString(36) + "-" + clientErrorSeq;
         try {
           console.error("[closet][" + id + "] " + where + ":", err && err.stack ? err.stack : err);
+        } catch (e) { /* logging must never throw */ }
+        // OBS-1: persist to Firestore so failures are detectable without
+        // the user reporting them. Write-only (owner create, no reads via
+        // the app); capped per session and guarded against loops — a
+        // failing write must never cascade into more writes.
+        try {
+          if (!clientErrorPersisting && clientErrorPersisted < 20 &&
+              typeof db !== "undefined" && db &&
+              typeof currentUser !== "undefined" && currentUser &&
+              typeof firebase !== "undefined") {
+            clientErrorPersisting = true;
+            clientErrorPersisted++;
+            db.collection("users").doc(currentUser.uid).collection("client_errors").add({
+              where: String(where || "").slice(0, 120),
+              code: (err && err.code) ? String(err.code).slice(0, 80) : "",
+              message: String((err && err.message) || err || "").slice(0, 500),
+              page: location.pathname,
+              userAgent: String(navigator.userAgent || "").slice(0, 200),
+              createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            }).catch(function () { /* logging must never throw */ })
+              .then(function () { clientErrorPersisting = false; });
+          }
         } catch (e) { /* logging must never throw */ }
         return id;
       }
@@ -3256,7 +3287,7 @@
         allTrips.forEach(function (t) {
           var leg = (t.legs && t.legs[0]) || {};
           var card = document.createElement("article");
-          card.className = "item";
+          card.className = "trip-card";
           card.setAttribute("role", "button");
           card.setAttribute("tabindex", "0");
           var title = document.createElement("h3");
@@ -3363,15 +3394,23 @@
             notes: notes,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
           };
-          var op = tripEditingId
-            ? col.doc(tripEditingId).update(payload)
-            : col.add(Object.assign({
+          var isNewTrip = !tripEditingId;
+          var op = isNewTrip
+            ? col.add(Object.assign({
                 packing: null,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
-              }, payload));
-          op.then(function () {
+              }, payload))
+            : col.doc(tripEditingId).update(payload);
+          op.then(function (ref) {
             closeOverlay(document.getElementById("tripOverlay"));
-            showToast(tripEditingId ? "Trip updated." : "Trip saved.");
+            if (isNewTrip && ref && ref.id && !tripById(ref.id)) {
+              // Make the new trip openable immediately, before the
+              // snapshot listener catches up.
+              allTrips.unshift({ id: ref.id, name: name, legs: [leg], notes: notes, packing: null });
+              renderTrips();
+              openTripDetail(ref.id);
+            }
+            showToast(isNewTrip ? "Trip saved." : "Trip updated.");
           }).catch(function (err) {
             showToast(friendlyError(err));
           }).then(function () {

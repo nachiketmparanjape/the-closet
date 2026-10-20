@@ -28,7 +28,7 @@ const { shopCheck } = require("./shopcheck");
 const { planPacking, sanitizeTripInput } = require("./packing");
 // PC-11: every expected failure goes through the catalog; every failure
 // path logs with a correlation ID.
-const { fail, newCorrelationId, logError } = require("./errors");
+const { fail, newCorrelationId, logError, logSuccess } = require("./errors");
 
 // The default bucket is closet-404e9.firebasestorage.app (the appspot.com
 // bucket exists but the client writes to firebasestorage.app). Without an
@@ -48,6 +48,14 @@ function boundary(where, correlationId, uid, err) {
   fail(err && err.key ? err.key : "INTERNAL");
 }
 
+// Success counterpart to boundary(): one structured log line per
+// successful request, so Cloud Logging can answer "what's the success
+// rate of planPacking this week?" without any extra infrastructure.
+function finish(where, correlationId, uid, start, result) {
+  logSuccess(where, { correlationId: correlationId, uid: uid, durationMs: Date.now() - start });
+  return result;
+}
+
 exports.describeItem = onCall(
   {
     region: "us-central1",
@@ -58,6 +66,7 @@ exports.describeItem = onCall(
   async (request) => {
     const correlationId = newCorrelationId();
     const uid = request.auth ? request.auth.uid : null;
+    const start = Date.now();
     if (!request.auth) {
       fail("NOT_SIGNED_IN");
     }
@@ -96,7 +105,7 @@ exports.describeItem = onCall(
       const photoIds = Array.isArray(data.photoIds)
         ? data.photoIds.filter((p) => typeof p === "string").slice(0, 4)
         : [];
-      return await describeImage(buffer, mimeType, photoIds);
+      return finish("describeItem", correlationId, uid, start, await await describeImage(buffer, mimeType, photoIds));
     } catch (err) {
       // Any failure inside describeImage is a downstream AI failure.
       if (!(err instanceof HttpsError) && !err.key) err.key = "DESCRIBE_FAILED";
@@ -115,6 +124,7 @@ exports.askStylist = onCall(
   async (request) => {
     const correlationId = newCorrelationId();
     const uid = request.auth ? request.auth.uid : null;
+    const start = Date.now();
     try {
       if (!request.auth) {
         fail("NOT_SIGNED_IN");
@@ -159,7 +169,7 @@ exports.askStylist = onCall(
       } catch (e) {
         logError("askStylist.styleProfile", e, { uid: uid, correlationId: correlationId });
       }
-      return await askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile);
+      return finish("askStylist", correlationId, uid, start, await await askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile));
     } catch (err) {
       // Any failure inside askStylist is a downstream AI failure.
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
@@ -182,6 +192,7 @@ exports.reflectOutfit = onCall(
   async (request) => {
     const correlationId = newCorrelationId();
     const uid = request.auth ? request.auth.uid : null;
+    const start = Date.now();
     try {
       if (!request.auth) {
         fail("NOT_SIGNED_IN");
@@ -191,7 +202,7 @@ exports.reflectOutfit = onCall(
       if (!ratingId || ratingId.length > 100) {
         fail("BAD_REQUEST");
       }
-      return await reflectOutfit(uid, ratingId);
+      return finish("reflectOutfit", correlationId, uid, start, await await reflectOutfit(uid, ratingId));
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
       boundary("reflectOutfit", correlationId, uid, err);
@@ -209,6 +220,7 @@ exports.critiqueOutfit = onCall(
   async (request) => {
     const correlationId = newCorrelationId();
     const uid = request.auth ? request.auth.uid : null;
+    const start = Date.now();
     try {
       if (!request.auth) {
         fail("NOT_SIGNED_IN");
@@ -218,7 +230,7 @@ exports.critiqueOutfit = onCall(
       if (!outfitId || outfitId.length > 100) {
         fail("BAD_REQUEST");
       }
-      return await critiqueOutfit(uid, outfitId);
+      return finish("critiqueOutfit", correlationId, uid, start, await await critiqueOutfit(uid, outfitId));
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
       boundary("critiqueOutfit", correlationId, uid, err);
@@ -236,6 +248,7 @@ exports.parseOutfitPhoto = onCall(
   async (request) => {
     const correlationId = newCorrelationId();
     const uid = request.auth ? request.auth.uid : null;
+    const start = Date.now();
     try {
       if (!request.auth) {
         fail("NOT_SIGNED_IN");
@@ -245,7 +258,7 @@ exports.parseOutfitPhoto = onCall(
       if (!storagePath || storagePath.length > 300) {
         fail("BAD_REQUEST");
       }
-      return await parseOutfitPhoto(uid, storagePath);
+      return finish("parseOutfitPhoto", correlationId, uid, start, await await parseOutfitPhoto(uid, storagePath));
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
       boundary("parseOutfitPhoto", correlationId, uid, err);
@@ -264,6 +277,7 @@ exports.shopCheck = onCall(
   async (request) => {
     const correlationId = newCorrelationId();
     const uid = request.auth ? request.auth.uid : null;
+    const start = Date.now();
     try {
       if (!request.auth) {
         fail("NOT_SIGNED_IN");
@@ -273,7 +287,7 @@ exports.shopCheck = onCall(
       if (!storagePath || storagePath.length > 300) {
         fail("BAD_REQUEST");
       }
-      return await shopCheck(uid, storagePath);
+      return finish("shopCheck", correlationId, uid, start, await await shopCheck(uid, storagePath));
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
       boundary("shopCheck", correlationId, uid, err);
@@ -296,6 +310,7 @@ exports.planPacking = onCall(
   async (request) => {
     const correlationId = newCorrelationId();
     const uid = request.auth ? request.auth.uid : null;
+    const start = Date.now();
     try {
       if (!request.auth) {
         fail("NOT_SIGNED_IN");
@@ -319,7 +334,7 @@ exports.planPacking = onCall(
       } catch (e) {
         logError("planPacking.vibeProfile", e, { uid: uid, correlationId: correlationId });
       }
-      return await planPacking(items, trip.leg, trip.weatherSummary, trip.notes, vibeProfile);
+      return finish("planPacking", correlationId, uid, start, await await planPacking(items, trip.leg, trip.weatherSummary, trip.notes, vibeProfile));
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
       boundary("planPacking", correlationId, uid, err);

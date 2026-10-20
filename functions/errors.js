@@ -12,7 +12,7 @@
 "use strict";
 
 const { HttpsError } = require("firebase-functions/v2/https");
-const { error: logErrorRaw } = require("firebase-functions/logger");
+const { error: logErrorRaw, info: logInfoRaw } = require("firebase-functions/logger");
 const crypto = require("crypto");
 
 const CATALOG = {
@@ -115,4 +115,11 @@ function logError(where, err, context) {
   logErrorRaw(where + " failed", fields);
 }
 
-module.exports = { CATALOG, fail, codedError, newCorrelationId, logError };
+// Structured server log for a successful callable request. Pairs with
+// logError in Cloud Logging, so success rates per function are a query
+// (not a guess). No user content — only timing, outcome, and ids.
+function logSuccess(where, context) {
+  logInfoRaw(where + " succeeded", Object.assign({ outcome: "success" }, context || {}));
+}
+
+module.exports = { CATALOG, fail, codedError, newCorrelationId, logError, logSuccess };

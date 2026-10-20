@@ -29,7 +29,11 @@ const WARMTHS = ["light", "medium", "heavy"];
 // Sprint 5: controlled style-tag vocabulary. Each tag must earn its place —
 // these are the ones that change outfit decisions.
 const STYLE_TAGS = ["classic", "minimalist", "preppy", "streetwear", "vintage", "bohemian", "edgy", "romantic", "sporty", "rugged", "refined", "avant-garde"];
-const MODEL_VERSION = "gemini-3.8-flash"; // 2.5-flash retires 2026-10-20 (Google lifecycle page)
+const MODEL_VERSION = "gemini-2.5-flash"; // Verified live in us-central1 2026-10-19.
+// "gemini-3.8-flash" was never resolvable here (Vertex 404 on every
+// function that used it, including planPacking) — probed the 3.x family
+// directly, only 2.5-family names return 200. Revisit only against a
+// live probe, never the lifecycle page alone.
 
 const PROMPT = `You are cataloguing one garment from its photo for a personal wardrobe app.
 Look at the photo and answer with ONLY a JSON object (no markdown, no prose) with exactly these keys:
