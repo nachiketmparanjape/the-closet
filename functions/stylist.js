@@ -545,25 +545,37 @@ const UPDATE_TRIP_PACKING_DECL = {
   },
 };
 
-// Pure: pull the first function call out of a generateContent response,
-// tolerating both the SDK's functionCalls getter and the raw parts shape.
-function extractToolCall(response) {
+// Pure: pull ALL function calls out of a generateContent response,
+// tolerating both the SDK's functionCalls getter and the raw parts
+// shape. Trip mode can legitimately call two tools in one turn
+// (updateTripPacking + pinContext), so callers must not stop at one.
+function extractToolCalls(response) {
+  const calls = [];
   try {
     const fcs = response && response.functionCalls;
-    if (Array.isArray(fcs) && fcs.length && fcs[0] && typeof fcs[0].name === "string") {
-      return { name: fcs[0].name, args: fcs[0].args || {} };
+    if (Array.isArray(fcs) && fcs.length) {
+      for (const fc of fcs) {
+        if (fc && typeof fc.name === "string") calls.push({ name: fc.name, args: fc.args || {} });
+      }
+      if (calls.length) return calls;
     }
     const cands = (response && response.candidates) || [];
     for (const c of cands) {
       const parts = (c && c.content && c.content.parts) || [];
       for (const p of parts) {
         if (p && p.functionCall && typeof p.functionCall.name === "string") {
-          return { name: p.functionCall.name, args: p.functionCall.args || {} };
+          calls.push({ name: p.functionCall.name, args: p.functionCall.args || {} });
         }
       }
     }
-  } catch (e) { /* fall through — no call */ }
-  return null;
+  } catch (e) { /* fall through — no calls */ }
+  return calls;
+}
+
+// Pure: the first function call, kept for callers that only need one.
+function extractToolCall(response) {
+  const calls = extractToolCalls(response);
+  return calls.length ? calls[0] : null;
 }
 
 // "[i3]" → items index 2, or -1. Pure.
@@ -766,7 +778,11 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
       "preference), call the pinContext tool to PROPOSE saving it (action \"save\"). If a fact in CURRENT CONTEXT no " +
       "longer holds — plans cancelled, back early — call pinContext with action \"remove\" and that pin's kind + label. " +
       "The user confirms before anything changes — you only propose, and only when they state the fact or its end. " +
-      "Never propose on your own initiative.";
+      "Never propose on your own initiative.\n" +
+      "- BOTH TOOLS: if one message asks for a packing change AND states a lasting preference (\"pack light — I always " +
+      "pack light\"), call updateTripPacking for the change AND pinContext for the preference in the same response.\n" +
+      "- ALWAYS include a short prose reply in the same response as any tool call — never send a tool call with no text. " +
+      "Say what changed in one sentence; the client shows that line as your answer.";
   }
   const config = {
     systemInstruction: system,
@@ -808,13 +824,13 @@ async function callStylistModelTrip(ai, model, contents, config) {
   } catch (err) {
     throw codedError("AI_UNAVAILABLE", "askStylist(trip): generateContent failed: " + (err && err.message));
   }
-  const toolCall = extractToolCall(response);
+  const toolCalls = extractToolCalls(response);
   const text = (response.text || "").trim();
-  if (!toolCall && !text) {
+  if (!toolCalls.length && !text) {
     logAiFailure("askStylist-trip", response);
     throw codedError("AI_BAD_RESPONSE", "askStylist(trip): model returned no text and no tool call");
   }
-  return { text: text, toolCall: toolCall };
+  return { text: text, toolCalls: toolCalls };
 }
 
 // Confidence is computed IN CODE from the sub-score mean — never taken
@@ -835,49 +851,85 @@ function confidenceFromScores(scores) {
 // tripContext: sanitized trip context from sanitizeTripContext, or null.
 // In trip mode the model may call updateTripPacking instead of (or in
 // addition to) answering in prose — handles are mapped to real item ids
+// Pure: map an updateTripPacking tool call's args to real wardrobe ids
+// (the client re-validates on execute). Returns the mapped call or null
+// when nothing survived (e.g. the model sent non-[iN] handles).
+function mapUpdateTripPacking(raw, items) {
+  const args = raw && typeof raw === "object" ? raw : {};
+  const seen = new Set();
+  const articles = [];
+  for (const a of (Array.isArray(args.articles) ? args.articles : [])) {
+    const idx = handleIndex(a && a.handle, items);
+    if (idx < 0 || seen.has(items[idx].id)) continue;
+    seen.add(items[idx].id);
+    articles.push({ id: items[idx].id, reason: cleanText((a && a.reason) || "", 140) });
+  }
+  const outfits = [];
+  for (const o of (Array.isArray(args.outfits) ? args.outfits : [])) {
+    const ids = ((o && Array.isArray(o.handles)) ? o.handles : [])
+      .map((h) => handleIndex(h, items))
+      .filter((idx) => idx >= 0 && seen.has(items[idx].id))
+      .map((idx) => items[idx].id);
+    if (ids.length >= 2) {
+      outfits.push({ itemIds: ids, reasoning: cleanText((o && o.reasoning) || "", 200) });
+    }
+  }
+  if (!articles.length) return null;
+  return {
+    name: "updateTripPacking",
+    articles: articles,
+    outfits: outfits,
+    whatChanged: cleanText(args.whatChanged || "", 160),
+  };
+}
+
 // here; the client re-validates on execute.
 async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins) {
   const { model, contents, config } = buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins);
   const ai = getClient();
   if (tripContext) {
-    const { text, toolCall } = await callStylistModelTrip(ai, model, contents, config);
-    // Sprint 17: a pinContext call returns as a proposal (client
-    // confirms) — it takes the whole turn's tool slot, same as
-    // updateTripPacking. One tool call per turn, by design.
-    if (toolCall && toolCall.name === "pinContext") {
-      return { reply: text, toolCall: null, pinProposal: sanitizePinProposal(toolCall.args) };
-    }
-    let mappedCall = null;
-    if (toolCall && toolCall.name === "updateTripPacking") {
-      const raw = toolCall.args && typeof toolCall.args === "object" ? toolCall.args : {};
-      const seen = new Set();
-      const articles = [];
-      for (const a of (Array.isArray(raw.articles) ? raw.articles : [])) {
-        const idx = handleIndex(a && a.handle, items);
-        if (idx < 0 || seen.has(items[idx].id)) continue;
-        seen.add(items[idx].id);
-        articles.push({ id: items[idx].id, reason: cleanText((a && a.reason) || "", 140) });
-      }
-      const outfits = [];
-      for (const o of (Array.isArray(raw.outfits) ? raw.outfits : [])) {
-        const ids = ((o && Array.isArray(o.handles)) ? o.handles : [])
-          .map((h) => handleIndex(h, items))
-          .filter((idx) => idx >= 0 && seen.has(items[idx].id))
-          .map((idx) => items[idx].id);
-        if (ids.length >= 2) {
-          outfits.push({ itemIds: ids, reasoning: cleanText((o && o.reasoning) || "", 200) });
+    // Trip mode: the tools are independent — a packing change and a
+    // preference pin can land in the same turn. Process both.
+    let { text, toolCalls } = await callStylistModelTrip(ai, model, contents, config);
+    const updCall = toolCalls.find((c) => c.name === "updateTripPacking");
+    const pinCall = toolCalls.find((c) => c.name === "pinContext");
+    let mappedCall = updCall ? mapUpdateTripPacking(updCall.args, items) : null;
+    if (updCall && !mappedCall) {
+      // The model tried to update the packing but its args didn't
+      // survive mapping — log it (OBS-1) and re-ask once with a hint.
+      try {
+        console.error(JSON.stringify({
+          event: "trip_tool_args_rejected",
+          label: "askStylist-tripToolArgs",
+          argsKeys: Object.keys(updCall.args || {}),
+          articlesType: Array.isArray(updCall.args && updCall.args.articles) ? "array" : typeof (updCall.args && updCall.args.articles),
+        }));
+      } catch (e) { /* logging must never throw */ }
+      const retryContents = contents.concat([{
+        role: "user",
+        parts: [{ text: "Your packing update didn't go through — the articles didn't match the wardrobe. Call updateTripPacking again using the EXACT [iN] handles from the wardrobe list above (e.g. [i3]), every piece with a reason, and include a short sentence of prose saying what changed." }],
+      }]);
+      const retry = await callStylistModelTrip(ai, model, retryContents, config);
+      text = retry.text || text;
+      for (const c of retry.toolCalls) {
+        if (!mappedCall && c.name === "updateTripPacking") {
+          mappedCall = mapUpdateTripPacking(c.args, items);
+        }
+        if (!pinCall && c.name === "pinContext") {
+          toolCalls.push(c);
         }
       }
-      if (articles.length) {
-        mappedCall = {
-          name: "updateTripPacking",
-          articles: articles,
-          outfits: outfits,
-          whatChanged: cleanText(raw.whatChanged || "", 160),
-        };
-      }
     }
-    return { reply: text, toolCall: mappedCall, pinProposal: null };
+    const pinProposal = toolCalls.some((c) => c.name === "pinContext")
+      ? sanitizePinProposal((toolCalls.find((c) => c.name === "pinContext") || {}).args)
+      : null;
+    // The user always gets words, never an empty bubble.
+    if (!text) {
+      text = mappedCall
+        ? ("Packing updated — " + (mappedCall.whatChanged || "got it."))
+        : (pinProposal ? "Got it." : "Hmm — that came back empty on my end. Try again?");
+    }
+    return { reply: text, toolCall: mappedCall, pinProposal: pinProposal };
   }
   let parsed = await callStylistModel(ai, model, contents, config, "askStylist");
 
@@ -916,4 +968,4 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
   };
 }
 
-module.exports = { askStylist, buildStylistRequest, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins, sanitizePinProposal, extractToolCall, handleIndex, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM, VIBE_TAGS };
+module.exports = { askStylist, buildStylistRequest, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins, sanitizePinProposal, extractToolCall, extractToolCalls, mapUpdateTripPacking, handleIndex, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM, VIBE_TAGS };

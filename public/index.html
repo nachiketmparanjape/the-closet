@@ -3345,7 +3345,9 @@
           }
         }
         renderRefChips();
-        functions.httpsCallable("askStylist")(payload).then(function (res) {
+        warmToken().then(function () {
+          return functions.httpsCallable("askStylist")(payload);
+        }).then(function (res) {
           thinking.thinking = false;
           var d = res.data || {};
           // Sprint 16: the model called updateTripPacking — the client
@@ -3470,13 +3472,15 @@
             var last = composerPicks[composerPicks.length - 1].outfit;
             if (last && last.itemIds) previousPick = { itemIds: last.itemIds.slice() };
           }
-          return functions.httpsCallable("askStylist")({
-            items: stylistItems(),
-            messages: [{ role: "user", text: text }],
-            previousPick: previousPick,
-            vibe: detectVibeTag(text),
-            weatherContext: weather,
-            references: { articleIds: [], outfits: [] }
+          return warmToken().then(function () {
+            return functions.httpsCallable("askStylist")({
+              items: stylistItems(),
+              messages: [{ role: "user", text: text }],
+              previousPick: previousPick,
+              vibe: detectVibeTag(text),
+              weatherContext: weather,
+              references: { articleIds: [], outfits: [] }
+            });
           });
         }).then(function (callRes) {
           var outfit = callRes.data && callRes.data.outfit;
@@ -3606,6 +3610,15 @@
           if (p.kind === kind && (!p.validUntil || p.validUntil >= today)) return p;
         }
         return null;
+      }
+
+      // Sprint 17 fix buffer: callable auth rides on the current ID
+      // token; a stale mid-session token can send the call out
+      // unauthenticated (NOT_SIGNED_IN observed 2026-10-19). Refresh
+      // right before the call as cheap insurance.
+      function warmToken() {
+        if (!currentUser || !currentUser.getIdToken) return Promise.resolve();
+        return currentUser.getIdToken().catch(function () { /* best-effort */ });
       }
 
       function renderPinChip() {

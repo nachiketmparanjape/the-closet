@@ -4,6 +4,8 @@ const assert = require("node:assert");
 const {
   sanitizeTripContext,
   extractToolCall,
+  extractToolCalls,
+  mapUpdateTripPacking,
   handleIndex,
   buildStylistRequest,
 } = require("../functions/stylist");
@@ -141,5 +143,70 @@ describe("handleIndex", () => {
     assert.strictEqual(handleIndex("i2", items), -1);
     assert.strictEqual(handleIndex("[x2]", items), -1);
     assert.strictEqual(handleIndex(null, items), -1);
+  });
+});
+
+describe("extractToolCalls", () => {
+  test("returns all calls from the SDK shape, in order", () => {
+    const calls = extractToolCalls({
+      functionCalls: [
+        { name: "pinContext", args: { kind: "preference" } },
+        { name: "updateTripPacking", args: { articles: [] } },
+      ],
+    });
+    assert.strictEqual(calls.length, 2);
+    assert.strictEqual(calls[0].name, "pinContext");
+    assert.strictEqual(calls[1].name, "updateTripPacking");
+  });
+  test("returns all calls from the raw parts shape", () => {
+    const calls = extractToolCalls({
+      candidates: [
+        {
+          content: {
+            parts: [
+              { functionCall: { name: "updateTripPacking", args: {} } },
+              { functionCall: { name: "pinContext", args: {} } },
+            ],
+          },
+        },
+      ],
+    });
+    assert.deepStrictEqual(calls.map((c) => c.name), ["updateTripPacking", "pinContext"]);
+  });
+  test("returns [] when there are no calls", () => {
+    assert.deepStrictEqual(extractToolCalls({}), []);
+    assert.deepStrictEqual(extractToolCalls(null), []);
+  });
+});
+
+describe("mapUpdateTripPacking", () => {
+  const items = [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "d" }];
+  test("maps [iN] handles to ids, drops bad handles, keeps >=2-piece outfits", () => {
+    const m = mapUpdateTripPacking(
+      {
+        articles: [
+          { handle: "[i1]", reason: "warm" },
+          { handle: "[i2]" },
+          { handle: "[i9]" }, // out of range, dropped
+          { handle: "[i2]" }, // dup, dropped
+        ],
+        outfits: [
+          { handles: ["[i1]", "[i2]"], reasoning: "nice" },
+          { handles: ["[i1]"] }, // <2 pieces, dropped
+          { handles: ["[i1]", "[i3]"] }, // [i3] not packed → becomes [i1] only → dropped
+        ],
+        whatChanged: "slimmed",
+      },
+      items
+    );
+    assert.ok(m);
+    assert.deepStrictEqual(m.articles.map((a) => a.id), ["a", "b"]);
+    assert.strictEqual(m.outfits.length, 1);
+    assert.deepStrictEqual(m.outfits[0].itemIds, ["a", "b"]);
+    assert.strictEqual(m.whatChanged, "slimmed");
+  });
+  test("returns null when no articles survive", () => {
+    assert.strictEqual(mapUpdateTripPacking({ articles: [{ handle: "a-uuid" }] }, items), null);
+    assert.strictEqual(mapUpdateTripPacking({}, items), null);
   });
 });
