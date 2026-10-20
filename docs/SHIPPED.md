@@ -19,6 +19,24 @@ What went live. Momentum you can see.
   a shortlist, saves the outfit (source: "photo"). **Wear-logging half
   NOT shipped** — re-filed as its own cut (Sprint 14).
 
+## Sprint 17 (2026-10-19 → )
+
+- **CONTEXT-1: Context pins** — shipped 2026-10-19 (commit 53170f9),
+  in founder phone validation. Persistent-but-adaptable current facts
+  the stylist remembers across chats: location, weather, key
+  preferences (runs cold, formality bias, color loves/avoids, packing
+  style, "never suggest", activity kit). Propose-never-append: the
+  model surfaces at most one `pinProposal` per turn (JSON contract in
+  normal chat, `pinContext` tool in trip chat); the client always
+  confirms via an inline Save/Dismiss card before anything is written.
+  One active pin per kind (new global pin replaces same-kind globals);
+  expiry dates ignored by the server past `validUntil`. Priority:
+  conversation-stated weather > pin > measured WX-1 weather. UI:
+  📍 chip in the chat header for the active location pin, "Current
+  context" list with Remove in the account overlay, quiet listener
+  keeps both fresh. Server-side pin read is best-effort (logged to
+  OBS-1 on failure). Tests: `tests/context-pins.test.js` (8).
+
 ## Sprint 15 (2026-10-19 → )
 - **PC-29 Phase 1: Trips — trip objects + packing list** — Trips tab;
   trip CRUD (name, destination with geocoding, dates, notes); new
