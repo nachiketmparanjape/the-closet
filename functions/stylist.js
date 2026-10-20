@@ -526,7 +526,10 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
     system += "\n\nCURRENT WEATHER — measured at the user's location just now: " +
       weatherContext + ".\n" +
       "- Use it for the WEATHER sub-score and layering choices when the user hasn't stated different weather.\n" +
-      "- If the user states weather explicitly, theirs wins.";
+      "- If the user states weather explicitly, theirs wins.\n" +
+      "- ACTIVE-WEATHER RULE: if the conversation contains user-stated weather or a different location " +
+      "(e.g. \"I'm in Tahoe this weekend, snowing\"), THAT is the active weather for the rest of this " +
+      "conversation — score against it and ignore the measured value above until they state something new.";
   }
   // PC-16: iteration. The user is refining the previous pick, not starting
   // over — resolve its ids to wardrobe handles so the model can address
@@ -647,7 +650,9 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
       "- articles: every piece they should pack, each with a short reason. outfits: 2–3, built ONLY from those articles, 2+ pieces each.\n" +
       "- whatChanged: one plain sentence describing what changed versus the current plan above.\n" +
       "- After calling, say the whatChanged line in prose too, briefly.\n" +
-      "- Questions about the trip (weather, plans, \"will I need a coat?\") → answer in prose. NO tool call.";
+      "- Questions about the trip (weather, plans, \"will I need a coat?\") → answer in prose. NO tool call.\n" +
+      "- WEATHER DEFAULT: score everything against the packing weather above. If the user states different weather " +
+      "for this trip, that wins going forward.";
   }
   const config = {
     systemInstruction: system,

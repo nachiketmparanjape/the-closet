@@ -5,6 +5,7 @@ const {
   sanitizeTripContext,
   extractToolCall,
   handleIndex,
+  buildStylistRequest,
 } = require("../functions/stylist");
 
 describe("sanitizeTripContext", () => {
@@ -94,6 +95,37 @@ describe("extractToolCall", () => {
     assert.strictEqual(extractToolCall({}), null);
     assert.strictEqual(extractToolCall(null), null);
     assert.strictEqual(extractToolCall({ functionCalls: [] }), null);
+  });
+});
+
+describe("buildStylistRequest weather/trip wiring", () => {
+  const items = [
+    { id: "a", name: "Blue sweater", colors: [], formality: 5, warmth: 7 },
+    { id: "b", name: "White tee", colors: [], formality: 3, warmth: 3 },
+  ];
+  const messages = [{ role: "user", text: "hello" }];
+
+  test("measured weather carries the active-weather override rule", () => {
+    const req = buildStylistRequest(items, messages, [], null, null, "72°F and sunny");
+    assert.ok(req.config.systemInstruction.includes("ACTIVE-WEATHER RULE"));
+    assert.strictEqual(req.config.responseMimeType, "application/json");
+    assert.strictEqual(req.config.tools, undefined);
+  });
+
+  test("trip mode: tool declared, no forced JSON, trip weather is default", () => {
+    const ctx = sanitizeTripContext({
+      tripId: "t1",
+      tripName: "Vancouver",
+      leg: { resolvedName: "Vancouver, Canada", startDate: "2026-10-29", endDate: "2026-11-06" },
+      weatherSummary: "cold, rainy",
+      packing: { articleIds: ["a"], articleReasons: { a: "warm" }, outfits: [] },
+    });
+    const req = buildStylistRequest(items, messages, [], null, null, null, null, null, ctx);
+    assert.ok(req.config.systemInstruction.includes("TRIP MODE"));
+    assert.ok(req.config.systemInstruction.includes("WEATHER DEFAULT"));
+    assert.ok(req.config.systemInstruction.includes("CURRENT PACKING PLAN"));
+    assert.strictEqual(req.config.responseMimeType, undefined);
+    assert.strictEqual(req.config.tools[0].functionDeclarations[0].name, "updateTripPacking");
   });
 });
 

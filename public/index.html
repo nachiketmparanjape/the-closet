@@ -2902,7 +2902,10 @@
         renderChat();
         renderTripChip();
         openOverlay(chatOverlay);
-        refreshWeatherChip(); // WX-1: show what the stylist knows
+        // Sprint 16 fix: no geolocation in trip mode — the browser would
+        // prompt for *your* location, but the trip already has its own
+        // destination and stored weather. The chip stays hidden.
+        if (!tripChat) refreshWeatherChip(); // WX-1: show what the stylist knows
         window.setTimeout(function () { chatInput.focus(); }, 60);
       }
 
@@ -3096,7 +3099,10 @@
         chatInput.value = "";
         // WX-1: measured local weather rides along as context (cached 30
         // min; null when location is denied/unavailable — server ignores it).
-        var weatherContext = await getWeatherSummary();
+        // Sprint 16 fix: in trip mode the default weather is the TRIP's
+        // (already in tripContext) — never the user's current position,
+        // and never a geolocation prompt.
+        var weatherContext = tripChat ? null : await getWeatherSummary();
         // PC-22: keep the referenced labels on the message so the thread
         // shows what was pointed at (the chips above the input clear on send).
         var refLabels = chatRefs.articles.concat(chatRefs.outfits).map(function (r) {
