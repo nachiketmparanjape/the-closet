@@ -252,8 +252,8 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   persistent thread per trip, each with its own history and its own
   context scope — continuation of context at the right place, right
   time.
-- **Design:** `docs/proposals/THREADS-PROPOSAL.md`. Interim
-  threads-lite shipped 2026-10-19 (session-scoped per-context
+- **Design:** `docs/proposals/THREADS-PROPOSAL.md`. An interim
+  threads-lite went live 2026-10-19 (session-scoped per-context
   message lists, anchor-once, trip-mode pin scoping server +
   chip). The full cut persists threads
   (`users/{uid}/chat_threads/{threadId}`), resumes them across
