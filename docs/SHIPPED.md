@@ -128,3 +128,17 @@ What went live. Momentum you can see.
   **UX:** creating a trip now opens its detail (Plan packing as the
   next step, ✕ to dismiss); trips render as full-width cards
   (.trip-card) instead of bare tiles.
+- **Sprint 16 TRIPCHAT-1: trip chat mode (PC-29 Phase 2)** — shipped
+  2026-10-19 (commit bef4965). Packing iteration is conversational:
+  the trip detail CTA "💬 Talk to me for changes" opens the chat
+  scoped to the trip; the model receives the trip + current packing as
+  handles and may call the `updateTripPacking` tool to rewrite the
+  plan — the client validates every id against the wardrobe (drops
+  unknowns/dupes, filters <2-piece outfits) and writes
+  `trips/{tripId}.packing`, confirming with the model's whatChanged
+  line. First-gen `Plan packing` stays a button; the blind Re-plan
+  button is gone. First instance of the stylist-as-agent pattern
+  (model proposes, client disposes). 12 new tests; full suite green.
+  `askStylist` redeployed. Design: docs/sprints/sprint-16/.
+  Awaiting founder phone validation (open trip chat → ask for a change
+  → packing updates).
