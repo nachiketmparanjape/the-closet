@@ -17,7 +17,7 @@ const { initializeApp } = require("firebase-admin/app");
 const { getStorage } = require("firebase-admin/storage");
 const { getFirestore } = require("firebase-admin/firestore");
 const { describeImage } = require("./describe");
-const { askStylist, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext } = require("./stylist");
+const { askStylist, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext } = require("./stylist");
 const { reflectOutfit } = require("./reflect");
 const { critiqueOutfit } = require("./critique");
 const { parseOutfitPhoto } = require("./photo");
@@ -105,7 +105,7 @@ exports.describeItem = onCall(
       const photoIds = Array.isArray(data.photoIds)
         ? data.photoIds.filter((p) => typeof p === "string").slice(0, 4)
         : [];
-      return finish("describeItem", correlationId, uid, start, await await describeImage(buffer, mimeType, photoIds));
+      return finish("describeItem", correlationId, uid, start, await describeImage(buffer, mimeType, photoIds));
     } catch (err) {
       // Any failure inside describeImage is a downstream AI failure.
       if (!(err instanceof HttpsError) && !err.key) err.key = "DESCRIBE_FAILED";
@@ -136,6 +136,10 @@ exports.askStylist = onCall(
       const references = sanitizeReferences(data.references, items);
       const weatherContext = sanitizeWeatherContext(data.weatherContext);
       const vibe = sanitizeVibe(data.vibe);
+      // Sprint 16 (TRIPCHAT-1): optional trip-chat context. Malformed →
+      // null; the chat proceeds without it. The client supplies the
+      // trip + current packing; item ids are re-validated on execute.
+      const tripContext = sanitizeTripContext(data.tripContext);
       // Sprint 13: learned vibe profile, read server-side (best-effort like
       // styleProfile — a failed read never blocks the chat). The client
       // never sends it; the server is the source of truth.
@@ -169,7 +173,7 @@ exports.askStylist = onCall(
       } catch (e) {
         logError("askStylist.styleProfile", e, { uid: uid, correlationId: correlationId });
       }
-      return finish("askStylist", correlationId, uid, start, await await askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile));
+      return finish("askStylist", correlationId, uid, start, await askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext));
     } catch (err) {
       // Any failure inside askStylist is a downstream AI failure.
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
@@ -202,7 +206,7 @@ exports.reflectOutfit = onCall(
       if (!ratingId || ratingId.length > 100) {
         fail("BAD_REQUEST");
       }
-      return finish("reflectOutfit", correlationId, uid, start, await await reflectOutfit(uid, ratingId));
+      return finish("reflectOutfit", correlationId, uid, start, await reflectOutfit(uid, ratingId));
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
       boundary("reflectOutfit", correlationId, uid, err);
@@ -230,7 +234,7 @@ exports.critiqueOutfit = onCall(
       if (!outfitId || outfitId.length > 100) {
         fail("BAD_REQUEST");
       }
-      return finish("critiqueOutfit", correlationId, uid, start, await await critiqueOutfit(uid, outfitId));
+      return finish("critiqueOutfit", correlationId, uid, start, await critiqueOutfit(uid, outfitId));
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
       boundary("critiqueOutfit", correlationId, uid, err);
@@ -258,7 +262,7 @@ exports.parseOutfitPhoto = onCall(
       if (!storagePath || storagePath.length > 300) {
         fail("BAD_REQUEST");
       }
-      return finish("parseOutfitPhoto", correlationId, uid, start, await await parseOutfitPhoto(uid, storagePath));
+      return finish("parseOutfitPhoto", correlationId, uid, start, await parseOutfitPhoto(uid, storagePath));
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
       boundary("parseOutfitPhoto", correlationId, uid, err);
@@ -287,7 +291,7 @@ exports.shopCheck = onCall(
       if (!storagePath || storagePath.length > 300) {
         fail("BAD_REQUEST");
       }
-      return finish("shopCheck", correlationId, uid, start, await await shopCheck(uid, storagePath));
+      return finish("shopCheck", correlationId, uid, start, await shopCheck(uid, storagePath));
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
       boundary("shopCheck", correlationId, uid, err);
@@ -334,7 +338,7 @@ exports.planPacking = onCall(
       } catch (e) {
         logError("planPacking.vibeProfile", e, { uid: uid, correlationId: correlationId });
       }
-      return finish("planPacking", correlationId, uid, start, await await planPacking(items, trip.leg, trip.weatherSummary, trip.notes, vibeProfile));
+      return finish("planPacking", correlationId, uid, start, await planPacking(items, trip.leg, trip.weatherSummary, trip.notes, vibeProfile));
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
       boundary("planPacking", correlationId, uid, err);

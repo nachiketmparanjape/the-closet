@@ -382,6 +382,126 @@ function parseStylistJson(text) {
   return { reply: reply, outfit: outfit };
 }
 
+// Sprint 16 (TRIPCHAT-1): trip chat context. The client sends the trip
+// + its current packing; everything is length-clamped and the packing
+// ids are just strings here — the client re-validates them against the
+// real wardrobe when it executes the tool call. Malformed → null.
+function sanitizeTripContext(value) {
+  if (!value || typeof value !== "object") return null;
+  const tripId = typeof value.tripId === "string" ? cleanText(value.tripId, 100) : "";
+  if (!tripId) return null;
+  const legIn = value.leg && typeof value.leg === "object" ? value.leg : {};
+  const leg = {
+    location: cleanText(legIn.location || "", 120),
+    resolvedName: cleanText(legIn.resolvedName || "", 180),
+    startDate: /^\d{4}-\d{2}-\d{2}$/.test(legIn.startDate || "") ? legIn.startDate : "",
+    endDate: /^\d{4}-\d{2}-\d{2}$/.test(legIn.endDate || "") ? legIn.endDate : "",
+  };
+  const packingIn = value.packing && typeof value.packing === "object" ? value.packing : null;
+  let packing = null;
+  if (packingIn) {
+    const ids = Array.isArray(packingIn.articleIds)
+      ? packingIn.articleIds.filter((x) => typeof x === "string" && x.length > 0 && x.length <= 100).slice(0, 30)
+      : [];
+    const reasons = {};
+    if (packingIn.articleReasons && typeof packingIn.articleReasons === "object") {
+      for (const k of Object.keys(packingIn.articleReasons).slice(0, 30)) {
+        if (typeof packingIn.articleReasons[k] === "string") {
+          reasons[k.slice(0, 100)] = cleanText(packingIn.articleReasons[k], 140);
+        }
+      }
+    }
+    const outfits = Array.isArray(packingIn.outfits)
+      ? packingIn.outfits.slice(0, 5).map((o) => ({
+          itemIds: o && Array.isArray(o.itemIds)
+            ? o.itemIds.filter((x) => typeof x === "string" && x.length > 0 && x.length <= 100).slice(0, 10)
+            : [],
+          reasoning: o && typeof o.reasoning === "string" ? cleanText(o.reasoning, 200) : "",
+        })).filter((o) => o.itemIds.length >= 2)
+      : [];
+    packing = { articleIds: ids, articleReasons: reasons, outfits: outfits };
+  }
+  return {
+    tripId: tripId,
+    tripName: cleanText(value.tripName || "", 120),
+    leg: leg,
+    notes: cleanText(value.notes || "", 500),
+    weatherSummary: value.weatherSummary ? cleanText(value.weatherSummary, 500) : null,
+    packing: packing,
+  };
+}
+
+// Sprint 16 (TRIPCHAT-1): the tool the model calls to rewrite a trip's
+// packing. Handles, not ids — the server maps handles → ids before the
+// payload reaches the client, and the client re-validates on execute.
+const UPDATE_TRIP_PACKING_DECL = {
+  name: "updateTripPacking",
+  description: "Replace the trip's packing plan with the full revised plan. Call ONLY when the user asks for packing changes.",
+  parameters: {
+    type: "OBJECT",
+    properties: {
+      articles: {
+        type: "ARRAY",
+        description: "The complete revised packing list — every piece the user should pack for this trip.",
+        items: {
+          type: "OBJECT",
+          properties: {
+            handle: { type: "STRING", description: "Wardrobe handle like [i3]" },
+            reason: { type: "STRING", description: "Why this piece earns its place on this trip" },
+          },
+          required: ["handle"],
+        },
+      },
+      outfits: {
+        type: "ARRAY",
+        description: "2–3 outfits built ONLY from the articles list above.",
+        items: {
+          type: "OBJECT",
+          properties: {
+            handles: { type: "ARRAY", items: { type: "STRING" }, description: "Wardrobe handles forming the outfit" },
+            reasoning: { type: "STRING" },
+          },
+          required: ["handles"],
+        },
+      },
+      whatChanged: {
+        type: "STRING",
+        description: "One plain sentence saying what changed versus the previous packing plan.",
+      },
+    },
+    required: ["articles", "whatChanged"],
+  },
+};
+
+// Pure: pull the first function call out of a generateContent response,
+// tolerating both the SDK's functionCalls getter and the raw parts shape.
+function extractToolCall(response) {
+  try {
+    const fcs = response && response.functionCalls;
+    if (Array.isArray(fcs) && fcs.length && fcs[0] && typeof fcs[0].name === "string") {
+      return { name: fcs[0].name, args: fcs[0].args || {} };
+    }
+    const cands = (response && response.candidates) || [];
+    for (const c of cands) {
+      const parts = (c && c.content && c.content.parts) || [];
+      for (const p of parts) {
+        if (p && p.functionCall && typeof p.functionCall.name === "string") {
+          return { name: p.functionCall.name, args: p.functionCall.args || {} };
+        }
+      }
+    }
+  } catch (e) { /* fall through — no call */ }
+  return null;
+}
+
+// "[i3]" → items index 2, or -1. Pure.
+function handleIndex(handle, items) {
+  const m = typeof handle === "string" ? handle.trim().match(/^\[i(\d+)\]$/) : null;
+  if (!m) return -1;
+  const idx = Number(m[1]) - 1;
+  return idx >= 0 && idx < items.length ? idx : -1;
+}
+
 // items: sanitized array. messages: sanitized [{role, text}].
 // styleProfile: sanitized preference strings (may be empty).
 // previousPick: sanitized {itemIds} from sanitizePreviousPick, or null.
@@ -391,7 +511,7 @@ function parseStylistJson(text) {
 // Build the exact model request askStylist sends. Exported so the
 // benchmark runner (tests/benchmark) exercises the real prompt —
 // prompt changes and benchmark stay in sync by construction.
-function buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile) {
+function buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext) {
   const model = process.env.GEMINI_MODEL || MODEL_VERSION;
   const wardrobe = items.map((it, i) => itemLine(it, i)).join("\n");
   let system = SYSTEM;
@@ -480,13 +600,68 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
   for (const m of messages) {
     contents.push({ role: m.role, parts: [{ text: m.text }] });
   }
+  // Sprint 16 (TRIPCHAT-1): trip mode. The model gets the trip + the
+  // current packing (as handles) and one tool to rewrite the plan.
+  if (tripContext) {
+    const leg = tripContext.leg || {};
+    const where = leg.resolvedName || leg.location || "the destination";
+    const when = leg.startDate
+      ? " (" + leg.startDate + (leg.endDate && leg.endDate !== leg.startDate ? " → " + leg.endDate : "") + ")"
+      : "";
+    system += "\n\nTRIP MODE — you are the stylist for the trip \"" +
+      (tripContext.tripName || "Trip") + "\" to " + where + when + ".";
+    if (tripContext.notes) system += "\nTrip notes from the user: " + tripContext.notes;
+    if (tripContext.weatherSummary) system += "\nPacking weather: " + tripContext.weatherSummary;
+    const pk = tripContext.packing;
+    if (pk && pk.articleIds.length) {
+      const byId = new Map(items.map((it, i) => [it.id, i]));
+      const lines = [];
+      for (const id of pk.articleIds) {
+        const idx = byId.get(id);
+        if (idx === undefined) continue;
+        const reason = pk.articleReasons && pk.articleReasons[id] ? " — " + pk.articleReasons[id] : "";
+        lines.push("- [i" + (idx + 1) + "] \"" + cleanText(items[idx].name, 60) + "\"" + reason);
+      }
+      if (lines.length) {
+        system += "\n\nCURRENT PACKING PLAN — these pieces are currently going:\n" + lines.join("\n");
+        const outfitLines = [];
+        pk.outfits.forEach((o, oi) => {
+          const parts = o.itemIds.map((id) => {
+            const idx = byId.get(id);
+            return idx === undefined ? null : "[i" + (idx + 1) + "]";
+          }).filter(Boolean);
+          if (parts.length >= 2) {
+            outfitLines.push("Outfit " + (oi + 1) + ": " + parts.join(", ") +
+              (o.reasoning ? " — " + o.reasoning : ""));
+          }
+        });
+        if (outfitLines.length) system += "\n" + outfitLines.join("\n");
+      }
+    } else {
+      system += "\n\nNo packing plan exists yet for this trip.";
+    }
+    system += "\n\nYOU HAVE A TOOL: updateTripPacking.\n" +
+      "- Call it ONLY when the user asks for a packing change (\"keep the blue sweater\", \"drop the boots\", \"pack warmer\", \"add a dinner outfit\").\n" +
+      "- The payload is the COMPLETE new packing plan — include pieces they didn't mention if those still belong.\n" +
+      "- \"keep X\" is a hard constraint: X stays no matter what. \"drop/remove X\": X leaves the plan.\n" +
+      "- articles: every piece they should pack, each with a short reason. outfits: 2–3, built ONLY from those articles, 2+ pieces each.\n" +
+      "- whatChanged: one plain sentence describing what changed versus the current plan above.\n" +
+      "- After calling, say the whatChanged line in prose too, briefly.\n" +
+      "- Questions about the trip (weather, plans, \"will I need a coat?\") → answer in prose. NO tool call.";
+  }
   const config = {
     systemInstruction: system,
     temperature: 0.3,
     maxOutputTokens: 2500,
     thinkingConfig: { thinkingBudget: 1024 },
-    responseMimeType: "application/json",
   };
+  if (tripContext) {
+    // Function calling is incompatible with a forced JSON mime type —
+    // trip mode answers in prose and/or the tool call instead.
+    config.tools = [{ functionDeclarations: [UPDATE_TRIP_PACKING_DECL] }];
+  } else {
+    config.responseMimeType = "application/json";
+  }
   return { model, contents, config };
 }
 
@@ -505,6 +680,24 @@ async function callStylistModel(ai, model, contents, config, label) {
   return parseStylistJson(text);
 }
 
+// Sprint 16 (TRIPCHAT-1): trip-mode call. A tool-only response has no
+// text — that is fine as long as a function call came through.
+async function callStylistModelTrip(ai, model, contents, config) {
+  let response;
+  try {
+    response = await ai.models.generateContent({ model, contents, config });
+  } catch (err) {
+    throw codedError("AI_UNAVAILABLE", "askStylist(trip): generateContent failed: " + (err && err.message));
+  }
+  const toolCall = extractToolCall(response);
+  const text = (response.text || "").trim();
+  if (!toolCall && !text) {
+    logAiFailure("askStylist-trip", response);
+    throw codedError("AI_BAD_RESPONSE", "askStylist(trip): model returned no text and no tool call");
+  }
+  return { text: text, toolCall: toolCall };
+}
+
 // Confidence is computed IN CODE from the sub-score mean — never taken
 // from the model directly. Reweightable against user ratings later
 // without touching the prompt.
@@ -520,9 +713,47 @@ function confidenceFromScores(scores) {
 // vibe: sanitized explicit vibe tag or null (Sprint 13).
 // vibeProfile: sanitized {tags, confidence} or null (Sprint 13).
 // Returns { reply, outfit: { itemIds, confidence, reasoning, scores } | null }.
-async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile) {
-  const { model, contents, config } = buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile);
+// tripContext: sanitized trip context from sanitizeTripContext, or null.
+// In trip mode the model may call updateTripPacking instead of (or in
+// addition to) answering in prose — handles are mapped to real item ids
+// here; the client re-validates on execute.
+async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext) {
+  const { model, contents, config } = buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext);
   const ai = getClient();
+  if (tripContext) {
+    const { text, toolCall } = await callStylistModelTrip(ai, model, contents, config);
+    let mappedCall = null;
+    if (toolCall && toolCall.name === "updateTripPacking") {
+      const raw = toolCall.args && typeof toolCall.args === "object" ? toolCall.args : {};
+      const seen = new Set();
+      const articles = [];
+      for (const a of (Array.isArray(raw.articles) ? raw.articles : [])) {
+        const idx = handleIndex(a && a.handle, items);
+        if (idx < 0 || seen.has(items[idx].id)) continue;
+        seen.add(items[idx].id);
+        articles.push({ id: items[idx].id, reason: cleanText((a && a.reason) || "", 140) });
+      }
+      const outfits = [];
+      for (const o of (Array.isArray(raw.outfits) ? raw.outfits : [])) {
+        const ids = ((o && Array.isArray(o.handles)) ? o.handles : [])
+          .map((h) => handleIndex(h, items))
+          .filter((idx) => idx >= 0 && seen.has(items[idx].id))
+          .map((idx) => items[idx].id);
+        if (ids.length >= 2) {
+          outfits.push({ itemIds: ids, reasoning: cleanText((o && o.reasoning) || "", 200) });
+        }
+      }
+      if (articles.length) {
+        mappedCall = {
+          name: "updateTripPacking",
+          articles: articles,
+          outfits: outfits,
+          whatChanged: cleanText(raw.whatChanged || "", 160),
+        };
+      }
+    }
+    return { reply: text, toolCall: mappedCall };
+  }
   let parsed = await callStylistModel(ai, model, contents, config, "askStylist");
 
   // Slot validation with ONE repair attempt. The repair shows the model
@@ -559,4 +790,4 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
   };
 }
 
-module.exports = { askStylist, buildStylistRequest, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM, VIBE_TAGS };
+module.exports = { askStylist, buildStylistRequest, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, extractToolCall, handleIndex, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM, VIBE_TAGS };

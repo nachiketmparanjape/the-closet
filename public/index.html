@@ -170,6 +170,8 @@
     /* WX-1: shows the weather the stylist is working with. Hidden until a
        reading succeeds — no chip is better than a stale or "unknown" one. */
     .weather-chip { display: inline-block; font-size: 13px; font-weight: 400; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; margin-left: 10px; vertical-align: middle; white-space: nowrap; }
+    .trip-chip { display: inline-block; font-size: 13px; font-weight: 500; color: var(--ink); border: 1px solid var(--accent, #e58db1); border-radius: 999px; padding: 3px 10px; margin-left: 8px; vertical-align: middle; white-space: nowrap; }
+    .trip-chip button { background: none; border: none; color: inherit; font-size: 13px; cursor: pointer; padding: 0 0 0 6px; }
     .chat-list { display: flex; flex-direction: column; gap: 8px; max-height: 52vh; overflow-y: auto; margin: 0 0 12px; }
     .chat-msg { max-width: 88%; padding: 9px 13px; border-radius: 14px; font-size: 14px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: break-word; }
     .chat-msg.user { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
@@ -738,7 +740,7 @@
   <div class="overlay" id="chatOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="chatTitle">
     <section class="modal">
       <div class="modal-head">
-        <h2 id="chatTitle">Stylist <span class="weather-chip" id="weatherChip" hidden></span></h2>
+        <h2 id="chatTitle">Stylist <span class="weather-chip" id="weatherChip" hidden></span> <span class="trip-chip" id="tripChip" hidden></span></h2>
         <button class="icon-button" id="chatClose" type="button" aria-label="Close stylist chat">×</button>
       </div>
       <div class="modal-body">
@@ -2784,6 +2786,46 @@
       // descriptions. The model never sees photos here.
       var stylistMessages = [];
       var chatBusy = false;
+      // Sprint 16 (TRIPCHAT-1): trip mode — null, or { tripId } while the
+      // chat is scoped to one trip (packing iteration by conversation).
+      var tripChat = null;
+
+      // Pure (tested in tests/tripchat-client.test.js): validate a
+      // updateTripPacking tool call before executing it. Unknown ids and
+      // duplicate articles drop; outfits keep only packed pieces and
+      // need 2+ of them. null = refuse (plan untouched).
+      function validatePackingToolArgs(tc, items) {
+        if (!tc || typeof tc !== "object") return null;
+        var known = {};
+        (items || []).forEach(function (it) { if (it && it.id) known[it.id] = true; });
+        var seen = {};
+        var articleIds = [];
+        var reasons = {};
+        (Array.isArray(tc.articles) ? tc.articles : []).forEach(function (a) {
+          if (!a || !known[a.id] || seen[a.id]) return;
+          seen[a.id] = true;
+          articleIds.push(a.id);
+          reasons[a.id] = String(a.reason || "").slice(0, 140);
+        });
+        if (!articleIds.length) return null;
+        var outfits = [];
+        (Array.isArray(tc.outfits) ? tc.outfits : []).forEach(function (o) {
+          var ids = (o && Array.isArray(o.itemIds) ? o.itemIds : [])
+            .filter(function (id) { return seen[id]; });
+          if (ids.length >= 2) {
+            outfits.push({
+              itemIds: ids,
+              reasoning: String((o && o.reasoning) || "").slice(0, 200)
+            });
+          }
+        });
+        return {
+          articleIds: articleIds,
+          articleReasons: reasons,
+          outfits: outfits,
+          whatChanged: String(tc.whatChanged || "").slice(0, 160)
+        };
+      }
 
       function renderChat() {
         chatList.textContent = "";
@@ -2858,9 +2900,81 @@
           });
         }
         renderChat();
+        renderTripChip();
         openOverlay(chatOverlay);
         refreshWeatherChip(); // WX-1: show what the stylist knows
         window.setTimeout(function () { chatInput.focus(); }, 60);
+      }
+
+      // Sprint 16 (TRIPCHAT-1): enter trip mode — chat scoped to one
+      // trip's packing. The model gets the trip + current plan and a
+      // tool to rewrite the plan; the client executes it.
+      function openTripChat(tripId) {
+        var trip = tripById(tripId);
+        if (!trip || !trip.packing || !currentUser) return;
+        tripChat = { tripId: tripId };
+        var leg = (trip.legs && trip.legs[0]) || {};
+        stylistMessages.push({
+          role: "model",
+          text: "You're tweaking the *" + (trip.name || "trip") + "* packing (" +
+            fmtTripDates(leg) + ") — tell me what to change and I'll update it."
+        });
+        openChat();
+      }
+
+      function exitTripChat() {
+        tripChat = null;
+        renderTripChip();
+      }
+
+      function renderTripChip() {
+        var el = document.getElementById("tripChip");
+        if (!tripChat) { el.hidden = true; el.textContent = ""; return; }
+        var trip = tripById(tripChat.tripId);
+        if (!trip) { exitTripChat(); return; }
+        var leg = (trip.legs && trip.legs[0]) || {};
+        el.textContent = "";
+        el.hidden = false;
+        var label = document.createElement("span");
+        label.textContent = "🧳 " + (trip.name || "Trip");
+        var dates = fmtTripDates(leg);
+        if (dates) label.textContent += " · " + dates;
+        el.appendChild(label);
+        var x = document.createElement("button");
+        x.type = "button";
+        x.setAttribute("aria-label", "Leave trip mode");
+        x.textContent = "×";
+        x.addEventListener("click", exitTripChat);
+        el.appendChild(x);
+      }
+
+      // Executes a validated updateTripPacking tool call against the
+      // trip doc. Resolves true on write, false on validation/write
+      // failure (plan untouched).
+      function applyTripPackingTool(tripId, tc) {
+        var trip = tripById(tripId);
+        if (!trip || !currentUser) return Promise.resolve(false);
+        var v = validatePackingToolArgs(tc, allItems || []);
+        if (!v) return Promise.resolve(false);
+        var prev = trip.packing || {};
+        return db.collection("users").doc(currentUser.uid)
+          .collection("trips").doc(tripId)
+          .update({
+            packing: {
+              articleIds: v.articleIds,
+              articleReasons: v.articleReasons,
+              outfits: v.outfits,
+              reply: v.whatChanged,
+              weatherSnapshot: prev.weatherSnapshot || null,
+              forecastAvailable: !!prev.forecastAvailable,
+              generatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            },
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          }).then(function () { return true; })
+          .catch(function (err) {
+            if (typeof reportError === "function") reportError("applyTripPackingTool", err);
+            return false;
+          });
       }
 
       // PC-22: @-mention references. Typing "@" in the chat input opens a
@@ -3028,13 +3142,55 @@
         };
         chatRefs = { articles: [], outfits: [] }; // per-message; PC-16 carries continuity
         if (!payload.vibe && vibeIntentWithoutMatch(text)) logVibeMiss(text);
+        // Sprint 16 (TRIPCHAT-1): trip mode — the trip + current packing
+        // ride along; the server sanitizes, the model may tool-call.
+        if (tripChat) {
+          var tct = tripById(tripChat.tripId);
+          if (tct) {
+            var tleg = (tct.legs && tct.legs[0]) || {};
+            var tpk = tct.packing || {};
+            payload.tripContext = {
+              tripId: tct.id,
+              tripName: tct.name || "",
+              leg: {
+                location: tleg.location || "",
+                resolvedName: tleg.resolvedName || "",
+                startDate: tleg.startDate || "",
+                endDate: tleg.endDate || ""
+              },
+              notes: tct.notes || "",
+              weatherSummary: tpk.weatherSnapshot || null,
+              packing: {
+                articleIds: tpk.articleIds || [],
+                articleReasons: tpk.articleReasons || {},
+                outfits: (tpk.outfits || []).map(function (o) {
+                  return { itemIds: o.itemIds || [], reasoning: o.reasoning || "" };
+                })
+              }
+            };
+          }
+        }
         renderRefChips();
         functions.httpsCallable("askStylist")(payload).then(function (res) {
           thinking.thinking = false;
-          thinking.text = (res.data && res.data.reply) || "Hmm, I couldn't put that together — try again?";
-          // PC-12: structured outfit attached for the saveable card.
-          var outfit = res.data && res.data.outfit;
-          thinking.outfit = (outfit && outfit.itemIds && outfit.itemIds.length >= 2) ? outfit : null;
+          var d = res.data || {};
+          // Sprint 16: the model called updateTripPacking — the client
+          // executes it (model proposes, client disposes).
+          if (d.toolCall && d.toolCall.name === "updateTripPacking" && tripChat) {
+            thinking.text = "Updating your packing…";
+            renderChat();
+            applyTripPackingTool(tripChat.tripId, d.toolCall).then(function (ok) {
+              thinking.text = ok
+                ? "Packing updated — " + (d.toolCall.whatChanged || "got it.")
+                : "I couldn't apply those changes to your packing — mind rephrasing?";
+              renderChat();
+            });
+          } else {
+            thinking.text = d.reply || "Hmm, I couldn't put that together — try again?";
+            // PC-12: structured outfit attached for the saveable card.
+            var outfit = d.outfit;
+            thinking.outfit = (outfit && outfit.itemIds && outfit.itemIds.length >= 2) ? outfit : null;
+          }
         }).catch(function (err) {
           thinking.thinking = false;
           thinking.text = friendlyError(err);
@@ -3046,7 +3202,7 @@
       }
 
       document.getElementById("chatFab").addEventListener("click", openChat);
-      document.getElementById("chatClose").addEventListener("click", function () { closeOverlay(chatOverlay); });
+      document.getElementById("chatClose").addEventListener("click", function () { exitTripChat(); closeOverlay(chatOverlay); });
       chatForm.addEventListener("submit", sendChat);
 
       // Sprint 14: outfit composer ("Pick an outfit") — one-tap morning pick. Client
@@ -3450,8 +3606,11 @@
           wEl.textContent = "🌤 " + trip.packing.weatherSnapshot;
           wEl.hidden = false;
         } else wEl.hidden = true;
+        // Sprint 16: with a plan in place, iteration is conversational —
+        // the button opens trip chat instead of blindly re-planning.
         document.getElementById("tripPlanBtn").textContent =
-          trip.packing ? "Re-plan packing" : "Plan packing";
+          (trip.packing && trip.packing.articleIds && trip.packing.articleIds.length)
+            ? "💬 Talk to me for changes" : "Plan packing";
         renderTripPacking(trip);
       }
 
@@ -3644,7 +3803,14 @@
         activeTripId = null;
         closeOverlay(document.getElementById("tripDetailOverlay"));
       });
-      document.getElementById("tripPlanBtn").addEventListener("click", planPackingForTrip);
+      document.getElementById("tripPlanBtn").addEventListener("click", function () {
+        var trip = tripById(activeTripId);
+        if (trip && trip.packing && trip.packing.articleIds && trip.packing.articleIds.length) {
+          openTripChat(trip.id);
+        } else {
+          planPackingForTrip();
+        }
+      });
       document.getElementById("tripDeleteBtn").addEventListener("click", function () {
         var trip = tripById(activeTripId);
         if (!trip || !currentUser) return;
