@@ -214,3 +214,32 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   tagged shop items in one place).
 - **Status:** Not started. The `tripId` field already exists on
   shopChecks (Sprint 15); tagging UI + unified trip view remain.
+
+### OBS-2: Error logging & handling overhaul (M)
+- **Idea (founder 2026-10-19):** treat error data as *system quality
+  data* — available for debugging now and for monitoring in the long
+  run, not just ad-hoc log dives. Tonight's session is the evidence:
+  the packing bug hid for two turns because a rejected tool call was
+  silently dropped, and the "not signed in" flake surfaced in metrics
+  as `(uncoded)`.
+- **Scope (to be refined at sprint planning):**
+  - **Taxonomy audit:** every callable throws coded errors only; fix
+    the key-loss where HttpsError-carried codes log as `(uncoded)`
+    (logError reads `.key`; make it read `.code`/catalog consistently).
+    Client copy exists for every code (friendlyError coverage check).
+  - **Rejections are events:** every dropped/invalid tool call,
+    malformed model response, and self-heal retry is logged
+    structured (args shape, no user content) — generalizing
+    `trip_tool_args_rejected`. Nothing fails silently server-side.
+  - **Quality report:** extend the OBS-1 metrics into a durable
+    report — per-function success rate, top error keys, client error
+    counts, latency percentiles, self-heal rate — runnable on demand
+    and summarizable on a cadence. Decide where it lives (local
+    script vs. scheduled digest) at planning.
+  - **Alerting:** a cheap threshold signal when a function's failure
+    rate spikes (mirrors the $50 budget-alert pattern; notify-only).
+  - **Client side:** reportError already persists to `client_errors`;
+    add session correlation so a user report ("it broke at 9:28")
+    can be matched to the exact server call.
+- **Status:** Not started. Builds on OBS-1 (Sprint 15 fix buffer).
+  Sprint candidate — pull at a planning walk.
