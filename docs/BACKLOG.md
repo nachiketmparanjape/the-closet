@@ -202,8 +202,15 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   Sprint 16 (both founder-validated 2026-10-19). Packing iteration is
   conversational: the trip detail CTA "💬 Talk to me for changes" opens
   trip chat, which rewrites the plan via the `updateTripPacking` tool
-  call; the blind Re-plan button is gone. Remaining: Phase 3
-  (trip-tagged shop items + unified trip view) and the trip-preference
-  curation open thread. Designs: `docs/sprints/sprint-15/
-  TRIPS-PHASE1-DESIGN.md`, `docs/sprints/sprint-16/
-  PHASE2-TRIP-CHAT-DESIGN.md`.
+  call; the blind Re-plan button is gone. Remaining work split out:
+  Phase 3 → PC-31; trip-preference curation stays an open thread here.
+  Designs: `docs/sprints/sprint-15/TRIPS-PHASE1-DESIGN.md`,
+  `docs/sprints/sprint-16/PHASE2-TRIP-CHAT-DESIGN.md`.
+
+### PC-31: Trips Phase 3 — trip-tagged shop items + unified trip view (M)
+- **Idea (founder 2026-10-18, PC-29 decision 4):** shop-list items can
+  be tagged to a trip ("will this earn a place *for this trip*?"); they
+  show in the generic Shop list AND in a unified trip view (packing +
+  tagged shop items in one place).
+- **Status:** Not started. The `tripId` field already exists on
+  shopChecks (Sprint 15); tagging UI + unified trip view remain.
