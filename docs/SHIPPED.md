@@ -43,6 +43,13 @@ What went live. Momentum you can see.
   fact no longer holds (cancelled plans, back early). Client shows a
   "Forget 'X'?" confirm naming the actual stored target; trip-scoped
   pins are never touched by chat proposals.
+  Fix buffer 2026-10-19 (commit 0fa93ba): trip-mode tool handling.
+  `extractToolCalls` returns ALL calls (a pinContext call could steal
+  the turn from updateTripPacking, degrading to an empty "Hmm" reply).
+  Both tools are now processed per turn; a rejected packing call is
+  logged (trip_tool_args_rejected) and re-asked once with a handle
+  hint; trip mode never returns an empty reply. Client warms the ID
+  token before askStylist calls against an intermittent NOT_SIGNED_IN.
 
 ## Sprint 15 (2026-10-19 → )
 - **PC-29 Phase 1: Trips — trip objects + packing list** — Trips tab;
