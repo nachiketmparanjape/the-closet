@@ -58,6 +58,17 @@ What went live. Momentum you can see.
   states TODAY explicitly; expiry filters by the client date; a past
   validUntil is dropped at sanitize; expired pins are marked in the
   account list. The stored pin was repaired to 2026-10-26.
+  Fix buffer 3 2026-10-19 (commit df0ccdb): context scoping +
+  threads-lite + auth self-heal. Global location/weather pins no
+  longer enter trip conversations (server injects preference +
+  trip-scoped pins only; the pin chip hides in trip mode). Chat
+  keeps one message list per context (general / per-trip) and
+  resumes them — the trip anchor posts only on a brand-new thread.
+  Trip-mode output cap raised to 4000 (truncated packing rewrites).
+  friendlyError now strips the functions/ prefix (NOT_SIGNED_IN had
+  surfaced as a generic error); askStylist retries once after a
+  forced token refresh on unauthenticated. Full persisted threads
+  are scoped as PC-32 (proposal in docs/proposals/).
 
 ## Sprint 15 (2026-10-19 → )
 - **PC-29 Phase 1: Trips — trip objects + packing list** — Trips tab;
