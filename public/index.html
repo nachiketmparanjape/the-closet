@@ -2840,6 +2840,19 @@
       // PC-10: chat stylist — text-only outfit picks over the cached
       // descriptions. The model never sees photos here.
       var stylistMessages = [];
+      // Threads-lite (founder 2026-10-19): one message list per
+      // context — the general chat and one per trip. Switching context
+      // swaps the list, so reopening a trip chat RESUMES its
+      // conversation instead of re-anchoring a fresh one every time.
+      // (Persisted threads are the full design: PC-32 proposal.)
+      var chatThreads = {};
+      var activeThreadKey = "general";
+      function switchThread(key) {
+        if (key === activeThreadKey) return;
+        chatThreads[activeThreadKey] = stylistMessages;
+        activeThreadKey = key;
+        stylistMessages = chatThreads[key] || [];
+      }
       var chatBusy = false;
       // Sprint 16 (TRIPCHAT-1): trip mode — null, or { tripId } while the
       // chat is scoped to one trip (packing iteration by conversation).
@@ -3070,6 +3083,7 @@
         }
         renderChat();
         renderTripChip();
+        renderPinChip();
         openOverlay(chatOverlay);
         // Sprint 16 fix: no geolocation in trip mode — the browser would
         // prompt for *your* location, but the trip already has its own
@@ -3085,18 +3099,27 @@
         var trip = tripById(tripId);
         if (!trip || !trip.packing || !currentUser) return;
         tripChat = { tripId: tripId };
-        var leg = (trip.legs && trip.legs[0]) || {};
-        stylistMessages.push({
-          role: "model",
-          text: "You're tweaking the *" + (trip.name || "trip") + "* packing (" +
-            fmtTripDates(leg) + ") — tell me what to change and I'll update it."
-        });
+        switchThread("trip:" + tripId);
+        // Anchor only a brand-new trip thread — a resumed one keeps
+        // its history (and its context) intact.
+        if (!stylistMessages.length) {
+          var leg = (trip.legs && trip.legs[0]) || {};
+          stylistMessages.push({
+            role: "model",
+            text: "You're tweaking the *" + (trip.name || "trip") + "* packing (" +
+              fmtTripDates(leg) + ") — tell me what to change and I'll update it."
+          });
+        }
+        renderPinChip();
         openChat();
       }
 
       function exitTripChat() {
         tripChat = null;
+        switchThread("general");
         renderTripChip();
+        renderPinChip();
+        renderChat();
       }
 
       function renderTripChip() {
@@ -3347,9 +3370,7 @@
           }
         }
         renderRefChips();
-        warmToken().then(function () {
-          return functions.httpsCallable("askStylist")(payload);
-        }).then(function (res) {
+        callAskStylist(payload).then(function (res) {
           thinking.thinking = false;
           var d = res.data || {};
           // Sprint 16: the model called updateTripPacking — the client
@@ -3474,16 +3495,14 @@
             var last = composerPicks[composerPicks.length - 1].outfit;
             if (last && last.itemIds) previousPick = { itemIds: last.itemIds.slice() };
           }
-          return warmToken().then(function () {
-            return functions.httpsCallable("askStylist")({
-              items: stylistItems(),
-              messages: [{ role: "user", text: text }],
-              previousPick: previousPick,
-              vibe: detectVibeTag(text),
-              weatherContext: weather,
-              today: localTodayStr(),
-              references: { articleIds: [], outfits: [] }
-            });
+          return callAskStylist({
+            items: stylistItems(),
+            messages: [{ role: "user", text: text }],
+            previousPick: previousPick,
+            vibe: detectVibeTag(text),
+            weatherContext: weather,
+            today: localTodayStr(),
+            references: { articleIds: [], outfits: [] }
           });
         }).then(function (callRes) {
           var outfit = callRes.data && callRes.data.outfit;
@@ -3633,8 +3652,25 @@
         return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
       }
 
+      // askStylist with one self-heal: on an unauthenticated error the
+      // ID token evidently didn't ride along (observed repeatedly
+      // 2026-10-19) — force a refresh and retry exactly once.
+      function callAskStylist(payload) {
+        function attempt() {
+          return functions.httpsCallable("askStylist")(payload);
+        }
+        return warmToken().then(attempt).catch(function (err) {
+          var code = (err && err.code) || "";
+          if (!currentUser || !/unauthenticated$/.test(code)) throw err;
+          return currentUser.getIdToken(true).then(attempt);
+        });
+      }
+
       function renderPinChip() {
         var el = document.getElementById("pinChip");
+        // In a trip thread the trip chip carries the location context;
+        // a global location pin would just mix contexts.
+        if (tripChat) { el.hidden = true; el.textContent = ""; return; }
         var pin = activePin("location");
         if (!pin) { el.hidden = true; el.textContent = ""; return; }
         el.hidden = false;

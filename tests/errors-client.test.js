@@ -76,3 +76,18 @@ describe("friendlyError", () => {
     });
   });
 });
+
+describe("friendlyError functions/ prefix (2026-10-19)", () => {
+  it("maps functions/unauthenticated to the sign-in copy", () => {
+    assert.strictEqual(
+      friendlyError({ code: "functions/unauthenticated", message: "x" }),
+      "Please sign in to continue."
+    );
+  });
+  it("maps other prefixed callable codes too", () => {
+    assert.strictEqual(
+      friendlyError({ code: "functions/unavailable", message: "x" }),
+      "Couldn't reach the server. Check your connection and try again."
+    );
+  });
+});

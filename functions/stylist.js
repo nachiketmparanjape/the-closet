@@ -703,9 +703,18 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
   system += "\n\nTODAY is " + weekday + ", " + todayStr + ". " +
     "Resolve every relative date the user gives (\"until Sunday\", \"next week\", \"back Friday\") " +
     "against TODAY — never guess a year.";
-  const activePins = (Array.isArray(pins) ? pins : []).filter(
+  // Threads scoping (founder 2026-10-19): inside a trip conversation,
+  // global location/weather pins do NOT apply — the trip's own
+  // destination and packing weather are the context there. Preference
+  // pins and pins scoped to this trip still do.
+  let activePins = (Array.isArray(pins) ? pins : []).filter(
     (p) => !p.validUntil || p.validUntil >= todayStr
   );
+  if (tripContext) {
+    activePins = activePins.filter(
+      (p) => p.kind === "preference" || p.tripId === tripContext.tripId
+    );
+  }
   if (activePins.length) {
     const pinLines = activePins.map((p) => {
       let line = "- [" + p.kind + "] " + p.label;
@@ -802,7 +811,9 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
   const config = {
     systemInstruction: system,
     temperature: 0.3,
-    maxOutputTokens: 2500,
+    // Trip mode rewrites the whole packing plan per call — the biggest
+    // output in the app; 2500 truncated tool calls (2026-10-19).
+    maxOutputTokens: tripContext ? 4000 : 2500,
     thinkingConfig: { thinkingBudget: 1024 },
   };
   if (tripContext) {

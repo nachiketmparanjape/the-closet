@@ -107,6 +107,13 @@ describe("pin prompt injection", () => {
     assert.ok(decls.includes("updateTripPacking"));
     assert.ok(req.config.systemInstruction.includes("PIN PROPOSAL"));
   });
+  test("trip mode scopes pins: preferences in, global locations out", () => {
+    const sys = buildStylistRequest([], [], null, null, null, null, null, null,
+      { tripId: "t1", leg: {}, packing: null }, pins, today)
+      .config.systemInstruction;
+    assert.ok(sys.includes("runs cold"));      // preference pin applies
+    assert.ok(!sys.includes("Tahoe"));          // global location pin does not
+  });
 });
 
 describe("parseStylistJson", () => {

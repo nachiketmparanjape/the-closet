@@ -48,6 +48,11 @@
   function friendlyError(err) {
     if (!err) return "Something went wrong. Try again.";
     var code = err.code;
+    // Callable errors arrive prefixed ("functions/unauthenticated");
+    // the catalog is keyed by the bare code — strip the prefix.
+    if (typeof code === "string" && code.indexOf("functions/") === 0) {
+      code = code.slice("functions/".length);
+    }
     if (typeof code === "string" && CODE_COPY[code]) return CODE_COPY[code];
     // Some SDKs nest the code or only leave a message.
     var msg = err.message || String(err);
