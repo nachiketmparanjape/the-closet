@@ -106,3 +106,25 @@ above. The trip-preference curation topic is the remaining open thread.)*
 3. Multi-leg in v1 UI, or single destination now with legs in the model?
 4. Does a trip need a "bought for this trip" link into the Shop list?
    (Natural cross-lane tie-in — Phase 3 candidate.)
+
+## Design decision (founder, 2026-10-19): packing iteration is conversational
+
+After phone-testing Phase 1, the founder approved the first packing
+plan ("looks alright") and flagged the `Re-plan packing` button as a
+blind reroll — "a random slow machine": the user has no way to say
+*what should be different*. Two iteration primitives were considered:
+(1) a re-plan prompt box ("pack warmer", "we're hiking now"), and
+(2) per-piece keep/remove constraints before regenerating.
+
+**Decision:** do NOT build those as detail-view UI. Iteration ships as
+trip chat (Phase 2): the trip detail's CTA becomes a chat entry point —
+"talk to me for changes" — and the user asks for changes in
+conversation ("keep the blue sweater, drop the heavy boots, pack
+warmer"). The chat carries the current packing plan as context and
+writes the revised plan back to the trip. The blind `Re-plan packing`
+button is replaced by this CTA when Phase 2 lands; the initial
+`Plan packing` (first generation) stays a button.
+
+**Phase 2 = the next Trips update** (founder, 2026-10-19). Scope at
+planning time: chat mode scoped to a trip, packing plan in context,
+plan replace-via-chat, keep/remove semantics expressed in prose.

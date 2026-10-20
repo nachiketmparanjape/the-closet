@@ -198,5 +198,10 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   recorded 2026-10-18 (articles + outfits lists, day-by-day optional,
   simple UI; chat mode; single destination v1; trip-tagged shop items).
   Open thread: trip preference curation (bloat-aware design).
-- **Status:** Phase 1 building in Sprint 15 (design:
-  `docs/sprints/sprint-15/TRIPS-PHASE1-DESIGN.md`, validated 2026-10-19).
+- **Status:** Phase 1 shipped in Sprint 15 and founder-validated
+  2026-10-19 (design: `docs/sprints/sprint-15/TRIPS-PHASE1-DESIGN.md`).
+  **Phase 2 = next Trips update (founder, 2026-10-19):** packing
+  iteration is conversational — trip chat with a "talk to me for
+  changes" CTA on the trip detail replaces the blind Re-plan button;
+  re-plan prompts and keep/remove piece constraints are expressed in
+  chat, not as detail-view UI (design decision in the proposal).
