@@ -184,7 +184,11 @@ exports.askStylist = onCall(
       } catch (e) {
         logError("askStylist.styleProfile", e, { uid: uid, correlationId: correlationId });
       }
-      return finish("askStylist", correlationId, uid, start, await askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins));
+      // Sprint 17 fix buffer: the client's local date (YYYY-MM-DD) —
+      // the model resolves relative dates against it, and pins expire
+      // by it. Malformed → null (server falls back to its own clock).
+      const today = /^\d{4}-\d{2}-\d{2}$/.test(data.today || "") ? data.today : null;
+      return finish("askStylist", correlationId, uid, start, await askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today));
     } catch (err) {
       // Any failure inside askStylist is a downstream AI failure.
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";

@@ -355,7 +355,7 @@ function parseScores(o) {
   return out;
 }
 
-function parseStylistJson(text) {
+function parseStylistJson(text, todayStr) {
   let obj = null;
   if (typeof text === "string") {
     const match = text.match(/\{[\s\S]*\}/);
@@ -381,7 +381,7 @@ function parseStylistJson(text) {
   }
   // Sprint 17: optional pin proposal — the model may surface one durable
   // fact per message. Sanitized; the client confirms before saving.
-  const proposal = sanitizePinProposal(obj.pinProposal);
+  const proposal = sanitizePinProposal(obj.pinProposal, todayStr);
   return { reply: reply, outfit: outfit, pinProposal: proposal };
 }
 
@@ -414,13 +414,19 @@ function sanitizePins(raw) {
 // the pinContext tool call (trip mode). Returns the sanitized proposal
 // or null. The client always confirms before saving: propose, never
 // append.
-function sanitizePinProposal(obj) {
+function sanitizePinProposal(obj, todayStr) {
   if (!obj || typeof obj !== "object") return null;
   const kinds = { location: 1, weather: 1, preference: 1 };
   const kind = typeof obj.kind === "string" ? obj.kind : "";
   if (!kinds[kind]) return null;
   const label = cleanText(obj.label || "", 80);
   if (!label) return null;
+  // Sprint 17 fix buffer: the model resolves relative dates itself and
+  // can hallucinate (a "2024" validUntil shipped once — a pin born dead).
+  // A past expiry date is always a fumble: drop it so the pin still
+  // works and can be removed later by hand or by chat.
+  let validUntil = /^\d{4}-\d{2}-\d{2}$/.test(obj.validUntil || "") ? obj.validUntil : "";
+  if (validUntil && todayStr && validUntil < todayStr) validUntil = "";
   // Sprint 17 fix buffer: proposals can retract as well as save. "remove"
   // targets a pin the user says no longer holds (cancelled plans, back
   // early) — the client always confirms before deleting.
@@ -431,7 +437,7 @@ function sanitizePinProposal(obj) {
     label: label,
     detail: cleanText(obj.detail || "", 200),
     weatherSummary: cleanText(obj.weatherSummary || "", 200),
-    validUntil: /^\d{4}-\d{2}-\d{2}$/.test(obj.validUntil || "") ? obj.validUntil : "",
+    validUntil: validUntil,
   };
 }
 
@@ -595,7 +601,7 @@ function handleIndex(handle, items) {
 // Build the exact model request askStylist sends. Exported so the
 // benchmark runner (tests/benchmark) exercises the real prompt —
 // prompt changes and benchmark stay in sync by construction.
-function buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins) {
+function buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today) {
   const model = process.env.GEMINI_MODEL || MODEL_VERSION;
   const wardrobe = items.map((it, i) => itemLine(it, i)).join("\n");
   let system = SYSTEM;
@@ -687,7 +693,16 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
   // Sprint 17 (CONTEXT PINS): the user's confirmed current facts.
   // Outrank the measured weather; conversation-stated weather still
   // outranks them. Expired pins are ignored here (cleanup is quiet).
-  const todayStr = new Date().toISOString().slice(0, 10);
+  // The client's local date wins over the server clock — evening in
+  // California is already tomorrow in UTC.
+  const todayStr = /^\d{4}-\d{2}-\d{2}$/.test(today || "")
+    ? today
+    : new Date().toISOString().slice(0, 10);
+  const weekday = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][
+    new Date(todayStr + "T12:00:00Z").getUTCDay()];
+  system += "\n\nTODAY is " + weekday + ", " + todayStr + ". " +
+    "Resolve every relative date the user gives (\"until Sunday\", \"next week\", \"back Friday\") " +
+    "against TODAY — never guess a year.";
   const activePins = (Array.isArray(pins) ? pins : []).filter(
     (p) => !p.validUntil || p.validUntil >= todayStr
   );
@@ -800,7 +815,7 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
   return { model, contents, config };
 }
 
-async function callStylistModel(ai, model, contents, config, label) {
+async function callStylistModel(ai, model, contents, config, label, todayStr) {
   let response;
   try {
     response = await ai.models.generateContent({ model, contents, config });
@@ -812,7 +827,7 @@ async function callStylistModel(ai, model, contents, config, label) {
     logAiFailure(label, response);
     throw codedError("AI_BAD_RESPONSE", label + ": model returned no text");
   }
-  return parseStylistJson(text);
+  return parseStylistJson(text, todayStr);
 }
 
 // Sprint 16 (TRIPCHAT-1): trip-mode call. A tool-only response has no
@@ -884,8 +899,11 @@ function mapUpdateTripPacking(raw, items) {
 }
 
 // here; the client re-validates on execute.
-async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins) {
-  const { model, contents, config } = buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins);
+async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today) {
+  const todayStr = /^\d{4}-\d{2}-\d{2}$/.test(today || "")
+    ? today
+    : new Date().toISOString().slice(0, 10);
+  const { model, contents, config } = buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, todayStr);
   const ai = getClient();
   if (tripContext) {
     // Trip mode: the tools are independent — a packing change and a
@@ -921,7 +939,7 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
       }
     }
     const pinProposal = toolCalls.some((c) => c.name === "pinContext")
-      ? sanitizePinProposal((toolCalls.find((c) => c.name === "pinContext") || {}).args)
+      ? sanitizePinProposal((toolCalls.find((c) => c.name === "pinContext") || {}).args, todayStr)
       : null;
     // The user always gets words, never an empty bubble.
     if (!text) {
@@ -931,7 +949,7 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
     }
     return { reply: text, toolCall: mappedCall, pinProposal: pinProposal };
   }
-  let parsed = await callStylistModel(ai, model, contents, config, "askStylist");
+  let parsed = await callStylistModel(ai, model, contents, config, "askStylist", todayStr);
 
   // Slot validation with ONE repair attempt. The repair shows the model
   // its own answer plus what's wrong with it.
@@ -943,7 +961,7 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
       { role: "user", parts: [{ text: "That outfit doesn't work: " + (problem || "the handles didn't match the wardrobe") + ". Choose again using only wardrobe handles, following all rules." }] },
     ]);
     try {
-      parsed = await callStylistModel(ai, model, repairContents, config, "askStylist-repair");
+      parsed = await callStylistModel(ai, model, repairContents, config, "askStylist-repair", todayStr);
       mapped = parsed.outfit ? mapHandlesToIds(parsed.outfit, items) : null;
       problem = parsed.outfit ? validateSlots(mapped || [], items) : null;
     } catch (e) {

@@ -1433,6 +1433,7 @@
           var bits = [];
           if (p.detail) bits.push(p.detail);
           if (p.validUntil) bits.push("until " + p.validUntil);
+          if (p.validUntil && p.validUntil < localTodayStr()) bits.push("expired");
           if (bits.length) label.textContent += " — " + bits.join(", ");
           row.appendChild(label);
           var b = el("button", "secondary", "Remove");
@@ -3302,6 +3303,7 @@
           // Server accepts exact vocabulary hits only.
           vibe: detectVibeTag(text),
           weatherContext: weatherContext,
+          today: localTodayStr(),
           // PC-22: explicit @-references ride along as structured ids.
           // Outfit contents are resolved client-side (it already has them);
           // the server re-validates every id against the real wardrobe.
@@ -3479,6 +3481,7 @@
               previousPick: previousPick,
               vibe: detectVibeTag(text),
               weatherContext: weather,
+              today: localTodayStr(),
               references: { articleIds: [], outfits: [] }
             });
           });
@@ -3619,6 +3622,15 @@
       function warmToken() {
         if (!currentUser || !currentUser.getIdToken) return Promise.resolve();
         return currentUser.getIdToken().catch(function () { /* best-effort */ });
+      }
+
+      // The user's local calendar date (YYYY-MM-DD) — sent with chat
+      // calls so the model resolves "until Sunday" against *their*
+      // today, not the server's UTC clock.
+      function localTodayStr() {
+        var d = new Date();
+        function p(n) { return (n < 10 ? "0" : "") + n; }
+        return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
       }
 
       function renderPinChip() {

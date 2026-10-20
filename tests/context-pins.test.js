@@ -54,6 +54,14 @@ describe("sanitizePinProposal", () => {
     assert.equal(
       sanitizePinProposal({ kind: "location", label: "NY", action: "nuke" }).action, "save");
   });
+  test("a past validUntil is dropped (model date fumble), future kept", () => {
+    const p = sanitizePinProposal(
+      { kind: "location", label: "NY", validUntil: "2024-06-21" }, "2026-10-19");
+    assert.equal(p.validUntil, "");
+    const q = sanitizePinProposal(
+      { kind: "location", label: "NY", validUntil: "2026-10-26" }, "2026-10-19");
+    assert.equal(q.validUntil, "2026-10-26");
+  });
 });
 
 describe("pin prompt injection", () => {
@@ -62,13 +70,24 @@ describe("pin prompt injection", () => {
     { kind: "preference", label: "runs cold", validUntil: "" },
     { kind: "weather", label: "home", validUntil: "2000-01-01" }, // expired
   ];
-  const sys = buildStylistRequest([], [], null, null, null, null, null, null, null, pins)
+  const today = "2026-10-19"; // Monday
+  const sys = buildStylistRequest([], [], null, null, null, null, null, null, null, pins, today)
     .config.systemInstruction;
   test("active pins are injected, expired ones are not", () => {
     assert.ok(sys.includes("CURRENT CONTEXT"));
     assert.ok(sys.includes("Tahoe"));
     assert.ok(sys.includes("runs cold"));
     assert.ok(!sys.includes('"home"'));
+  });
+  test("TODAY line names the user's local date and weekday", () => {
+    assert.ok(sys.includes("TODAY is Monday, 2026-10-19"));
+    assert.ok(sys.includes("never guess a year"));
+  });
+  test("expiry filters by the client date, not the server clock", () => {
+    const edge = buildStylistRequest([], [], null, null, null, null, null, null, null,
+      [{ kind: "location", label: "Tahoe", validUntil: "2026-10-19" }], "2026-10-19")
+      .config.systemInstruction;
+    assert.ok(edge.includes("Tahoe"));
   });
   test("pin weather outranks measured, conversation still wins", () => {
     assert.ok(sys.includes("outranks the measured"));
