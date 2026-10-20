@@ -50,6 +50,14 @@ What went live. Momentum you can see.
   logged (trip_tool_args_rejected) and re-asked once with a handle
   hint; trip mode never returns an empty reply. Client warms the ID
   token before askStylist calls against an intermittent NOT_SIGNED_IN.
+  Fix buffer 2 2026-10-19 (commit b0945e5): model date grounding. The
+  saved NYC pin carried validUntil "2024-06-21" — the model resolved
+  "next week" with no knowledge of today and hallucinated the year;
+  born-expired pins vanish from CURRENT CONTEXT, so removal could
+  never be proposed. Client now sends its local date; the prompt
+  states TODAY explicitly; expiry filters by the client date; a past
+  validUntil is dropped at sanitize; expired pins are marked in the
+  account list. The stored pin was repaired to 2026-10-26.
 
 ## Sprint 15 (2026-10-19 → )
 - **PC-29 Phase 1: Trips — trip objects + packing list** — Trips tab;
