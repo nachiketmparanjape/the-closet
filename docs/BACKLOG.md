@@ -284,3 +284,43 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   future. The discipline half can split out as an (S) at planning.
 - **Status:** Not started (proposal stage). Sprint candidate;
   sits next to PC-32 (threads) and CONTEXT-1 (pins).
+
+### UX-13: Visual redesign + design system (L)
+- **Idea (founder 2026-10-20):** the app looks extremely
+  rudimentary next to modern apps; it has to feel modern and
+  seamless, because feeling drives whether someone wants to use
+  it — and this product's initial overhead (adding your clothes)
+  means everything after onboarding must be really good.
+- **Design:** `docs/proposals/REDESIGN-PROPOSAL.md`. System
+  first: a living `docs/DESIGN.md` (tokens, component kit,
+  motion rules, state patterns), 2–3 directions mocked on the
+  wardrobe grid for the founder to pick, then behavior-preserving
+  screen-by-screen re-skins in priority order. Flow changes stay
+  separate decisions. The proposal also carries the
+  framework-rebuild analysis (benefits, risks, the timing
+  tension) and a concrete decision point: evaluate at the first
+  planning walk after the design doc is validated and two screens
+  are re-skinned, decided by a timeboxed one-screen spike against
+  pre-agreed GO criteria; if GO, strangler-style, never a freeze.
+- **Status:** Not started (proposal stage). Sprint candidate —
+  the design doc + direction mocks are the first cut when pulled.
+
+### UX-14: Onboarding — cut time-to-first-value (L)
+- **Idea (founder 2026-10-20):** onboarding is the biggest
+  hurdle for the concept — the app is extremely useful once a
+  wardrobe is in, and getting it in is the problem to solve for
+  the long run.
+- **Design:** `docs/proposals/ONBOARDING-PROPOSAL.md`. Metric:
+  time-to-first-value (first pick the user rates good), not items
+  added. Three attack lines: (1) cut cost per item — a
+  closet-dump confirm queue (AI describes, user only confirms),
+  capture in existing moments (packing, laundry), worn-today
+  outfit capture that doubles as a wear log; (2) cut the
+  threshold — greatest-hits first (~10 favorites unlock picks),
+  a labeled demo wardrobe to feel the value before paying the
+  cost; (3) grow the catalogue itself — chat-driven and
+  gap-driven add prompts under a strict once-per-conversation
+  budget. Subsumes UX-12's tutorial question (disposition at the
+  planning walk); first-run is designed as part of UX-13.
+- **Status:** Not started (proposal stage). Each attack line
+  becomes its own sized cut at a planning walk.
