@@ -327,7 +327,7 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
 - **Status:** Not started (proposal stage). Each attack line
   becomes its own sized cut at a planning walk.
 
-## PC-34: Garment extraction & clean rendering (research spike)
+### PC-34: Garment extraction & clean rendering (research spike)
 - **Size:** Spike S, then size from findings
 - **Value:** Founder's long-term direction (2026-10-21): user photos
   are shot on beds and carpets, and no layout survives an ugly
@@ -355,7 +355,7 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   roll and upload into Closet cleanly (see PC-35); the spike
   still owns the feature's name, limits, and platform reach.
 
-## PC-35: Beginner guide — ways to add clothes (incl. Google Photos)
+### PC-35: Beginner guide — ways to add clothes (incl. Google Photos)
 - **Size:** S
 - **Value:** Founder discovery (2026-10-21, verified by doing
   it): Google Photos' wardrobe collection — auto-extracted
