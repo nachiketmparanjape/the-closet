@@ -353,3 +353,5 @@ What went live. Momentum you can see.
   all seven functions ACTIVE with the new env, callable boundary
   checks return the proper sign-in error. Awaiting founder phone
   validation (describe a photo / ask the stylist).
+
+- **Bulk dupe UX rework (founder report, 2026-10-21):** the PC-19 duplicate warning was a binary native confirm — add the dupe too, or cancel and reselect everything. Now an in-sheet decision bar names the match(es) with three paths: "Skip it & add the rest" (flagged jobs become Skipped — "Already in your wardrobe as X", the rest start immediately), "Add it anyway", "Cancel" (selection untouched). Handles multiple dupes at once; if every photo is a dupe, skipping explains there is nothing left to add.
