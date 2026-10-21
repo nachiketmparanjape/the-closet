@@ -46,6 +46,16 @@ service cloud.firestore {
         && request.resource.data.label.size() > 0
         && request.resource.data.label.size() <= 80;
     }
+    // DESIGN-HOME-1 (fix buffer 5): Today's daily picks + app settings
+    // live server-side so every device sees the same Today. Owner-only.
+    match /users/{userId}/today_picks/{dayId} {
+      allow read, create, update, delete:
+        if request.auth != null && request.auth.uid == userId;
+    }
+    match /users/{userId}/settings/{settingId} {
+      allow read, create, update, delete:
+        if request.auth != null && request.auth.uid == userId;
+    }
     match /users/{userId}/ratings/{ratingId} {
       allow read, create, update, delete:
         if request.auth != null && request.auth.uid == userId;

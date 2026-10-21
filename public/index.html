@@ -282,6 +282,28 @@
     #chatTodayStrip .today-pick-photos img { width: 56px; height: 70px; border-radius: 10px; }
     #chatTodayStrip .today-why { font-size: 14px; margin-top: 10px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
     #chatTodayStrip .today-actions { margin-top: 12px; }
+    /* Fix buffer 5 (founder): the stylist docks — bottom sheet on phone,
+       right-edge panel on desktop. Never a floating card mid-screen. */
+    #chatOverlay { place-items: end center; padding: 0; }
+    #chatOverlay .modal { width: 100%; max-height: 92dvh; border-radius: 20px 20px 0 0; }
+    @media (min-width: 900px) {
+      #chatOverlay { place-items: stretch end; }
+      #chatOverlay .modal { width: 420px; height: 100%; max-height: none; border-radius: 0; }
+    }
+    /* Motion basics (DESIGN.md §5) — shipped with fix buffer 5. */
+    .view-enter { animation: view-in 200ms cubic-bezier(.2,.7,.2,1); }
+    @keyframes view-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    .overlay:not([hidden]) .modal { animation: modal-in 260ms cubic-bezier(.2,.7,.2,1); }
+    @keyframes modal-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+    #chatOverlay:not([hidden]) .modal { animation-name: chat-in; }
+    @keyframes chat-in { from { opacity: .3; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+    @media (min-width: 900px) { @keyframes chat-in { from { opacity: .3; transform: translateX(36px); } to { opacity: 1; transform: none; } } }
+    .primary, .secondary, .chip, .auth-button { transition: transform 120ms ease, background 150ms ease, border-color 150ms ease; }
+    .primary:active, .secondary:active, .chip:active, .tab-action:active { transform: scale(.98); }
+    #tripView .trip-title { font-family: "Closet Serif", serif; font-size: 27px; font-weight: 500; letter-spacing: -.02em; line-height: 1.1; margin: 0 0 6px; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    }
     .chat-fab, .feedback-fab { display: none !important; }
     .outfit-card { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-md); padding: 16px; margin-top: 8px; }
 
@@ -560,6 +582,21 @@
       <p class="hint" id="tripsHint">Packing lists from your wardrobe, tuned to the weather where you're going.</p>
       <div class="gallery" id="tripsGallery"></div>
     </section>
+
+    <!-- Fix buffer 5: a trip is a page, not a floating window. -->
+    <section aria-label="Trip detail" id="tripView" hidden>
+      <button class="secondary" id="tripBackBtn" type="button" style="margin-bottom:16px">‹ All trips</button>
+      <h2 class="trip-title" id="tripDetailTitle">Trip</h2>
+      <p class="hint" id="tripDetailMeta" style="margin-top:0"></p>
+      <p class="hint" id="tripDetailNotes" hidden></p>
+      <p class="hint" id="tripDetailWeather" hidden></p>
+      <div style="display:flex;gap:8px;margin:10px 0;">
+        <button class="primary" id="tripPlanBtn" type="button" style="flex:1">Plan packing</button>
+        <button class="secondary" id="tripDeleteBtn" type="button">Delete</button>
+      </div>
+      <div id="tripPlanThinking" class="hint" hidden>Planning your packing…</div>
+      <div id="tripPacking"></div>
+    </section>
   </main>
 
 
@@ -663,26 +700,6 @@
 
   <!-- Sprint 15: trip detail — two flat lists (articles to pack, outfits),
        per the founder's simplicity constraint. -->
-  <div class="overlay" id="tripDetailOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="tripDetailTitle">
-    <section class="modal">
-      <div class="modal-head">
-        <h2 id="tripDetailTitle">Trip</h2>
-        <button class="icon-button" id="tripDetailClose" type="button" aria-label="Close">×</button>
-      </div>
-      <div class="modal-body">
-        <p class="hint" id="tripDetailMeta" style="margin-top:0"></p>
-        <p class="hint" id="tripDetailNotes" hidden></p>
-        <p class="hint" id="tripDetailWeather" hidden></p>
-        <div style="display:flex;gap:8px;margin:10px 0;">
-          <button class="primary" id="tripPlanBtn" type="button" style="flex:1">Plan packing</button>
-          <button class="secondary" id="tripDeleteBtn" type="button">Delete</button>
-        </div>
-        <div id="tripPlanThinking" class="hint" hidden>Planning your packing…</div>
-        <div id="tripPacking"></div>
-      </div>
-    </section>
-  </div>
-
   <!-- UX-11: one "Add outfit" entry — the sheet names the three ways. -->
   <div class="overlay sheet-overlay" id="addOutfitSheet" hidden role="dialog" aria-modal="true" aria-labelledby="addOutfitSheetTitle">
     <section class="sheet">
@@ -3974,14 +3991,13 @@
 
       function openTripDetail(id) {
         activeTripId = id;
+        switchView("trip");
         renderTripDetail();
-        openOverlay(document.getElementById("tripDetailOverlay"));
       }
 
       function renderTripDetail() {
         var trip = tripById(activeTripId);
-        var overlay = document.getElementById("tripDetailOverlay");
-        if (!trip) { closeOverlay(overlay); return; }
+        if (!trip) { if (activeTripId) { activeTripId = null; switchView("trips"); } return; }
         var leg = (trip.legs && trip.legs[0]) || {};
         document.getElementById("tripDetailTitle").textContent = trip.name || "Trip";
         var meta = [];
@@ -4190,9 +4206,9 @@
           if (!g) showToast("Couldn't find that place — check the spelling?");
         });
       });
-      document.getElementById("tripDetailClose").addEventListener("click", function () {
+      document.getElementById("tripBackBtn").addEventListener("click", function () {
         activeTripId = null;
-        closeOverlay(document.getElementById("tripDetailOverlay"));
+        switchView("trips");
       });
       document.getElementById("tripPlanBtn").addEventListener("click", function () {
         var trip = tripById(activeTripId);
@@ -4209,7 +4225,7 @@
         db.collection("users").doc(currentUser.uid).collection("trips").doc(trip.id).delete()
           .then(function () {
             activeTripId = null;
-            closeOverlay(document.getElementById("tripDetailOverlay"));
+            switchView("trips");
             showToast("Trip deleted.");
           }).catch(function (err) {
             showToast(friendlyError(err));
@@ -4360,13 +4376,61 @@
       // Another call the proposal machinery (callAskStylist) directly.
       var todayDataSeen = false;
       var todayRoutedOnce = false;
-      var todayState = { picks: [], idx: 0, generating: false, wornId: null, loaded: false, error: false, renderToken: 0 };
+      var todayState = { picks: [], idx: 0, generating: false, wornSet: {}, loaded: false, error: false, renderToken: 0, waitingSince: 0 };
+      // Fix buffer 5: Today state is server-side (settings/app +
+      // today_picks/{day}) — localStorage is only a first-paint mirror.
+      var todayHomeCache = null;
       function todayHomeOn() {
+        if (todayHomeCache !== null) return todayHomeCache;
         try { return window.localStorage.getItem("closetTodayHome") === "1"; } catch (e) { return false; }
       }
       function setTodayHome(on) {
+        todayHomeCache = on;
         try { window.localStorage.setItem("closetTodayHome", on ? "1" : "0"); } catch (e) {}
+        if (currentUser) {
+          db.collection("users").doc(currentUser.uid).collection("settings").doc("app")
+            .set({ todayHome: on, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true })
+            .catch(function () {});
+        }
         syncTodayChrome();
+      }
+      function watchTodaySettings(user) {
+        db.collection("users").doc(user.uid).collection("settings").doc("app")
+          .onSnapshot(function (snap) {
+            if (!snap.exists) {
+              // Migration: a device that opted in pre-server carries the
+              // preference up, so the account becomes the source of truth.
+              var local = false;
+              try { local = window.localStorage.getItem("closetTodayHome") === "1"; } catch (e) {}
+              if (local) setTodayHome(true);
+              return;
+            }
+            var on = !!((snap.data() || {}).todayHome);
+            if (todayHomeCache !== on) {
+              todayHomeCache = on;
+              try { window.localStorage.setItem("closetTodayHome", on ? "1" : "0"); } catch (e) {}
+              syncTodayChrome();
+            }
+            if (on && !todayRoutedOnce) {
+              todayRoutedOnce = true;
+              switchView("today");
+            }
+          }, function () {});
+      }
+      function watchTodayPicks(user) {
+        db.collection("users").doc(user.uid).collection("today_picks").doc(localTodayStr())
+          .onSnapshot(function (snap) {
+            if (!snap.exists) return;
+            var d = snap.data() || {};
+            if (d.picks && d.picks.length) {
+              todayState.picks = d.picks;
+              todayState.idx = Math.min(d.idx || 0, d.picks.length - 1);
+              todayState.loaded = true;
+              todayState.waitingSince = 0;
+              maybeRenderToday();
+              renderChatTodayStrip();
+            }
+          }, function () {});
       }
       function syncTodayChrome() {
         var on = todayHomeOn();
@@ -4378,11 +4442,15 @@
         return "closetTodayPicks:" + (currentUser ? currentUser.uid : "anon") + ":" + localTodayStr();
       }
       function persistToday() {
+        var clean = todayState.picks.map(function (w) { return { outfit: w.outfit, note: w.note || null }; });
         try {
-          window.localStorage.setItem(todayCacheKey(), JSON.stringify({
-            picks: todayState.picks, idx: todayState.idx, wornId: todayState.wornId
-          }));
+          window.localStorage.setItem(todayCacheKey(), JSON.stringify({ picks: clean, idx: todayState.idx }));
         } catch (e) {}
+        if (currentUser) {
+          db.collection("users").doc(currentUser.uid).collection("today_picks").doc(localTodayStr())
+            .set({ picks: clean, idx: todayState.idx, composingAt: null, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true })
+            .catch(function () {});
+        }
       }
       function restoreToday() {
         if (todayState.loaded) return;
@@ -4394,7 +4462,6 @@
             if (d && d.picks && d.picks.length) {
               todayState.picks = d.picks;
               todayState.idx = Math.min(d.idx || 0, d.picks.length - 1);
-              todayState.wornId = d.wornId || null;
             }
           }
         } catch (e) {}
@@ -4442,28 +4509,50 @@
         todayState.generating = true;
         todayState.error = false;
         renderToday();
-        getWeatherSummary().then(function (weather) {
-          return callAskStylist({
-            items: stylistItems(),
-            messages: [{ role: "user", text: "Dress me for today. Pick one complete outfit from my wardrobe. Be decisive — this is the morning rush." }],
-            previousPick: previousPick || null,
-            vibe: detectVibeTag("dress me for today"),
-            weatherContext: weather,
-            today: localTodayStr(),
-            references: { articleIds: [], outfits: [] }
-          });
-        }).then(function (callRes) {
-          var outfit = callRes.data && callRes.data.outfit;
-          if (outfit && outfit.itemIds && outfit.itemIds.length >= 2) {
-            var wrap = { outfit: outfit };
-            var reply = callRes.data && callRes.data.reply;
-            if (reply) wrap.note = reply.length > 220 ? reply.slice(0, 220) + "…" : reply;
-            todayState.picks.push(wrap);
-            todayState.idx = todayState.picks.length - 1;
-            persistToday();
-          } else {
-            todayState.error = true;
+        var ref = db.collection("users").doc(currentUser.uid).collection("today_picks").doc(localTodayStr());
+        // Cross-device discipline: the first device of the day composes;
+        // everyone else adopts that pick. Alternates (previousPick set)
+        // skip adoption — they're this user's explicit "another".
+        var gate = previousPick ? Promise.resolve(false) : ref.get().then(function (snap) {
+          var d = snap.exists ? (snap.data() || {}) : {};
+          if (d.picks && d.picks.length) {
+            todayState.picks = d.picks;
+            todayState.idx = Math.min(d.idx || 0, d.picks.length - 1);
+            todayState.loaded = true;
+            return true;
           }
+          if (d.composingAt && Date.now() - d.composingAt < 90000) {
+            if (!todayState.waitingSince) todayState.waitingSince = Date.now();
+            return true; // in flight elsewhere — the watcher delivers it
+          }
+          todayState.waitingSince = 0;
+          return ref.set({ composingAt: Date.now() }, { merge: true }).then(function () { return false; });
+        }).catch(function () { return false; });
+        gate.then(function (adopted) {
+          if (adopted) return null;
+          return getWeatherSummary().then(function (weather) {
+            return callAskStylist({
+              items: stylistItems(),
+              messages: [{ role: "user", text: "Dress me for today. Pick one complete outfit from my wardrobe. Be decisive — this is the morning rush." }],
+              previousPick: previousPick || null,
+              vibe: detectVibeTag("dress me for today"),
+              weatherContext: weather,
+              today: localTodayStr(),
+              references: { articleIds: [], outfits: [] }
+            });
+          }).then(function (callRes) {
+            var outfit = callRes.data && callRes.data.outfit;
+            if (outfit && outfit.itemIds && outfit.itemIds.length >= 2) {
+              var wrap = { outfit: outfit };
+              var reply = callRes.data && callRes.data.reply;
+              if (reply) wrap.note = reply.length > 220 ? reply.slice(0, 220) + "…" : reply;
+              todayState.picks.push(wrap);
+              todayState.idx = todayState.picks.length - 1;
+              persistToday();
+            } else {
+              todayState.error = true;
+            }
+          });
         }).catch(function () {
           todayState.error = true;
         }).then(function () {
@@ -4503,7 +4592,8 @@
             note: "",
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
           }).then(function () {
-            todayState.wornId = savedId;
+            todayState.wornSet = todayState.wornSet || {};
+            todayState.wornSet[savedId] = true;
             persistToday();
             showToast("Logged — enjoy the fit.");
             renderToday();
@@ -4550,6 +4640,28 @@
         var word = cut.lastIndexOf(" ");
         return (word > 80 ? cut.slice(0, word) : cut) + "…";
       }
+      // Worn state is read from wear_events for today (fix buffer 5):
+      // if the wear record goes away, the worn tag goes away.
+      function refreshTodayWorn() {
+        if (!currentUser) return;
+        var start = new Date();
+        start.setHours(0, 0, 0, 0);
+        var end = new Date(start.getTime() + 86400000);
+        db.collection("users").doc(currentUser.uid).collection("wear_events")
+          .where("wornAt", ">=", firebase.firestore.Timestamp.fromDate(start))
+          .where("wornAt", "<", firebase.firestore.Timestamp.fromDate(end))
+          .get().then(function (snap) {
+            var set = {};
+            snap.forEach(function (d) {
+              var w = d.data();
+              if (w.outfitId) set[w.outfitId] = true;
+            });
+            var before = Object.keys(todayState.wornSet || {}).sort().join(",");
+            var after = Object.keys(set).sort().join(",");
+            todayState.wornSet = set;
+            if (before !== after) { maybeRenderToday(); renderChatTodayStrip(); }
+          }).catch(function () {});
+      }
       function todayAsk() {
         openChat();
         renderChatTodayStrip();
@@ -4584,7 +4696,7 @@
         }
         strip.hidden = false;
         var o = wrap.outfit;
-        var worn = todayState.wornId && o.savedId && todayState.wornId === o.savedId;
+        var worn = !!(o.savedId && todayState.wornSet && todayState.wornSet[o.savedId]);
         strip.appendChild(shopCheckEl("p", "today-eyebrow", worn ? "Today's pick · worn ✓" : "Today's pick"));
         var photos = document.createElement("div");
         photos.className = "today-pick-photos";
@@ -4652,6 +4764,7 @@
         root.appendChild(thread);
         renderTodayThread(thread, token);
         renderChatTodayStrip();
+        refreshTodayWorn();
       }
 
       function renderTodaySlot(slot) {
@@ -4692,11 +4805,19 @@
           card.appendChild(shopCheckEl("p", "today-eyebrow", "Today's pick"));
           card.appendChild(shopCheckEl("p", "today-composing", "Composing today's pick…"));
           slot.appendChild(card);
-          setTimeout(function () { generateTodayPick(null); }, 30);
+          if (!todayState.kickAt || Date.now() - todayState.kickAt > 4000) {
+            todayState.kickAt = Date.now();
+            setTimeout(function () { generateTodayPick(null); }, 30);
+          }
           return;
         }
         var o = wrap.outfit;
-        var worn = todayState.wornId && o.savedId && todayState.wornId === o.savedId;
+        // Worn derives from actual wear data (fix buffer 5), never a
+        // local flag; a deleted outfit un-saves the pick so it can be
+        // worn (and saved) again — unless a wear event proves it was worn.
+        var outfitAlive = !!(o.savedId && allOutfits.some(function (x) { return x.id === o.savedId || x.versionGroup === o.savedId; }));
+        if (o.savedId && todayDataSeen && !outfitAlive && !(todayState.wornSet && todayState.wornSet[o.savedId])) o.savedId = null;
+        var worn = !!(o.savedId && todayState.wornSet && todayState.wornSet[o.savedId]);
         card.appendChild(shopCheckEl("p", "today-eyebrow", worn ? "Today's pick · worn ✓" : "Today's pick"));
         var photos = document.createElement("div");
         photos.className = "today-pick-photos";
@@ -4721,10 +4842,12 @@
         var actions = document.createElement("div");
         actions.className = "today-actions";
         if (worn) {
-          actions.appendChild(mkBtn("secondary", "View in Outfits", function () {
-            switchView("outfits");
-            openOutfit(o.savedId);
-          }));
+          if (outfitAlive) {
+            actions.appendChild(mkBtn("secondary", "View in Outfits", function () {
+              switchView("outfits");
+              openOutfit(o.savedId);
+            }));
+          }
         } else {
           actions.appendChild(mkBtn("primary", "Wear this", todayWear));
         }
@@ -4811,7 +4934,6 @@
           if (dates) bits.push(dates);
           if (nextTrip.packing && nextTrip.packing.articleIds) bits.push(nextTrip.packing.articleIds.length + " pieces packed");
           thread.appendChild(threadCard((nextTrip.name || "Trip") + " — " + when, bits.join(" · ") || "Your next trip", function () {
-            switchView("trips");
             openTripDetail(nextTrip.id);
           }));
           cards++;
@@ -4896,7 +5018,7 @@
       function switchView(view) {
         feedbackView = view; // FB-1: record where feedback comes from
         document.querySelectorAll(".tab").forEach(function (t) {
-          var on = t.getAttribute("data-view") === view;
+          var on = t.getAttribute("data-view") === (view === "trip" ? "trips" : view);
           t.classList.toggle("active", on);
           t.setAttribute("aria-selected", on ? "true" : "false");
         });
@@ -4908,7 +5030,16 @@
         document.getElementById("outfitsView").hidden = view !== "outfits";
         document.getElementById("shopListView").hidden = view !== "shoplist";
         document.getElementById("tripsView").hidden = view !== "trips";
+        document.getElementById("tripView").hidden = view !== "trip";
         if (view === "today") renderToday();
+        // Motion basics (§5): the incoming view fades + rises 8px.
+        var secIds = { today: "todayView", wardrobe: "wardrobeView", outfits: "outfitsView", shoplist: "shopListView", trips: "tripsView", trip: "tripView" };
+        var sec = document.getElementById(secIds[view] || "");
+        if (sec) {
+          sec.classList.remove("view-enter");
+          void sec.offsetWidth;
+          sec.classList.add("view-enter");
+        }
       }
       document.querySelectorAll(".tab").forEach(function (t) {
         t.addEventListener("click", function () { switchView(t.getAttribute("data-view")); });
@@ -6733,10 +6864,8 @@
             watchTrips(user); // Sprint 15 (PC-29 Phase 1)
             watchPins(user); // Sprint 17 (context pins)
             syncTodayChrome(); // DESIGN-HOME-1
-            if (!todayRoutedOnce) {
-              todayRoutedOnce = true;
-              if (todayHomeOn()) switchView("today");
-            }
+            watchTodaySettings(user); // fix buffer 5: server-side toggle
+            watchTodayPicks(user); // fix buffer 5: cross-device picks
           });
         } catch (error) {
           configured = false;

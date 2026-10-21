@@ -24,6 +24,15 @@ What went live. Momentum you can see.
   pill is the persistent door home (his steer). Pick notes are
   cleaned of raw markdown and cut at sentence boundaries (his
   screenshot showed formatting junk mid-chop).
+  Fix buffer 5 (manual testing): Today state moved server-side
+  (settings/app toggle + today_picks/{day}) — one Today across
+  devices, first device composes, others adopt; worn derives
+  from live wear_events (his phantom-worn bug); trips became a
+  full page instead of a stacked overlay; the stylist docks
+  (bottom sheet on phone, right panel on desktop); motion
+  basics landed per DESIGN.md §5 (view transitions, overlay
+  entrances, press states, reduced-motion honored). Firestore
+  rules gained the two new owner-only collections (deployed).
 - **Fix buffers (founder testing, 2026-10-21).** Buffer 1:
   Stylist became a filled accent pill + the bar gained its
   shadow (text-only read as hidden); the identity preview was

@@ -304,6 +304,21 @@ the experiment on, opening the stylist shows the pick card
 always-visible ✦ Stylist pill is the persistent door home —
 the founder's own steer ("part of the whole stylist
 experience"). The wordmark stays as a secondary affordance.
+**Fix buffer 5 (manual testing, 2026-10-21):** (a) Today state
+is server-side — the toggle lives in `settings/app`, the day's
+picks in `today_picks/{day}`; localStorage is a first-paint
+mirror only, and the first device of the day composes while
+others adopt (a 90-second compose claim prevents duplicate
+generations). (b) **Worn derives from actual wear data** —
+`wear_events` for today — never a local flag; deleting the
+wear record removes the tag, and a deleted outfit un-saves
+the pick. (c) **A trip is a page** (`#tripView`, back to the
+list), not a floating window; the editor remains a sheet.
+(d) **The stylist docks**: bottom sheet on phone, a 420px
+right-edge panel on desktop. (e) **Motion basics shipped**
+(§5): 200ms view fade-rise, 260ms overlay entrances (the
+docked stylist slides), press compression, all of it off
+under reduced-motion.
 
 ### 4.9 Toast, empty state, skeleton
 - **Toast:** bottom-center above the tab bar, `--ink` fill,
