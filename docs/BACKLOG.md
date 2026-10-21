@@ -408,6 +408,44 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   founder-verified — the collection's images save to the camera
   roll and upload into Closet cleanly (see PC-35); the spike
   still owns the feature's name, limits, and platform reach.
+  Founder expansion (2026-10-21, later): seeing the exported
+  cutouts, he set them as the quality benchmark and posed the
+  spike's two charter questions verbatim — (Q1) is it actually
+  possible for us: is there a readymade solution, and if not,
+  can we build it as good from scratch? (Q2) how expensive is
+  it — per photo at our scale, and in build/maintenance if we
+  roll our own? The spike's recommendation must answer both
+  head-on, with the Google output as the bar. PC-36 (worn-photo
+  decomposition) shares this spike — same segmentation core.
+
+### PC-36: Photo of a person → individual articles + the outfit
+- **Size:** Spike shared with PC-34, then size from findings
+- **Value:** Founder (2026-10-21): the endgame of the
+  Google-Photos-clean-view direction. Photograph yourself
+  wearing an outfit — or reuse photos you already have — and
+  the app identifies each worn garment, creates the
+  individual articles (clean renders, per PC-34), and
+  creates the outfit object matching what's being worn.
+  Cataloguing cost per piece drops to ~zero and the outfit
+  arrives free with the pieces: onboarding's front-loaded
+  cost (UX-14's core problem) collapses. It also compounds —
+  every outfit photo a user already owns becomes wardrobe +
+  outfits in one step. Today's parseOutfitPhoto only MATCHES
+  a photo against pieces already catalogued; this CREATES
+  the pieces.
+- **Scope:** Research first, as one spike with PC-34 (same
+  segmentation core), answering the founder's two charter
+  questions for this capability too: (Q1) feasibility —
+  readymade fashion-parsing / human-parsing solutions vs
+  from scratch, judged honestly against the Google
+  benchmark; (Q2) cost — per photo at our scale, plus
+  build/maintenance if scratch. Any build follows the
+  spike's recommendation only. Shape of the eventual build:
+  one worn photo → draft articles (clean render + AI tags)
+  the user confirms or edits — nothing lands silently — plus
+  one outfit composed of exactly those articles.
+- **Status:** Not started. Filed 2026-10-21 from the
+  founder's message; research pairs with PC-34.
 
 ### PC-35: Beginner guide — ways to add clothes (incl. Google Photos)
 - **Size:** S
