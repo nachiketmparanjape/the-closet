@@ -279,6 +279,24 @@ AI-suggestion rows (the describe/name hints) in Small
 `--accent-dark` — the one sanctioned accent-text use besides
 §4.6, because it literally is the AI speaking.
 
+### 4.10 Today home (experimental, toggle-gated)
+
+The stylist-first home from
+`docs/proposals/TODAY-HOME-PROPOSAL.md` (validated 2026-10-21,
+built as DESIGN-HOME-1). Anatomy: serif greeting (Display) +
+weather chip; the **proposal slot** — today's pick composed as
+piece photos with names, the stylist's one-line why, and
+*Wear this · Another · Ask the stylist*; then the **day's
+thread**: doorway cards (rate yesterday's outfit, trip
+countdown, saved shop checks, unworn pieces), each deep-linking
+in context; an **Explore row** as the floor when the thread is
+thin. Graded empty states (zero / below-threshold / ready)
+per the proposal — honest progress, a labeled sample, never a
+fake pick. With the experiment on, the topline carries a
+tappable serif **"Closet"** wordmark (the home affordance; the
+tab bar itself never changes). One generation per day, cached;
+the screen renders instantly and the proposal streams in.
+
 ### 4.9 Toast, empty state, skeleton
 - **Toast:** bottom-center above the tab bar, `--ink` fill,
   `--paper` text, radius full, auto-dismiss 3.2s. One at a time.

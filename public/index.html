@@ -252,6 +252,29 @@
     /* Wide screens: the tab cluster caps at 780px, centered — five tabs
        stretched across a laptop read as scattered, not native (DESIGN.md §3). */
     @media (min-width: 900px) { .tabs { padding-left: max(8px, calc((100vw - 780px) / 2)); padding-right: max(8px, calc((100vw - 780px) / 2)); } }
+    /* DESIGN-HOME-1: Today — the experimental stylist-first home (§4.10). */
+    .wordmark { border: none; background: none; font-family: "Closet Serif", serif; font-size: 21px; font-weight: 600; letter-spacing: -.02em; color: var(--ink); cursor: pointer; padding: 6px 2px; min-height: 44px; }
+    .today-greet { font-family: "Closet Serif", serif; font-size: 34px; font-weight: 500; letter-spacing: -.025em; line-height: 1.08; margin: 6px 0 4px; }
+    .today-date { color: var(--muted); font-size: 13.5px; margin: 0 0 6px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .today-weather { border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font-size: 12.5px; color: var(--muted-strong); background: var(--paper); }
+    .today-card { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-md); padding: 18px; margin-top: 16px; }
+    .today-eyebrow { font-size: 11.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; }
+    .today-pick-photos { display: flex; gap: 10px; flex-wrap: wrap; }
+    .today-pick-photos figure { margin: 0; width: 84px; }
+    .today-pick-photos img { width: 84px; height: 105px; object-fit: cover; border-radius: 12px; display: block; background: var(--paper-soft); }
+    .today-pick-photos figcaption { font-size: 11px; color: var(--muted); margin-top: 5px; line-height: 1.3; }
+    .today-why { font-size: 15px; line-height: 1.55; margin: 14px 0 0; }
+    .today-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+    .today-composing { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 14.5px; padding: 10px 0; }
+    .today-thread-card { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-md); padding: 14px 16px; margin-top: 12px; cursor: pointer; font: inherit; color: var(--ink); }
+    .today-thread-card .tt { font-size: 15px; font-weight: 600; margin: 0; }
+    .today-thread-card .ts { font-size: 13px; color: var(--muted); margin: 2px 0 0; }
+    .today-thread-card .chev { margin-left: auto; color: var(--faint); font-size: 20px; flex: none; }
+    .today-explore { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+    .today-explore button { text-align: left; background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-md); padding: 14px 16px; cursor: pointer; font: inherit; color: var(--ink); min-height: 44px; }
+    .today-explore .et { font-size: 15px; font-weight: 600; display: block; }
+    .today-explore .es { font-size: 12.5px; color: var(--muted); display: block; margin-top: 2px; line-height: 1.4; }
+    .today-sample-tag { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; background: var(--accent-soft); color: var(--accent-dark); border-radius: 999px; padding: 3px 9px; margin: 0 0 10px; }
     .chat-fab, .feedback-fab { display: none !important; }
     .outfit-card { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-md); padding: 16px; margin-top: 8px; }
 
@@ -422,6 +445,7 @@
 <body>
   <main class="app">
     <div class="topline">
+      <button class="wordmark" id="todayHomeBtn" type="button" hidden>Closet</button>
       <div class="status" id="statusText"><span class="status-dot" id="statusDot"></span><span>Firebase setup needed</span></div>
       <div class="top-actions">
         <button class="auth-button" id="authButton" type="button" disabled title="Complete Firebase setup to enable Google sign-in">Sign in with Google · setup needed</button>
@@ -455,6 +479,10 @@
       <button class="tab" type="button" data-view="trips" role="tab" aria-selected="false">Trips</button>
       <button class="tab-action" id="tabChat" type="button">✦ Stylist</button>
     </div>
+
+    <section aria-label="Today" id="todayView" hidden>
+      <div id="todayRoot"></div>
+    </section>
 
     <section aria-label="Wardrobe catalog" id="wardrobeView">
       <div class="utility">
@@ -1592,6 +1620,24 @@
         fb.style.marginTop = "16px";
         fb.addEventListener("click", function () { closeOverlay(document.getElementById("accountOverlay")); openFeedback(); });
         body.appendChild(fb);
+        // DESIGN-HOME-1: the experimental Today home toggle.
+        body.appendChild(h("Experimental"));
+        body.appendChild(el("p", "hint", "Preview the new Today home — a stylist-first home screen: today's pick first, your catalogue one tap away. In testing; the regular home stays untouched while it's off."));
+        var todayToggleBtn = el("button", todayHomeOn() ? "primary" : "secondary", todayHomeOn() ? "Today home: on — turn off" : "Preview the new Today home");
+        todayToggleBtn.type = "button";
+        todayToggleBtn.style.marginTop = "10px";
+        todayToggleBtn.addEventListener("click", function () {
+          var on = !todayHomeOn();
+          setTodayHome(on);
+          if (on) {
+            closeOverlay(document.getElementById("accountOverlay"));
+            switchView("today");
+            showToast("Today home on — tap “Closet” up top to come back here.");
+          } else {
+            renderAccountBody();
+          }
+        });
+        body.appendChild(todayToggleBtn);
         renderContextSection(body);
         renderVibeSection(body);
         body.appendChild(h("Privacy"));
@@ -2224,6 +2270,8 @@
             loadingGrid.hidden = true;
             gallery.hidden = false;
             renderGallery();
+            todayDataSeen = true;
+            maybeRenderToday();
           }, function (error) {
             loadingGrid.hidden = true;
             gallery.hidden = false;
@@ -3744,6 +3792,7 @@
             allTrips = snap.docs.filter(function (d) { return d.exists; })
               .map(function (d) { return Object.assign({ id: d.id }, d.data()); });
             renderTrips();
+            maybeRenderToday();
             if (activeTripId) renderTripDetail();
           }, function (err) {
             showToast(friendlyError(err));
@@ -4297,6 +4346,449 @@
       var outfitUnsub = null;
       var activeOutfitGroup = null; // versionGroup id of the outfit being viewed
 
+      // DESIGN-HOME-1: Today — the stylist-first home (experimental,
+      // toggle-gated). Design: docs/proposals/TODAY-HOME-PROPOSAL.md
+      // + DESIGN.md §4.10. Chat is an escape hatch only: Wear this /
+      // Another call the proposal machinery (callAskStylist) directly.
+      var todayDataSeen = false;
+      var todayRoutedOnce = false;
+      var todayState = { picks: [], idx: 0, generating: false, wornId: null, loaded: false, error: false, renderToken: 0 };
+      function todayHomeOn() {
+        try { return window.localStorage.getItem("closetTodayHome") === "1"; } catch (e) { return false; }
+      }
+      function setTodayHome(on) {
+        try { window.localStorage.setItem("closetTodayHome", on ? "1" : "0"); } catch (e) {}
+        syncTodayChrome();
+      }
+      function syncTodayChrome() {
+        var on = todayHomeOn();
+        var wm = document.getElementById("todayHomeBtn");
+        if (wm) wm.hidden = !on;
+        if (!on && !document.getElementById("todayView").hidden) switchView("wardrobe");
+      }
+      function todayCacheKey() {
+        return "closetTodayPicks:" + (currentUser ? currentUser.uid : "anon") + ":" + localTodayStr();
+      }
+      function persistToday() {
+        try {
+          window.localStorage.setItem(todayCacheKey(), JSON.stringify({
+            picks: todayState.picks, idx: todayState.idx, wornId: todayState.wornId
+          }));
+        } catch (e) {}
+      }
+      function restoreToday() {
+        if (todayState.loaded) return;
+        todayState.loaded = true;
+        try {
+          var raw = window.localStorage.getItem(todayCacheKey());
+          if (raw) {
+            var d = JSON.parse(raw);
+            if (d && d.picks && d.picks.length) {
+              todayState.picks = d.picks;
+              todayState.idx = Math.min(d.idx || 0, d.picks.length - 1);
+              todayState.wornId = d.wornId || null;
+            }
+          }
+        } catch (e) {}
+      }
+      function todayThresholdMet() {
+        var hasTop = false, hasBottom = false;
+        allItems.forEach(function (it) {
+          if (it.category === "Tops") hasTop = true;
+          if (it.category === "Bottoms") hasBottom = true;
+        });
+        return allItems.length >= 4 && hasTop && hasBottom;
+      }
+      function maybeRenderToday() {
+        var v = document.getElementById("todayView");
+        if (v && !v.hidden) renderToday();
+      }
+      function todayGreeting() {
+        var h = new Date().getHours();
+        return h < 12 ? "Good morning" : (h < 18 ? "Good afternoon" : "Good evening");
+      }
+      function mkBtn(cls, label, onClick) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = cls;
+        b.textContent = label;
+        b.addEventListener("click", onClick);
+        return b;
+      }
+      function threadCard(title, sub, onClick) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "today-thread-card";
+        var txt = document.createElement("span");
+        var t = document.createElement("p"); t.className = "tt"; t.textContent = title;
+        var s = document.createElement("p"); s.className = "ts"; s.textContent = sub;
+        txt.appendChild(t); txt.appendChild(s);
+        var chev = document.createElement("span"); chev.className = "chev"; chev.textContent = "›";
+        b.appendChild(txt); b.appendChild(chev);
+        b.addEventListener("click", onClick);
+        return b;
+      }
+
+      function generateTodayPick(previousPick) {
+        if (todayState.generating || !currentUser || !functions) return;
+        todayState.generating = true;
+        todayState.error = false;
+        renderToday();
+        getWeatherSummary().then(function (weather) {
+          return callAskStylist({
+            items: stylistItems(),
+            messages: [{ role: "user", text: "Dress me for today. Pick one complete outfit from my wardrobe. Be decisive — this is the morning rush." }],
+            previousPick: previousPick || null,
+            vibe: detectVibeTag("dress me for today"),
+            weatherContext: weather,
+            today: localTodayStr(),
+            references: { articleIds: [], outfits: [] }
+          });
+        }).then(function (callRes) {
+          var outfit = callRes.data && callRes.data.outfit;
+          if (outfit && outfit.itemIds && outfit.itemIds.length >= 2) {
+            var wrap = { outfit: outfit };
+            var reply = callRes.data && callRes.data.reply;
+            if (reply) wrap.note = reply.length > 220 ? reply.slice(0, 220) + "…" : reply;
+            todayState.picks.push(wrap);
+            todayState.idx = todayState.picks.length - 1;
+            persistToday();
+          } else {
+            todayState.error = true;
+          }
+        }).catch(function () {
+          todayState.error = true;
+        }).then(function () {
+          todayState.generating = false;
+          renderToday();
+        });
+      }
+      function todayAnother() {
+        if (todayState.idx < todayState.picks.length - 1) {
+          todayState.idx++;
+          persistToday();
+          renderToday();
+          return;
+        }
+        if (todayState.picks.length >= 3) {
+          showToast("That's today's set — ask the stylist for more.");
+          return;
+        }
+        var cur = todayState.picks[todayState.idx];
+        generateTodayPick(cur && cur.outfit ? { itemIds: cur.outfit.itemIds.slice() } : null);
+      }
+      function todayWear() {
+        var wrap = todayState.picks[todayState.idx];
+        if (!wrap || !currentUser) return;
+        var o = wrap.outfit;
+        function finish(savedId) {
+          var names = (o.itemIds || []).map(function (id) {
+            var it = itemById(id);
+            return it ? it.name : "Unknown item";
+          });
+          db.collection("users").doc(currentUser.uid).collection("wear_events").doc().set({
+            wornAt: firebase.firestore.FieldValue.serverTimestamp(),
+            articleIds: o.itemIds || [],
+            articleNames: names,
+            outfitId: savedId,
+            occasion: null,
+            note: "",
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          }).then(function () {
+            todayState.wornId = savedId;
+            persistToday();
+            showToast("Logged — enjoy the fit.");
+            renderToday();
+          }).catch(function (err) { showToast(friendlyError(err)); });
+        }
+        if (o.savedId) { finish(o.savedId); return; }
+        findDuplicateOutfit(o.itemIds, "stylist").then(function (dup) {
+          if (dup) {
+            o.savedId = dup.id;
+            persistToday();
+            finish(dup.id);
+            return;
+          }
+          saveChatOutfit(wrap, function () {
+            if (o.savedId) { persistToday(); finish(o.savedId); }
+          });
+        }).catch(function (err) { showToast(friendlyError(err)); });
+      }
+
+      function renderToday() {
+        var root = document.getElementById("todayRoot");
+        if (!root || !currentUser) return;
+        restoreToday();
+        var token = ++todayState.renderToken;
+        root.textContent = "";
+
+        // Greeting + date + weather chip.
+        var g = document.createElement("h2");
+        g.className = "today-greet";
+        g.textContent = todayGreeting() + ".";
+        root.appendChild(g);
+        var dline = document.createElement("p");
+        dline.className = "today-date";
+        var dspan = document.createElement("span");
+        dspan.textContent = new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+        dline.appendChild(dspan);
+        var wchip = document.createElement("span");
+        wchip.className = "today-weather";
+        wchip.hidden = true;
+        dline.appendChild(wchip);
+        root.appendChild(dline);
+        getWeatherSummary().then(function (s) {
+          if (s && token === todayState.renderToken) { wchip.textContent = s; wchip.hidden = false; }
+        });
+
+        var slot = document.createElement("div");
+        root.appendChild(slot);
+        renderTodaySlot(slot);
+
+        // The day's thread (doorway cards).
+        var thread = document.createElement("div");
+        root.appendChild(thread);
+        renderTodayThread(thread, token);
+      }
+
+      function renderTodaySlot(slot) {
+        // Data not in yet — neutral composing card, never a wrong grade.
+        if (!todayDataSeen && !allItems.length && !todayState.picks.length) {
+          var sk = document.createElement("div");
+          sk.className = "today-card";
+          sk.appendChild(shopCheckEl("p", "today-composing", "Pulling up your wardrobe…"));
+          slot.appendChild(sk);
+          return;
+        }
+        if (!allItems.length) { slot.appendChild(todayZeroCard()); return; }
+        if (!todayThresholdMet()) { slot.appendChild(todayProgressCard()); return; }
+
+        // Ready grade: today's pick.
+        var card = document.createElement("div");
+        card.className = "today-card";
+        var wrap = todayState.picks[todayState.idx];
+        if (todayState.generating && !wrap) {
+          card.appendChild(shopCheckEl("p", "today-eyebrow", "Today's pick"));
+          card.appendChild(shopCheckEl("p", "today-composing", "Composing today's pick…"));
+          slot.appendChild(card);
+          return;
+        }
+        if (!wrap && todayState.error) {
+          card.appendChild(shopCheckEl("p", "today-eyebrow", "Today's pick"));
+          card.appendChild(shopCheckEl("p", "today-why", "Couldn't compose today's pick — the stylist hiccuped."));
+          var acts = document.createElement("div");
+          acts.className = "today-actions";
+          acts.appendChild(mkBtn("primary", "Try again", function () { generateTodayPick(null); }));
+          acts.appendChild(mkBtn("secondary", "Ask the stylist", function () { openChat(); }));
+          card.appendChild(acts);
+          slot.appendChild(card);
+          return;
+        }
+        if (!wrap) {
+          // Idle with nothing cached — kick the day's one generation.
+          card.appendChild(shopCheckEl("p", "today-eyebrow", "Today's pick"));
+          card.appendChild(shopCheckEl("p", "today-composing", "Composing today's pick…"));
+          slot.appendChild(card);
+          setTimeout(function () { generateTodayPick(null); }, 30);
+          return;
+        }
+        var o = wrap.outfit;
+        var worn = todayState.wornId && o.savedId && todayState.wornId === o.savedId;
+        card.appendChild(shopCheckEl("p", "today-eyebrow", worn ? "Today's pick · worn ✓" : "Today's pick"));
+        var photos = document.createElement("div");
+        photos.className = "today-pick-photos";
+        (o.itemIds || []).forEach(function (id) {
+          var it = itemById(id);
+          var ps = it ? itemPhotos(it) : [];
+          var fig = document.createElement("figure");
+          if (ps.length && ps[0].url) {
+            var img = document.createElement("img");
+            img.src = ps[0].url;
+            img.alt = it ? it.name : "item photo";
+            img.loading = "lazy";
+            fig.appendChild(img);
+          }
+          var cap = document.createElement("figcaption");
+          cap.textContent = it ? it.name : "Unknown item";
+          fig.appendChild(cap);
+          photos.appendChild(fig);
+        });
+        card.appendChild(photos);
+        if (wrap.note) card.appendChild(shopCheckEl("p", "today-why", wrap.note));
+        var actions = document.createElement("div");
+        actions.className = "today-actions";
+        if (worn) {
+          actions.appendChild(mkBtn("secondary", "View in Outfits", function () {
+            switchView("outfits");
+            openOutfit(o.savedId);
+          }));
+        } else {
+          actions.appendChild(mkBtn("primary", "Wear this", todayWear));
+        }
+        actions.appendChild(mkBtn("secondary", todayState.generating ? "Composing…" : "Another", function () {
+          if (!todayState.generating) todayAnother();
+        }));
+        actions.appendChild(mkBtn("secondary", "Ask the stylist", function () { openChat(); }));
+        card.appendChild(actions);
+        slot.appendChild(card);
+      }
+
+      function todayZeroCard() {
+        var frag = document.createDocumentFragment();
+        var card = document.createElement("div");
+        card.className = "today-card";
+        card.appendChild(shopCheckEl("p", "today-eyebrow", "Start here"));
+        card.appendChild(shopCheckEl("p", "today-why", "Photograph a few pieces you own, and every morning starts with an outfit already picked. It takes about a minute a piece."));
+        var acts = document.createElement("div");
+        acts.className = "today-actions";
+        acts.appendChild(mkBtn("primary", "＋ Add your first pieces", function () { document.getElementById("addButton").click(); }));
+        acts.appendChild(mkBtn("secondary", "Bulk add", function () { document.getElementById("bulkButton").click(); }));
+        card.appendChild(acts);
+        frag.appendChild(card);
+        // Labeled sample — what a morning could look like (never real data).
+        var sample = document.createElement("div");
+        sample.className = "today-card";
+        var tag = document.createElement("p");
+        tag.className = "today-sample-tag";
+        tag.textContent = "Sample";
+        sample.appendChild(tag);
+        sample.appendChild(shopCheckEl("p", "today-eyebrow", "A sample pick"));
+        var photos = document.createElement("div");
+        photos.className = "today-pick-photos";
+        [["photo-1591047139829-d91aecb6caea", "Olive field jacket"], ["photo-1521572163474-6864f9cf17ab", "Striped cotton tee"], ["photo-1542272604-787c3835535d", "Slim indigo jeans"]].forEach(function (s) {
+          var fig = document.createElement("figure");
+          var img = document.createElement("img");
+          img.src = "https://images.unsplash.com/" + s[0] + "?auto=format&fit=crop&w=300&q=60";
+          img.alt = "";
+          img.loading = "lazy";
+          fig.appendChild(img);
+          var cap = document.createElement("figcaption");
+          cap.textContent = s[1];
+          fig.appendChild(cap);
+          photos.appendChild(fig);
+        });
+        sample.appendChild(photos);
+        sample.appendChild(shopCheckEl("p", "today-why", "What your mornings could look like — yours will be built from your own clothes."));
+        frag.appendChild(sample);
+        return frag;
+      }
+
+      function todayProgressCard() {
+        var card = document.createElement("div");
+        card.className = "today-card";
+        card.appendChild(shopCheckEl("p", "today-eyebrow", "Getting there"));
+        var n = allItems.length;
+        card.appendChild(shopCheckEl("p", "today-why",
+          n + (n === 1 ? " piece" : " pieces") + " in — add a few more (a top and a bottom at minimum) and I can dress you in the mornings."));
+        var acts = document.createElement("div");
+        acts.className = "today-actions";
+        acts.appendChild(mkBtn("primary", "＋ Add a piece", function () { document.getElementById("addButton").click(); }));
+        acts.appendChild(mkBtn("secondary", "Ask the stylist", function () { openChat(); }));
+        card.appendChild(acts);
+        return card;
+      }
+
+      function renderTodayThread(thread, token) {
+        var cards = 0;
+        // Trip countdown — nearest upcoming trip.
+        var todayStr = localTodayStr();
+        var nextTrip = null, nextStart = null;
+        allTrips.forEach(function (t) {
+          var leg = (t.legs && t.legs[0]) || {};
+          if (leg.startDate && leg.startDate >= todayStr && (!nextStart || leg.startDate < nextStart)) {
+            nextTrip = t; nextStart = leg.startDate;
+          }
+        });
+        if (nextTrip) {
+          var days = Math.round((Date.parse(nextStart + "T12:00:00") - Date.parse(todayStr + "T12:00:00")) / 86400000);
+          var when = days === 0 ? "today" : (days === 1 ? "tomorrow" : "in " + days + " days");
+          var leg0 = (nextTrip.legs && nextTrip.legs[0]) || {};
+          var bits = [];
+          var dates = fmtTripDates(leg0);
+          if (dates) bits.push(dates);
+          if (nextTrip.packing && nextTrip.packing.articleIds) bits.push(nextTrip.packing.articleIds.length + " pieces packed");
+          thread.appendChild(threadCard((nextTrip.name || "Trip") + " — " + when, bits.join(" · ") || "Your next trip", function () {
+            switchView("trips");
+            openTripDetail(nextTrip.id);
+          }));
+          cards++;
+        }
+        // Saved shop checks waiting on a decision.
+        var considering = allShopChecks.filter(function (c) { return (c.status || "considering") === "considering"; }).length;
+        if (considering) {
+          thread.appendChild(threadCard(
+            considering + (considering === 1 ? " pick" : " picks") + " waiting on your shop list",
+            "Checked and saved — worth a decision before you buy.",
+            function () { switchView("shoplist"); }));
+          cards++;
+        }
+        // Pieces that have never made it into an outfit.
+        if (allOutfits.length && allItems.length) {
+          var used = {};
+          allOutfits.forEach(function (o) { (o.itemIds || []).forEach(function (id) { used[id] = true; }); });
+          var unworn = allItems.filter(function (it) { return !used[it.id]; }).length;
+          if (unworn) {
+            thread.appendChild(threadCard(
+              unworn + (unworn === 1 ? " piece hasn't" : " pieces haven't") + " made an outfit yet",
+              "Your wardrobe has range the stylist hasn't used.",
+              function () { switchView("wardrobe"); }));
+            cards++;
+          }
+        }
+        // Rate card — the latest worn outfit from before today (async).
+        if (currentUser) {
+          db.collection("users").doc(currentUser.uid).collection("wear_events")
+            .orderBy("wornAt", "desc").limit(8).get()
+            .then(function (snap) {
+              if (token !== todayState.renderToken) return;
+              var found = null;
+              snap.forEach(function (d) {
+                if (found) return;
+                var w = d.data();
+                var t = w.wornAt && w.wornAt.toDate ? w.wornAt.toDate() : null;
+                if (!t) return;
+                var ds = t.getFullYear() + "-" + String(t.getMonth() + 1).padStart(2, "0") + "-" + String(t.getDate()).padStart(2, "0");
+                if (ds < todayStr && w.outfitId) found = { w: w, dateStr: ds };
+              });
+              if (!found) return;
+              var outfit = null;
+              allOutfits.forEach(function (o) { if (o.id === found.w.outfitId) outfit = o; });
+              if (!outfit) return;
+              var whenLabel = found.dateStr === yesterdayStr() ? "Yesterday" : new Date(found.dateStr + "T12:00:00").toLocaleDateString(undefined, { weekday: "long" });
+              var card = threadCard(whenLabel + " you wore: " + (outfit.name || "an outfit"), "How was it? Tap to rate it.", function () {
+                switchView("outfits");
+                openOutfit(outfit.versionGroup || outfit.id);
+              });
+              thread.insertBefore(card, thread.firstChild);
+            }).catch(function () {});
+        }
+        // Explore floor — when the thread is thin, name every door.
+        if (cards < 2) {
+          var head = shopCheckEl("p", "today-eyebrow", "Explore");
+          head.style.marginTop = "22px";
+          thread.appendChild(head);
+          var grid = document.createElement("div");
+          grid.className = "today-explore";
+          [["Wardrobe", "Every piece you own", "wardrobe"], ["Outfits", "Looks you've saved and worn", "outfits"],
+           ["Shop list", "Things you've checked before buying", "shoplist"], ["Trips", "Trips and their packing lists", "trips"]].forEach(function (tile) {
+            var b = document.createElement("button");
+            b.type = "button";
+            var et = document.createElement("span"); et.className = "et"; et.textContent = tile[0];
+            var es = document.createElement("span"); es.className = "es"; es.textContent = tile[1];
+            b.appendChild(et); b.appendChild(es);
+            b.addEventListener("click", function () { switchView(tile[2]); });
+            grid.appendChild(b);
+          });
+          thread.appendChild(grid);
+        }
+      }
+      function yesterdayStr() {
+        var d = new Date();
+        d.setDate(d.getDate() - 1);
+        return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+      }
+      document.getElementById("todayHomeBtn").addEventListener("click", function () { switchView("today"); });
+
       function switchView(view) {
         feedbackView = view; // FB-1: record where feedback comes from
         document.querySelectorAll(".tab").forEach(function (t) {
@@ -4307,10 +4799,12 @@
         // Fix buffer 3: the hero is the wardrobe's moment — on other
         // views it collapses so content starts at the top.
         document.querySelector(".hero").hidden = view !== "wardrobe";
+        document.getElementById("todayView").hidden = view !== "today";
         document.getElementById("wardrobeView").hidden = view !== "wardrobe";
         document.getElementById("outfitsView").hidden = view !== "outfits";
         document.getElementById("shopListView").hidden = view !== "shoplist";
         document.getElementById("tripsView").hidden = view !== "trips";
+        if (view === "today") renderToday();
       }
       document.querySelectorAll(".tab").forEach(function (t) {
         t.addEventListener("click", function () { switchView(t.getAttribute("data-view")); });
@@ -4332,6 +4826,7 @@
           .onSnapshot(function (snap) {
             allOutfits = snap.docs.map(function (d) { var o = d.data(); o.id = d.id; return o; });
             renderOutfits();
+            maybeRenderToday();
             if (activeOutfitGroup) renderOutfitDetail(); // refresh open detail
           }, function (error) {
             showToast(friendlyError(error));
@@ -5319,6 +5814,7 @@
             allShopChecks = snap.docs.filter(function (d) { return d.exists; })
               .map(function (d) { return Object.assign({ id: d.id }, d.data()); });
             renderShopList();
+            maybeRenderToday();
           }, function (err) {
             showToast(friendlyError(err));
           });
@@ -6132,6 +6628,11 @@
             watchShopChecks(user); // PC-28
             watchTrips(user); // Sprint 15 (PC-29 Phase 1)
             watchPins(user); // Sprint 17 (context pins)
+            syncTodayChrome(); // DESIGN-HOME-1
+            if (!todayRoutedOnce) {
+              todayRoutedOnce = true;
+              if (todayHomeOn()) switchView("today");
+            }
           });
         } catch (error) {
           configured = false;

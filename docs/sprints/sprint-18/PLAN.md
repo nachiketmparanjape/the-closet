@@ -87,7 +87,7 @@ issue #61's "What should I wear?" cluster as a designed
 component instead of a one-off. Starts only once Card 2's
 validation lands.
 
-### Candidate (not in slate): DESIGN-HOME-1 — Today, a stylist-first home
+### 4. DESIGN-HOME-1: Today, a stylist-first home (toggle-gated) — in slate
 
 Filed 2026-10-21 after the founder widened the design latitude
 ("don't be afraid to propose dramatic updates or complete
@@ -96,10 +96,10 @@ steered it the same day: build it as a **parallel experience**
 (Account toggle, default off) he can test on his phone, with
 the design answering his two questions — new-user upload CTAs
 and feature discoverability — and chat kept non-load-bearing
-(his stated concern). Proposal is now v0.2 with three critique
-rounds folded (`docs/proposals/TODAY-HOME-PROPOSAL.md`),
-**awaiting founder validation**; on his yes it becomes a build
-card here, and it composes with Card 3 (shared proposal-card
+(his stated concern). Proposal v0.2 with three critique rounds
+folded (`docs/proposals/TODAY-HOME-PROPOSAL.md`); **founder
+validated the build 2026-10-21** ("Build the toggle-gated
+Today"). It composes with Card 3 (shared proposal-card
 components) rather than competing with it.
 
 ## Out of scope
