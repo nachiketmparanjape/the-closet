@@ -524,7 +524,7 @@ const UPDATE_TRIP_PACKING_DECL = {
         items: {
           type: "OBJECT",
           properties: {
-            handle: { type: "STRING", description: "Wardrobe handle like [i3]" },
+            handle: { type: "STRING", description: "The wardrobe handle, exactly like [i3] — nothing else in this field" },
             reason: { type: "STRING", description: "Why this piece earns its place on this trip" },
           },
           required: ["handle"],
@@ -584,9 +584,19 @@ function extractToolCall(response) {
   return calls.length ? calls[0] : null;
 }
 
-// "[i3]" → items index 2, or -1. Pure.
+// "[i3]" → items index 2, or -1. Pure. Tolerant by design: the
+// prompt itself shows handles embedded in lines ("[i36] "Name" —
+// …"), and the model answers in kind — handle with the name
+// attached, brackets dropped, prose around it. The original
+// anchored match rejected every such article, the plan mapped to
+// zero pieces, and the trip reply fell through to the "came back
+// empty" fallback (founder report 2026-10-21; the rejection had
+// already fired 7× in the logs since Oct 19, near-deterministic
+// once the wardrobe hit 69 pieces). Prefer a bracketed handle
+// anywhere in the string; fall back to a bare iN token.
 function handleIndex(handle, items) {
-  const m = typeof handle === "string" ? handle.trim().match(/^\[i(\d+)\]$/) : null;
+  if (typeof handle !== "string") return -1;
+  const m = handle.match(/\[i(\d+)\]/) || handle.match(/\bi(\d+)\b/);
   if (!m) return -1;
   const idx = Number(m[1]) - 1;
   return idx >= 0 && idx < items.length ? idx : -1;
@@ -802,7 +812,7 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
     });
     if (restLines.length) {
       system += "\n\nREST OF THE WARDROBE — not packed yet, but the user can ask for any of these by name and you can add them to the plan:\n" +
-        restLines.slice(0, 40).join("\n");
+        restLines.slice(0, 200).join("\n");
     }
     system += "\n\nYOU HAVE A TOOL: updateTripPacking.\n" +
       "- Call it ONLY when the user asks for a packing change (\"keep the blue sweater\", \"drop the boots\", \"pack warmer\", \"add a dinner outfit\").\n" +
@@ -823,6 +833,7 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
       "Never propose on your own initiative.\n" +
       "- BOTH TOOLS: if one message asks for a packing change AND states a lasting preference (\"pack light — I always " +
       "pack light\"), call updateTripPacking for the change AND pinContext for the preference in the same response.\n" +
+      "- Each article in updateTripPacking is an object like {\"handle\": \"[i3]\", \"reason\": \"...\"} — the handle ALONE in that exact form, no name or other text attached to it.\n" +
       "- ALWAYS include a short prose reply in the same response as any tool call — never send a tool call with no text. " +
       "Say what changed in one sentence; the client shows that line as your answer.";
   }
@@ -830,8 +841,10 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
     systemInstruction: system,
     temperature: 0.3,
     // Trip mode rewrites the whole packing plan per call — the biggest
-    // output in the app; 2500 truncated tool calls (2026-10-19).
-    maxOutputTokens: tripContext ? 4000 : 2500,
+    // output in the app; 2500 truncated tool calls (2026-10-19), and
+    // 4000 still crowded a full re-plan over a 69-piece wardrobe
+    // (2026-10-21) — the thinking budget draws from the same pool.
+    maxOutputTokens: tripContext ? 7000 : 2500,
     thinkingConfig: { thinkingBudget: 1024 },
   };
   if (tripContext) {
@@ -903,7 +916,16 @@ function mapUpdateTripPacking(raw, items) {
   const seen = new Set();
   const articles = [];
   for (const a of (Array.isArray(args.articles) ? args.articles : [])) {
-    const idx = handleIndex(a && a.handle, items);
+    // Entries may be objects ({handle, reason}) or bare strings,
+    // and the handle may ride under handle/id/item. If no handle
+    // parses, a bare string that exactly names a piece still
+    // resolves — the model sometimes answers with names.
+    const rawHandle = typeof a === "string" ? a : (a && (a.handle || a.id || a.item));
+    let idx = handleIndex(rawHandle, items);
+    if (idx < 0 && typeof rawHandle === "string") {
+      const want = rawHandle.trim().toLowerCase();
+      idx = items.findIndex((it) => (it.name || "").trim().toLowerCase() === want);
+    }
     if (idx < 0 || seen.has(items[idx].id)) continue;
     seen.add(items[idx].id);
     articles.push({ id: items[idx].id, reason: cleanText((a && a.reason) || "", 140) });
@@ -927,6 +949,22 @@ function mapUpdateTripPacking(raw, items) {
   };
 }
 
+// OBS-1: rejected trip-tool args, WITH a sample of the raw values —
+// keys/types alone left the 2026-10-21 failure undiagnosable beyond
+// "structurally complete, mapped to zero."
+function logTripArgsRejected(stage, args) {
+  try {
+    console.error(JSON.stringify({
+      event: "trip_tool_args_rejected",
+      label: "askStylist-tripToolArgs",
+      stage: stage,
+      argsKeys: Object.keys(args || {}),
+      articlesType: Array.isArray(args && args.articles) ? "array" : typeof (args && args.articles),
+      articlesSample: JSON.stringify((args && args.articles) || []).slice(0, 600),
+    }));
+  } catch (e) { /* logging must never throw */ }
+}
+
 // here; the client re-validates on execute.
 async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today) {
   const todayStr = /^\d{4}-\d{2}-\d{2}$/.test(today || "")
@@ -941,17 +979,11 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
     const updCall = toolCalls.find((c) => c.name === "updateTripPacking");
     const pinCall = toolCalls.find((c) => c.name === "pinContext");
     let mappedCall = updCall ? mapUpdateTripPacking(updCall.args, items) : null;
+    let retrySawUpd = false;
     if (updCall && !mappedCall) {
       // The model tried to update the packing but its args didn't
       // survive mapping — log it (OBS-1) and re-ask once with a hint.
-      try {
-        console.error(JSON.stringify({
-          event: "trip_tool_args_rejected",
-          label: "askStylist-tripToolArgs",
-          argsKeys: Object.keys(updCall.args || {}),
-          articlesType: Array.isArray(updCall.args && updCall.args.articles) ? "array" : typeof (updCall.args && updCall.args.articles),
-        }));
-      } catch (e) { /* logging must never throw */ }
+      logTripArgsRejected("first", updCall.args);
       const retryContents = contents.concat([{
         role: "user",
         parts: [{ text: "Your packing update didn't go through — the articles didn't match the wardrobe. Call updateTripPacking again using the EXACT [iN] handles from the wardrobe list above (e.g. [i3]), every piece with a reason, and include a short sentence of prose saying what changed." }],
@@ -960,7 +992,9 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
       text = retry.text || text;
       for (const c of retry.toolCalls) {
         if (!mappedCall && c.name === "updateTripPacking") {
+          retrySawUpd = true;
           mappedCall = mapUpdateTripPacking(c.args, items);
+          if (!mappedCall) logTripArgsRejected("retry", c.args);
         }
         if (!pinCall && c.name === "pinContext") {
           toolCalls.push(c);
@@ -970,11 +1004,17 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
     const pinProposal = toolCalls.some((c) => c.name === "pinContext")
       ? sanitizePinProposal((toolCalls.find((c) => c.name === "pinContext") || {}).args, todayStr)
       : null;
-    // The user always gets words, never an empty bubble.
+    // The user always gets words, never an empty bubble — and the
+    // words must describe what actually happened. A plan that
+    // arrived but couldn't be applied is not an "empty" reply.
+    const planFailed = !mappedCall && (updCall || retrySawUpd);
     if (!text) {
       text = mappedCall
         ? ("Packing updated — " + (mappedCall.whatChanged || "got it."))
-        : (pinProposal ? "Got it." : "Hmm — that came back empty on my end. Try again?");
+        : (pinProposal ? "Got it."
+          : planFailed
+            ? "I drafted a plan but couldn't apply it cleanly — your packing is unchanged. Mind asking once more?"
+            : "Hmm — that came back empty on my end. Try again?");
     }
     return { reply: text, toolCall: mappedCall, pinProposal: pinProposal };
   }

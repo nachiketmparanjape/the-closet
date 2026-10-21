@@ -137,12 +137,20 @@ describe("handleIndex", () => {
     assert.strictEqual(handleIndex("[i1]", items), 0);
     assert.strictEqual(handleIndex("[i3]", items), 2);
   });
-  test("rejects out-of-range and malformed handles", () => {
+  test("rejects out-of-range and handle-free strings", () => {
     assert.strictEqual(handleIndex("[i0]", items), -1);
     assert.strictEqual(handleIndex("[i4]", items), -1);
-    assert.strictEqual(handleIndex("i2", items), -1);
     assert.strictEqual(handleIndex("[x2]", items), -1);
+    assert.strictEqual(handleIndex("banana", items), -1);
     assert.strictEqual(handleIndex(null, items), -1);
+  });
+  test("accepts the handle forms the model actually sends", () => {
+    // The strict anchored match rejected every one of these in
+    // production (2026-10-21): the plan mapped to zero pieces and
+    // trip chat answered "came back empty."
+    assert.strictEqual(handleIndex("i2", items), 1);
+    assert.strictEqual(handleIndex("[i2] \"Some name\"", items), 1);
+    assert.strictEqual(handleIndex("the [i3] one", items), 2);
   });
 });
 
