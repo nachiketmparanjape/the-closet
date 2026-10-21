@@ -19,6 +19,11 @@ What went live. Momentum you can see.
   home affordance; the tab bar is unchanged. Design:
   `docs/proposals/TODAY-HOME-PROPOSAL.md` v0.2, DESIGN.md §4.10.
   Founder phone validation is the verdict that counts.
+  Fix buffer 4 (his first real use): the wordmark failed as the
+  way back, so Today now leads the stylist sheet — the ✦ Stylist
+  pill is the persistent door home (his steer). Pick notes are
+  cleaned of raw markdown and cut at sentence boundaries (his
+  screenshot showed formatting junk mid-chop).
 - **Fix buffers (founder testing, 2026-10-21).** Buffer 1:
   Stylist became a filled accent pill + the bar gained its
   shadow (text-only read as hidden); the identity preview was
