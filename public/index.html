@@ -107,6 +107,10 @@
     .hero-copy { display: flex; flex-wrap: wrap; gap: 10px; }
     .hero-copy p { flex: 1 1 100%; }
     .hero-copy .primary, .hero-copy .secondary { flex: 1 1 0; min-width: 0; }
+    /* Sprint 18 fix buffer: in the compact hero the four actions keep their
+       natural width and never wrap mid-label — one primary, three identical
+       secondaries (D7: no random colors, no lone emoji). */
+    .hero.hero-compact .hero-copy .primary, .hero.hero-compact .hero-copy .secondary { flex: 0 0 auto; white-space: nowrap; }
     /* Sprint 10 UX: once the wardrobe is non-empty the hero compacts to a
        slim header — the full statement is for the empty state only. */
     .hero.hero-compact { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 24px; padding: 30px 0 10px; }
@@ -123,7 +127,9 @@
     .danger:hover { background: #b3261e; color: #fff; }
     .danger:disabled { cursor: not-allowed; opacity: .48; }
     .item-photo { width: 100%; max-height: 320px; object-fit: contain; border-radius: var(--r-md); margin-bottom: 16px; background: var(--paper-soft); display: block; }
-    .hint { font-size: 13px; color: var(--accent-dark); margin: 2px 0 0; }
+    /* Sprint 18 fix buffer (D7): hints are information, not action — muted.
+       Accent-dark survives only on .ai-suggest, where the AI is speaking. */
+    .hint { font-size: 13px; color: var(--muted); margin: 2px 0 0; }
     .ai-suggest { font-size: 13px; color: var(--accent-dark); margin: 6px 0 0; }
     .ai-suggest .ai-desc { margin: 0 0 4px; }
     .ai-suggest .ai-tags { margin: 0; color: var(--muted); font-size: 12px; }
@@ -181,8 +187,11 @@
     .shop-status.considering { background: var(--accent-soft); color: var(--accent-dark); }
     .shop-status.bought { background: var(--sage); color: var(--sage-ink); }
     .shop-status.dismissed { background: var(--paper-soft); color: var(--muted); }
-    .shop-card .shop-card-name { font-weight: 600; font-size: 14px; margin: 8px 0 0; }
+    /* The stored "name" is the AI's description sentence — clamp it to a
+       title's shape; the verdict gets its own ink body style, clamped to 3. */
+    .shop-card .shop-card-name { font-weight: 600; font-size: 14px; line-height: 1.4; margin: 8px 0 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .shop-card .hint { margin-top: 2px; }
+    .shop-card-verdict { font-size: 13px; color: var(--ink); line-height: 1.5; margin: 4px 0 0; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
     .status-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 0; }
     .link-row { display: flex; gap: 8px; align-items: center; }
     .link-row a { color: var(--accent-dark); font-size: 14px; word-break: break-all; }
@@ -240,6 +249,9 @@
     .tab-action { flex: 1; border: none; background: var(--accent); color: #fff; font: inherit; font-size: 13.5px; font-weight: 700; padding: 10px 2px; border-radius: 999px; cursor: pointer; min-height: 44px; margin: 2px 4px; }
     .tab-action:active { background: var(--accent-dark); }
     @media (prefers-color-scheme: dark) { .tab-action { color: #10141a; } .tab-action:active { color: #10141a; } }
+    /* Wide screens: the tab cluster caps at 780px, centered — five tabs
+       stretched across a laptop read as scattered, not native (DESIGN.md §3). */
+    @media (min-width: 900px) { .tabs { padding-left: max(8px, calc((100vw - 780px) / 2)); padding-right: max(8px, calc((100vw - 780px) / 2)); } }
     .chat-fab, .feedback-fab { display: none !important; }
     .outfit-card { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-md); padding: 16px; margin-top: 8px; }
 
@@ -254,8 +266,12 @@
     .outfit-card .conf { font-size: 13px; color: var(--muted); margin: 6px 0; }
     .outfit-card .reason { font-size: 13px; font-style: italic; color: var(--muted); margin: 6px 0; }
     .outfit-card button { margin-top: 4px; }
-    .outfit-thumbs { display: flex; gap: 4px; margin: 8px 0; }
-    .outfit-thumbs img { width: 52px; height: 52px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+    /* Sprint 18 fix buffer: outfit tiles get a designed collage zone
+       (paper-soft stage, consistent thumbs) and a 2-line clamping name —
+       auto-generated outfit names are sentences, not labels. */
+    .outfit-thumbs { display: flex; gap: 6px; margin: 0 0 4px; background: var(--paper-soft); border-radius: var(--r-md); padding: 8px; }
+    .outfit-thumbs img { width: 56px; height: 56px; object-fit: cover; border-radius: 10px; }
+    .outfit-name { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.35; min-height: 2.7em; }
     .outfit-row { display: flex; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
     .outfit-row img { width: 44px; height: 44px; object-fit: cover; border-radius: 8px; flex: none; }
     .outfit-row .nm { font-size: 14px; font-weight: 600; }
@@ -307,7 +323,7 @@
     .chip.active { border-color: var(--ink); background: var(--ink); color: var(--paper); }
 
     .catalog-head { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 16px; padding: 34px 0 22px; }
-    .catalog-head h2 { margin: 0; font-family: "Closet Serif", serif; font-size: clamp(26px, 3vw, 38px); font-weight: 500; letter-spacing: -.025em; }
+    .catalog-head h2 { margin: 0; font-family: "Closet Serif", serif; font-size: 27px; font-weight: 500; letter-spacing: -.02em; }
     .count { color: var(--muted); font-size: 13px; }
 
     .gallery { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(12px, 2vw, 24px); }
@@ -428,7 +444,7 @@
         </button>
         <button class="secondary" id="bulkButton" type="button">Bulk add</button>
         <button class="secondary" id="shopCheckButton" type="button">Shop check</button>
-        <button class="secondary" id="composerButton" type="button" style="border-color:var(--accent);color:var(--accent-dark)">✨ Pick an outfit</button>
+        <button class="secondary" id="composerButton" type="button">Pick an outfit</button>
       </div>
     </section>
 
@@ -4364,7 +4380,7 @@
           var details = document.createElement("div");
           details.className = "item-details";
           var name = document.createElement("p");
-          name.className = "item-name";
+          name.className = "item-name outfit-name";
           name.textContent = (o.favorite ? "★ " : "") + (o.name || "Outfit");
           if ((o.version || 1) > 1) {
             var badge = document.createElement("span");
@@ -4377,7 +4393,7 @@
           var span = document.createElement("span");
           span.textContent = (o.itemIds || []).length + " pieces" +
             (o.occasion ? " · " + o.occasion : "") +
-            (o.source === "stylist" ? " · ✨" : "");
+            (o.source === "stylist" ? " · Stylist pick" : "");
           meta.appendChild(span);
           details.appendChild(name);
           details.appendChild(meta);
@@ -5342,7 +5358,7 @@
           card.appendChild(imgWrap);
           var name = (c.item && (c.item.note || c.item.category)) || "Shop item";
           card.appendChild(el("p", "shop-card-name", name));
-          if (c.verdict) card.appendChild(el("p", "hint", c.verdict));
+          if (c.verdict) card.appendChild(el("p", "shop-card-verdict", c.verdict));
           card.appendChild(el("span", "shop-status " + (c.status || "considering"), STATUS_LABELS[c.status] || "Considering"));
           function open() { openShopCheckDetail(c.id); }
           card.addEventListener("click", open);

@@ -326,3 +326,28 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   planning walk); first-run is designed as part of UX-13.
 - **Status:** Not started (proposal stage). Each attack line
   becomes its own sized cut at a planning walk.
+
+## PC-34: Garment extraction & clean rendering (research spike)
+- **Size:** Spike S, then size from findings
+- **Value:** Founder's long-term direction (2026-10-21): user photos
+  are shot on beds and carpets, and no layout survives an ugly
+  source photo — the Sprint 18 tiles read "clunky" partly for
+  this reason. The apps he admires extract the garment itself
+  and render it clean (cutout on a neutral ground). He also
+  reports Google Photos (Android) auto-builds a wardrobe
+  collection from photos of him wearing clothes — if users can
+  export those, importing pre-extracted garments could collapse
+  the cataloguing cost (an attack line for UX-14).
+- **Scope:** Research spike, fixed protocol (TL;DR, findings,
+  options + tradeoffs, recommendation, sources), answering:
+  (1) server-side background-removal / segmentation options —
+  quality on soft garments, per-photo cost at our scale, API
+  vs self-hosted; (2) what Google Photos' clothing collection
+  actually is and whether users can get those images out
+  (founder-reported — verify, don't assume); (3) where
+  extraction slots into the pipeline (upload-time clean render
+  alongside the original — the original is never destroyed).
+  Design keeps the photo honest for now: tiles render best-
+  effort, extraction is a rendering layer, not a data change.
+- **Status:** Not started. Filed 2026-10-21 from the founder's
+  note; research runs on pull.

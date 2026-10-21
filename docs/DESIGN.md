@@ -140,7 +140,10 @@ physically float above the page.
   (avatar/initial button → the existing account overlay).
   There are **no floating action buttons** in this system — the
   tab bar owns the bottom edge; feedback lives as a row inside
-  the account overlay (Critiques, round 1).
+  the account overlay (Critiques, round 1). On wide screens
+  (≥900px) the tab cluster caps at 780px, centered — five tabs
+  stretched across a laptop read as scattered, not native
+  (fix buffer, 2026-10-21).
 - Wardrobe grid (D3): 2 columns compact / 3–4 wide, gap 12,
   photo tiles at **4:5** (`object-fit: cover`). Item detail
   shows the full garment: `object-fit: contain`, max-height

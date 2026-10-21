@@ -47,6 +47,14 @@ optimizing blindly.
   with zero dedicated effort — and every capture is
   simultaneously a wear log, which is the loop the product has
   always wanted to close (recommend → wear → rate → learn).
+- **Already-extracted imports** (founder addendum, 2026-10-21).
+  He reports Google Photos (Android) auto-collects his clothes
+  from photos of him wearing them. If users can export those,
+  "bring your wardrobe from Google Photos" is the cheapest
+  catalogue bootstrap that exists — the photos arrive pre-found,
+  possibly pre-extracted. Unverified: what the feature is and
+  what export looks like is research question (2) of PC-34;
+  if it pans out, this becomes the first-run's front door.
 
 ## Attack line 2 — cut the threshold for value
 

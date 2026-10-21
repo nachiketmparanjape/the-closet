@@ -56,7 +56,6 @@
   .hero-actions { display:flex; gap:10px; margin-left:auto; flex-wrap:wrap; }
   .primary { display:inline-flex; align-items:center; justify-content:center; gap:9px; min-height:48px; border:1px solid var(--black); background:var(--black); color:var(--on-black); border-radius:8px; padding:0 19px; font-weight:600; cursor:pointer; font-family:inherit; font-size:15px; }
   .secondary { min-height:48px; border:1px solid var(--line-strong); background:var(--paper); color:var(--ink); border-radius:8px; padding:0 16px; font-weight:600; cursor:pointer; font-family:inherit; font-size:15px; }
-  .secondary.composer { border-color:var(--accent); color:var(--accent-dark); }
   .utility { display:grid; grid-template-columns:minmax(210px,1fr) auto; gap:18px; align-items:center; padding:18px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); margin-top:14px; }
   .search { position:relative; max-width:460px; color:var(--faint); }
   .search input { width:100%; border:0; background:transparent; color:var(--ink); padding:11px 14px 11px 4px; outline:none; font:inherit; font-size:16px; }
@@ -186,7 +185,7 @@
       '<div class="hero-actions"><button class="primary" type="button">+ Add a piece</button>' +
       '<button class="secondary" type="button">Bulk add</button>' +
       '<button class="secondary" type="button">Shop check</button>' +
-      '<button class="secondary composer" type="button">✨ Pick an outfit</button></div></section>' +
+      '<button class="secondary" type="button">Pick an outfit</button></div></section>' +
     '<div class="utility"><label class="search"><input type="search" placeholder="Search your wardrobe" /></label>' +
       '<div class="filters"><button class="chip active" type="button">All</button><button class="chip" type="button">Tops</button>' +
       '<button class="chip" type="button">Bottoms</button><button class="chip" type="button">Outerwear</button>' +
