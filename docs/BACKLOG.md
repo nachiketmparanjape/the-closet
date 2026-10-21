@@ -327,6 +327,60 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
 - **Status:** Not started (proposal stage). Each attack line
   becomes its own sized cut at a planning walk.
 
+### UX-15: Sheets & popups feel native — motion, swipe, backdrop everywhere (M)
+- **Size:** M
+- **Value:** Founder report (2026-10-21): the stylist chat
+  "looks like a bottom-up drawer but there is no visible
+  smooth animation — jittery or none at all," with no
+  swipe-down and inconsistent tap-outside dismissal. His
+  instruction: one item that fixes this class of thing
+  across the whole app, not a patch per sheet. Sheets are
+  how everything in Closet happens — add, bulk, chat,
+  trips, outfits, account — and right now each teleports
+  in, vanishes on close, and follows its own dismissal
+  rules. Per his UX-13 framing, feeling decides whether
+  people stay; this is the feeling layer of every flow.
+- **Current state (audited 2026-10-21, in the card so the
+  cut starts from facts):** an entrance keyframe exists
+  (.modal 260ms rise; chat 24px) but — (a) NO exit
+  animation exists: closeOverlay hides instantly;
+  (b) the backdrop dim pops with no fade; (c) 24px of
+  travel on a 92dvh sheet doesn't read as a drawer slide;
+  (d) backdrop-tap dismissal is wired on only 4 of 13
+  overlays; (e) swipe-down exists nowhere; (f) Esc covers
+  only some overlays; (g) openOverlay focuses the first
+  focusable element instantly, which can jump layout on
+  mobile.
+- **Scope:** one sheet system for all 13 overlays (item,
+  upload, bulk, chat, trip, outfit, builder, composer,
+  photoParse, shopCheck, shopCheckDetail, account,
+  feedback):
+  - Motion both ways: backdrop fades; bottom sheets slide
+    from the bottom edge with full travel (~280ms in,
+    ~220ms out, standard easing), centered modals
+    fade/scale subtly; transform/opacity only — no layout
+    animation, no jitter; closeOverlay gains a closing
+    state so the exit plays before hidden flips.
+  - Dismissal parity on every sheet: close control,
+    backdrop tap, swipe-down (drag follows the finger,
+    threshold/velocity snap), Esc. Dismissal respects
+    in-flight work — the bulk sheet's minimize semantics
+    are the model; a dirty form's rule (confirm vs stay)
+    is decided per sheet in the cut, never by accident.
+  - No focus theft on open: focus moves only when the
+    sheet's job needs the keyboard, never an instant
+    programmatic focus that jumps scroll.
+  - prefers-reduced-motion: crossfade only, no travel.
+- **Acceptance:** on the founder's phone, every sheet in
+  the app opens and closes with visible, smooth motion;
+  every sheet dismisses by backdrop tap and swipe-down;
+  nothing teleports; DESIGN.md §5 is updated to describe
+  the system as built (the spec already promises motion —
+  this cut makes the promise true).
+- **Status:** Not started. Filed 2026-10-21. Natural pull:
+  with or right after DESIGN-CHAT-1 — the chat sheet is
+  the worst offender.
+
 ### PC-34: Garment extraction & clean rendering (research spike)
 - **Size:** Spike S, then size from findings
 - **Value:** Founder's long-term direction (2026-10-21): user photos
