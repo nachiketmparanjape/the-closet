@@ -417,6 +417,12 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   roll our own? The spike's recommendation must answer both
   head-on, with the Google output as the bar. PC-36 (worn-photo
   decomposition) shares this spike — same segmentation core.
+  Research landed same day (studio inbox + PRODUCT.md record);
+  **founder approved Option A 2026-10-21**: Photoroom behind
+  one `extractGarment` callable, provider-swappable, original
+  never destroyed. First step is the evidence step — a
+  ~20-photo trial on the founder's real bed/carpet photos
+  (quality + latency) — then the build pulls through planning.
 
 ### PC-36: Photo of a person → individual articles + the outfit
 - **Size:** Spike shared with PC-34, then size from findings
@@ -445,7 +451,10 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   the user confirms or edits — nothing lands silently — plus
   one outfit composed of exactly those articles.
 - **Status:** Not started. Filed 2026-10-21 from the
-  founder's message; research pairs with PC-34.
+  founder's message; research pairs with PC-34. Research
+  landed same day; **founder approved Option A 2026-10-21**:
+  prototype on the PC-34 matting core, judged on the
+  founder's real outfit photos before any build is sized.
 
 ### PC-35: Beginner guide — ways to add clothes (incl. Google Photos)
 - **Size:** S

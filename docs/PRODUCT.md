@@ -161,3 +161,39 @@ Decided topics stay as compact records; full reports live in `research_notes/`.
 - **Decision:** no — rating remains post-wear only. The rating is the
   reflection loop's input (predicted confidence vs actual outcome), and an
   outcome only exists once the outfit was actually worn. Founder call.
+
+### [DECIDED 2026-10-21] Garment extraction & worn-photo decomposition (PC-34 + PC-36)
+- **Question:** can photos be parsed into clean garment cutouts
+  (PC-34), and worn photos into individual articles + the outfit
+  (PC-36) — readymade or from scratch, and at what cost? Benchmark:
+  Google Photos' Wardrobe output.
+- **Findings:** PC-34 is a commodity — Photoroom's API does
+  benchmark-grade removal at $0.02/image ($20/mo floor covers 1,000
+  images; per-response uncertainty score fits our confirm queue).
+  remove.bg's API dies 2026-12-01 (traffic moves to Leonardo), so it
+  is not an option. Open-source BiRefNet (MIT; BRIA's RMBG-2.0 is
+  non-commercial — avoid) via per-second GPU hosting (Replicate/fal)
+  lands ~$0.001/image. Gemini 2.5 Flash does segmentation masks but
+  they are coarse, and Google dropped segmentation in Gemini 3.x —
+  a label/box oracle, not the extraction engine. PC-36 has no
+  readymade API: the buildable pipeline is a fashion parser (FASHN
+  Human Parser, SegFormer, 18 classes — license needs a read) or
+  Gemini boxes → per-garment BiRefNet refinement → describeItem tags
+  → draft articles + outfit. It will trail Google on occluded/layered
+  garments: a worn photo holds only visible pixels, and Google's
+  renders benefit from whole-library best-shot selection and apparent
+  generative cleanup — completion we would only ever ship labeled,
+  with the raw cutout kept. Per onboarded user (~100 photos) every
+  route costs cents-to-$2; the real difference is fixed cost
+  ($20/mo buy vs a new GPU service to own).
+- **Recommendation:** buy PC-34 (Photoroom behind one
+  `extractGarment` callable, original photo never destroyed);
+  prototype PC-36 on the same matting core and judge it on real
+  outfit photos before sizing a build; never train from scratch —
+  assembling open models is the from-scratch answer at our scale.
+  Full report: `research_notes/closet-garment-extraction.md`.
+- **Decision (founder, 2026-10-21):** Option A approved as
+  recommended. First step is the evidence step, not the build:
+  a ~20-photo Photoroom trial on the founder's real bed/carpet
+  photos (quality + latency), then the PC-34 build and the
+  PC-36 prototype get pulled through planning.
