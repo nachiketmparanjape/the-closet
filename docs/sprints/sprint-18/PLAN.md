@@ -87,6 +87,19 @@ issue #61's "What should I wear?" cluster as a designed
 component instead of a one-off. Starts only once Card 2's
 validation lands.
 
+### Candidate (not in slate): DESIGN-HOME-1 — Today, a stylist-first home
+
+Filed 2026-10-21 after the founder widened the design latitude
+("don't be afraid to propose dramatic updates or complete
+redesigns — doesn't have to be incremental"). Sketch:
+`docs/proposals/TODAY-HOME-PROPOSAL.md` — invert the app from
+catalogue-first to a Today home (morning greeting + today's
+outfit proposal + the day's thread), catalogue unchanged as a
+tab. Awaiting founder steer; if validated it designs fully
+(critique rounds + DESIGN.md amendment) before it joins a
+slate, and it composes with Card 3 (shared proposal-card
+components) rather than competing with it.
+
 ## Out of scope
 
 - Framework rebuild — governed by the decision point in the
