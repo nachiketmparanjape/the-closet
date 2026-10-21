@@ -5,7 +5,10 @@ cut records live in sprint folders). v1 drafted in Sprint 18
 (card DESIGN-SYSTEM-1) from a full inventory of the current app,
 then put through three recorded critique rounds before founder
 review — log in `docs/sprints/sprint-18/DESIGN-CRITIQUES.md`,
-with the fixes folded into this version._
+with the fixes folded into this version. **Founder approved the
+direction 2026-10-21** ("let's go with this") — which also
+satisfies condition (a) of the UX-13 framework decision point;
+condition (b) is two screens re-skinned on this system._
 
 **How this doc is used:** new or re-skinned UI is built from the
 tokens and components here — nothing freehand. A deviation is a
@@ -270,6 +273,20 @@ trust to buy novelty. *Alternative:* a clean tech-neutral
 rebrand (white/gray + one electric color) — wins if the product
 pivots away from fashion-editorial toward utility; loses the
 one distinctive asset the app already owns.
+_Changeability (founder question, 2026-10-21):_ identity is
+tokenized — the palette is ~20 role values in two `:root`
+blocks, the voice is two font families + the §2.2 scale. A
+future identity change is therefore a token swap + font swap:
+hours, not sprints — *provided* the §2.1 no-hardcoded-colors
+rule holds (every stray hex is a small mortgage on this).
+What does not change cheaply: component shapes and layout
+grammar (tab bar, card anatomy, the proposal pattern) — those
+are the system, not the identity — and anything captured
+outside the app (screenshots, an app icon, a name). While the
+product has one user, this is the cheap experiment window:
+identity experiments run as alternate token blocks on the
+reference screen, judged on real content, adopted or dropped
+by editing this doc.
 
 **D2 — Serif for moments, sans for work.** *Why:* fashion is
 editorial; headlines, outfit names and scores in serif give the
