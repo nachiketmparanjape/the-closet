@@ -29,11 +29,18 @@ const WARMTHS = ["light", "medium", "heavy"];
 // Sprint 5: controlled style-tag vocabulary. Each tag must earn its place —
 // these are the ones that change outfit decisions.
 const STYLE_TAGS = ["classic", "minimalist", "preppy", "streetwear", "vintage", "bohemian", "edgy", "romantic", "sporty", "rugged", "refined", "avant-garde"];
-const MODEL_VERSION = "gemini-2.5-flash"; // Verified live in us-central1 2026-10-19.
-// "gemini-3.8-flash" was never resolvable here (Vertex 404 on every
-// function that used it, including planPacking) — probed the 3.x family
-// directly, only 2.5-family names return 200. Revisit only against a
-// live probe, never the lifecycle page alone.
+const MODEL_VERSION = "gemini-3.5-flash"; // Probed live 2026-10-20 on the
+// GLOBAL endpoint with this app's exact request shapes (thinkingBudget
+// 512/1024, vision + JSON mode) — all 200, 2–5s. History: the 2.5 family
+// retired 2026-10-20. Probe rejects, same day: 3.8-flash (rejects
+// budgets <8192; vision+JSON hung >45s), 3.5-flash-lite (rejects
+// thinking budgets), 3.1-flash-lite (vision+JSON timed out >45s).
+// The 3.x family also 404s on regional endpoints — it only serves from
+// global; the Oct 19 outage was deployed env pinning
+// VERTEX_LOCATION=us-central1, not the model name. Deployed env
+// (GEMINI_MODEL / VERTEX_LOCATION) must match this: gemini-3.5-flash /
+// global. Never re-point blind — probe first, on the endpoint the
+// code actually uses, with the app's real request shapes.
 
 const PROMPT = `You are cataloguing one garment from its photo for a personal wardrobe app.
 Look at the photo and answer with ONLY a JSON object (no markdown, no prose) with exactly these keys:

@@ -1,0 +1,255 @@
+{
+  "label": "gemini-3.5-flash-migration",
+  "at": "2026-10-21T04:34:05.101Z",
+  "done": true,
+  "results": [
+    {
+      "id": "color-harmony-business-casual",
+      "ms": 4012,
+      "finishReason": "STOP",
+      "thoughtTokens": 187,
+      "outputTokens": 189,
+      "reply": "For your business casual dinner tonight, I recommend pairing the Navy Oxford shirt with the Khaki chinos and Brown loafers. This classic combination strikes the perfect balance of professional and relaxed, keeping you comfortable in the mild 65°F weather.",
+      "outfitRaw": {
+        "items": [
+          "[i1]",
+          "[i3]",
+          "[i5]"
+        ],
+        "reasoning": "The classic pairing of a navy oxford and khaki chinos anchors this timeless business-casual look. The brown loafers tie the warm tan of the pants together with a rich, complementary leather tone.",
+        "scores": {
+          "color": 9,
+          "formality": 10,
+          "weather": 9,
+          "proportion": 9,
+          "occasion": 10
+        }
+      },
+      "outfitMapped": [
+        {
+          "id": "a1",
+          "name": "Navy Oxford shirt"
+        },
+        {
+          "id": "a3",
+          "name": "Khaki chinos"
+        },
+        {
+          "id": "a5",
+          "name": "Brown loafers"
+        }
+      ],
+      "slotProblem": null,
+      "scores": {
+        "color": 9,
+        "formality": 10,
+        "weather": 9,
+        "proportion": 9,
+        "occasion": 10
+      },
+      "parseError": null,
+      "checks": [
+        "picks a top + bottom (+ shoes)",
+        "formality fits business-casual dinner (not the white tee + sneakers)",
+        "colors harmonize (navy/tan/brown is the classic answer)"
+      ]
+    },
+    {
+      "id": "pattern-clash",
+      "ms": 4088,
+      "finishReason": "STOP",
+      "thoughtTokens": 338,
+      "outputTokens": 177,
+      "reply": "For a relaxed Saturday, I've paired your **Plaid flannel shirt** with your **Black jeans**. It's a classic, effortless weekend combination that's comfortable and stylish.",
+      "outfitRaw": {
+        "items": [
+          "[i2]",
+          "[i3]"
+        ],
+        "reasoning": "The black jeans anchor this casual look, providing a solid neutral base for the bold pattern. The red and black plaid of the flannel shirt coordinates perfectly with the black denim for a classic, relaxed weekend vibe.",
+        "scores": {
+          "color": 9,
+          "formality": 10,
+          "weather": 8,
+          "proportion": 9,
+          "occasion": 10
+        }
+      },
+      "outfitMapped": [
+        {
+          "id": "b2",
+          "name": "Plaid flannel shirt"
+        },
+        {
+          "id": "b3",
+          "name": "Black jeans"
+        }
+      ],
+      "slotProblem": null,
+      "scores": {
+        "color": 9,
+        "formality": 10,
+        "weather": 8,
+        "proportion": 9,
+        "occasion": 10
+      },
+      "parseError": null,
+      "checks": [
+        "does NOT pair the striped top with the plaid shirt (pattern clash)",
+        "reasons about pattern interaction explicitly"
+      ]
+    },
+    {
+      "id": "duplicate-names",
+      "ms": 3940,
+      "finishReason": "STOP",
+      "thoughtTokens": 296,
+      "outputTokens": 177,
+      "reply": "I've put together a clean, athletic outfit for your gym session and grocery run. The solid black tee paired with grey joggers is a classic, effortless combination that works perfectly for both activities.",
+      "outfitRaw": {
+        "items": [
+          "[i1]",
+          "[i3]"
+        ],
+        "reasoning": "The solid black tee anchors this athletic, casual look, providing a clean base. The neutral grey joggers tie the monochromatic, low-contrast color palette together perfectly for a gym-to-grocery run.",
+        "scores": {
+          "color": 9,
+          "formality": 10,
+          "weather": 9,
+          "proportion": 9,
+          "occasion": 10
+        }
+      },
+      "outfitMapped": [
+        {
+          "id": "c1",
+          "name": "Black tee"
+        },
+        {
+          "id": "c3",
+          "name": "Grey joggers"
+        }
+      ],
+      "slotProblem": null,
+      "scores": {
+        "color": 9,
+        "formality": 10,
+        "weather": 9,
+        "proportion": 9,
+        "occasion": 10
+      },
+      "parseError": null,
+      "checks": [
+        "can distinguish the two black tees (handles, not names)",
+        "outfit references real item IDs"
+      ]
+    },
+    {
+      "id": "weather-mismatch",
+      "ms": 3772,
+      "finishReason": "STOP",
+      "thoughtTokens": 296,
+      "outputTokens": 182,
+      "reply": "For a warm, sunny walk in 85°F weather, I've put together a lightweight, breathable outfit using your cream linen shirt and tan chino shorts. This combination keeps you cool while looking effortlessly put-together.",
+      "outfitRaw": {
+        "items": [
+          "[i2]",
+          "[i4]"
+        ],
+        "reasoning": "The lightweight cream linen shirt anchors this warm-weather look, keeping it breathable and relaxed. The neutral tan chino shorts complement the cream top for a cohesive, sun-ready tonal palette.",
+        "scores": {
+          "color": 9,
+          "formality": 10,
+          "weather": 10,
+          "proportion": 9,
+          "occasion": 10
+        }
+      },
+      "outfitMapped": [
+        {
+          "id": "d2",
+          "name": "Linen shirt"
+        },
+        {
+          "id": "d4",
+          "name": "Chino shorts"
+        }
+      ],
+      "slotProblem": null,
+      "scores": {
+        "color": 9,
+        "formality": 10,
+        "weather": 10,
+        "proportion": 9,
+        "occasion": 10
+      },
+      "parseError": null,
+      "checks": [
+        "does NOT pick the wool overcoat (warmth mismatch)",
+        "weather reasoning is explicit"
+      ]
+    },
+    {
+      "id": "preference-honoring",
+      "ms": 3729,
+      "finishReason": "STOP",
+      "thoughtTokens": 269,
+      "outputTokens": 178,
+      "reply": "For your date night, I've put together a smart-casual look using your burgundy sweater and navy trousers. This combination respects your preference to avoid green tops while offering a rich, sophisticated color palette perfect for an evening out.",
+      "outfitRaw": {
+        "items": [
+          "[i1]",
+          "[i3]"
+        ],
+        "reasoning": "The structured navy trousers anchor this smart-casual look with a polished foundation. The deep burgundy of the sweater provides a warm, sophisticated contrast that harmonizes beautifully with the cool navy.",
+        "scores": {
+          "color": 9,
+          "formality": 8,
+          "weather": 7,
+          "proportion": 8,
+          "occasion": 9
+        }
+      },
+      "outfitMapped": [
+        {
+          "id": "e1",
+          "name": "Burgundy sweater"
+        },
+        {
+          "id": "e3",
+          "name": "Navy trousers"
+        }
+      ],
+      "slotProblem": null,
+      "scores": {
+        "color": 9,
+        "formality": 8,
+        "weather": 7,
+        "proportion": 8,
+        "occasion": 9
+      },
+      "parseError": null,
+      "checks": [
+        "honors the style profile (no green top despite it being a fine pick otherwise)",
+        "picks burgundy + navy"
+      ]
+    },
+    {
+      "id": "incomplete-warm-wardrobe",
+      "ms": 3457,
+      "finishReason": "STOP",
+      "thoughtTokens": 232,
+      "outputTokens": 106,
+      "reply": "I would love to help you prepare for your job interview tomorrow, but your current wardrobe only contains two casual t-shirts ([i1] and [i2]) and no pants or skirts. A job interview typically requires at least business casual attire, and we are missing the bottoms to complete any outfit. I work strictly with what you currently own, so I recommend checking a shop to find a suitable pair of trousers and a blazer for your interview.",
+      "outfitRaw": null,
+      "outfitMapped": null,
+      "slotProblem": null,
+      "scores": null,
+      "parseError": null,
+      "checks": [
+        "does NOT fabricate a blazer that isn't in the wardrobe",
+        "is honest about the wardrobe gap (or asks a clarifying question)"
+      ]
+    }
+  ]
+}
