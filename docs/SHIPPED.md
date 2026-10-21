@@ -207,9 +207,15 @@ What went live. Momentum you can see.
   only serve from the global endpoint. Model chosen by live probe
   with the app's exact request shapes (thinkingBudget 512/1024,
   vision + JSON mode), never the lifecycle page alone: 3.5-flash
-  passed everything in 2–5s; 3.8-flash rejects thinking budgets
-  under 8192 and hung >45s on vision+JSON; 3.5-flash-lite rejects
-  thinking budgets; 3.1-flash-lite timed out on vision+JSON.
+  passed everything in ~3s; 3.8-flash was flaky on these shapes
+  (timeouts on the 512-budget text and vision+JSON calls, a 429 on
+  recheck); both lite models passed every shape (and faster) but
+  are a capability tier down — reasoning quality wins at this
+  app's ~$0–1/month burn. (Correction, same night: an early
+  partial probe capture misstated the lite models as rejecting
+  these requests; the full matrix plus a confirmation recheck
+  show they pass. The choice is unchanged; the reasons are as
+  written here.)
   Verification: 217/217 tests, stylist benchmark 6/6 scenarios
   clean (results: tests/benchmark/results/gemini-3.5-flash-migration.json),
   all seven functions ACTIVE with the new env, callable boundary

@@ -31,10 +31,12 @@ const WARMTHS = ["light", "medium", "heavy"];
 const STYLE_TAGS = ["classic", "minimalist", "preppy", "streetwear", "vintage", "bohemian", "edgy", "romantic", "sporty", "rugged", "refined", "avant-garde"];
 const MODEL_VERSION = "gemini-3.5-flash"; // Probed live 2026-10-20 on the
 // GLOBAL endpoint with this app's exact request shapes (thinkingBudget
-// 512/1024, vision + JSON mode) — all 200, 2–5s. History: the 2.5 family
-// retired 2026-10-20. Probe rejects, same day: 3.8-flash (rejects
-// budgets <8192; vision+JSON hung >45s), 3.5-flash-lite (rejects
-// thinking budgets), 3.1-flash-lite (vision+JSON timed out >45s).
+// 512/1024, vision + JSON mode) — all 200, ~3s. History: the 2.5 family
+// retired 2026-10-20. Also probed, same day: 3.8-flash was flaky on
+// these shapes (timeouts on think512 and vision+JSON, a 429 on
+// recheck); both lite models (3.5-flash-lite, 3.1-flash-lite) passed
+// every shape but are a capability tier down — the stylist leans on
+// reasoning quality, and the app's burn makes that free.
 // The 3.x family also 404s on regional endpoints — it only serves from
 // global; the Oct 19 outage was deployed env pinning
 // VERTEX_LOCATION=us-central1, not the model name. Deployed env
