@@ -1374,6 +1374,30 @@
         return pid === "google.com" ? "Google" : pid === "password" ? "Email link" : pid;
       }
 
+      // A second popup chained from an async error handler has no user
+      // activation left, so browsers block it (founder friction report,
+      // 2026-10-21: "first popup works, second one is blocked"). Any
+      // chained Google sign-in therefore goes by redirect, and
+      // completeGoogleRedirect() finishes it when the page returns.
+      function googleRedirectSignIn(anonUid) {
+        try { window.localStorage.setItem("pendingGoogleMigration", anonUid || ""); } catch (e) {}
+        var provider = new firebase.auth.GoogleAuthProvider();
+        auth.signInWithRedirect(provider).catch(function (err) { showToast(friendlyError(err)); });
+      }
+      function completeGoogleRedirect() {
+        if (!auth || !auth.getRedirectResult) return;
+        auth.getRedirectResult().then(function (res) {
+          var anonUid = null;
+          try {
+            anonUid = window.localStorage.getItem("pendingGoogleMigration");
+            window.localStorage.removeItem("pendingGoogleMigration");
+          } catch (e) {}
+          if (res && res.user && anonUid) offerMigration(anonUid);
+        }).catch(function (err) {
+          if (err && err.code) showToast(friendlyError(err));
+        });
+      }
+
       function upgradeWithGoogle() {
         if (!configured || !currentUser) return;
         var provider = new firebase.auth.GoogleAuthProvider();
@@ -1385,11 +1409,13 @@
           if (err.code === "auth/credential-already-in-use") {
             // This Google account already exists (the user's real account):
             // sign into it, then offer to move the guest wardrobe over —
-            // one account per email.
-            var anonUid = currentUser.uid;
-            auth.signInWithPopup(provider).then(function () {
-              offerMigration(anonUid);
-            }).catch(function (e2) { showToast(friendlyError(e2)); });
+            // one account per email. By redirect, not a second popup:
+            // chained popups are blocked (see googleRedirectSignIn).
+            googleRedirectSignIn(currentUser.uid);
+          } else if (err.code === "auth/popup-blocked") {
+            // Even the first popup can be blocked under strict settings —
+            // same redirect fallback.
+            googleRedirectSignIn(isGuest() ? currentUser.uid : null);
           } else if (err.code === "auth/account-exists-with-different-credential" && err.email && err.credential) {
             // This Google account's email already has an email-link account.
             // Stash the Google credential, sign in via email link, then
@@ -6854,6 +6880,7 @@
             else showToast("Couldn't finish signing in — no email address found.");
             window.history.replaceState({}, document.title, window.location.pathname);
           }
+          completeGoogleRedirect();
           auth.onAuthStateChanged(function (user) {
             if (!user) {
               auth.signInAnonymously().catch(function (err) { showToast(friendlyError(err)); });
