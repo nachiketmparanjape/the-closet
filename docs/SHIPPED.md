@@ -4,6 +4,22 @@ What went live. Momentum you can see.
 
 ## Sprint 18 (2026-10-21 → )
 
+- **Fix buffers (founder testing, 2026-10-21).** Buffer 1:
+  Stylist became a filled accent pill + the bar gained its
+  shadow (text-only read as hidden); the identity preview was
+  rebuilt faithful (real view structure, sample content) with
+  light/dark × identity toggles after the founder caught the
+  first version being an impression, not a preview. Buffer 2
+  (from prod screenshots): hero CTAs unified (one primary,
+  three identical secondaries, no lone emoji, no mid-label
+  wraps); the global hint color returned to muted — accent-dark
+  had leaked onto informational text everywhere (D7); interior
+  titles dropped to the Title token (27px); outfit tiles got a
+  collage stage + 2-line names + "Stylist pick" in words; shop
+  cards clamp their description-title to 2 lines and verdict to
+  3 in ink; the desktop tab cluster caps at 780px centered; HTML
+  now serves no-cache so founder testing always sees the latest
+  build. PC-34 (garment extraction research) filed the same day.
 - **DESIGN-SYSTEM-1 — `docs/DESIGN.md` v1.** The living design
   spec: principles, tokens (color roles, type scale, 4pt spacing,
   radius scale), the component kit, motion rules, accessibility
