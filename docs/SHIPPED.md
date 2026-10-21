@@ -47,6 +47,20 @@ What went live. Momentum you can see.
   Also same day: Google sign-in's chained popup (blocked by
   browsers) replaced with a redirect fallback that completes
   on return, migration offer included.
+  Correction (founder regression report, same day): the
+  redirect return raced the anonymous-first sign-in — the
+  listener fired with no user and signed him back out to
+  guest before the redirect result landed, so Google login
+  appeared twice and never stuck. The anonymous fallback now
+  waits for the redirect to settle, and the known-account
+  path no longer redirects at all: the account sheet explains
+  and his next tap runs the sign-in popup with fresh user
+  activation (continueToExistingAccount). Redirect remains
+  only for the strict popup-blocked case.
+  Pack check-off (founder-approved add-on): tap a pack row to
+  check it off — state on the trip doc (packing.packedIds),
+  progress bar + "N of M packed", optimistic with revert on
+  failure; a re-plan resets the checks with the plan.
 - **Fix buffers (founder testing, 2026-10-21).** Buffer 1:
   Stylist became a filled accent pill + the bar gained its
   shadow (text-only read as hidden); the identity preview was
