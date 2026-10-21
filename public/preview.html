@@ -78,7 +78,7 @@
   [data-mode="dark"] .tabbar { box-shadow:0 -10px 30px rgba(0,0,0,.35); }
   .tabbar span { flex:1; text-align:center; font-size:13px; font-weight:600; color:var(--muted); padding:10px 2px; border-radius:10px; min-height:24px; }
   .tabbar span.active { background:var(--paper-soft); color:var(--ink); }
-  .tabbar span.stylist { background:var(--accent); color:var(--on-accent); font-weight:700; border-radius:999px; margin:2px 4px; }
+  .tabbar span.stylist { background:linear-gradient(135deg, var(--accent), var(--accent-dark)); color:var(--on-accent); font-weight:700; border-radius:999px; margin:2px 4px; box-shadow:0 4px 16px rgba(36,86,200,.35); }
 
   .phone { max-width:430px; margin:0 auto 26px; border-radius:26px; padding-left:16px; padding-right:16px; padding-top:18px; }
   .phone .utility { grid-template-columns:1fr; }
@@ -193,7 +193,7 @@
       '<button class="chip" type="button">Other</button></div></div>' +
     '<div class="catalog-head"><h2>Every piece</h2><span class="count">8 pieces</span></div>' +
     '<div class="gallery">' + tiles + '</div>' +
-    '<div class="tabbar"><span class="active">Wardrobe</span><span>Outfits</span><span>Shop list</span><span>Trips</span><span class="stylist">Stylist</span></div>';
+    '<div class="tabbar"><span class="active">Wardrobe</span><span>Outfits</span><span>Shop list</span><span>Trips</span><span class="stylist">✦ Stylist</span></div>';
   }
   document.getElementById("phoneFrame").innerHTML = wardrobeHTML();
   document.getElementById("deskFrame").innerHTML = wardrobeHTML();
