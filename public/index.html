@@ -1736,10 +1736,11 @@
         fb.style.marginTop = "16px";
         fb.addEventListener("click", function () { closeOverlay(document.getElementById("accountOverlay")); openFeedback(); });
         body.appendChild(fb);
-        // DESIGN-HOME-1: the experimental Today home toggle.
-        body.appendChild(h("Experimental"));
-        body.appendChild(el("p", "hint", "Preview the new Today home — a stylist-first home screen: today's pick first, your catalogue one tap away. In testing; the regular home stays untouched while it's off."));
-        var todayToggleBtn = el("button", todayHomeOn() ? "primary" : "secondary", todayHomeOn() ? "Today home: on — turn off" : "Preview the new Today home");
+        // DESIGN-HOME-1: the Today home toggle (an opt-out since
+        // graduation — Today is the default home, 2026-10-21).
+        body.appendChild(h("Today home"));
+        body.appendChild(el("p", "hint", "Today is your home screen — the stylist's pick first, your catalogue one tap away. Turn it off to go back to opening on the catalogue."));
+        var todayToggleBtn = el("button", todayHomeOn() ? "primary" : "secondary", todayHomeOn() ? "Today home: on — turn off" : "Turn on the Today home");
         todayToggleBtn.type = "button";
         todayToggleBtn.style.marginTop = "10px";
         todayToggleBtn.addEventListener("click", function () {
@@ -4530,7 +4531,14 @@
       var todayHomeCache = null;
       function todayHomeOn() {
         if (todayHomeCache !== null) return todayHomeCache;
-        try { return window.localStorage.getItem("closetTodayHome") === "1"; } catch (e) { return false; }
+        try {
+          var lv = window.localStorage.getItem("closetTodayHome");
+          if (lv === "0") return false;
+          if (lv === "1") return true;
+        } catch (e) {}
+        // DESIGN-HOME-1 graduated (founder, 2026-10-21): Today is the
+        // default home — only an explicit stored "off" opts out.
+        return true;
       }
       function setTodayHome(on) {
         todayHomeCache = on;
@@ -4545,15 +4553,25 @@
       function watchTodaySettings(user) {
         db.collection("users").doc(user.uid).collection("settings").doc("app")
           .onSnapshot(function (snap) {
-            if (!snap.exists) {
-              // Migration: a device that opted in pre-server carries the
-              // preference up, so the account becomes the source of truth.
-              var local = false;
-              try { local = window.localStorage.getItem("closetTodayHome") === "1"; } catch (e) {}
-              if (local) setTodayHome(true);
-              return;
+            var data = snap.exists ? (snap.data() || {}) : {};
+            var local = null;
+            try {
+              var lv = window.localStorage.getItem("closetTodayHome");
+              if (lv === "1") local = true; else if (lv === "0") local = false;
+            } catch (e) {}
+            var on;
+            if (typeof data.todayHome === "boolean") {
+              on = data.todayHome;
+            } else if (local !== null) {
+              // Migration: a device carrying an explicit pre-server
+              // choice writes it up; the account becomes the source
+              // of truth (an explicit opt-out survives graduation).
+              on = local;
+              setTodayHome(on);
+            } else {
+              // No stored choice anywhere → the graduated default.
+              on = true;
             }
-            var on = !!((snap.data() || {}).todayHome);
             if (todayHomeCache !== on) {
               todayHomeCache = on;
               try { window.localStorage.setItem("closetTodayHome", on ? "1" : "0"); } catch (e) {}

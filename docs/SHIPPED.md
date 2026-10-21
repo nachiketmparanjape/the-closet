@@ -61,6 +61,11 @@ What went live. Momentum you can see.
   check it off — state on the trip doc (packing.packedIds),
   progress bar + "N of M packed", optimistic with revert on
   failure; a re-plan resets the checks with the plan.
+  Graduation (founder, same day): Today is the default home —
+  no stored choice means the app opens on Today; an explicit
+  off is honored on every device, and the Account toggle is
+  now an opt-out labeled "Today home." DESIGN.md §4.10
+  records the promotion.
   Trip chat wardrobe scope (founder ask, same day): the chat
   could only discuss the current packing plan — the plumbing
   always allowed the whole wardrobe (handle mapping + client

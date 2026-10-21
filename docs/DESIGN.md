@@ -279,7 +279,7 @@ AI-suggestion rows (the describe/name hints) in Small
 `--accent-dark` — the one sanctioned accent-text use besides
 §4.6, because it literally is the AI speaking.
 
-### 4.10 Today home (experimental, toggle-gated)
+### 4.10 Today home (the default home since 2026-10-21)
 
 The stylist-first home from
 `docs/proposals/TODAY-HOME-PROPOSAL.md` (validated 2026-10-21,
@@ -319,6 +319,12 @@ right-edge panel on desktop. (e) **Motion basics shipped**
 (§5): 200ms view fade-rise, 260ms overlay entrances (the
 docked stylist slides), press compression, all of it off
 under reduced-motion.
+**Graduation (founder, 2026-10-21):** "make the experimental
+experience default — it looks good enough to me." Today is now
+the default home: with no stored choice anywhere, the app
+opens on Today; an explicit off (settings doc or device) is
+still honored everywhere, and the Account toggle survives as
+an opt-out, relabeled from "Experimental" to "Today home."
 
 ### 4.9 Toast, empty state, skeleton
 - **Toast:** bottom-center above the tab bar, `--ink` fill,
