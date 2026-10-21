@@ -4,6 +4,21 @@ What went live. Momentum you can see.
 
 ## Sprint 18 (2026-10-21 → )
 
+- **DESIGN-HOME-1 — Today, the stylist-first home (experimental).**
+  Toggle-gated from the account overlay ("Preview the new Today
+  home," default off; the regular home is untouched while off).
+  When on: cold-open lands on Today — serif greeting + weather
+  chip, today's outfit proposal from the real composer machinery
+  (one generation a day, cached; *Wear this* saves + logs the
+  wear, *Another* cycles alternates, *Ask the stylist* is the
+  only chat touch), then the day's thread (rate-yesterday card,
+  trip countdown, shop-list door, unworn pieces) with an Explore
+  floor. Graded empty states for new users (dominant upload CTA
+  + a labeled sample at zero pieces; honest progress below the
+  compose threshold). A "Closet" wordmark in the topline is the
+  home affordance; the tab bar is unchanged. Design:
+  `docs/proposals/TODAY-HOME-PROPOSAL.md` v0.2, DESIGN.md §4.10.
+  Founder phone validation is the verdict that counts.
 - **Fix buffers (founder testing, 2026-10-21).** Buffer 1:
   Stylist became a filled accent pill + the bar gained its
   shadow (text-only read as hidden); the identity preview was
