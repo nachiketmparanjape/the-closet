@@ -324,6 +324,9 @@
     .pack-progress { height: 4px; background: var(--paper-soft); border-radius: 999px; overflow: hidden; margin: 2px 0 6px; }
     .pack-progress-fill { height: 100%; background: var(--accent); border-radius: 999px; transition: width 250ms ease; }
     .pack-progress-label { font-size: 13px; color: var(--muted); margin: 0 0 10px; }
+    /* Bulk add, minimized: a floating progress pill above the tab bar
+       while a run continues with its sheet closed. */
+    .bulk-mini { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(84px + env(safe-area-inset-bottom)); z-index: 25; background: var(--black); color: var(--on-black); border: none; border-radius: 999px; padding: 10px 18px; font-size: 14px; font-weight: 600; box-shadow: var(--shadow); cursor: pointer; white-space: nowrap; max-width: calc(100vw - 32px); }
     .pack-name { font-weight: 600; font-size: 15px; line-height: 1.3; }
     .pack-reason { font-size: 13.5px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
     @media (prefers-reduced-motion: reduce) {
@@ -856,7 +859,7 @@
       <div class="modal-body form-grid">
         <p class="hint">One photo per piece — each becomes its own item, named and described by AI. Review them in the gallery afterwards.</p>
         <div class="field file-drop">
-          <label for="bulkInput">Photos (up to 50)</label>
+          <label for="bulkInput">Photos (up to 100)</label>
           <input id="bulkInput" type="file" accept="image/jpeg,image/png,image/webp" multiple />
           <div class="photo-actions">
             <button class="secondary" id="bulkCameraBtn" type="button">Take photo</button>
@@ -866,12 +869,17 @@
         <div class="bulk-list" id="bulkList" hidden></div>
         <div class="progress" id="bulkProgress" hidden aria-label="Bulk upload progress"><span></span></div>
         <div class="form-actions">
+          <button class="secondary" id="bulkStop" type="button" hidden>Stop</button>
           <button class="secondary" id="bulkCancel" type="button">Close</button>
           <button class="primary" id="bulkStart" type="button" disabled>Add pieces</button>
         </div>
       </div>
     </section>
   </div>
+
+  <!-- Bulk add minimized: the run keeps going with the sheet closed;
+       this pill is its window back in. -->
+  <button id="bulkMini" class="bulk-mini" type="button" hidden></button>
 
   <div class="overlay" id="chatOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="chatTitle">
     <section class="modal">
@@ -2819,10 +2827,11 @@
 
       // PC-9: bulk add — N photos become N items, one per photo.
       // Bounded concurrency (3), per-item failure isolation with retry.
-      var BULK_MAX = 50;
+      var BULK_MAX = 100;
       var BULK_CONCURRENCY = 3;
       var bulkJobs = [];          // {file, name, status, phase, error}
       var bulkRunning = false;
+      var bulkStopRequested = false;
       var bulkActiveWorkers = 0;
 
       function loadImageFile(file) {
@@ -2846,6 +2855,7 @@
         if (!currentUser) { signIn(); return; }
         renderBulkList();
         openOverlay(bulkOverlay);
+        syncBulkMini();
       }
 
       function bulkJobStatusText(job) {
@@ -2853,6 +2863,7 @@
         if (job.status === "done") return "Done";
         if (job.status === "failed") return "Failed";
         if (job.status === "invalid") return "Skipped";
+        if (job.status === "stopped") return "Not added";
         if (job.phase === "upload") return "Uploading…";
         if (job.phase === "describe") return "Describing…";
         return "Saving…";
@@ -2886,6 +2897,7 @@
           bulkList.appendChild(row);
         });
         updateBulkProgress();
+        syncBulkMini();
       }
 
       function updateBulkProgress() {
@@ -2959,6 +2971,11 @@
       }
 
       function bulkWorker() {
+        if (bulkStopRequested) {
+          bulkActiveWorkers--;
+          if (bulkActiveWorkers <= 0) bulkFinish();
+          return;
+        }
         var job = null;
         for (var i = 0; i < bulkJobs.length; i++) {
           if (bulkJobs[i].status === "queued") { job = bulkJobs[i]; job.status = "active"; job.phase = "upload"; break; }
@@ -2989,6 +3006,8 @@
         var dupe = findPhotoDupe(bulkJobs.filter(function (j) { return j.status === "queued"; }).map(function (j) { return j.file; }));
         if (dupe && !window.confirm("One of these photos looks like one already on '" + dupe.itemName + "'. Add anyway?")) return;
         bulkRunning = true;
+        bulkStopRequested = false;
+        document.getElementById("bulkStop").hidden = false;
         bulkInput.disabled = true;
         bulkStartBtn.disabled = true;
         bulkActiveWorkers = BULK_CONCURRENCY;
@@ -2998,11 +3017,39 @@
       function bulkFinish() {
         bulkRunning = false;
         bulkInput.disabled = false;
+        document.getElementById("bulkStop").hidden = true;
         var done = bulkJobs.filter(function (j) { return j.status === "done"; }).length;
         var failed = bulkJobs.filter(function (j) { return j.status === "failed"; }).length;
-        var msg = "Bulk add finished: " + done + " added" + (failed ? ", " + failed + " failed — retry them here" : "") + ".";
+        var stopped = bulkJobs.filter(function (j) { return j.status === "stopped"; }).length;
+        var msg = (stopped ? "Bulk add stopped: " : "Bulk add finished: ") + done + " added"
+          + (failed ? ", " + failed + " failed — retry them here" : "")
+          + (stopped ? ", " + stopped + " not added" : "") + ".";
         showToast(msg);
         renderBulkList();
+      }
+
+      // The minimized run's presence: a pill above the tab bar while
+      // the sheet is closed (founder ask, 2026-10-21 — closing the
+      // sheet minimizes the run, it never kills it).
+      function syncBulkMini() {
+        var pill = document.getElementById("bulkMini");
+        if (!pill) return;
+        if (!bulkRunning || !bulkOverlay.hidden) { pill.hidden = true; return; }
+        var done = bulkJobs.filter(function (j) { return j.status === "done"; }).length;
+        var failed = bulkJobs.filter(function (j) { return j.status === "failed"; }).length;
+        var total = bulkJobs.filter(function (j) { return j.status !== "invalid"; }).length;
+        pill.textContent = "Adding pieces… " + (done + failed) + "/" + total
+          + (failed ? " · " + failed + " failed" : "") + " — tap to view";
+        pill.hidden = false;
+      }
+
+      function requestBulkStop() {
+        if (!bulkRunning) return;
+        bulkStopRequested = true;
+        bulkJobs.forEach(function (j) { if (j.status === "queued") j.status = "stopped"; });
+        document.getElementById("bulkStop").hidden = true;
+        renderBulkList();
+        showToast("Stopping — pieces already in flight will finish.");
       }
 
       bulkInput.addEventListener("change", function () {
@@ -3054,8 +3101,17 @@
         bulkKick();
       });
 
-      document.getElementById("bulkClose").addEventListener("click", function () { closeOverlay(bulkOverlay); });
-      document.getElementById("bulkCancel").addEventListener("click", function () { closeOverlay(bulkOverlay); });
+      function minimizeBulk() {
+        closeOverlay(bulkOverlay);
+        if (bulkRunning) {
+          showToast("Still adding in the background — tap the pill at the bottom to check on it.");
+          syncBulkMini();
+        }
+      }
+      document.getElementById("bulkClose").addEventListener("click", minimizeBulk);
+      document.getElementById("bulkCancel").addEventListener("click", minimizeBulk);
+      document.getElementById("bulkStop").addEventListener("click", requestBulkStop);
+      document.getElementById("bulkMini").addEventListener("click", function () { openOverlay(bulkOverlay); syncBulkMini(); });
       document.getElementById("bulkButton").addEventListener("click", beginBulk);
 
       // PC-10: chat stylist — text-only outfit picks over the cached
