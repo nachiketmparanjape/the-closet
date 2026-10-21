@@ -259,3 +259,28 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   (`users/{uid}/chat_threads/{threadId}`), resumes them across
   reloads, and cleans up on trip delete.
 - **Status:** Not started (proposal stage). Sprint candidate.
+
+### PC-33: Trip steering in chat + pin discipline (M)
+- **Idea (founder 2026-10-20):** asking the general chat about a
+  trip *next week* produced a "Remember as current location?" pin
+  proposal for the destination. Verified problem: pins carry an
+  end date but no start date, so a saved pin would have taken
+  effect immediately and outranked measured weather — and no trip
+  object existed, because the chat never suggested one. His
+  direction: trip questions should steer toward creating a trip
+  object, with a one-line education on why working inside it is
+  better; one-off advice stays available.
+- **Design:** `docs/proposals/TRIP-STEER-PROPOSAL.md`. Three
+  parts: (1) a trip-intent confirm card in general chat (prefilled
+  destination/dates, create-or-dismiss, at most once per
+  conversation, advice never gated); (2) the one-off path stays
+  write-free — conversation-stated context already outranks
+  everything; (3) pin discipline — location/weather pins are
+  proposed only for facts true now; preference pins are unaffected;
+  a steering card suppresses a pin proposal for the same fact.
+  Future-dated pins (a `validFrom` field) were considered and
+  rejected in the proposal, with a revisit trigger recorded.
+  Principle: pins are the present-tense layer; trips own the
+  future. The discipline half can split out as an (S) at planning.
+- **Status:** Not started (proposal stage). Sprint candidate;
+  sits next to PC-32 (threads) and CONTEXT-1 (pins).
