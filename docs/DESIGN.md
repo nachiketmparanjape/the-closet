@@ -296,6 +296,14 @@ fake pick. With the experiment on, the topline carries a
 tappable serif **"Closet"** wordmark (the home affordance; the
 tab bar itself never changes). One generation per day, cached;
 the screen renders instantly and the proposal streams in.
+**Fix buffer 4 (founder's first real use, 2026-10-21):** the
+wordmark alone failed as the way back — it reads as a title and
+scrolls away. Today now also **leads the stylist sheet**: with
+the experiment on, opening the stylist shows the pick card
+(compact mirror, same actions) above the conversation, so the
+always-visible ✦ Stylist pill is the persistent door home —
+the founder's own steer ("part of the whole stylist
+experience"). The wordmark stays as a secondary affordance.
 
 ### 4.9 Toast, empty state, skeleton
 - **Toast:** bottom-center above the tab bar, `--ink` fill,

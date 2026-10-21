@@ -275,6 +275,13 @@
     .today-explore .et { font-size: 15px; font-weight: 600; display: block; }
     .today-explore .es { font-size: 12.5px; color: var(--muted); display: block; margin-top: 2px; line-height: 1.4; }
     .today-sample-tag { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; background: var(--accent-soft); color: var(--accent-dark); border-radius: 999px; padding: 3px 9px; margin: 0 0 10px; }
+    /* Fix buffer 4: Today leads the stylist sheet (founder: the pill is
+       the always-visible door back). Compact mirror of the pick card. */
+    #chatTodayStrip { border-bottom: 1px solid var(--line); padding: 14px 2px 16px; margin-bottom: 12px; }
+    #chatTodayStrip .today-pick-photos figure { width: 56px; }
+    #chatTodayStrip .today-pick-photos img { width: 56px; height: 70px; border-radius: 10px; }
+    #chatTodayStrip .today-why { font-size: 14px; margin-top: 10px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    #chatTodayStrip .today-actions { margin-top: 12px; }
     .chat-fab, .feedback-fab { display: none !important; }
     .outfit-card { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-md); padding: 16px; margin-top: 8px; }
 
@@ -827,6 +834,7 @@
         <button class="icon-button" id="chatClose" type="button" aria-label="Close stylist chat">×</button>
       </div>
       <div class="modal-body">
+        <div id="chatTodayStrip" hidden></div>
         <div class="chat-list" id="chatList" aria-live="polite"></div>
         <form class="chat-input-row" id="chatForm" style="position:relative;">
           <div id="chatRefChips" class="chat-ref-chips" hidden></div>
@@ -4515,6 +4523,100 @@
         }).catch(function (err) { showToast(friendlyError(err)); });
       }
 
+      // The stylist's reply is markdown-ish prose; the pick card shows a
+      // clean, sentence-bounded excerpt — never raw formatting or a
+      // mid-word chop (founder screenshot, fix buffer 4).
+      function cleanTodayNote(text) {
+        if (!text) return "";
+        var t = String(text)
+          .replace(/\*\*/g, "")
+          .replace(/\*/g, "")
+          .replace(/`/g, "")
+          .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+          .replace(/\[|\]/g, "")
+          .replace(/\s+/g, " ")
+          .trim();
+        // A note that was truncated upstream can end in a dangling
+        // fragment ("…look. Top: i…") — drop back to the last
+        // complete sentence when there is one.
+        if (/…$/.test(t)) {
+          var ls = Math.max(t.lastIndexOf(". "), t.lastIndexOf("! "), t.lastIndexOf("? "));
+          if (ls > 60) return t.slice(0, ls + 1);
+        }
+        if (t.length <= 200) return t;
+        var cut = t.slice(0, 200);
+        var sent = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "), cut.lastIndexOf("? "));
+        if (sent > 80) return cut.slice(0, sent + 1);
+        var word = cut.lastIndexOf(" ");
+        return (word > 80 ? cut.slice(0, word) : cut) + "…";
+      }
+      function todayAsk() {
+        openChat();
+        renderChatTodayStrip();
+      }
+      // Fix buffer 4: Today leads the stylist sheet when the experiment
+      // is on — the ✦ Stylist pill is the persistent door back to Today
+      // (the topline wordmark alone failed the founder's first real use:
+      // it reads as a title and scrolls away).
+      function renderChatTodayStrip() {
+        var strip = document.getElementById("chatTodayStrip");
+        if (!strip) return;
+        strip.textContent = "";
+        if (!todayHomeOn() || !currentUser) { strip.hidden = true; return; }
+        restoreToday();
+        var wrap = todayState.picks[todayState.idx];
+        if (!wrap) {
+          if (todayThresholdMet() && allItems.length) {
+            strip.hidden = false;
+            var row = document.createElement("div");
+            row.className = "today-actions";
+            row.style.marginTop = "0";
+            row.appendChild(shopCheckEl("p", "today-why", "Today's pick lives on the Today home."));
+            row.appendChild(mkBtn("secondary", "Go to Today", function () {
+              closeOverlay(chatOverlay);
+              switchView("today");
+            }));
+            strip.appendChild(row);
+          } else {
+            strip.hidden = true;
+          }
+          return;
+        }
+        strip.hidden = false;
+        var o = wrap.outfit;
+        var worn = todayState.wornId && o.savedId && todayState.wornId === o.savedId;
+        strip.appendChild(shopCheckEl("p", "today-eyebrow", worn ? "Today's pick · worn ✓" : "Today's pick"));
+        var photos = document.createElement("div");
+        photos.className = "today-pick-photos";
+        (o.itemIds || []).forEach(function (id) {
+          var it = itemById(id);
+          var ps = it ? itemPhotos(it) : [];
+          var fig = document.createElement("figure");
+          if (ps.length && ps[0].url) {
+            var img = document.createElement("img");
+            img.src = ps[0].url;
+            img.alt = it ? it.name : "item photo";
+            img.loading = "lazy";
+            fig.appendChild(img);
+          }
+          var cap = document.createElement("figcaption");
+          cap.textContent = it ? it.name : "Unknown item";
+          fig.appendChild(cap);
+          photos.appendChild(fig);
+        });
+        strip.appendChild(photos);
+        if (wrap.note) strip.appendChild(shopCheckEl("p", "today-why", cleanTodayNote(wrap.note)));
+        var actions = document.createElement("div");
+        actions.className = "today-actions";
+        if (!worn) actions.appendChild(mkBtn("primary", "Wear this", function () { todayWear(); }));
+        actions.appendChild(mkBtn("secondary", "Another", function () { if (!todayState.generating) todayAnother(); }));
+        actions.appendChild(mkBtn("secondary", "Open Today", function () {
+          closeOverlay(chatOverlay);
+          switchView("today");
+        }));
+        strip.appendChild(actions);
+      }
+
       function renderToday() {
         var root = document.getElementById("todayRoot");
         if (!root || !currentUser) return;
@@ -4549,6 +4651,7 @@
         var thread = document.createElement("div");
         root.appendChild(thread);
         renderTodayThread(thread, token);
+        renderChatTodayStrip();
       }
 
       function renderTodaySlot(slot) {
@@ -4579,7 +4682,7 @@
           var acts = document.createElement("div");
           acts.className = "today-actions";
           acts.appendChild(mkBtn("primary", "Try again", function () { generateTodayPick(null); }));
-          acts.appendChild(mkBtn("secondary", "Ask the stylist", function () { openChat(); }));
+          acts.appendChild(mkBtn("secondary", "Ask the stylist", function () { todayAsk(); }));
           card.appendChild(acts);
           slot.appendChild(card);
           return;
@@ -4614,7 +4717,7 @@
           photos.appendChild(fig);
         });
         card.appendChild(photos);
-        if (wrap.note) card.appendChild(shopCheckEl("p", "today-why", wrap.note));
+        if (wrap.note) card.appendChild(shopCheckEl("p", "today-why", cleanTodayNote(wrap.note)));
         var actions = document.createElement("div");
         actions.className = "today-actions";
         if (worn) {
@@ -4628,7 +4731,7 @@
         actions.appendChild(mkBtn("secondary", todayState.generating ? "Composing…" : "Another", function () {
           if (!todayState.generating) todayAnother();
         }));
-        actions.appendChild(mkBtn("secondary", "Ask the stylist", function () { openChat(); }));
+        actions.appendChild(mkBtn("secondary", "Ask the stylist", function () { todayAsk(); }));
         card.appendChild(actions);
         slot.appendChild(card);
       }
@@ -4683,7 +4786,7 @@
         var acts = document.createElement("div");
         acts.className = "today-actions";
         acts.appendChild(mkBtn("primary", "＋ Add a piece", function () { document.getElementById("addButton").click(); }));
-        acts.appendChild(mkBtn("secondary", "Ask the stylist", function () { openChat(); }));
+        acts.appendChild(mkBtn("secondary", "Ask the stylist", function () { todayAsk(); }));
         card.appendChild(acts);
         return card;
       }
@@ -4788,6 +4891,7 @@
         return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
       }
       document.getElementById("todayHomeBtn").addEventListener("click", function () { switchView("today"); });
+      document.getElementById("tabChat").addEventListener("click", function () { renderChatTodayStrip(); });
 
       function switchView(view) {
         feedbackView = view; // FB-1: record where feedback comes from
