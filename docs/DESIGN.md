@@ -10,6 +10,12 @@ direction 2026-10-21** ("let's go with this") — which also
 satisfies condition (a) of the UX-13 framework decision point;
 condition (b) is two screens re-skinned on this system._
 
+_Founder latitude, widened 2026-10-21: "Don't be afraid to
+propose dramatic updates or complete redesigns — doesn't have
+to be incremental updates." Bold structural proposals are
+in-scope for this doc and its proposals folder; they still
+validate before they build._
+
 **How this doc is used:** new or re-skinned UI is built from the
 tokens and components here — nothing freehand. A deviation is a
 doc edit first (argue it here, in the open), never a quiet
