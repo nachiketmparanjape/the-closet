@@ -350,4 +350,38 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   Design keeps the photo honest for now: tiles render best-
   effort, extraction is a rendering layer, not a data change.
 - **Status:** Not started. Filed 2026-10-21 from the founder's
-  note; research runs on pull.
+  note; research runs on pull. Update same day: question (2) is
+  founder-verified — the collection's images save to the camera
+  roll and upload into Closet cleanly (see PC-35); the spike
+  still owns the feature's name, limits, and platform reach.
+
+## PC-35: Beginner guide — ways to add clothes (incl. Google Photos)
+- **Size:** S
+- **Value:** Founder discovery (2026-10-21, verified by doing
+  it): Google Photos' wardrobe collection — auto-extracted
+  garments on clean grounds, Items/Outfits — saves its images
+  to the camera roll, and those upload straight into Closet.
+  For a beginner this skips the worst onboarding step entirely
+  (photographing clothes on a bed) and the pieces arrive as
+  clean cutouts — the look the redesign wants (PC-34).
+  Onboarding's core problem is cost front-loaded, value
+  back-loaded (UX-14); a guide teaching the cheap paths is
+  the cheapest attack on it.
+- **Scope:** A short in-app guide, "Ways to add your clothes,"
+  reachable in one tap from the wardrobe/Today empty states
+  and from the Add flow. Three paths, a few lines each plus
+  the action: (1) photograph a piece — the standard flow;
+  (2) many at once — bulk add, one photo per piece; (3) bring
+  them from Google Photos — open the wardrobe collection,
+  save pieces to the camera roll, add them here like any
+  photo. Copy stays honest: Closet doesn't connect to Google
+  Photos directly; it's a download-then-add path. Founder's
+  2026-10-21 screenshots (Items grid, "saved to the Camera
+  Roll," sample cutouts on white) are the reference for how
+  path (3) actually looks.
+- **Acceptance:** a new user with an empty wardrobe reaches
+  the guide in one tap, reads it in under a minute, and can
+  follow the Google Photos path without guessing a step.
+- **Status:** Not started. Filed 2026-10-21 from the founder's
+  screenshots; sprint candidate — pairs with UX-14 (attack
+  line 1) and PC-34.

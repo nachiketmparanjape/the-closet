@@ -55,6 +55,11 @@ optimizing blindly.
   possibly pre-extracted. Unverified: what the feature is and
   what export looks like is research question (2) of PC-34;
   if it pans out, this becomes the first-run's front door.
+  **Founder-verified 2026-10-21:** export works — the
+  collection's images save to the camera roll and upload into
+  Closet cleanly, arriving as clean cutouts. PC-35 files the
+  beginner guide that teaches this path (plus photograph and
+  bulk) from the empty states.
 
 ## Attack line 2 — cut the threshold for value
 
