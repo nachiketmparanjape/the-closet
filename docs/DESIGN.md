@@ -48,7 +48,7 @@ Honest state of `public/index.html` today:
 2. **Morning-fast.** The core job happens half-awake, one
    thumb, in under 30 seconds. Every screen answers "how many
    taps to the thing I came for?" and the answer is small.
-3. **Warm editorial, not dashboard.** Paper tones, serif
+3. **Editorial, not dashboard.** Gallery-paper tones, serif
    moments, generous whitespace. This is a fashion product; it
    should read like a magazine that happens to be software.
 4. **One component per job.** If two features need a card, they
@@ -72,21 +72,21 @@ hexes live in one `:root` block (light) + one dark mapping.
 
 | Role | Light | Dark | Used for |
 |---|---|---|---|
-| `--bg` | `#f5f4f0` | `#121412` | app background (warm paper) |
-| `--paper` | `#ffffff` | `#1a1d1a` | cards, sheets, raised surfaces |
-| `--paper-soft` | `#ebe9e3` | `#242824` | inset surfaces, card fills |
-| `--ink` | `#171917` | `#f2f2ec` | primary text, primary buttons |
-| `--muted` | `#666963` | `#b9bdb6` | secondary text on `--bg`/`--paper` |
-| `--muted-strong` | `#54574f` | `#ccd0c8` | small text on `--paper-soft` (see §6) |
-| `--faint` | `#6a6d68` | `#8f958e` | tertiary text, never body copy |
-| `--line` | `#d8d8d1` | `#343934` | hairline borders |
-| `--line-strong` | `#babdb5` | `#4b514b` | interactive borders |
-| `--accent` | `#b8425b` | `#e36f87` | THE action/emphasis color (D7) |
-| `--accent-dark` | `#8c2840` | `#f38aa0` | accent text, pressed states |
-| `--accent-soft` | `#f4dfe4` | `#45252d` | accent-tinted fills |
-| `--sage` / `--sage-ink` | `#dce4d5` / `#40523c` | `#283529` / `#c5d8be` | calm positive (fits, success) |
-| `--danger` | `#b3263e` | `#ff8094` | destructive, errors |
-| `--black` / `--on-black` | `#171917` / `#fafaf6` | `#eff1eb` / `#171917` | score badges, inverted chips |
+| `--bg` | `#edf0f2` | `#0e1218` | app background (cool paper) |
+| `--paper` | `#ffffff` | `#171c24` | cards, sheets, raised surfaces |
+| `--paper-soft` | `#e2e7ec` | `#1f2631` | inset surfaces, card fills |
+| `--ink` | `#10141a` | `#eef1f5` | primary text, primary buttons |
+| `--muted` | `#5b6572` | `#9aa5b1` | secondary text on `--bg`/`--paper` |
+| `--muted-strong` | `#49525e` | `#c3ccd6` | small text on `--paper-soft` (see §6) |
+| `--faint` | `#6b7684` | `#7d8794` | tertiary text, never body copy |
+| `--line` | `#d3dae1` | `#2a313b` | hairline borders |
+| `--line-strong` | `#aeb9c4` | `#3d4654` | interactive borders |
+| `--accent` | `#2456c8` | `#6f9bff` | THE action/emphasis color (D7) |
+| `--accent-dark` | `#1a41a0` | `#9dbdff` | accent text, pressed states |
+| `--accent-soft` | `#dde6fa` | `#1d2a47` | accent-tinted fills |
+| `--sage` / `--sage-ink` | `#dde5da` / `#3d5238` | `#22302a` / `#b7d3c0` | calm positive (fits, success) |
+| `--danger` | `#b3263e` | `#ff8296` | destructive, errors |
+| `--black` / `--on-black` | `#10141a` / `#f5f7fa` | `#eef1f5` / `#10141a` | score badges, inverted chips |
 
 Rules: accent means *act or attend* — nothing else wears it
 (D7). No hardcoded colors anywhere; a color that isn't a token
@@ -179,6 +179,15 @@ verified on the phone, not assumed:
   offline, and app-store presence are *not* achievable in this
   stack — they belong to the framework/shell decision (UX-13
   decision point), and this doc doesn't pretend otherwise.
+- **This system is the future native app's blueprint**
+  (founder goal, 2026-10-21): a consistent, native-looking
+  experience now is deliberately an investment in whatever
+  client comes next. Tokens (color roles, type scale, spacing,
+  radius) and component anatomy are platform-independent —
+  they map 1:1 onto a native theme (SwiftUI / Compose) — so a
+  future native app inherits a *tested* design and starts at
+  implementation, not at design. Every screen re-skinned to
+  this doc is a screen the native app doesn't have to invent.
 
 ## 4. Components
 
@@ -293,14 +302,24 @@ AI-suggestion rows (the describe/name hints) in Small
 
 ## 7. Decisions — the why, and what else was on the table
 
-**D1 — Evolve the current identity (warm paper + raspberry +
-serif/sans), systematize it.** *Why:* the identity already
-exists and suits the material — warm paper makes colorful
-garment photos look like a lookbook; a rebrand spends user
-trust to buy novelty. *Alternative:* a clean tech-neutral
-rebrand (white/gray + one electric color) — wins if the product
-pivots away from fashion-editorial toward utility; loses the
-one distinctive asset the app already owns.
+**D1 — Identity: "Gallery" palette + serif moments (merged
+verdict, 2026-10-21).** v1 proposed evolving the existing
+identity (warm paper + raspberry). The founder asked to
+experiment while the product has one user, so Card 2 built the
+grid twice: *Lookbook* (the existing identity, systematized) vs
+*Gallery* (cool neutral paper, ink-blue accent, all-grotesque
+type) — one toggle, same components (`/preview.html`). His
+verdict: **Gallery looks much better; the Lookbook font is
+better.** Adopted identity = the merge: Gallery's palette
+(§2.1) with the serif display face kept for moments (D2
+unchanged). The lesson is D1's own changeability note, proven
+the day after it was written: because the identity was
+tokenized, a full identity change cost one token swap — and
+the experiment itself cost one static page. Warm-paper
+raspberry is retired, not mourned: it read "craft project"
+next to Gallery's gallery-wall calm, and cool neutrals flatter
+a *wider* range of garment colors (the warm cast was quietly
+grading every photo).
 _Changeability (founder question, 2026-10-21):_ identity is
 tokenized — the palette is ~20 role values in two `:root`
 blocks, the voice is two font families + the §2.2 scale. A

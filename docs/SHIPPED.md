@@ -29,8 +29,16 @@ What went live. Momentum you can see.
   under "Gallery" tokens (cool neutral, ink-blue, all-grotesque)
   vs the current "Lookbook", one toggle, same components.
   Verification: 217/217 tests, inline script syntax-checked,
-  live client probed after deploy. Awaiting founder phone
-  validation (tab bar feel, standalone launch, identity pick).
+  live client probed after deploy. **Identity verdict
+  (founder, 2026-10-21): Gallery wins on look, Lookbook's serif
+  wins on type — adopted identity is the merge** (Gallery
+  palette + serif moments; D1 rewritten with the story, §2.1
+  retokenized, app + manifest + icons swapped the same day —
+  one token swap, as the D1 changeability note predicted).
+  Founder also recorded the standing goal behind the native
+  feel work: this system is the future native app's blueprint
+  (DESIGN.md, Native feel). Still awaiting phone validation
+  (tab bar feel, standalone launch, new palette in situ).
 
 ## Sprint 13 (2026-10-18 → )
 - **AUTH-1: Privacy-friendlier sign-in** — shipped 2026-10-18, in founder

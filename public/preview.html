@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="lookbook">
+<html lang="en" data-theme="gallery">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -22,9 +22,9 @@
     --bg: #edf0f2; --paper: #ffffff; --paper-soft: #e2e7ec;
     --ink: #10141a; --muted: #5b6572; --line: #d3dae1; --line-strong: #aeb9c4;
     --accent: #2456c8; --accent-dark: #1a41a0; --accent-soft: #dde6fa;
-    --display-font: -apple-system, "Segoe UI", Roboto, sans-serif;
+    --display-font: Georgia, "Times New Roman", serif;
     --ui-font: -apple-system, "Segoe UI", Roboto, sans-serif;
-    --title-weight: 700; --title-spacing: -0.02em;
+    --title-weight: 500; --title-spacing: -0.025em;
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: #2a2c2a; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; }
@@ -72,15 +72,17 @@
 <body>
   <div class="explainer">
     <h1>One grid, two identities</h1>
-    <p>Sprint 18 experiment. The wardrobe grid below is a single component
-    system — same spacing, radius, card anatomy, tab bar. The toggle swaps
-    <em>only</em> the token block (palette + type voice). Judge both on the
-    same content, then tell Bramble which one feels like the product.</p>
+    <p>Sprint 18 experiment — <strong>decided 2026-10-21</strong>. The wardrobe grid
+    below is a single component system — same spacing, radius, card anatomy,
+    tab bar. The toggle swaps <em>only</em> the token block (palette + type
+    voice). Founder's verdict: Gallery looks much better, Lookbook's serif is
+    better — so the adopted identity is the merge, and it's what the live app
+    now runs. Gallery below shows the merged form (its palette + the serif).</p>
     <div class="toggle">
-      <button id="btnLook" type="button" aria-pressed="true">Lookbook</button>
-      <button id="btnGal" type="button" aria-pressed="false">Gallery</button>
+      <button id="btnLook" type="button" aria-pressed="false">Lookbook</button>
+      <button id="btnGal" type="button" aria-pressed="true">Gallery ✓ adopted</button>
     </div>
-    <p class="caption" id="caption">Lookbook — warm paper, raspberry accent, serif moments. The current identity, systematized.</p>
+    <p class="caption" id="caption">Gallery — cool neutral paper, ink-blue accent, serif moments kept. Adopted 2026-10-21; live in the app.</p>
   </div>
 
   <div class="phone">
@@ -119,8 +121,8 @@
 
 <script>
   var captions = {
-    lookbook: "Lookbook — warm paper, raspberry accent, serif moments. The current identity, systematized.",
-    gallery: "Gallery — cool neutral paper, ink-blue accent, all-grotesque type. The challenger."
+    lookbook: "Lookbook — warm paper, raspberry accent, serif moments. The previous identity, systematized.",
+    gallery: "Gallery — cool neutral paper, ink-blue accent, serif moments kept. Adopted 2026-10-21; live in the app."
   };
   function setTheme(name) {
     document.documentElement.setAttribute("data-theme", name);
