@@ -193,3 +193,25 @@ What went live. Momentum you can see.
   `askStylist` redeployed. Design: docs/sprints/sprint-16/.
   Awaiting founder phone validation (open trip chat → ask for a change
   → packing updates).
+- **AI model migration: gemini-2.5-flash → gemini-3.5-flash** —
+  shipped 2026-10-20 (commit 950e6ed). Google retired the whole 2.5
+  family on Vertex AI on 2026-10-20, leaving no fallback in the old
+  config. All seven AI functions (describeItem, askStylist,
+  reflectOutfit, critiqueOutfit, parseOutfitPhoto, shopCheck,
+  planPacking) re-pointed in code (`MODEL_VERSION`) and in deployed
+  env (`GEMINI_MODEL=gemini-3.5-flash`, `VERTEX_LOCATION=global`);
+  deploy-create.js / deploy-askstylist.js env defaults fixed to
+  match so future functions don't regress. Root cause of the
+  Oct 19 3.x outage pinned down: those scripts had pinned
+  `VERTEX_LOCATION=us-central1` on every function, and 3.x models
+  only serve from the global endpoint. Model chosen by live probe
+  with the app's exact request shapes (thinkingBudget 512/1024,
+  vision + JSON mode), never the lifecycle page alone: 3.5-flash
+  passed everything in 2–5s; 3.8-flash rejects thinking budgets
+  under 8192 and hung >45s on vision+JSON; 3.5-flash-lite rejects
+  thinking budgets; 3.1-flash-lite timed out on vision+JSON.
+  Verification: 217/217 tests, stylist benchmark 6/6 scenarios
+  clean (results: tests/benchmark/results/gemini-3.5-flash-migration.json),
+  all seven functions ACTIVE with the new env, callable boundary
+  checks return the proper sign-in error. Awaiting founder phone
+  validation (describe a photo / ask the stylist).
