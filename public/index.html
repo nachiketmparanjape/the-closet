@@ -4086,6 +4086,15 @@
             lbl.textContent = "Option " + (i + 1);
             el.appendChild(lbl);
             var wrap = { outfit: { itemIds: o.itemIds, reasoning: o.reasoning } };
+            // Saved state derives from the wardrobe's actual data: this
+            // render rebuilds the wraps on every pass, so a savedId set
+            // on an old wrap is forgotten and the button looked dead
+            // (founder bug report, 2026-10-21). If an outfit with this
+            // exact combination exists, the suggestion is already saved.
+            var existing = allOutfits.filter(function (x) {
+              return x.dedupHash && x.dedupHash === outfitDedupHash(o.itemIds, "stylist");
+            })[0];
+            if (existing) wrap.outfit.savedId = existing.versionGroup || existing.id;
             el.appendChild(renderOutfitCard(wrap, renderTripDetail));
             if (o.reasoning) {
               var rc = document.createElement("p");
@@ -6733,6 +6742,7 @@
             o.savedId = dup.id;
             renderChat();
             showToast("This exact outfit is already saved — showing the existing one.");
+            if (typeof onDone === "function") onDone();
             return;
           }
           var ref = db.collection("users").doc(currentUser.uid).collection("outfits").doc();
