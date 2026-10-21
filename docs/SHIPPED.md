@@ -61,6 +61,16 @@ What went live. Momentum you can see.
   check it off — state on the trip doc (packing.packedIds),
   progress bar + "N of M packed", optimistic with revert on
   failure; a re-plan resets the checks with the plan.
+  Trip chat wardrobe scope (founder ask, same day): the chat
+  could only discuss the current packing plan — the plumbing
+  always allowed the whole wardrobe (handle mapping + client
+  validation run against all items) but the prompt never said
+  so. Trip mode now lists the unpacked pieces as "REST OF THE
+  WARDROBE" beside the plan and explicitly allows adding any
+  piece by name; chat edits preserve check-offs for pieces
+  that stay in the plan. (Hosting CI broke that afternoon —
+  Google-side IAM 403 — so these shipped via the manual REST
+  deploy recorded in AGENTS.md.)
 - **Fix buffers (founder testing, 2026-10-21).** Buffer 1:
   Stylist became a filled accent pill + the bar gained its
   shadow (text-only read as hidden); the identity preview was
