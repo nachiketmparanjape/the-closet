@@ -20,6 +20,12 @@ What went live. Momentum you can see.
   3 in ink; the desktop tab cluster caps at 780px centered; HTML
   now serves no-cache so founder testing always sees the latest
   build. PC-34 (garment extraction research) filed the same day.
+  Buffer 3 (phone screenshots, dark mode): the hero now collapses
+  on non-wardrobe views so content starts at the top; a
+  specificity slip that kept outfit names on one truncated line
+  was fixed (the clamp now wins); Stylist gained sparkle — a ✦
+  glyph, an accent gradient, and a soft glow — per the founder's
+  "more sparkly" note.
 - **DESIGN-SYSTEM-1 — `docs/DESIGN.md` v1.** The living design
   spec: principles, tokens (color roles, type scale, 4pt spacing,
   radius scale), the component kit, motion rules, accessibility
