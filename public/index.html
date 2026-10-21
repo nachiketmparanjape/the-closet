@@ -301,6 +301,23 @@
     .primary, .secondary, .chip, .auth-button { transition: transform 120ms ease, background 150ms ease, border-color 150ms ease; }
     .primary:active, .secondary:active, .chip:active, .tab-action:active { transform: scale(.98); }
     #tripView .trip-title { font-family: "Closet Serif", serif; font-size: 27px; font-weight: 500; letter-spacing: -.02em; line-height: 1.1; margin: 0 0 6px; }
+    /* Fix buffer 6 (founder screenshot review, 2026-10-21): trip page
+       modernization — quiet text back affordance instead of a bordered
+       box, meta as one calm line, weather as a chip, the stylist's note
+       in reading type, and the pack list as one grouped card with
+       dividers (the modern list pattern) instead of floating rows. */
+    #tripBackBtn { min-height: 36px; border: none; background: none; padding: 0 8px 0 0; color: var(--muted-strong); font-size: 15px; }
+    #tripDetailMeta { font-size: 14px; color: var(--muted-strong); margin: 0 0 2px; }
+    #tripDetailWeather { display: inline-block; background: var(--paper-soft); color: var(--muted-strong); border-radius: 999px; padding: 5px 12px; font-size: 13px; margin: 8px 0 2px; }
+    #tripDeleteBtn { color: var(--danger); }
+    .trip-section-h { font-size: 17px; font-weight: 650; letter-spacing: -.01em; margin: 24px 0 8px; }
+    .trip-reply { font-size: 15px; line-height: 1.55; color: var(--muted-strong); margin: 14px 0 0; }
+    .pack-list { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-md); padding: 2px 14px; }
+    .pack-row { display: flex; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+    .pack-row:last-child { border-bottom: none; }
+    .pack-thumb { width: 52px; height: 52px; object-fit: cover; border-radius: 10px; flex: none; }
+    .pack-name { font-weight: 600; font-size: 15px; line-height: 1.3; }
+    .pack-reason { font-size: 13.5px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
     }
@@ -316,8 +333,12 @@
     .outfit-card h4 { margin: 0 0 6px; font-size: 15px; }
     .outfit-card ul { margin: 6px 0; padding-left: 18px; font-size: 14px; }
     .outfit-card .conf { font-size: 13px; color: var(--muted); margin: 6px 0; }
-    .outfit-card .reason { font-size: 13px; font-style: italic; color: var(--muted); margin: 6px 0; }
-    .outfit-card button { margin-top: 4px; }
+    .outfit-card .reason { font-size: 14px; font-style: normal; line-height: 1.5; color: var(--muted-strong); margin: 8px 0 2px; }
+    .outfit-card button { margin-top: 10px; width: 100%; }
+    /* Buffer 6: no card-in-card — inside an outfit card the photo row
+       sits directly on the card surface (the paper-soft tray stays
+       only where .outfit-thumbs is used standalone). */
+    .outfit-card .outfit-thumbs { background: none; padding: 0; border-radius: 0; }
     /* Sprint 18 fix buffer: outfit tiles get a designed collage zone
        (paper-soft stage, consistent thumbs) and a 2-line clamping name —
        auto-generated outfit names are sentences, not labels. */
@@ -430,7 +451,7 @@
     .outfit-card .outfit-thumbs { display: flex; gap: 10px; margin: 8px 0; }
     .outfit-card .outfit-thumb { margin: 0; flex: 1 1 0; min-width: 0; }
     .outfit-card .outfit-thumb img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; display: block; }
-    .outfit-card .outfit-thumb figcaption { font-size: 11px; color: #aaa; margin-top: 4px; line-height: 1.3; }
+    .outfit-card .outfit-thumb figcaption { font-size: 11px; color: var(--faint); margin-top: 4px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .score-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; }
     .score-chip { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); }
     .tag-checks { display: flex; flex-wrap: wrap; gap: 4px 12px; }
@@ -4027,7 +4048,7 @@
         var leg = (trip.legs && trip.legs[0]) || {};
         document.getElementById("tripDetailTitle").textContent = trip.name || "Trip";
         var meta = [];
-        if (leg.resolvedName || leg.location) meta.push("📍 " + (leg.resolvedName || leg.location));
+        if (leg.resolvedName || leg.location) meta.push(leg.resolvedName || leg.location);
         var dates = fmtTripDates(leg);
         if (dates) meta.push(dates);
         document.getElementById("tripDetailMeta").textContent = meta.join(" · ");
@@ -4036,14 +4057,14 @@
         else notesEl.hidden = true;
         var wEl = document.getElementById("tripDetailWeather");
         if (trip.packing && trip.packing.weatherSnapshot) {
-          wEl.textContent = "🌤 " + trip.packing.weatherSnapshot;
+          wEl.textContent = trip.packing.weatherSnapshot;
           wEl.hidden = false;
         } else wEl.hidden = true;
         // Sprint 16: with a plan in place, iteration is conversational —
         // the button opens trip chat instead of blindly re-planning.
         document.getElementById("tripPlanBtn").textContent =
           (trip.packing && trip.packing.articleIds && trip.packing.articleIds.length)
-            ? "💬 Talk to me for changes" : "Plan packing";
+            ? "Talk to me for changes" : "Plan packing";
         renderTripPacking(trip);
       }
 
@@ -4060,58 +4081,55 @@
         }
         if (p.reply) {
           var reply = document.createElement("p");
-          reply.className = "hint";
-          reply.style.fontStyle = "italic";
+          reply.className = "trip-reply";
           reply.textContent = p.reply.length > 280 ? p.reply.slice(0, 280) + "…" : p.reply;
           el.appendChild(reply);
         }
         var h1 = document.createElement("h3");
-        h1.style.margin = "12px 0 6px";
+        h1.className = "trip-section-h";
         h1.textContent = "To pack (" + p.articleIds.length + ")";
         el.appendChild(h1);
         var reasons = p.articleReasons || {};
+        var list = document.createElement("div");
+        list.className = "pack-list";
         p.articleIds.forEach(function (id) {
           var it = itemById(id);
           if (!it) return;
           var row = document.createElement("div");
-          row.style.cssText = "display:flex;gap:10px;align-items:center;margin:6px 0;";
+          row.className = "pack-row";
           var photos = itemPhotos(it);
           if (photos.length && photos[0].url) {
             var img = document.createElement("img");
             img.src = photos[0].url;
             img.alt = it.name || "item photo";
             img.loading = "lazy";
-            img.style.cssText = "width:44px;height:44px;object-fit:cover;border-radius:8px;flex:none;";
+            img.className = "pack-thumb";
             row.appendChild(img);
           }
           var txt = document.createElement("div");
           var nm = document.createElement("div");
-          nm.style.fontWeight = "600";
+          nm.className = "pack-name";
           nm.textContent = it.name || "Untitled item";
           txt.appendChild(nm);
           if (reasons[id]) {
             var rs = document.createElement("div");
-            rs.className = "hint";
-            rs.style.margin = "2px 0 0";
+            rs.className = "pack-reason";
             rs.textContent = reasons[id];
             txt.appendChild(rs);
           }
           row.appendChild(txt);
-          el.appendChild(row);
+          list.appendChild(row);
         });
+        el.appendChild(list);
         var outfits = p.outfits || [];
         if (outfits.length) {
           var h2 = document.createElement("h3");
-          h2.style.margin = "16px 0 6px";
+          h2.className = "trip-section-h";
           h2.textContent = "Outfits";
           el.appendChild(h2);
           outfits.forEach(function (o, i) {
-            var lbl = document.createElement("p");
-            lbl.className = "hint";
-            lbl.style.margin = "10px 0 0";
-            lbl.textContent = "Option " + (i + 1);
-            el.appendChild(lbl);
-            var wrap = { outfit: { itemIds: o.itemIds, reasoning: o.reasoning } };
+            // Buffer 6: label and reasoning live inside the card now.
+            var wrap = { outfit: { itemIds: o.itemIds, reasoning: o.reasoning }, title: "Option " + (i + 1), reasoningInCard: true };
             // Saved state derives from the wardrobe's actual data: this
             // render rebuilds the wraps on every pass, so a savedId set
             // on an old wrap is forgotten and the button looked dead
@@ -4122,13 +4140,6 @@
             })[0];
             if (existing) wrap.outfit.savedId = existing.versionGroup || existing.id;
             el.appendChild(renderOutfitCard(wrap, renderTripDetail));
-            if (o.reasoning) {
-              var rc = document.createElement("p");
-              rc.className = "hint";
-              rc.style.margin = "4px 0 0";
-              rc.textContent = o.reasoning;
-              el.appendChild(rc);
-            }
           });
         }
       }
@@ -6786,7 +6797,7 @@
             name: defaultOutfitName(o.itemIds),
             occasion: null,
             weather: null,
-            appConfidence: o.confidence,
+            appConfidence: o.confidence != null ? o.confidence : null,
             appReasoning: o.reasoning || "",
             appScores: o.scores || null,
             dedupHash: outfitDedupHash(o.itemIds, "stylist"),
@@ -6799,9 +6810,11 @@
             recordVibeSignal(vibeDeltasForItems(o.itemIds, 0.03)); // Sprint 13: endorsement, weakest signal
             if (typeof onDone === "function") onDone();
           }).catch(function (err) {
+            if (typeof reportError === "function") reportError("saveChatOutfit", err);
             showToast(friendlyError(err));
           });
         }).catch(function (err) {
+          if (typeof reportError === "function") reportError("saveChatOutfit.dedup", err);
           showToast(friendlyError(err));
         });
       }
@@ -6811,7 +6824,7 @@
         var card = document.createElement("div");
         card.className = "outfit-card";
         var h = document.createElement("h4");
-        h.textContent = "Outfit pick";
+        h.textContent = msg.title || "Outfit pick";
         card.appendChild(h);
         // PC-16: inline thumbnails — see the outfit without leaving chat.
         var thumbs = document.createElement("div");
@@ -6839,6 +6852,14 @@
           conf.className = "conf";
           conf.textContent = "Stylist confidence: " + o.confidence + "/10";
           card.appendChild(conf);
+        }
+        // Trip page (buffer 6): the reasoning belongs inside the card it
+        // describes — outside, the card boundary looked broken.
+        if (msg.reasoningInCard && o.reasoning) {
+          var reasonEl = document.createElement("p");
+          reasonEl.className = "reason";
+          reasonEl.textContent = o.reasoning;
+          card.appendChild(reasonEl);
         }
         var btn = document.createElement("button");
         btn.type = "button";

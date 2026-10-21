@@ -33,6 +33,20 @@ What went live. Momentum you can see.
   basics landed per DESIGN.md §5 (view transitions, overlay
   entrances, press states, reduced-motion honored). Firestore
   rules gained the two new owner-only collections (deployed).
+  Fix buffer 6 (founder screenshot review): the trip Save outfit
+  error was root-caused — trip suggestions carry no confidence
+  value and saveChatOutfit wrote it as undefined, which
+  Firestore rejects outright (chat saves always had one, so
+  only trips broke); the write now nulls it, and save failures
+  report into the client-error pipeline. Trip page
+  modernization: option label + reasoning moved inside the
+  outfit card, the card-in-card photo tray removed, card action
+  full-width, captions tokenized + 2-line clamped; quiet text
+  back button, emoji removed from meta/weather/actions, weather
+  as a chip, pack list as one grouped card with dividers.
+  Also same day: Google sign-in's chained popup (blocked by
+  browsers) replaced with a redirect fallback that completes
+  on return, migration offer included.
 - **Fix buffers (founder testing, 2026-10-21).** Buffer 1:
   Stylist became a filled accent pill + the bar gained its
   shadow (text-only read as hidden); the identity preview was
