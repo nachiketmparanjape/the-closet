@@ -1,185 +1,239 @@
 <!doctype html>
-<html lang="en" data-theme="gallery">
+<html lang="en" data-theme="gallery" data-mode="light">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="robots" content="noindex" />
-<title>Closet — identity preview (Sprint 18)</title>
+<title>Closet — faithful preview (Sprint 18)</title>
 <style>
-  /* The experiment: ONE component system, TWO identities.
-     Everything below the token blocks is shared — spacing, radius,
-     card anatomy, tab bar. Only palette + type voice change.
-     That is exactly what "identity is tokenized" buys (DESIGN.md D1). */
-  [data-theme="lookbook"] {
-    --bg: #f5f4f0; --paper: #ffffff; --paper-soft: #ebe9e3;
-    --ink: #171917; --muted: #666963; --line: #d8d8d1; --line-strong: #babdb5;
-    --accent: #b8425b; --accent-dark: #8c2840; --accent-soft: #f4dfe4;
-    --display-font: Georgia, "Times New Roman", serif;
-    --ui-font: -apple-system, "Segoe UI", Roboto, sans-serif;
-    --title-weight: 500; --title-spacing: -0.025em;
+  /* Sprint 18 preview, rebuilt for fidelity (founder feedback 2026-10-21):
+     the frames below mirror the LIVE wardrobe view structure 1:1 — topline,
+     compact hero, search + filters, catalog head, real tile anatomy
+     (photo / name / color-dot + category), bottom tab bar with the Stylist
+     as a filled accent pill. Sample content stands in for account data.
+     Toggles swap ONLY token blocks: identity (palette) × mode (light/dark).
+     Type is shared since the merge (serif moments + grotesque work). */
+  [data-theme="lookbook"][data-mode="light"] {
+    --bg:#f5f4f0; --paper:#ffffff; --paper-soft:#ebe9e3; --ink:#171917; --muted:#666963; --muted-strong:#54574f; --faint:#6a6d68;
+    --line:#d8d8d1; --line-strong:#babdb5; --accent:#b8425b; --accent-dark:#8c2840; --accent-soft:#f4dfe4; --on-accent:#ffffff;
+    --sage:#dce4d5; --sage-ink:#40523c; --black:#171917; --on-black:#fafaf6; --shadow:0 18px 50px rgba(26,29,25,.08);
   }
-  [data-theme="gallery"] {
-    --bg: #edf0f2; --paper: #ffffff; --paper-soft: #e2e7ec;
-    --ink: #10141a; --muted: #5b6572; --line: #d3dae1; --line-strong: #aeb9c4;
-    --accent: #2456c8; --accent-dark: #1a41a0; --accent-soft: #dde6fa;
-    --display-font: Georgia, "Times New Roman", serif;
-    --ui-font: -apple-system, "Segoe UI", Roboto, sans-serif;
-    --title-weight: 500; --title-spacing: -0.025em;
+  [data-theme="lookbook"][data-mode="dark"] {
+    --bg:#121412; --paper:#1a1d1a; --paper-soft:#242824; --ink:#f2f2ec; --muted:#b9bdb6; --muted-strong:#ccd0c8; --faint:#8f958e;
+    --line:#343934; --line-strong:#4b514b; --accent:#e36f87; --accent-dark:#f38aa0; --accent-soft:#45252d; --on-accent:#2b0d16;
+    --sage:#283529; --sage-ink:#c5d8be; --black:#eff1eb; --on-black:#171917; --shadow:0 18px 55px rgba(0,0,0,.28);
   }
+  [data-theme="gallery"][data-mode="light"] {
+    --bg:#edf0f2; --paper:#ffffff; --paper-soft:#e2e7ec; --ink:#10141a; --muted:#5b6572; --muted-strong:#49525e; --faint:#6b7684;
+    --line:#d3dae1; --line-strong:#aeb9c4; --accent:#2456c8; --accent-dark:#1a41a0; --accent-soft:#dde6fa; --on-accent:#ffffff;
+    --sage:#dde5da; --sage-ink:#3d5238; --black:#10141a; --on-black:#f5f7fa; --shadow:0 18px 50px rgba(16,20,26,.10);
+  }
+  [data-theme="gallery"][data-mode="dark"] {
+    --bg:#0e1218; --paper:#171c24; --paper-soft:#1f2631; --ink:#eef1f5; --muted:#9aa5b1; --muted-strong:#c3ccd6; --faint:#7d8794;
+    --line:#2a313b; --line-strong:#3d4654; --accent:#6f9bff; --accent-dark:#9dbdff; --accent-soft:#1d2a47; --on-accent:#0e1218;
+    --sage:#22302a; --sage-ink:#b7d3c0; --black:#eef1f5; --on-black:#10141a; --shadow:0 18px 55px rgba(0,0,0,.3);
+  }
+  :root { --serif: Georgia, "Times New Roman", serif; --sans: -apple-system, "Segoe UI", Roboto, sans-serif; }
   * { box-sizing: border-box; }
-  body { margin: 0; background: #2a2c2a; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; }
-  .explainer { max-width: 430px; margin: 0 auto; padding: 22px 18px 6px; color: #e8e8e2; }
-  .explainer h1 { font-size: 19px; margin: 0 0 6px; font-weight: 700; }
-  .explainer p { font-size: 13.5px; line-height: 1.55; color: #b9bdb6; margin: 0 0 12px; }
-  .toggle { display: flex; gap: 8px; margin: 0 0 8px; }
-  .toggle button { flex: 1; min-height: 44px; border-radius: 999px; border: 1px solid #555a55; background: transparent; color: #e8e8e2; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
-  .toggle button[aria-pressed="true"] { background: #e8e8e2; color: #171917; border-color: #e8e8e2; }
-  .caption { font-size: 12.5px; color: #9aa098; min-height: 18px; margin: 0 0 14px; }
+  body { margin:0; background:#232624; font-family:var(--sans); }
+  .explainer { max-width:460px; margin:0 auto; padding:22px 18px 4px; color:#e8e8e2; }
+  .explainer h1 { font-size:19px; margin:0 0 6px; }
+  .explainer p { font-size:13.5px; line-height:1.55; color:#b9bdb6; margin:0 0 12px; }
+  .toggle { display:flex; gap:8px; margin:0 0 8px; }
+  .toggle button { flex:1; min-height:44px; border-radius:999px; border:1px solid #555a55; background:transparent; color:#e8e8e2; font:inherit; font-size:14px; font-weight:600; cursor:pointer; }
+  .toggle button[aria-pressed="true"] { background:#e8e8e2; color:#171917; border-color:#e8e8e2; }
+  .toggle-label { font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:#8b9089; margin:10px 0 6px; }
+  .caption { font-size:12.5px; color:#9aa098; min-height:18px; margin:0 0 12px; }
 
-  /* ---- the app frame: identical structure for both identities ---- */
-  .phone { max-width: 430px; margin: 0 auto 28px; background: var(--bg); color: var(--ink); font-family: var(--ui-font); border-radius: 26px; overflow: hidden; position: relative; padding-bottom: 76px; transition: background .25s ease, color .25s ease; }
-  .apphead { display: flex; align-items: center; justify-content: space-between; padding: 20px 16px 4px; }
-  .apphead .brand { font-family: var(--display-font); font-weight: var(--title-weight); letter-spacing: var(--title-spacing); font-size: 24px; }
-  .wx { font-size: 13px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; background: var(--paper); }
-  .filters { display: flex; gap: 8px; padding: 14px 16px 2px; overflow-x: auto; }
-  .fchip { border: 1px solid var(--line); background: var(--paper); color: var(--muted); border-radius: 999px; padding: 8px 14px; font-size: 13px; font-weight: 600; white-space: nowrap; }
-  .fchip.active { background: var(--ink); border-color: var(--ink); color: var(--paper); }
-  .catalog-head { display: flex; align-items: baseline; gap: 10px; padding: 18px 16px 12px; }
-  .catalog-head h2 { margin: 0; font-family: var(--display-font); font-weight: var(--title-weight); letter-spacing: var(--title-spacing); font-size: 26px; }
-  .catalog-head span { color: var(--muted); font-size: 13px; }
-  .gallery { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 10px; padding: 0 16px; }
-  .item { min-width: 0; }
-  .item-image { aspect-ratio: 4 / 5; overflow: hidden; background: var(--paper-soft); border-radius: 14px; }
-  .item-image img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .item-name { margin: 8px 0 2px; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .item-meta { color: var(--muted); font-size: 12px; }
-  .proposal { margin: 20px 16px 0; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
-  .proposal .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--accent-dark); margin: 0 0 6px; }
-  .proposal h3 { margin: 0 0 4px; font-size: 16px; font-weight: 600; }
-  .proposal p { margin: 0 0 12px; font-size: 13px; color: var(--muted); line-height: 1.5; }
-  .proposal .row { display: flex; gap: 8px; }
-  .btn-save { flex: 1; min-height: 48px; border: none; border-radius: 8px; background: var(--accent); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
-  .btn-ghost { flex: 1; min-height: 48px; border: 1px solid var(--line-strong); border-radius: 8px; background: transparent; color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; }
-  .addrow { padding: 18px 16px 4px; }
-  .btn-primary { width: 100%; min-height: 48px; border: none; border-radius: 8px; background: var(--ink); color: var(--paper); font: inherit; font-weight: 600; cursor: pointer; }
-  .tabbar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; gap: 2px; padding: 8px 8px 14px; background: var(--paper); border-top: 1px solid var(--line); }
-  .tabbar span { flex: 1; text-align: center; font-size: 13px; font-weight: 600; color: var(--muted); padding: 10px 2px; border-radius: 10px; }
-  .tabbar span.active { background: var(--paper-soft); color: var(--ink); }
-  .tabbar span.stylist { color: var(--accent-dark); font-weight: 700; }
-  .note { max-width: 430px; margin: 0 auto; padding: 0 18px 30px; color: #9aa098; font-size: 12px; line-height: 1.6; }
-  /* Desktop frame: same components, wider canvas — the grid reflows to
-     4 columns and the tab bar spans full width, exactly as the live app
-     behaves on a laptop today. No separate desktop layout, by design. */
-  .desk-wrap { max-width: 1080px; margin: 0 auto; padding: 0 14px; }
-  .desk-head { color: #e8e8e2; font-size: 15px; font-weight: 700; margin: 6px 2px 4px; }
-  .desk-sub { color: #9aa098; font-size: 12.5px; margin: 0 2px 12px; line-height: 1.55; }
-  .desktop { background: var(--bg); color: var(--ink); font-family: var(--ui-font); border-radius: 18px; overflow: hidden; position: relative; padding-bottom: 76px; margin-bottom: 30px; transition: background .25s ease, color .25s ease; }
-  .desktop .apphead { padding: 24px 24px 4px; }
-  .desktop .filters { padding: 14px 24px 2px; }
-  .desktop .catalog-head { padding: 20px 24px 14px; }
-  .desktop .catalog-head h2 { font-size: 30px; }
-  .desktop .gallery { grid-template-columns: repeat(4, 1fr); gap: 20px 16px; padding: 0 24px; }
-  .desktop .proposal { margin: 22px 24px 0; }
-  .desktop .addrow { padding: 18px 24px 4px; }
-  .desktop .addrow .btn-primary { width: auto; padding: 0 28px; }
+  /* ---- shared app structure (mirrors the live wardrobe view) ---- */
+  .frame { background:var(--bg); color:var(--ink); font-family:var(--sans); position:relative; overflow:hidden; transition:background .25s ease, color .25s ease; padding-bottom:84px; }
+  .topline { display:flex; align-items:center; justify-content:space-between; gap:20px; padding-bottom:22px; border-bottom:1px solid var(--line); }
+  .status { display:inline-flex; align-items:center; gap:9px; color:var(--muted); font-size:13px; font-weight:600; }
+  .status-dot { width:8px; height:8px; border-radius:50%; background:#4f8151; box-shadow:0 0 0 4px rgba(79,129,81,.17); flex:0 0 auto; }
+  .auth-button { min-height:44px; border:1px solid var(--line-strong); background:var(--paper); color:var(--ink); border-radius:8px; padding:0 13px; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; }
+  .hero-compact { display:flex; align-items:center; flex-wrap:wrap; gap:8px 24px; padding:26px 0 8px; }
+  .hero-compact h1 { margin:0; font-family:var(--serif); font-weight:500; font-size:30px; letter-spacing:-.03em; line-height:1.05; }
+  .hero-actions { display:flex; gap:10px; margin-left:auto; flex-wrap:wrap; }
+  .primary { display:inline-flex; align-items:center; justify-content:center; gap:9px; min-height:48px; border:1px solid var(--black); background:var(--black); color:var(--on-black); border-radius:8px; padding:0 19px; font-weight:600; cursor:pointer; font-family:inherit; font-size:15px; }
+  .secondary { min-height:48px; border:1px solid var(--line-strong); background:var(--paper); color:var(--ink); border-radius:8px; padding:0 16px; font-weight:600; cursor:pointer; font-family:inherit; font-size:15px; }
+  .secondary.composer { border-color:var(--accent); color:var(--accent-dark); }
+  .utility { display:grid; grid-template-columns:minmax(210px,1fr) auto; gap:18px; align-items:center; padding:18px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); margin-top:14px; }
+  .search { position:relative; max-width:460px; color:var(--faint); }
+  .search input { width:100%; border:0; background:transparent; color:var(--ink); padding:11px 14px 11px 4px; outline:none; font:inherit; font-size:16px; }
+  .search input::placeholder { color:var(--faint); }
+  .filters { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+  .chip { border:1px solid var(--line); background:var(--paper); color:var(--muted); border-radius:999px; padding:9px 14px; font-size:13px; font-weight:600; min-height:36px; font-family:inherit; }
+  .chip.active { border-color:var(--ink); background:var(--ink); color:var(--paper); }
+  .catalog-head { display:flex; align-items:center; flex-wrap:wrap; gap:12px 16px; padding:26px 0 18px; }
+  .catalog-head h2 { margin:0; font-family:var(--serif); font-size:30px; font-weight:500; letter-spacing:-.025em; }
+  .count { color:var(--muted); font-size:13px; }
+  .gallery { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:16px 10px; }
+  .item { min-width:0; }
+  .item-image { aspect-ratio:4/5; overflow:hidden; background:var(--paper-soft); position:relative; border-radius:14px; }
+  .item-image img { width:100%; height:100%; object-fit:cover; display:block; }
+  .item-details { padding:10px 1px 4px; }
+  .item-name { margin:0 0 4px; font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .item-meta { display:flex; align-items:center; gap:7px; color:var(--muted); font-size:12px; }
+  .color-dot { width:9px; height:9px; border-radius:50%; border:1px solid rgba(127,135,145,.45); flex:0 0 auto; }
+  .tabbar { position:absolute; left:0; right:0; bottom:0; display:flex; gap:2px; padding:8px 8px 12px; background:var(--paper); border-top:1px solid var(--line); box-shadow:0 -10px 30px rgba(16,20,26,.10); }
+  [data-mode="dark"] .tabbar { box-shadow:0 -10px 30px rgba(0,0,0,.35); }
+  .tabbar span { flex:1; text-align:center; font-size:13px; font-weight:600; color:var(--muted); padding:10px 2px; border-radius:10px; min-height:24px; }
+  .tabbar span.active { background:var(--paper-soft); color:var(--ink); }
+  .tabbar span.stylist { background:var(--accent); color:var(--on-accent); font-weight:700; border-radius:999px; margin:2px 4px; }
+
+  .phone { max-width:430px; margin:0 auto 26px; border-radius:26px; padding-left:16px; padding-right:16px; padding-top:18px; }
+  .phone .utility { grid-template-columns:1fr; }
+  .phone .filters { justify-content:flex-start; }
+  .phone .hero-compact h1 { font-size:26px; }
+  .phone .hero-actions { margin-left:0; }
+  .phone .topline { flex-direction:column; align-items:flex-start; gap:10px; padding-bottom:16px; }
+  .desk-wrap { max-width:1080px; margin:0 auto; padding:0 14px; }
+  .desk-head { color:#e8e8e2; font-size:15px; font-weight:700; margin:6px 2px 4px; }
+  .desk-sub { color:#9aa098; font-size:12.5px; margin:0 2px 12px; line-height:1.55; }
+  .desktop { border-radius:18px; padding-left:28px; padding-right:28px; padding-top:22px; margin-bottom:30px; }
+  .desktop .gallery { grid-template-columns:repeat(4, minmax(0,1fr)); gap:22px 18px; }
+
+  /* account overlay mock — where Feedback lives in the live app */
+  .acct-overlay { position:fixed; inset:0; background:rgba(10,12,10,.55); display:none; place-items:center; padding:18px; z-index:50; }
+  .acct-overlay.open { display:grid; }
+  .acct-modal { width:min(560px,100%); max-height:88vh; overflow:auto; background:var(--paper); color:var(--ink); border-radius:14px; padding:24px 26px; font-family:var(--sans); box-shadow:var(--shadow); }
+  .acct-modal h2 { margin:0 0 4px; font-family:var(--serif); font-weight:500; font-size:24px; }
+  .acct-modal .hint { font-size:13px; color:var(--muted); margin:2px 0 10px; }
+  .acct-modal h3 { font-size:13px; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); margin:20px 0 6px; }
+  .acct-modal .secondary { margin-top:10px; margin-right:8px; }
+  .acct-close { float:right; border:none; background:none; color:var(--ink); font-size:22px; cursor:pointer; line-height:1; }
+  .toast { position:fixed; left:50%; transform:translateX(-50%); bottom:26px; background:var(--ink); color:var(--bg); font-size:13.5px; font-weight:600; padding:11px 18px; border-radius:999px; display:none; z-index:60; max-width:88vw; text-align:center; }
+  .toast.show { display:block; }
+  .note { max-width:460px; margin:0 auto; padding:0 18px 30px; color:#9aa098; font-size:12px; line-height:1.6; }
 </style>
 </head>
 <body>
   <div class="explainer">
-    <h1>One grid, two identities</h1>
-    <p>Sprint 18 experiment — <strong>decided 2026-10-21</strong>. The wardrobe grid
-    below is a single component system — same spacing, radius, card anatomy,
-    tab bar. The toggle swaps <em>only</em> the token block (palette + type
-    voice). Founder's verdict: Gallery looks much better, Lookbook's serif is
-    better — so the adopted identity is the merge, and it's what the live app
-    now runs. Gallery below shows the merged form (its palette + the serif).</p>
+    <h1>Faithful preview — the real wardrobe view, tokenized</h1>
+    <p>Rebuilt after the founder caught the first version being a cleaned-up
+    impression. These frames mirror the live app's wardrobe view structure —
+    topline, compact hero, search + filters, catalog head, real tile anatomy,
+    tab bar — with sample content. The toggles change <em>only</em> tokens.
+    Tap <strong>Account</strong> in either frame: that overlay is where
+    <strong>Feedback</strong> lives in the live app now.</p>
+    <p class="toggle-label">Identity</p>
     <div class="toggle">
-      <button id="btnLook" type="button" aria-pressed="false">Lookbook</button>
       <button id="btnGal" type="button" aria-pressed="true">Gallery ✓ adopted</button>
+      <button id="btnLook" type="button" aria-pressed="false">Lookbook (previous)</button>
     </div>
-    <p class="caption" id="caption">Gallery — cool neutral paper, ink-blue accent, serif moments kept. Adopted 2026-10-21; live in the app.</p>
+    <p class="toggle-label">Mode</p>
+    <div class="toggle">
+      <button id="btnLight" type="button" aria-pressed="true">Light</button>
+      <button id="btnDark" type="button" aria-pressed="false">Dark</button>
+    </div>
+    <p class="caption" id="caption">Gallery · Light — the adopted identity in daylight.</p>
   </div>
 
-  <div class="phone">
-    <div class="apphead"><span class="brand">Closet</span><span class="wx">Mountain View · 64°F</span></div>
-    <div class="filters">
-      <span class="fchip active">All</span><span class="fchip">Tops</span><span class="fchip">Bottoms</span><span class="fchip">Outerwear</span><span class="fchip">Shoes</span>
-    </div>
-    <div class="catalog-head"><h2>Every piece</h2><span>8 pieces</span></div>
-    <div class="gallery">
-      <div class="item"><div class="item-image"><img alt="" src="https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=600&q=60" /></div><p class="item-name">Striped cotton tee</p><p class="item-meta">Tops · Cotton</p></div>
-      <div class="item"><div class="item-image"><img alt="" src="https://images.unsplash.com/photo-1591047139829-d91aecb6caea?auto=format&fit=crop&w=600&q=60" /></div><p class="item-name">Olive field jacket</p><p class="item-meta">Outerwear · Canvas</p></div>
-      <div class="item"><div class="item-image"><img alt="" src="https://images.unsplash.com/photo-1542272604-787c3835535d?auto=format&fit=crop&w=600&q=60" /></div><p class="item-name">Slim indigo jeans</p><p class="item-meta">Bottoms · Denim</p></div>
-      <div class="item"><div class="item-image"><img alt="" src="https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=600&q=60" /></div><p class="item-name">Running sneakers</p><p class="item-meta">Shoes · Mesh</p></div>
-      <div class="item"><div class="item-image"><img alt="" src="https://images.unsplash.com/photo-1551028719-00167b16eac5?auto=format&fit=crop&w=600&q=60" /></div><p class="item-name">Leather jacket</p><p class="item-meta">Outerwear · Leather</p></div>
-      <div class="item"><div class="item-image"><img alt="" src="https://images.unsplash.com/photo-1523381210434-271e8be1f52b?auto=format&fit=crop&w=600&q=60" /></div><p class="item-name">Everyday crew tee</p><p class="item-meta">Tops · Cotton</p></div>
-      <div class="item"><div class="item-image"><img alt="" src="https://images.unsplash.com/photo-1560343090-f0409e92791a?auto=format&fit=crop&w=600&q=60" /></div><p class="item-name">White leather sneakers</p><p class="item-meta">Shoes · Leather</p></div>
-      <div class="item"><div class="item-image"><img alt="" src="https://images.unsplash.com/photo-1434389677669-e08b4cac3105?auto=format&fit=crop&w=600&q=60" /></div><p class="item-name">Linen overshirt</p><p class="item-meta">Tops · Linen</p></div>
-    </div>
+  <!-- PHONE FRAME -->
+  <div class="frame phone" id="phoneFrame"></div>
 
-    <div class="proposal">
-      <p class="eyebrow">📍 Stylist proposal</p>
-      <h3>Remember as current location?</h3>
-      <p>New York — business trip — cool, 50s°F — until Oct 26</p>
-      <div class="row"><button class="btn-save" type="button">Save</button><button class="btn-ghost" type="button">Dismiss</button></div>
-    </div>
-
-    <div class="addrow"><button class="btn-primary" type="button">Add a piece</button></div>
-
-    <div class="tabbar"><span class="active">Wardrobe</span><span>Outfits</span><span>Shop list</span><span>Trips</span><span class="stylist">Stylist</span></div>
-  </div>
-
+  <!-- DESKTOP FRAME -->
   <div class="desk-wrap">
     <p class="desk-head">Desktop — same system, wider canvas</p>
-    <p class="desk-sub">No separate laptop layout: the grid reflows to four columns,
-    the tab bar spans the full width, sheets and overlays center. This is how the
-    live app already behaves on a laptop — the frame below proves the design
-    system holds up stretched, and the toggle above restyles it too.</p>
-    <div class="desktop">
-      <div class="apphead"><span class="brand">Closet</span><span class="wx">Mountain View · 64°F</span></div>
-      <div class="filters">
-        <span class="fchip active">All</span><span class="fchip">Tops</span><span class="fchip">Bottoms</span><span class="fchip">Outerwear</span><span class="fchip">Shoes</span><span class="fchip">Accessories</span>
-      </div>
-      <div class="catalog-head"><h2>Every piece</h2><span>8 pieces</span></div>
-      <div class="gallery">
-        <div class="item"><div class="item-image"><img alt="" src="https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=600&q=60" /></div><p class="item-name">Striped cotton tee</p><p class="item-meta">Tops · Cotton</p></div>
-        <div class="item"><div class="item-image"><img alt="" src="https://images.unsplash.com/photo-1591047139829-d91aecb6caea?auto=format&fit=crop&w=600&q=60" /></div><p class="item-name">Olive field jacket</p><p class="item-meta">Outerwear · Canvas</p></div>
-        <div class="item"><div class="item-image"><img alt="" src="https://images.unsplash.com/photo-1542272604-787c3835535d?auto=format&fit=crop&w=600&q=60" /></div><p class="item-name">Slim indigo jeans</p><p class="item-meta">Bottoms · Denim</p></div>
-        <div class="item"><div class="item-image"><img alt="" src="https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=600&q=60" /></div><p class="item-name">Running sneakers</p><p class="item-meta">Shoes · Mesh</p></div>
-        <div class="item"><div class="item-image"><img alt="" src="https://images.unsplash.com/photo-1551028719-00167b16eac5?auto=format&fit=crop&w=600&q=60" /></div><p class="item-name">Leather jacket</p><p class="item-meta">Outerwear · Leather</p></div>
-        <div class="item"><div class="item-image"><img alt="" src="https://images.unsplash.com/photo-1523381210434-271e8be1f52b?auto=format&fit=crop&w=600&q=60" /></div><p class="item-name">Everyday crew tee</p><p class="item-meta">Tops · Cotton</p></div>
-        <div class="item"><div class="item-image"><img alt="" src="https://images.unsplash.com/photo-1560343090-f0409e92791a?auto=format&fit=crop&w=600&q=60" /></div><p class="item-name">White leather sneakers</p><p class="item-meta">Shoes · Leather</p></div>
-        <div class="item"><div class="item-image"><img alt="" src="https://images.unsplash.com/photo-1434389677669-e08b4cac3105?auto=format&fit=crop&w=600&q=60" /></div><p class="item-name">Linen overshirt</p><p class="item-meta">Tops · Linen</p></div>
-      </div>
-      <div class="proposal">
-        <p class="eyebrow">📍 Stylist proposal</p>
-        <h3>Remember as current location?</h3>
-        <p>New York — business trip — cool, 50s°F — until Oct 26</p>
-        <div class="row"><button class="btn-save" type="button">Save</button><button class="btn-ghost" type="button">Dismiss</button></div>
-      </div>
-      <div class="addrow"><button class="btn-primary" type="button">Add a piece</button></div>
-      <div class="tabbar"><span class="active">Wardrobe</span><span>Outfits</span><span>Shop list</span><span>Trips</span><span class="stylist">Stylist</span></div>
-    </div>
+    <p class="desk-sub">No separate laptop layout: the grid reflows to four columns and the
+    tab bar spans the full width — exactly how the live app behaves on a laptop today.</p>
+    <div class="frame desktop" id="deskFrame"></div>
   </div>
 
-  <p class="note">Stand-ins: stock photos for wardrobe photos; Georgia / system sans
-  for the self-hosted Closet Serif / Closet Sans pair. Structure, spacing and
-  components are the real Sprint 18 spec (DESIGN.md). Nothing on this page
+  <p class="note">Stand-ins: stock photos for wardrobe photos; Georgia / system sans for the
+  self-hosted Closet Serif / Closet Sans pair; "Signed in as you" for the account label.
+  Structure, spacing, and component anatomy are the real thing (DESIGN.md). Nothing here
   talks to your account.</p>
 
+  <!-- ACCOUNT OVERLAY MOCK -->
+  <div class="acct-overlay" id="acctOverlay">
+    <div class="acct-modal">
+      <button class="acct-close" id="acctClose" type="button" aria-label="Close">×</button>
+      <h2>Your account</h2>
+      <p class="hint">Signed in as you.</p>
+      <button class="secondary" id="acctFeedback" type="button">Send feedback</button>
+      <button class="secondary" type="button">Sign out</button>
+      <h3>Current context</h3>
+      <p class="hint">No active pins.</p>
+      <h3>Privacy</h3>
+      <p class="hint" style="color:var(--ink)">Your wardrobe and photos are private to your account — no ads, no trackers, nothing sold.</p>
+    </div>
+  </div>
+  <div class="toast" id="toast">In the live app, this button opens the feedback form — Account → Send feedback.</div>
+
 <script>
-  var captions = {
-    lookbook: "Lookbook — warm paper, raspberry accent, serif moments. The previous identity, systematized.",
-    gallery: "Gallery — cool neutral paper, ink-blue accent, serif moments kept. Adopted 2026-10-21; live in the app."
-  };
-  function setTheme(name) {
-    document.documentElement.setAttribute("data-theme", name);
-    document.getElementById("btnLook").setAttribute("aria-pressed", name === "lookbook" ? "true" : "false");
-    document.getElementById("btnGal").setAttribute("aria-pressed", name === "gallery" ? "true" : "false");
-    document.getElementById("caption").textContent = captions[name];
+  var ITEMS = [
+    ["photo-1521572163474-6864f9cf17ab", "Striped cotton tee", "Tops", "#7a8ba0"],
+    ["photo-1591047139829-d91aecb6caea", "Olive field jacket", "Outerwear", "#6b7250"],
+    ["photo-1542272604-787c3835535d", "Slim indigo jeans", "Bottoms", "#3b4a6b"],
+    ["photo-1549298916-b41d501d3772", "Running sneakers", "Shoes", "#d84f35"],
+    ["photo-1551028719-00167b16eac5", "Leather jacket", "Outerwear", "#2b2320"],
+    ["photo-1523381210434-271e8be1f52b", "Everyday crew tee", "Tops", "#c8b8a2"],
+    ["photo-1560343090-f0409e92791a", "White leather sneakers", "Shoes", "#e8e8e6"],
+    ["photo-1434389677669-e08b4cac3105", "Linen overshirt", "Tops", "#b9c4b1"]
+  ];
+  function wardrobeHTML() {
+    var tiles = ITEMS.map(function (it) {
+      return '<article class="item"><div class="item-image"><img alt="" loading="lazy" src="https://images.unsplash.com/' +
+        it[0] + '?auto=format&fit=crop&w=600&q=60" /></div><div class="item-details"><p class="item-name">' +
+        it[1] + '</p><div class="item-meta"><span class="color-dot" style="background:' + it[3] +
+        '"></span><span>' + it[2] + '</span></div></div></article>';
+    }).join("");
+    return '' +
+    '<div class="topline"><div class="status"><span class="status-dot"></span><span>Signed in as you</span></div>' +
+      '<div><button class="auth-button acct-open" type="button">Account</button></div></div>' +
+    '<section class="hero-compact"><h1>Your wardrobe,<br />laid out.</h1>' +
+      '<div class="hero-actions"><button class="primary" type="button">+ Add a piece</button>' +
+      '<button class="secondary" type="button">Bulk add</button>' +
+      '<button class="secondary" type="button">Shop check</button>' +
+      '<button class="secondary composer" type="button">✨ Pick an outfit</button></div></section>' +
+    '<div class="utility"><label class="search"><input type="search" placeholder="Search your wardrobe" /></label>' +
+      '<div class="filters"><button class="chip active" type="button">All</button><button class="chip" type="button">Tops</button>' +
+      '<button class="chip" type="button">Bottoms</button><button class="chip" type="button">Outerwear</button>' +
+      '<button class="chip" type="button">Shoes</button><button class="chip" type="button">Accessories</button>' +
+      '<button class="chip" type="button">Other</button></div></div>' +
+    '<div class="catalog-head"><h2>Every piece</h2><span class="count">8 pieces</span></div>' +
+    '<div class="gallery">' + tiles + '</div>' +
+    '<div class="tabbar"><span class="active">Wardrobe</span><span>Outfits</span><span>Shop list</span><span>Trips</span><span class="stylist">Stylist</span></div>';
   }
-  document.getElementById("btnLook").addEventListener("click", function () { setTheme("lookbook"); });
-  document.getElementById("btnGal").addEventListener("click", function () { setTheme("gallery"); });
+  document.getElementById("phoneFrame").innerHTML = wardrobeHTML();
+  document.getElementById("deskFrame").innerHTML = wardrobeHTML();
+
+  var captions = {
+    "gallery|light": "Gallery · Light — the adopted identity in daylight.",
+    "gallery|dark": "Gallery · Dark — the adopted identity after dark. Your default, per the founder.",
+    "lookbook|light": "Lookbook · Light — the previous identity (warm paper, raspberry).",
+    "lookbook|dark": "Lookbook · Dark — the previous identity after dark."
+  };
+  function sync() {
+    var t = document.documentElement.getAttribute("data-theme");
+    var m = document.documentElement.getAttribute("data-mode");
+    document.getElementById("btnGal").setAttribute("aria-pressed", t === "gallery" ? "true" : "false");
+    document.getElementById("btnLook").setAttribute("aria-pressed", t === "lookbook" ? "true" : "false");
+    document.getElementById("btnLight").setAttribute("aria-pressed", m === "light" ? "true" : "false");
+    document.getElementById("btnDark").setAttribute("aria-pressed", m === "dark" ? "true" : "false");
+    document.getElementById("caption").textContent = captions[t + "|" + m];
+    // the account overlay + toast borrow the app tokens — they live on <html> already via CSS vars on the overlay's parent chain
+    document.getElementById("acctOverlay").setAttribute("data-theme", t);
+  }
+  document.getElementById("btnGal").addEventListener("click", function () { document.documentElement.setAttribute("data-theme", "gallery"); sync(); });
+  document.getElementById("btnLook").addEventListener("click", function () { document.documentElement.setAttribute("data-theme", "lookbook"); sync(); });
+  document.getElementById("btnLight").addEventListener("click", function () { document.documentElement.setAttribute("data-mode", "light"); sync(); });
+  document.getElementById("btnDark").addEventListener("click", function () { document.documentElement.setAttribute("data-mode", "dark"); sync(); });
+
+  var overlay = document.getElementById("acctOverlay");
+  document.querySelectorAll(".acct-open").forEach(function (b) {
+    b.addEventListener("click", function () { overlay.classList.add("open"); });
+  });
+  document.getElementById("acctClose").addEventListener("click", function () { overlay.classList.remove("open"); });
+  overlay.addEventListener("click", function (e) { if (e.target === overlay) overlay.classList.remove("open"); });
+  var toast = document.getElementById("toast");
+  document.getElementById("acctFeedback").addEventListener("click", function () {
+    overlay.classList.remove("open");
+    toast.classList.add("show");
+    setTimeout(function () { toast.classList.remove("show"); }, 3400);
+  });
+  sync();
 </script>
 </body>
 </html>

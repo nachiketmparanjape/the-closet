@@ -231,11 +231,15 @@
        padding. The Stylist is an action tab (opens the chat overlay, no
        active state); feedback moved into the account overlay, so both
        floating buttons are retired. */
-    .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 15; display: flex; gap: 2px; margin: 0; padding: 8px 8px calc(8px + env(safe-area-inset-bottom)); background: var(--paper); border-top: 1px solid var(--line); }
+    .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 15; display: flex; gap: 2px; margin: 0; padding: 8px 8px calc(8px + env(safe-area-inset-bottom)); background: var(--paper); border-top: 1px solid var(--line); box-shadow: 0 -10px 30px rgba(16, 20, 26, .10); }
     .tab { flex: 1; border: none; background: transparent; color: var(--muted); font: inherit; font-size: 13px; font-weight: 600; padding: 10px 2px; border-radius: 10px; cursor: pointer; min-height: 44px; }
     .tab.active { background: var(--paper-soft); color: var(--ink); }
-    .tab-action { flex: 1; border: none; background: transparent; color: var(--accent-dark); font: inherit; font-size: 13px; font-weight: 700; padding: 10px 2px; border-radius: 10px; cursor: pointer; min-height: 44px; }
-    .tab-action:active { background: var(--accent-soft); }
+    /* Founder feedback 2026-10-21: a text-only Stylist read as hidden.
+       The action tab is a filled accent pill — the one loud element in
+       the bar (DESIGN.md §3, D7: accent marks the AI action). */
+    .tab-action { flex: 1; border: none; background: var(--accent); color: #fff; font: inherit; font-size: 13.5px; font-weight: 700; padding: 10px 2px; border-radius: 999px; cursor: pointer; min-height: 44px; margin: 2px 4px; }
+    .tab-action:active { background: var(--accent-dark); }
+    @media (prefers-color-scheme: dark) { .tab-action { color: #10141a; } .tab-action:active { color: #10141a; } }
     .chat-fab, .feedback-fab { display: none !important; }
     .outfit-card { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-md); padding: 16px; margin-top: 8px; }
 

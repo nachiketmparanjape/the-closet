@@ -153,9 +153,14 @@ physically float above the page.
   everywhere it appears.
 - The Stylist is the tab bar's fifth element — an **action
   tab**, not a view: it opens the chat overlay (chat is a
-  conversation layer over any view, not a place). Its label
-  wears `--accent-dark`: accent marks the AI action (D7).
-  It carries no active state.
+  conversation layer over any view, not a place). It is a
+  **filled accent pill**, the one loud element in the bar —
+  amended 2026-10-21 on founder feedback: as accent *text* it
+  read as hidden next to the quiet tabs; the AI action must be
+  unmissable (D7). The bar itself carries a soft top shadow
+  (the one sanctioned floating-layer shadow outside §2.4's
+  overlays, because the bar floats over scrolling content).
+  The action tab carries no active state.
 
 ### Native feel (founder directive, 2026-10-21)
 
