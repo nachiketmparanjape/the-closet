@@ -302,8 +302,10 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   planning walk after the design doc is validated and two screens
   are re-skinned, decided by a timeboxed one-screen spike against
   pre-agreed GO criteria; if GO, strangler-style, never a freeze.
-- **Status:** Not started (proposal stage). Sprint candidate —
-  the design doc + direction mocks are the first cut when pulled.
+- **Status:** In Sprint 18 — design foundation batch (plan:
+  `docs/sprints/sprint-18/PLAN.md`). DESIGN.md v1 is the first
+  card; direction validation happens on the explained doc plus
+  the wardrobe-grid reference implementation.
 
 ### UX-14: Onboarding — cut time-to-first-value (L)
 - **Idea (founder 2026-10-20):** onboarding is the biggest

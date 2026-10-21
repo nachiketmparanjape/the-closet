@@ -1,0 +1,384 @@
+# DESIGN.md — The Closet design system
+
+_Living spec (the PERSONALIZATION.md pattern: design lives here,
+cut records live in sprint folders). v1 drafted in Sprint 18
+(card DESIGN-SYSTEM-1) from a full inventory of the current app,
+then put through three recorded critique rounds before founder
+review — log in `docs/sprints/sprint-18/DESIGN-CRITIQUES.md`,
+with the fixes folded into this version._
+
+**How this doc is used:** new or re-skinned UI is built from the
+tokens and components here — nothing freehand. A deviation is a
+doc edit first (argue it here, in the open), never a quiet
+one-off in code. Decisions are numbered (D1…) with the *why* and
+the alternatives, so a future session — human or agent — can
+re-litigate intelligently instead of re-inventing.
+
+## 0. Where we start (inventory, 2026-10-20)
+
+Honest state of `public/index.html` today:
+
+- Tokens exist embryonically: a `:root` palette in warm paper
+  tones (bg `#f5f4f0`, ink `#171917`, raspberry accent `#b8425b`,
+  sage secondary) with a full dark mapping under
+  `prefers-color-scheme`. Two self-hosted families: "Closet
+  Serif" (display) + "Closet Sans" (UI).
+- No scales: border radii in the wild are 4 / 5 / 6 / 10 / 14 /
+  99 / 999px; spacing is per-component improvisation.
+- No component kit: at least five different chip implementations
+  (weather, trip, pin, palette, chat-reference), card styles
+  re-derived per feature (outfit, trip, shop), one stray
+  hardcoded color (`#e58db1` in the trip chip) bypassing tokens.
+- Semantics leak: hint text is accent-colored by default, so the
+  brand color does non-semantic work everywhere.
+- Good bones to keep: bottom sheets already exist and feel
+  right; primary buttons already meet the 44px touch floor;
+  one strong soft shadow token; the serif/sans pairing is a
+  genuine identity most products never get.
+
+## 1. Principles
+
+1. **Photo-first.** The clothes are the content; the interface
+   is the frame. Chrome recedes — neutral surfaces, restrained
+   color — so a rack of real photos looks like a lookbook, not a
+   database.
+2. **Morning-fast.** The core job happens half-awake, one
+   thumb, in under 30 seconds. Every screen answers "how many
+   taps to the thing I came for?" and the answer is small.
+3. **Warm editorial, not dashboard.** Paper tones, serif
+   moments, generous whitespace. This is a fashion product; it
+   should read like a magazine that happens to be software.
+4. **One component per job.** If two features need a card, they
+   use *the* card. Consistency is what "designed" means to a
+   user's eye.
+5. **Quiet AI.** AI surfaces (picks, proposals, scores) wear
+   the product's clothes, not a chatbot skin. The one exception
+   is the proposal pattern (§4.6), which is deliberately
+   recognizable — trust needs a consistent shape.
+6. **Spec only what the stack can do.** This system is
+   implementable in the current single-file vanilla client.
+   Anything needing a framework waits for the UX-13 framework
+   decision point.
+
+## 2. Tokens
+
+### 2.1 Color (roles, not hexes)
+
+Keep the existing identity (D1). Code refers to roles only; the
+hexes live in one `:root` block (light) + one dark mapping.
+
+| Role | Light | Dark | Used for |
+|---|---|---|---|
+| `--bg` | `#f5f4f0` | `#121412` | app background (warm paper) |
+| `--paper` | `#ffffff` | `#1a1d1a` | cards, sheets, raised surfaces |
+| `--paper-soft` | `#ebe9e3` | `#242824` | inset surfaces, card fills |
+| `--ink` | `#171917` | `#f2f2ec` | primary text, primary buttons |
+| `--muted` | `#666963` | `#b9bdb6` | secondary text on `--bg`/`--paper` |
+| `--muted-strong` | `#54574f` | `#ccd0c8` | small text on `--paper-soft` (see §6) |
+| `--faint` | `#6a6d68` | `#8f958e` | tertiary text, never body copy |
+| `--line` | `#d8d8d1` | `#343934` | hairline borders |
+| `--line-strong` | `#babdb5` | `#4b514b` | interactive borders |
+| `--accent` | `#b8425b` | `#e36f87` | THE action/emphasis color (D7) |
+| `--accent-dark` | `#8c2840` | `#f38aa0` | accent text, pressed states |
+| `--accent-soft` | `#f4dfe4` | `#45252d` | accent-tinted fills |
+| `--sage` / `--sage-ink` | `#dce4d5` / `#40523c` | `#283529` / `#c5d8be` | calm positive (fits, success) |
+| `--danger` | `#b3263e` | `#ff8094` | destructive, errors |
+| `--black` / `--on-black` | `#171917` / `#fafaf6` | `#eff1eb` / `#171917` | score badges, inverted chips |
+
+Rules: accent means *act or attend* — nothing else wears it
+(D7). No hardcoded colors anywhere; a color that isn't a token
+doesn't merge. Garment colors in photos are content, never UI.
+
+### 2.2 Type
+
+Two families stay (D2): **Closet Serif** for moments,
+**Closet Sans** for work.
+
+| Style | Spec | Used for |
+|---|---|---|
+| Display | Serif, 40px / 1.0, −0.03em | landing hero, empty-state headlines — never interior screens |
+| Title | Serif, 27px / 1.1 | screen titles, outfit names |
+| Score | Serif, 56px / 1.0 | shop-check + confidence numerals |
+| Heading | Sans, 19px / 600 | card titles, section heads |
+| Body | Sans, 15.5px / 1.55 | default text, chat |
+| Small | Sans, 13px | metadata, hints, reasons |
+| Eyebrow | Sans, 12px / 700, +0.04em, uppercase | sheet titles, card eyebrows |
+
+Floors: serif never below 19px (it turns to mush); no text
+below 12px; body copy never in `--faint`.
+
+### 2.3 Spacing + radius (the rhythm section, D11)
+
+- Spacing scale (4pt base): **4 · 8 · 12 · 16 · 24 · 32 · 48**.
+  Screen padding 16 (compact) / 24 (wide). Card padding 16.
+  Section gap 24. If a value isn't on the scale, the layout is
+  wrong, not the scale.
+- Radius scale: **8** (buttons, inputs, small media) · **14**
+  (cards, proposal cards) · **20** (sheets, top corners) ·
+  **full** (chips, badges, pills). Photos inside a card take
+  the card radius minus 4. The 4/5/6px one-offs are retired.
+
+### 2.4 Elevation
+
+Two levels, that's all (D6): **flat** — cards sit on `--bg`
+with a `--line` border or a `--paper-soft` fill, no shadow;
+**floating** — sheets, overlays, the one existing `--shadow`
+(`0 18px 50px rgba(26,29,25,.08)`), reserved for things that
+physically float above the page.
+
+## 3. Layout + navigation
+
+- Content column max-width 1120px, centered; interior screens
+  are single-column flows inside it.
+- **Primary nav: a bottom tab bar** (D4) — Wardrobe · Outfits ·
+  Stylist · Trips · Shop list. Five equal tabs, text labels
+  (§4.1 note), active tab in `--ink`, inactive `--muted`, top
+  hairline border, safe-area padding. Account lives top-right
+  (avatar/initial button → the existing account overlay).
+  There are **no floating action buttons** in this system — the
+  tab bar owns the bottom edge; feedback lives as a row inside
+  the account overlay (Critiques, round 1).
+- Wardrobe grid (D3): 2 columns compact / 3–4 wide, gap 12,
+  photo tiles at **4:5** (`object-fit: cover`). Item detail
+  shows the full garment: `object-fit: contain`, max-height
+  320px, on a `--paper-soft` backdrop — the grid may crop for
+  recognition, the detail view never amputates (Critiques,
+  round 2).
+- The header is context, not chrome: screen title left;
+  weather chip and (general context only) the pin chip right —
+  one shared *chip row* pattern so context looks identical
+  everywhere it appears.
+
+## 4. Components
+
+One per job (Principle 4). Each lists its anatomy once; feature
+code composes these, never re-derives them.
+
+### 4.1 Buttons
+- **Primary** — `--ink` fill, `--paper` text, radius 8,
+  min-height 48, 15.5px/600. One per view: the screen's main
+  action. (Accent fill is reserved for the proposal card's
+  confirm, §4.6 — the moment the AI asks, color marks it.)
+- **Secondary** — transparent, `--line-strong` border, same
+  sizing. **Ghost** — no border, `--ink` text. **Danger** —
+  `--danger` text/border; fills only inside confirm dialogs.
+- Pressed state: 0.98 scale + 120ms (see §5). Disabled: 45%
+  opacity, no pointer events. Every action has a text label —
+  never icon-only (a founder call, 2026-10-18, and now law).
+- Tab bar labels follow the same rule: text, no glyphs, in v1.
+  (Revisit when/if an icon set arrives with the framework
+  decision — see Critiques, round 3.)
+
+### 4.2 Item card
+Photo (4:5) → name (Heading, truncated 1 line) → one Small
+muted line (category · color). Badges float top-left on the
+photo (score badge pattern: `--black` pill, `--on-black` text).
+No attributes on the card — recognition is visual (D3);
+attributes live in item detail.
+
+### 4.3 Outfit card
+`--paper` fill, `--line` border, radius 14, padding 16. Eyebrow
+(source: "Today's pick" / trip name), serif outfit name when
+named, item rows as small photo thumbs + names, reasoning in
+Small italic `--muted`, confidence in Small. Actions as ghost
+buttons in a footer row ("I wore this", "Shuffle", "Save").
+
+### 4.4 Trip card / shop card
+Same shell as 4.3. Trip: name (Heading), dates + destination
+(Small muted), packing status line. Shop: photo-led like 4.2
+with the score badge; verdict in Small `--sage-ink` or
+`--danger` by outcome; status chip (§4.5) top-right of the
+photo.
+
+### 4.5 Chip (exactly one)
+Pill, radius full, 13px, padding 4px 10px, `--paper` fill,
+`--line` border, `--ink` text. Variants: **info** (weather —
+muted text), **removable** (adds a × ghost button — pins,
+references), **state** (shop status — tinted fill by state,
+never a new shape). This one component replaces the five
+current chip implementations.
+
+### 4.6 Proposal card — the trust pattern
+Every "the AI wants to remember / create / change something"
+moment in the product is this card (D5): inline in chat, full
+bubble width, `--paper` fill, `--accent-soft` eyebrow row with
+the kind glyph + a question as the title ("Remember as current
+location?", "Create this trip?"), body lines (label — detail —
+weather — until…), footer: **Save/confirm** (accent primary) +
+**Dismiss** (ghost). One shape, every time, so the user learns
+it once: *this shape means my call.* On narrow widths the footer
+stacks — Save above Dismiss — never wraps mid-label.
+
+### 4.7 Sheet
+Bottom sheet (existing pattern, standardized): radius 20 top,
+handle bar, Eyebrow title, options as full-width rows (title
+15px/600 + optional Small muted sub), cancel row last,
+safe-area bottom padding, rises in 260ms (§5). Sheets are for
+choices; dialogs (centered) are only for destructive confirms.
+
+### 4.8 Forms
+Label above (Small/600), input height 48, radius 8, `--paper`
+fill, `--line-strong` border, focus = `--ink` border + 2px
+accent outline offset. Error: `--danger` border + Small danger
+message under the field — never color alone, always text.
+AI-suggestion rows (the describe/name hints) in Small
+`--accent-dark` — the one sanctioned accent-text use besides
+§4.6, because it literally is the AI speaking.
+
+### 4.9 Toast, empty state, skeleton
+- **Toast:** bottom-center above the tab bar, `--ink` fill,
+  `--paper` text, radius full, auto-dismiss 3.2s. One at a time.
+- **Empty state:** Display serif headline, one Body line of
+  why-it's-empty + what-to-do, exactly one primary CTA.
+  Conversational emoji allowed here and in chat (D8) — nowhere
+  in chrome.
+- **Loading:** skeletons, not spinners (D9): shimmer blocks in
+  the shape of the coming content (grid tiles, card rows).
+  Spinner survives only inside a busy button.
+
+## 5. Motion
+
+- Durations: **120ms** (presses, hovers) · **200ms** (fades,
+  tab swaps — content slides 8px + fades) · **260ms** (sheet
+  rise) · **350ms** (overlays). Easing: `cubic-bezier(.2,.7,.2,1)`
+  everywhere; nothing linear except shimmer.
+- Animate entrances and state changes; never animate data —
+  lists appear, they don't cascade in.
+- `prefers-reduced-motion`: all of the above collapses to
+  instant + fades off, shimmer off.
+- No `backdrop-filter` blur in v1 — it's a low-end-phone
+  performance trap; the tab bar is a solid `--paper` fill
+  (Critiques, round 1).
+
+## 6. Accessibility floors (non-negotiable)
+
+- Tap targets ≥ 44px; primary actions 48px.
+- Contrast ≥ 4.5:1 for text (≥ 3:1 for Display/Score). Known
+  tight pairs get the `--muted-strong` token on `--paper-soft`
+  surfaces (Critiques, round 3); accent text only ≥ 14px/600
+  or `--accent-dark` on `--accent-soft`.
+- Focus is always visible (accent outline). Errors always pair
+  color with text. Serif floors per §2.2.
+
+## 7. Decisions — the why, and what else was on the table
+
+**D1 — Evolve the current identity (warm paper + raspberry +
+serif/sans), systematize it.** *Why:* the identity already
+exists and suits the material — warm paper makes colorful
+garment photos look like a lookbook; a rebrand spends user
+trust to buy novelty. *Alternative:* a clean tech-neutral
+rebrand (white/gray + one electric color) — wins if the product
+pivots away from fashion-editorial toward utility; loses the
+one distinctive asset the app already owns.
+
+**D2 — Serif for moments, sans for work.** *Why:* fashion is
+editorial; headlines, outfit names and scores in serif give the
+app a magazine voice no dashboard has, while lists/forms/chat
+stay in the legible sans. *Alternative:* all-sans (the
+Linear/Notion school) — cleaner, safer, and generic; it would
+make the app look like every productivity tool. *Alternative
+2:* serif everywhere — romantic until a settings form sets in
+it; illegible at small sizes, hence the 19px floor.
+
+**D3 — Photo-first grid; attributes live one tap down.**
+*Why:* people recognize their clothes visually; a grid that
+reads like a contact sheet is scannable in a way attribute-
+dense cards never are, and dense cards are precisely what
+makes the current app read as a database. *Alternative:*
+info-rich cards (color/formality/warmth on every tile) — wins
+for power-user closet management, loses the morning-fast,
+lookbook feel; the data is still one tap away in detail.
+
+**D4 — Bottom tab bar for primary nav.** *Why:* the phone is
+the device, thumbs live at the bottom, and every modern app
+the user compares us to (Instagram, Depop, Airbnb) navigates
+there; it also frees the header to carry context (weather,
+pins) instead of nav. *Alternative:* keep the current top
+segmented row — perfectly good for desktop-first tools and
+cheaper to leave alone, but it reads "web page," not "app,"
+and pushes content down on the device that matters.
+
+**D5 — One proposal card for every AI ask.** *Why:* trust is a
+learned shape. Pins, trip creation (PC-33), catalogue adds
+(UX-14) all ask the user to let the AI change their data; if
+the ask always looks identical — question title, plain body,
+Save/Dismiss — the user builds one fast, confident reflex.
+*Alternative:* bespoke cards per feature (what we have) —
+each can be locally prettier; collectively they teach nothing
+and every new feature re-litigates consent UX.
+
+**D6 — Flat cards (border/fill), shadows only for floating
+layers.** *Why:* depth from paper tones + hairlines fits the
+editorial direction and is dark-mode-safe; shadowed cards are
+the single most dated signal in 2016-era Material design.
+*Alternative:* soft shadows on cards (the Airbnb-ish look) —
+warmer and more tactile, at the cost of muddying dark mode
+and competing with photo content for depth.
+
+**D7 — Accent is rationed: it means act/attend.** *Why:* today
+hint text wears the accent, so raspberry shouts everywhere and
+signals nothing. Rationed, the one accent element on a screen
+is unmissable — which is the entire point of having one.
+*Alternative:* accent as decoration (the current state) —
+friendlier, more colorful, and it spends the signal.
+
+**D8 — Emoji out of the chrome, kept in conversation.**
+*Why:* emoji render differently on every platform, age fast,
+and in buttons/tabs they read as toy-like; in the stylist's
+mouth (and empty states) they're warmth and voice.
+*Alternative:* emoji as the icon system (free, friendly) —
+the current drift; it caps how modern the app can ever feel,
+which is the complaint that started this redesign.
+(Companion rule: actions are never icon-only either — labels
+always; see §4.1.)
+
+**D9 — Skeletons over spinners.** *Why:* perceived speed —
+a shimmering grid-shaped placeholder feels ~instant and holds
+layout still; a centered spinner says "wait" and lets the
+page jump when content lands. *Alternative:* spinners —
+honest, simple, and the visual signature of an app that
+hasn't been designed yet. Chat keeps a typing indicator
+(three dots) because there, "someone is composing" is true.
+
+**D10 — Dark mode via token mapping, OS-driven.** *Why:* the
+tokens already map both schemes; following
+`prefers-color-scheme` is free, respectful, and one less
+setting to design. *Alternative:* a manual in-app toggle —
+a nicety for later; it is a settings feature, not a system
+property.
+
+**D11 — A 4pt spacing scale and a 4-step radius scale,
+enforced.** *Why:* rhythm is the invisible half of "feels
+designed" — the eye reads aligned repetition as quality
+without knowing why. Freehand spacing is how the current app
+got five chips and six radii. *Alternative:* designer's-eye
+spacing per component — works with a full-time designer
+iterating visually; we are a doc-driven studio, so the scale
+*is* the designer between sessions.
+
+**D12 — Serif numerals for scores.** *Why:* the shop score is
+a verdict moment; a 56px serif numeral reads like a magazine
+rating, not a dashboard KPI, and it's the number users will
+screenshot. *Alternative:* sans tabular numerals — better
+for scanning columns of figures, which this app never has.
+
+## 8. Applying it (per the Sprint 18 plan)
+
+1. Wardrobe grid + item card first (Card 2) — the reference
+   implementation; every later screen copies its moves.
+2. Chat + proposal card second (Card 3), absorbing the
+   "What should I wear?" cluster as designed components.
+3. Then trips, shop list, outfits, settings — one screen per
+   cut, behavior-preserving, phone-verified.
+Framework migration, when its decision point (redesign
+proposal) says go, ports *this* system — the tokens and
+components above are the spec it must reproduce.
+
+## 9. Open questions carried to the founder
+
+- A "Today" home (the morning pick as the literal first
+  screen) is a *flow* change, not a re-skin — out of Sprint
+  18's scope by the plan's own rule, flagged here because
+  Principle 2 keeps pointing at it. Founder's call, separately.
+- An icon set for the tab bar (replacing text-only tabs)
+  rides with the framework decision; text tabs are v1-honest.
