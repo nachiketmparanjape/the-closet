@@ -91,13 +91,15 @@ validation lands.
 
 Filed 2026-10-21 after the founder widened the design latitude
 ("don't be afraid to propose dramatic updates or complete
-redesigns — doesn't have to be incremental"). Sketch:
-`docs/proposals/TODAY-HOME-PROPOSAL.md` — invert the app from
-catalogue-first to a Today home (morning greeting + today's
-outfit proposal + the day's thread), catalogue unchanged as a
-tab. Awaiting founder steer; if validated it designs fully
-(critique rounds + DESIGN.md amendment) before it joins a
-slate, and it composes with Card 3 (shared proposal-card
+redesigns — doesn't have to be incremental"). The founder
+steered it the same day: build it as a **parallel experience**
+(Account toggle, default off) he can test on his phone, with
+the design answering his two questions — new-user upload CTAs
+and feature discoverability — and chat kept non-load-bearing
+(his stated concern). Proposal is now v0.2 with three critique
+rounds folded (`docs/proposals/TODAY-HOME-PROPOSAL.md`),
+**awaiting founder validation**; on his yes it becomes a build
+card here, and it composes with Card 3 (shared proposal-card
 components) rather than competing with it.
 
 ## Out of scope
