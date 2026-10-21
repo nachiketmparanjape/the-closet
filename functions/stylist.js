@@ -520,7 +520,7 @@ const UPDATE_TRIP_PACKING_DECL = {
     properties: {
       articles: {
         type: "ARRAY",
-        description: "The complete revised packing list — every piece the user should pack for this trip.",
+        description: "The complete revised packing list — every piece the user should pack for this trip. Any wardrobe piece may be included, not only pieces already packed.",
         items: {
           type: "OBJECT",
           properties: {
@@ -788,11 +788,29 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
     } else {
       system += "\n\nNo packing plan exists yet for this trip.";
     }
+    // Founder ask (2026-10-21): trip chat must reach the WHOLE wardrobe,
+    // not only the current plan — "add the black hoodie" names a piece
+    // that isn't packed yet. The plumbing always allowed it (handle
+    // mapping and client validation both run against all items); the
+    // prompt never said so and the unpacked pieces had no nearby
+    // inventory. List them, by handle, next to the plan.
+    const packedIdSet = new Set(pk && Array.isArray(pk.articleIds) ? pk.articleIds : []);
+    const restLines = [];
+    items.forEach((it, i) => {
+      if (!it || packedIdSet.has(it.id)) return;
+      restLines.push("- [i" + (i + 1) + "] \"" + cleanText(it.name, 60) + "\"");
+    });
+    if (restLines.length) {
+      system += "\n\nREST OF THE WARDROBE — not packed yet, but the user can ask for any of these by name and you can add them to the plan:\n" +
+        restLines.slice(0, 40).join("\n");
+    }
     system += "\n\nYOU HAVE A TOOL: updateTripPacking.\n" +
       "- Call it ONLY when the user asks for a packing change (\"keep the blue sweater\", \"drop the boots\", \"pack warmer\", \"add a dinner outfit\").\n" +
       "- The payload is the COMPLETE new packing plan — include pieces they didn't mention if those still belong.\n" +
       "- \"keep X\" is a hard constraint: X stays no matter what. \"drop/remove X\": X leaves the plan.\n" +
       "- articles: every piece they should pack, each with a short reason. outfits: 2–3, built ONLY from those articles, 2+ pieces each.\n" +
+      "- ADDING: the user can add ANY wardrobe piece by name — packed or not (\"add the black hoodie\", \"also pack my trail shoes\"). Put it in articles with a reason, like everything else.\n" +
+      "- In prose you may talk about any wardrobe piece by name, not only the packed ones.\n" +
       "- whatChanged: one plain sentence describing what changed versus the current plan above.\n" +
       "- After calling, say the whatChanged line in prose too, briefly.\n" +
       "- Questions about the trip (weather, plans, \"will I need a coat?\") → answer in prose. NO tool call.\n" +
