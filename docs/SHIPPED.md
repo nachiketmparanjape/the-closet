@@ -2,6 +2,36 @@
 
 What went live. Momentum you can see.
 
+## Sprint 18 (2026-10-21 → )
+
+- **DESIGN-SYSTEM-1 — `docs/DESIGN.md` v1.** The living design
+  spec: principles, tokens (color roles, type scale, 4pt spacing,
+  radius scale), the component kit, motion rules, accessibility
+  floors, and twelve numbered decisions with why + alternatives.
+  Drafted from a full inventory, then three recorded critique
+  rounds (log in the sprint folder) — the rounds caught a live
+  contrast bug in a token pair, a floating-button/tab-bar
+  collision, and a serif size floor. Founder approved the
+  direction 2026-10-21; identity recorded as tokenized and
+  explicitly changeable (D1 note).
+- **DESIGN-GRID-1 — shell + grid on the system.** Bottom tab bar
+  (Wardrobe / Outfits / Shop list / Trips + Stylist as the accent
+  action tab opening chat); both floating buttons retired —
+  feedback now lives in the account overlay. Token pass: radius
+  scale applied (cards 14, sheets 20, buttons 8), filter chips
+  per the one-chip spec, outfit/trip cards flat on `--paper`,
+  item photos rounded, detail photo shows the full garment
+  (contain on paper-soft), the stray hardcoded `#e58db1` fossil
+  removed. Native-feel basics: web manifest + generated icons,
+  per-scheme theme-color, iOS standalone metas, tap-highlight off,
+  overscroll contained, 16px form text (no iOS auto-zoom).
+  Alternate-identity experiment at `/preview.html`: the grid
+  under "Gallery" tokens (cool neutral, ink-blue, all-grotesque)
+  vs the current "Lookbook", one toggle, same components.
+  Verification: 217/217 tests, inline script syntax-checked,
+  live client probed after deploy. Awaiting founder phone
+  validation (tab bar feel, standalone launch, identity pick).
+
 ## Sprint 13 (2026-10-18 → )
 - **AUTH-1: Privacy-friendlier sign-in** — shipped 2026-10-18, in founder
   phone validation. Anonymous-first auth (app always has a user), upgrade

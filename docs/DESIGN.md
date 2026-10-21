@@ -151,6 +151,34 @@ physically float above the page.
   weather chip and (general context only) the pin chip right —
   one shared *chip row* pattern so context looks identical
   everywhere it appears.
+- The Stylist is the tab bar's fifth element — an **action
+  tab**, not a view: it opens the chat overlay (chat is a
+  conversation layer over any view, not a place). Its label
+  wears `--accent-dark`: accent marks the AI action (D7).
+  It carries no active state.
+
+### Native feel (founder directive, 2026-10-21)
+
+The web app should feel like a native app. Concretely, that is
+a checklist, not a vibe — each item is cheap in this stack and
+verified on the phone, not assumed:
+
+- **Installable + standalone:** web manifest, app icons,
+  `theme-color` per scheme, iOS standalone metas — launched
+  from the home screen it opens full-screen in `--bg` with no
+  browser chrome and no white flash.
+- **Touch physics:** no tap-highlight flash, no double-tap
+  zoom (`touch-action: manipulation`), momentum scrolling,
+  overscroll contained (no rubber-band revealing a "page"
+  behind the app), every target ≥ 44px (§6).
+- **No web tells:** inputs at 16px so iOS never auto-zooms a
+  form; no floating web-style buttons (§3); navigation is the
+  bottom tab bar, not in-page links; loading is skeletons
+  shaped like the app (D9), never a browser-style blank.
+- **Honest limits:** haptics, native share sheets, true
+  offline, and app-store presence are *not* achievable in this
+  stack — they belong to the framework/shell decision (UX-13
+  decision point), and this doc doesn't pretend otherwise.
 
 ## 4. Components
 

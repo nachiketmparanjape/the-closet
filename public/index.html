@@ -4,6 +4,15 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="color-scheme" content="light dark" />
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f5f4f0" />
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#121412" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Closet" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" href="/icons/icon-192.png" />
   <link rel="icon" href="data:," />
   <title>Closet</title>
   <style>
@@ -19,9 +28,13 @@
       --paper-soft: #ebe9e3;
       --ink: #171917;
       --muted: #666963;
+      --muted-strong: #54574f;
       --faint: #6a6d68;
       --line: #d8d8d1;
       --line-strong: #babdb5;
+      --r-sm: 8px;
+      --r-md: 14px;
+      --r-lg: 20px;
       --accent: #b8425b;
       --accent-dark: #8c2840;
       --accent-soft: #f4dfe4;
@@ -39,6 +52,7 @@
         --paper-soft: #242824;
         --ink: #f2f2ec;
         --muted: #b9bdb6;
+        --muted-strong: #ccd0c8;
         --faint: #8f958e;
         --line: #343934;
         --line-strong: #4b514b;
@@ -57,19 +71,25 @@
     * { box-sizing: border-box; }
     html { min-height: 100%; background: var(--bg); }
     body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink); font-family: "Closet Sans", sans-serif; }
+    /* Sprint 18 (DESIGN.md, native feel): app physics — no tap flash, no
+       double-tap zoom, overscroll stays inside the app, and form text at
+       16px so iOS never auto-zooms a field. */
+    html { overscroll-behavior-y: none; }
+    body { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+    input[type="text"], input[type="search"], input[type="email"], textarea { font-size: 16px; }
     button, input, select { font: inherit; }
     button { color: inherit; }
     a { color: inherit; }
     [hidden] { display: none !important; }
 
-    .app { max-width: 1320px; margin: 0 auto; padding: clamp(22px, 4vw, 56px); min-height: 100vh; }
+    .app { max-width: 1320px; margin: 0 auto; padding: clamp(22px, 4vw, 56px); padding-bottom: calc(clamp(22px, 4vw, 56px) + 78px + env(safe-area-inset-bottom)); min-height: 100vh; }
     .topline { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-bottom: 30px; border-bottom: 1px solid var(--line); }
     .status { display: inline-flex; align-items: center; gap: 9px; color: var(--muted); font-size: 13px; font-weight: 600; }
     .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #c38a2d; box-shadow: 0 0 0 4px color-mix(in srgb, #c38a2d 17%, transparent); }
     .status-dot.ready { background: #4f8151; box-shadow: 0 0 0 4px color-mix(in srgb, #4f8151 17%, transparent); }
     .top-actions { display: flex; align-items: center; gap: 14px; }
     .text-button { border: 0; background: transparent; padding: 7px 0; font-weight: 600; font-size: 13px; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
-    .auth-button { min-height: 38px; border: 1px solid var(--line-strong); background: var(--paper); border-radius: 4px; padding: 0 13px; font-size: 12px; font-weight: 600; cursor: pointer; }
+    .auth-button { min-height: 44px; border: 1px solid var(--line-strong); background: var(--paper); border-radius: var(--r-sm); padding: 0 13px; font-size: 12px; font-weight: 600; cursor: pointer; }
     .auth-button:disabled { color: var(--muted); cursor: not-allowed; opacity: .75; }
     .guest-banner { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 10px; margin: 10px 0 0; padding: 11px 14px; background: #fdf6e3; border: 1px solid #e5cf8a; border-radius: 10px; font-size: 13px; color: #6b5312; box-shadow: 0 2px 10px rgba(120, 90, 20, .08); }
     .guest-banner[hidden] { display: none; }
@@ -93,16 +113,16 @@
     .hero.hero-compact h1 { font-size: clamp(26px, 4vw, 38px); max-width: none; }
     .hero.hero-compact .hero-copy { padding-bottom: 0; display: flex; gap: 10px; margin-left: auto; }
     .hero.hero-compact .hero-copy p { display: none; }
-    .primary { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 48px; border: 1px solid var(--black); background: var(--black); color: var(--on-black); border-radius: 5px; padding: 0 19px; font-weight: 600; cursor: pointer; transition: background .18s ease, color .18s ease, border-color .18s ease; }
+    .primary { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 48px; border: 1px solid var(--black); background: var(--black); color: var(--on-black); border-radius: var(--r-sm); padding: 0 19px; font-weight: 600; cursor: pointer; transition: background .18s ease, color .18s ease, border-color .18s ease; }
     .primary:hover { background: var(--accent-dark); border-color: var(--accent-dark); color: #fff; }
     .primary:disabled { cursor: not-allowed; opacity: .48; }
     .primary svg { width: 18px; height: 18px; }
-    .secondary { min-height: 44px; border: 1px solid var(--line-strong); background: var(--paper); border-radius: 5px; padding: 0 16px; font-weight: 600; cursor: pointer; }
+    .secondary { min-height: 48px; border: 1px solid var(--line-strong); background: var(--paper); border-radius: var(--r-sm); padding: 0 16px; font-weight: 600; cursor: pointer; }
     .secondary:hover { border-color: var(--ink); }
     .danger { min-height: 44px; border: 1px solid #b3261e; background: transparent; color: #b3261e; border-radius: 5px; padding: 0 16px; font-weight: 600; cursor: pointer; }
     .danger:hover { background: #b3261e; color: #fff; }
     .danger:disabled { cursor: not-allowed; opacity: .48; }
-    .item-photo { width: 100%; max-height: 320px; object-fit: cover; border-radius: 6px; margin-bottom: 16px; background: var(--line); display: block; }
+    .item-photo { width: 100%; max-height: 320px; object-fit: contain; border-radius: var(--r-md); margin-bottom: 16px; background: var(--paper-soft); display: block; }
     .hint { font-size: 13px; color: var(--accent-dark); margin: 2px 0 0; }
     .ai-suggest { font-size: 13px; color: var(--accent-dark); margin: 6px 0 0; }
     .ai-suggest .ai-desc { margin: 0 0 4px; }
@@ -124,7 +144,7 @@
     .feedback-fab:hover { border-color: var(--ink); }
     /* UX-11: bottom-sheet chooser for the three ways to add an outfit. */
     .overlay.sheet-overlay { place-items: end center; padding: 0; }
-    .sheet { width: min(560px, 100%); background: var(--paper); border-radius: 14px 14px 0 0; padding: 10px 10px calc(10px + env(safe-area-inset-bottom)); box-shadow: var(--shadow); }
+    .sheet { width: min(560px, 100%); background: var(--paper); border-radius: var(--r-lg) var(--r-lg) 0 0; padding: 10px 10px calc(10px + env(safe-area-inset-bottom)); box-shadow: var(--shadow); }
     .sheet-title { margin: 0; padding: 10px 14px 6px; font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
     .sheet-option { display: flex; align-items: center; width: 100%; padding: 15px 14px; background: none; border: none; border-radius: 10px; font: inherit; text-align: left; cursor: pointer; color: var(--ink); }
     .sheet-option:hover { background: var(--paper-soft); }
@@ -170,7 +190,7 @@
     /* WX-1: shows the weather the stylist is working with. Hidden until a
        reading succeeds — no chip is better than a stale or "unknown" one. */
     .weather-chip { display: inline-block; font-size: 13px; font-weight: 400; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; margin-left: 10px; vertical-align: middle; white-space: nowrap; }
-    .trip-chip { display: inline-block; font-size: 13px; font-weight: 500; color: var(--ink); border: 1px solid var(--accent, #e58db1); border-radius: 999px; padding: 3px 10px; margin-left: 8px; vertical-align: middle; white-space: nowrap; }
+    .trip-chip { display: inline-block; font-size: 13px; font-weight: 500; color: var(--ink); border: 1px solid var(--line-strong); border-radius: 999px; padding: 3px 10px; margin-left: 8px; vertical-align: middle; white-space: nowrap; }
     .trip-chip button { background: none; border: none; color: inherit; font-size: 13px; cursor: pointer; padding: 0 0 0 6px; }
     .pin-proposal { background: var(--paper-soft); border: 1px solid var(--accent, #e58db1); border-radius: 10px; padding: 12px 14px; margin-top: 8px; }
     .pin-proposal-head { margin: 0; font-size: 14px; font-weight: 600; }
@@ -206,15 +226,23 @@
     .pal-add button { flex: none; }
     .field textarea { width: 100%; min-height: 64px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--paper); color: var(--ink); padding: 10px 12px; outline: none; font: inherit; resize: vertical; }
     .field textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-    .tabs { display: flex; gap: 4px; margin: 18px 0 4px; }
-    .tab { flex: 1; border: 1px solid var(--line); background: var(--paper-soft); color: var(--muted); font: inherit; font-size: 14px; font-weight: 600; padding: 10px; border-radius: 10px; cursor: pointer; }
-    .tab.active { background: var(--ink); color: var(--paper); border-color: var(--ink); }
-    .outfit-card { background: var(--paper-soft); border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-top: 8px; }
+    /* Sprint 18 (DESIGN.md D4 + native feel): the view switcher is now a
+       fixed bottom tab bar — solid paper, hairline top border, safe-area
+       padding. The Stylist is an action tab (opens the chat overlay, no
+       active state); feedback moved into the account overlay, so both
+       floating buttons are retired. */
+    .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 15; display: flex; gap: 2px; margin: 0; padding: 8px 8px calc(8px + env(safe-area-inset-bottom)); background: var(--paper); border-top: 1px solid var(--line); }
+    .tab { flex: 1; border: none; background: transparent; color: var(--muted); font: inherit; font-size: 13px; font-weight: 600; padding: 10px 2px; border-radius: 10px; cursor: pointer; min-height: 44px; }
+    .tab.active { background: var(--paper-soft); color: var(--ink); }
+    .tab-action { flex: 1; border: none; background: transparent; color: var(--accent-dark); font: inherit; font-size: 13px; font-weight: 700; padding: 10px 2px; border-radius: 10px; cursor: pointer; min-height: 44px; }
+    .tab-action:active { background: var(--accent-soft); }
+    .chat-fab, .feedback-fab { display: none !important; }
+    .outfit-card { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-md); padding: 16px; margin-top: 8px; }
 
 /* Trips are few and text-heavy (destination + dates), so they render as
    full-width list cards — not photo tiles in the item grid. */
 #tripsGallery { grid-template-columns: 1fr; }
-.trip-card { background: var(--paper-soft); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; cursor: pointer; min-width: 0; }
+.trip-card { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-md); padding: 16px; cursor: pointer; min-width: 0; }
 .trip-card h3 { margin: 0; font-size: 19px; }
 .trip-card .hint { margin: 4px 0 0; }
     .outfit-card h4 { margin: 0 0 6px; font-size: 15px; }
@@ -270,9 +298,9 @@
     .search input { width: 100%; border: 0; background: transparent; color: var(--ink); padding: 11px 14px 11px 29px; outline: none; }
     .search input::placeholder { color: var(--faint); }
     .filters { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
-    .chip { border: 1px solid transparent; background: transparent; color: var(--muted); border-radius: 99px; padding: 12px 16px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .chip { border: 1px solid var(--line); background: var(--paper); color: var(--muted); border-radius: 999px; padding: 9px 14px; font-size: 13px; font-weight: 600; cursor: pointer; min-height: 36px; }
     .chip:hover { color: var(--ink); }
-    .chip.active { border-color: var(--line-strong); background: var(--paper); color: var(--ink); }
+    .chip.active { border-color: var(--ink); background: var(--ink); color: var(--paper); }
 
     .catalog-head { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 16px; padding: 34px 0 22px; }
     .catalog-head h2 { margin: 0; font-family: "Closet Serif", serif; font-size: clamp(26px, 3vw, 38px); font-weight: 500; letter-spacing: -.025em; }
@@ -280,7 +308,7 @@
 
     .gallery { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(12px, 2vw, 24px); }
     .item { min-width: 0; }
-    .item-image { aspect-ratio: 4 / 5; overflow: hidden; background: var(--paper-soft); position: relative; }
+    .item-image { aspect-ratio: 4 / 5; overflow: hidden; background: var(--paper-soft); position: relative; border-radius: var(--r-md); }
     .item-image img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .item-details { padding: 13px 1px 4px; }
     .item-name { margin: 0 0 4px; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -352,7 +380,7 @@
       .empty { grid-template-columns: 1fr 1fr; }
     }
     @media (max-width: 620px) {
-      .app { padding: 18px 16px 38px; }
+      .app { padding: 18px 16px calc(96px + env(safe-area-inset-bottom)); }
       .topline { padding-bottom: 18px; align-items: flex-start; flex-direction: column; gap: 12px; }
       .top-actions { width: 100%; justify-content: space-between; }
       .hero { padding: 42px 0 36px; }
@@ -405,6 +433,7 @@
       <button class="tab" type="button" data-view="outfits" role="tab" aria-selected="false">Outfits</button>
       <button class="tab" type="button" data-view="shoplist" role="tab" aria-selected="false">Shop list</button>
       <button class="tab" type="button" data-view="trips" role="tab" aria-selected="false">Trips</button>
+      <button class="tab-action" id="tabChat" type="button">Stylist</button>
     </div>
 
     <section aria-label="Wardrobe catalog" id="wardrobeView">
@@ -1536,6 +1565,13 @@
           so.addEventListener("click", signOutAccount);
           body.appendChild(so);
         }
+        // Sprint 18: feedback lives here now — the floating button was
+        // retired when the tab bar took the bottom edge (DESIGN.md §3).
+        var fb = el("button", "secondary", "Send feedback");
+        fb.type = "button";
+        fb.style.marginTop = "16px";
+        fb.addEventListener("click", function () { closeOverlay(document.getElementById("accountOverlay")); openFeedback(); });
+        body.appendChild(fb);
         renderContextSection(body);
         renderVibeSection(body);
         body.appendChild(h("Privacy"));
@@ -3405,6 +3441,7 @@
       }
 
       document.getElementById("chatFab").addEventListener("click", openChat);
+      document.getElementById("tabChat").addEventListener("click", openChat);
       document.getElementById("chatClose").addEventListener("click", function () { exitTripChat(); closeOverlay(chatOverlay); });
       chatForm.addEventListener("submit", sendChat);
 

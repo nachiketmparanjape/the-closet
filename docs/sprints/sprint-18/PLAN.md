@@ -68,6 +68,16 @@ in — as the system's proof. Behavior-preserving: same data, same
 actions, new tokens/components/motion. Founder phone-verifies
 per the standing gate; his read of the grid is the real
 validation of the doc.
+**Scope notes (founder, 2026-10-21):** the app shell comes with
+this card — the grid lives inside it, so the bottom tab bar
+(Stylist as action tab), the token pass, and the native-feel
+basics (manifest, theme-color, touch physics, no floating
+buttons; feedback moves into the account overlay) land here
+rather than waiting for later screens. He also chose the
+two-identity experiment: the grid ships a second time as a
+static preview under one alternate token block ("Gallery" —
+cool neutral, ink-blue accent, all-grotesque type) so identity
+is judged on realistic content, per the D1 changeability note.
 
 ### 3. DESIGN-CHAT-1: Chat screen on the system (M) — pull after Card 2 validates
 

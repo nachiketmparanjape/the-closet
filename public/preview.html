@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en" data-theme="lookbook">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex" />
+<title>Closet — identity preview (Sprint 18)</title>
+<style>
+  /* The experiment: ONE component system, TWO identities.
+     Everything below the token blocks is shared — spacing, radius,
+     card anatomy, tab bar. Only palette + type voice change.
+     That is exactly what "identity is tokenized" buys (DESIGN.md D1). */
+  [data-theme="lookbook"] {
+    --bg: #f5f4f0; --paper: #ffffff; --paper-soft: #ebe9e3;
+    --ink: #171917; --muted: #666963; --line: #d8d8d1; --line-strong: #babdb5;
+    --accent: #b8425b; --accent-dark: #8c2840; --accent-soft: #f4dfe4;
+    --display-font: Georgia, "Times New Roman", serif;
+    --ui-font: -apple-system, "Segoe UI", Roboto, sans-serif;
+    --title-weight: 500; --title-spacing: -0.025em;
+  }
+  [data-theme="gallery"] {
+    --bg: #edf0f2; --paper: #ffffff; --paper-soft: #e2e7ec;
+    --ink: #10141a; --muted: #5b6572; --line: #d3dae1; --line-strong: #aeb9c4;
+    --accent: #2456c8; --accent-dark: #1a41a0; --accent-soft: #dde6fa;
+    --display-font: -apple-system, "Segoe UI", Roboto, sans-serif;
+    --ui-font: -apple-system, "Segoe UI", Roboto, sans-serif;
+    --title-weight: 700; --title-spacing: -0.02em;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #2a2c2a; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .explainer { max-width: 430px; margin: 0 auto; padding: 22px 18px 6px; color: #e8e8e2; }
+  .explainer h1 { font-size: 19px; margin: 0 0 6px; font-weight: 700; }
+  .explainer p { font-size: 13.5px; line-height: 1.55; color: #b9bdb6; margin: 0 0 12px; }
+  .toggle { display: flex; gap: 8px; margin: 0 0 8px; }
+  .toggle button { flex: 1; min-height: 44px; border-radius: 999px; border: 1px solid #555a55; background: transparent; color: #e8e8e2; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .toggle button[aria-pressed="true"] { background: #e8e8e2; color: #171917; border-color: #e8e8e2; }
+  .caption { font-size: 12.5px; color: #9aa098; min-height: 18px; margin: 0 0 14px; }
+
+  /* ---- the app frame: identical structure for both identities ---- */
+  .phone { max-width: 430px; margin: 0 auto 28px; background: var(--bg); color: var(--ink); font-family: var(--ui-font); border-radius: 26px; overflow: hidden; position: relative; padding-bottom: 76px; transition: background .25s ease, color .25s ease; }
+  .apphead { display: flex; align-items: center; justify-content: space-between; padding: 20px 16px 4px; }
+  .apphead .brand { font-family: var(--display-font); font-weight: var(--title-weight); letter-spacing: var(--title-spacing); font-size: 24px; }
+  .wx { font-size: 13px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; background: var(--paper); }
+  .filters { display: flex; gap: 8px; padding: 14px 16px 2px; overflow-x: auto; }
+  .fchip { border: 1px solid var(--line); background: var(--paper); color: var(--muted); border-radius: 999px; padding: 8px 14px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .fchip.active { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+  .catalog-head { display: flex; align-items: baseline; gap: 10px; padding: 18px 16px 12px; }
+  .catalog-head h2 { margin: 0; font-family: var(--display-font); font-weight: var(--title-weight); letter-spacing: var(--title-spacing); font-size: 26px; }
+  .catalog-head span { color: var(--muted); font-size: 13px; }
+  .gallery { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 10px; padding: 0 16px; }
+  .item { min-width: 0; }
+  .item-image { aspect-ratio: 4 / 5; overflow: hidden; background: var(--paper-soft); border-radius: 14px; }
+  .item-image img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .item-name { margin: 8px 0 2px; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item-meta { color: var(--muted); font-size: 12px; }
+  .proposal { margin: 20px 16px 0; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+  .proposal .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--accent-dark); margin: 0 0 6px; }
+  .proposal h3 { margin: 0 0 4px; font-size: 16px; font-weight: 600; }
+  .proposal p { margin: 0 0 12px; font-size: 13px; color: var(--muted); line-height: 1.5; }
+  .proposal .row { display: flex; gap: 8px; }
+  .btn-save { flex: 1; min-height: 48px; border: none; border-radius: 8px; background: var(--accent); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+  .btn-ghost { flex: 1; min-height: 48px; border: 1px solid var(--line-strong); border-radius: 8px; background: transparent; color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; }
+  .addrow { padding: 18px 16px 4px; }
+  .btn-primary { width: 100%; min-height: 48px; border: none; border-radius: 8px; background: var(--ink); color: var(--paper); font: inherit; font-weight: 600; cursor: pointer; }
+  .tabbar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; gap: 2px; padding: 8px 8px 14px; background: var(--paper); border-top: 1px solid var(--line); }
+  .tabbar span { flex: 1; text-align: center; font-size: 13px; font-weight: 600; color: var(--muted); padding: 10px 2px; border-radius: 10px; }
+  .tabbar span.active { background: var(--paper-soft); color: var(--ink); }
+  .tabbar span.stylist { color: var(--accent-dark); font-weight: 700; }
+  .note { max-width: 430px; margin: 0 auto; padding: 0 18px 30px; color: #9aa098; font-size: 12px; line-height: 1.6; }
+</style>
+</head>
+<body>
+  <div class="explainer">
+    <h1>One grid, two identities</h1>
+    <p>Sprint 18 experiment. The wardrobe grid below is a single component
+    system — same spacing, radius, card anatomy, tab bar. The toggle swaps
+    <em>only</em> the token block (palette + type voice). Judge both on the
+    same content, then tell Bramble which one feels like the product.</p>
+    <div class="toggle">
+      <button id="btnLook" type="button" aria-pressed="true">Lookbook</button>
+      <button id="btnGal" type="button" aria-pressed="false">Gallery</button>
+    </div>
+    <p class="caption" id="caption">Lookbook — warm paper, raspberry accent, serif moments. The current identity, systematized.</p>
+  </div>
+
+  <div class="phone">
+    <div class="apphead"><span class="brand">Closet</span><span class="wx">Mountain View · 64°F</span></div>
+    <div class="filters">
+      <span class="fchip active">All</span><span class="fchip">Tops</span><span class="fchip">Bottoms</span><span class="fchip">Outerwear</span><span class="fchip">Shoes</span>
+    </div>
+    <div class="catalog-head"><h2>Every piece</h2><span>8 pieces</span></div>
+    <div class="gallery">
+      <div class="item"><div class="item-image"><img alt="" src="https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=600&q=60" /></div><p class="item-name">Striped cotton tee</p><p class="item-meta">Tops · Cotton</p></div>
+      <div class="item"><div class="item-image"><img alt="" src="https://images.unsplash.com/photo-1591047139829-d91aecb6caea?auto=format&fit=crop&w=600&q=60" /></div><p class="item-name">Olive field jacket</p><p class="item-meta">Outerwear · Canvas</p></div>
+      <div class="item"><div class="item-image"><img alt="" src="https://images.unsplash.com/photo-1542272604-787c3835535d?auto=format&fit=crop&w=600&q=60" /></div><p class="item-name">Slim indigo jeans</p><p class="item-meta">Bottoms · Denim</p></div>
+      <div class="item"><div class="item-image"><img alt="" src="https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=600&q=60" /></div><p class="item-name">Running sneakers</p><p class="item-meta">Shoes · Mesh</p></div>
+      <div class="item"><div class="item-image"><img alt="" src="https://images.unsplash.com/photo-1551028719-00167b16eac5?auto=format&fit=crop&w=600&q=60" /></div><p class="item-name">Leather jacket</p><p class="item-meta">Outerwear · Leather</p></div>
+      <div class="item"><div class="item-image"><img alt="" src="https://images.unsplash.com/photo-1523381210434-271e8be1f52b?auto=format&fit=crop&w=600&q=60" /></div><p class="item-name">Everyday crew tee</p><p class="item-meta">Tops · Cotton</p></div>
+      <div class="item"><div class="item-image"><img alt="" src="https://images.unsplash.com/photo-1560343090-f0409e92791a?auto=format&fit=crop&w=600&q=60" /></div><p class="item-name">White leather sneakers</p><p class="item-meta">Shoes · Leather</p></div>
+      <div class="item"><div class="item-image"><img alt="" src="https://images.unsplash.com/photo-1434389677669-e08b4cac3105?auto=format&fit=crop&w=600&q=60" /></div><p class="item-name">Linen overshirt</p><p class="item-meta">Tops · Linen</p></div>
+    </div>
+
+    <div class="proposal">
+      <p class="eyebrow">📍 Stylist proposal</p>
+      <h3>Remember as current location?</h3>
+      <p>New York — business trip — cool, 50s°F — until Oct 26</p>
+      <div class="row"><button class="btn-save" type="button">Save</button><button class="btn-ghost" type="button">Dismiss</button></div>
+    </div>
+
+    <div class="addrow"><button class="btn-primary" type="button">Add a piece</button></div>
+
+    <div class="tabbar"><span class="active">Wardrobe</span><span>Outfits</span><span>Shop list</span><span>Trips</span><span class="stylist">Stylist</span></div>
+  </div>
+
+  <p class="note">Stand-ins: stock photos for wardrobe photos; Georgia / system sans
+  for the self-hosted Closet Serif / Closet Sans pair. Structure, spacing and
+  components are the real Sprint 18 spec (DESIGN.md). Nothing on this page
+  talks to your account.</p>
+
+<script>
+  var captions = {
+    lookbook: "Lookbook — warm paper, raspberry accent, serif moments. The current identity, systematized.",
+    gallery: "Gallery — cool neutral paper, ink-blue accent, all-grotesque type. The challenger."
+  };
+  function setTheme(name) {
+    document.documentElement.setAttribute("data-theme", name);
+    document.getElementById("btnLook").setAttribute("aria-pressed", name === "lookbook" ? "true" : "false");
+    document.getElementById("btnGal").setAttribute("aria-pressed", name === "gallery" ? "true" : "false");
+    document.getElementById("caption").textContent = captions[name];
+  }
+  document.getElementById("btnLook").addEventListener("click", function () { setTheme("lookbook"); });
+  document.getElementById("btnGal").addEventListener("click", function () { setTheme("gallery"); });
+</script>
+</body>
+</html>
