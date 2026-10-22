@@ -490,7 +490,7 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   suggestions, not repeats.
 - **Status:** Not started. Filed 2026-10-21. The two bugs
   from the same session — Today's Pick inside the trip
-  chat, and a raw-JSON reply — shipped as a fix buffer the
+  chat, and a raw-JSON reply — went out as a fix buffer the
   same day; this card is the capability they were blocking.
 
 ### PC-35: Beginner guide — ways to add clothes (incl. Google Photos)
