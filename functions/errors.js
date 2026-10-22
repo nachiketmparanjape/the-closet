@@ -74,6 +74,16 @@ const CATALOG = {
     grpc: "internal",
     message: "The description service is having trouble. Your upload still works without it.",
   },
+  EXTRACT_NOT_CONFIGURED: {
+    category: "dependency",
+    grpc: "internal",
+    message: "Photo cleanup isn't switched on yet. Your original photo is saved as-is.",
+  },
+  EXTRACT_FAILED: {
+    category: "dependency",
+    grpc: "internal",
+    message: "Photo cleanup had trouble with that one. Your original photo is untouched.",
+  },
   // internal (our bug — the client message stays generic on purpose)
   INTERNAL: {
     category: "internal",

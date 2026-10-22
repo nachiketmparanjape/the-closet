@@ -22,6 +22,7 @@ const { reflectOutfit } = require("./reflect");
 const { critiqueOutfit } = require("./critique");
 const { parseOutfitPhoto } = require("./photo");
 const { shopCheck } = require("./shopcheck");
+const { extractGarmentPhoto } = require("./extract");
 // Sprint 15 (PC-29 Phase 1): trip packing. sanitizeItems/sanitizeVibeProfile
 // come from ./stylist (already imported above); only the trip-specific
 // pieces live here.
@@ -110,6 +111,44 @@ exports.describeItem = onCall(
       // Any failure inside describeImage is a downstream AI failure.
       if (!(err instanceof HttpsError) && !err.key) err.key = "DESCRIBE_FAILED";
       boundary("describeItem", correlationId, uid, err);
+    }
+  }
+);
+
+// PC-34: garment extraction. The client sends the Storage path of a
+// photo it already uploaded; the function reads the original (never
+// writes to it), stores a clean cutout render at a deterministic
+// path, and returns that path plus the provider uncertainty score.
+// The API key lives in Secret Manager (PHOTOROOM_API_KEY), bound in
+// the deploy script's serviceConfig — never in code or the client.
+exports.extractGarment = onCall(
+  {
+    region: "us-central1",
+    timeoutSeconds: 120,
+    memory: "512MiB",
+    maxInstances: 5,
+    secrets: ["PHOTOROOM_API_KEY"],
+  },
+  async (request) => {
+    const correlationId = newCorrelationId();
+    const uid = request.auth ? request.auth.uid : null;
+    const start = Date.now();
+    if (!request.auth) {
+      fail("NOT_SIGNED_IN");
+    }
+    const data = request.data || {};
+    try {
+      if (typeof data.storagePath !== "string" || data.storagePath.length === 0) {
+        fail("NO_IMAGE");
+      }
+      const result = await extractGarmentPhoto(uid, data.storagePath, {
+        bucket: getStorage().bucket(),
+        apiKey: process.env.PHOTOROOM_API_KEY || null,
+      });
+      return finish("extractGarment", correlationId, uid, start, result);
+    } catch (err) {
+      if (!(err instanceof HttpsError) && !err.key) err.key = "EXTRACT_FAILED";
+      boundary("extractGarment", correlationId, uid, err);
     }
   }
 );

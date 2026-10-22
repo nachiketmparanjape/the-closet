@@ -1910,7 +1910,7 @@
         var imageWrap = document.createElement("div");
         imageWrap.className = "item-image";
         var image = document.createElement("img");
-        image.src = item.imageUrl;
+        image.src = itemDisplayUrl(item);
         image.alt = item.name || "Wardrobe item";
         image.loading = "lazy";
         imageWrap.appendChild(image);
@@ -1953,6 +1953,53 @@
         if (item.photos && item.photos.length) return item.photos;
         if (item.imageUrl) return [{ url: item.imageUrl, storagePath: item.storagePath || null }];
         return [];
+      }
+
+      // PC-34: display URL for a photo — the extracted clean render
+      // when one exists, otherwise the original photo. Data paths
+      // (delete, dedup, persist) always use the original fields.
+      function photoDisplayUrl(photo) {
+        if (!photo) return "";
+        return photo.renderUrl || photo.url || "";
+      }
+
+      function itemDisplayUrl(item) {
+        var photos = itemPhotos(item || {});
+        return photos.length ? photoDisplayUrl(photos[0]) : "";
+      }
+
+      // PC-34: ask the server to extract a clean render of one saved
+      // photo. Fire-and-forget — the callable reads the ORIGINAL from
+      // Storage (never modifies it) and stores a cutout render; on
+      // success the render is noted on the photo entry and display
+      // picks it up via photoDisplayUrl. Any failure is silent: the
+      // original keeps showing. The PC-19 phash is computed from the
+      // original at selection time and is never touched here.
+      function requestPhotoRender(itemId, storagePath) {
+        if (!functions || !currentUser || !itemId || !storagePath) return;
+        functions.httpsCallable("extractGarment")({ storagePath: storagePath }).then(function (res) {
+          var d = (res && res.data) || {};
+          if (!d.renderStoragePath) return null;
+          return storage.ref().child(d.renderStoragePath).getDownloadURL().then(function (renderUrl) {
+            var ref = db.collection("users").doc(currentUser.uid).collection("items").doc(itemId);
+            return ref.get().then(function (snap) {
+              if (!snap.exists) return null;
+              var data = snap.data() || {};
+              var photos = itemPhotos(data).map(function (p) {
+                if (p.storagePath !== storagePath) return p;
+                var copy = {};
+                Object.keys(p).forEach(function (k) { copy[k] = p[k]; });
+                copy.renderUrl = renderUrl;
+                copy.renderStoragePath = d.renderStoragePath;
+                copy.renderUncertainty = typeof d.uncertainty === "number" ? d.uncertainty : null;
+                return copy;
+              });
+              return ref.update({ photos: photos });
+            });
+          });
+        }).catch(function (err) {
+          reportError("extractGarment", err);
+        });
       }
 
       // PC-8: data model v2 — first-class colors array, top-level editable
@@ -2242,6 +2289,7 @@
           if (failed) return;
           if (idx >= files.length) {
             persistPhotos(existing.concat(newPhotos)).then(function () {
+              newPhotos.forEach(function (p) { requestPhotoRender(activeItem.id, p.storagePath); });
               addBtn.disabled = false;
               showToast("Photo added.");
             }).catch(function (error) {
@@ -2804,6 +2852,7 @@
             uploadSubmit.disabled = false;
             closeOverlay(uploadOverlay);
             showToast("Piece added to your wardrobe.");
+            photos.forEach(function (p) { requestPhotoRender(docRef.id, p.storagePath); });
             maybeNudgeUpgrade();
           }).catch(function (error) {
             cleanupUploads();
@@ -2977,7 +3026,7 @@
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
           };
           if (r.ai) doc.ai = r.ai;
-          return docRef.set(doc);
+          return docRef.set(doc).then(function () { requestPhotoRender(docRef.id, storagePath); });
         }).catch(function (err) {
           if (uploaded) { storage.ref().child(storagePath).delete().catch(function () {}); }
           throw err;
@@ -4360,7 +4409,7 @@
           var photos = itemPhotos(it);
           if (photos.length && photos[0].url) {
             var img = document.createElement("img");
-            img.src = photos[0].url;
+            img.src = photoDisplayUrl(photos[0]);
             img.alt = it.name || "item photo";
             img.loading = "lazy";
             img.className = "pack-thumb";
@@ -5059,7 +5108,7 @@
           var fig = document.createElement("figure");
           if (ps.length && ps[0].url) {
             var img = document.createElement("img");
-            img.src = ps[0].url;
+            img.src = photoDisplayUrl(ps[0]);
             img.alt = it ? it.name : "item photo";
             img.loading = "lazy";
             fig.appendChild(img);
@@ -5180,7 +5229,7 @@
           var fig = document.createElement("figure");
           if (ps.length && ps[0].url) {
             var img = document.createElement("img");
-            img.src = ps[0].url;
+            img.src = photoDisplayUrl(ps[0]);
             img.alt = it ? it.name : "item photo";
             img.loading = "lazy";
             fig.appendChild(img);
@@ -5457,7 +5506,7 @@
             var photos = it ? itemPhotos(it) : [];
             if (photos.length) {
               var img = document.createElement("img");
-              img.src = photos[0].url;
+              img.src = photoDisplayUrl(photos[0]);
               img.alt = "";
               img.loading = "lazy";
               thumbs.appendChild(img);
@@ -5578,7 +5627,7 @@
           var photos = it ? itemPhotos(it) : [];
           if (photos.length) {
             var img = document.createElement("img");
-            img.src = photos[0].url;
+            img.src = photoDisplayUrl(photos[0]);
             img.alt = "";
             row.appendChild(img);
           }
@@ -5733,7 +5782,7 @@
           var photos = it ? itemPhotos(it) : [];
           if (photos.length) {
             var img = document.createElement("img");
-            img.src = photos[0].url;
+            img.src = photoDisplayUrl(photos[0]);
             img.alt = "";
             row.appendChild(img);
           }
@@ -5941,7 +5990,7 @@
         var photos = itemPhotos(it);
         if (photos.length) {
           var img = document.createElement("img");
-          img.src = photos[0].url;
+          img.src = photoDisplayUrl(photos[0]);
           img.alt = "";
           img.loading = "lazy";
           cell.appendChild(img);
@@ -6218,7 +6267,7 @@
         var photos = itemPhotos(it);
         if (!photos.length) return null;
         var t = document.createElement("img");
-        t.src = photos[0].url;
+        t.src = photoDisplayUrl(photos[0]);
         t.alt = it.name || "";
         t.className = "shop-thumb";
         return t;
@@ -7162,7 +7211,7 @@
           var photos = it ? itemPhotos(it) : [];
           if (photos.length && photos[0].url) {
             var img = document.createElement("img");
-            img.src = photos[0].url;
+            img.src = photoDisplayUrl(photos[0]);
             img.alt = it ? it.name : "item photo";
             img.loading = "lazy";
             fig.appendChild(img);

@@ -423,6 +423,22 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   never destroyed. First step is the evidence step — a
   ~20-photo trial on the founder's real bed/carpet photos
   (quality + latency) — then the build pulls through planning.
+  Trial ran 2026-10-22 (10 production calls; quality record in
+  the studio research note). **Build pulled 2026-10-22** —
+  founder's call: implement for sure if costs stay low (Basic
+  is $20/mo covering 1,000 images, inside the floor at our
+  scale). The sandbox rerun on the 13 raw laid-out photos is
+  extra evidence, not a gate. Hard requirements from the
+  founder: the original photo is retained untouched, and the
+  PC-19 pHash — computed on the original at selection time and
+  stored per photo — stays the dedup reference; extraction is
+  a render layer only, never a data change. Build shape:
+  `extractGarment` callable with the provider behind
+  `functions/photoroom.js`; render at
+  `users/{uid}/renders/<sha256(storagePath)>.png`; the photo
+  entry gains renderUrl / renderStoragePath /
+  renderUncertainty; tiles prefer the render and fall back to
+  the original on any failure.
 
 ### PC-36: Photo of a person → individual articles + the outfit
 - **Size:** Spike shared with PC-34, then size from findings
