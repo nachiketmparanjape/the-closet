@@ -7,6 +7,7 @@ const {
   extractToolCalls,
   mapUpdateTripPacking,
   handleIndex,
+  unwrapJsonReply,
   buildStylistRequest,
 } = require("../functions/stylist");
 
@@ -151,6 +152,21 @@ describe("handleIndex", () => {
     assert.strictEqual(handleIndex("i2", items), 1);
     assert.strictEqual(handleIndex("[i2] \"Some name\"", items), 1);
     assert.strictEqual(handleIndex("the [i3] one", items), 2);
+  });
+});
+
+describe("unwrapJsonReply", () => {
+  test("unwraps the non-trip JSON envelope the model sometimes sends in trip mode", () => {
+    assert.strictEqual(
+      unwrapJsonReply('{"reply": "Capsule wardrobe — mix and match.", "outfit": null}'),
+      "Capsule wardrobe — mix and match."
+    );
+  });
+  test("leaves plain prose and non-envelope JSON alone", () => {
+    assert.strictEqual(unwrapJsonReply("Packing updated — added the fleece."), "Packing updated — added the fleece.");
+    assert.strictEqual(unwrapJsonReply('{"something": "else"}'), '{"something": "else"}');
+    assert.strictEqual(unwrapJsonReply(""), "");
+    assert.strictEqual(unwrapJsonReply(null), null);
   });
 });
 

@@ -3459,6 +3459,7 @@
           });
         }
         renderPinChip();
+        renderChatTodayStrip();
         openChat();
       }
 
@@ -3468,6 +3469,7 @@
         renderTripChip();
         renderPinChip();
         renderChat();
+        renderChatTodayStrip();
       }
 
       function renderTripChip() {
@@ -4966,6 +4968,9 @@
       function renderChatTodayStrip() {
         var strip = document.getElementById("chatTodayStrip");
         if (!strip) return;
+        // Trip mode is a dedicated room (founder, 2026-10-21): the
+        // daily pick never appears inside a trip conversation.
+        if (tripChat) { strip.hidden = true; strip.textContent = ""; return; }
         strip.textContent = "";
         if (!todayHomeOn() || !currentUser) { strip.hidden = true; return; }
         restoreToday();

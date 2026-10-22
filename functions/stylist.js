@@ -965,6 +965,23 @@ function logTripArgsRejected(stage, args) {
   } catch (e) { /* logging must never throw */ }
 }
 
+// Trip mode drops the JSON mime type, but the model sometimes still
+// answers in the non-trip JSON envelope ({"reply": ..., "outfit":
+// null}) as raw text — the client then renders the envelope itself
+// (founder screenshot, 2026-10-21). Unwrap it: the words are the
+// reply. A JSON-shaped outfit in trip mode is not actionable here —
+// trip outfits travel via updateTripPacking.
+function unwrapJsonReply(text) {
+  if (!text) return text;
+  const t = String(text).trim();
+  if (!t.startsWith("{")) return text;
+  try {
+    const obj = JSON.parse(t);
+    if (obj && typeof obj.reply === "string" && obj.reply.trim()) return obj.reply;
+  } catch (e) { /* not the envelope — leave the text alone */ }
+  return text;
+}
+
 // here; the client re-validates on execute.
 async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today) {
   const todayStr = /^\d{4}-\d{2}-\d{2}$/.test(today || "")
@@ -1004,6 +1021,7 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
     const pinProposal = toolCalls.some((c) => c.name === "pinContext")
       ? sanitizePinProposal((toolCalls.find((c) => c.name === "pinContext") || {}).args, todayStr)
       : null;
+    text = unwrapJsonReply(text);
     // The user always gets words, never an empty bubble — and the
     // words must describe what actually happened. A plan that
     // arrived but couldn't be applied is not an "empty" reply.
@@ -1055,4 +1073,4 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
   };
 }
 
-module.exports = { askStylist, buildStylistRequest, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins, sanitizePinProposal, extractToolCall, extractToolCalls, mapUpdateTripPacking, handleIndex, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM, VIBE_TAGS };
+module.exports = { askStylist, buildStylistRequest, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins, sanitizePinProposal, extractToolCall, extractToolCalls, mapUpdateTripPacking, handleIndex, unwrapJsonReply, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM, VIBE_TAGS };

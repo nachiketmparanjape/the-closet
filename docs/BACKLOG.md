@@ -456,6 +456,43 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   prototype on the PC-34 matting core, judged on the
   founder's real outfit photos before any build is sized.
 
+### PC-37: Trip chat is a full stylist room — outfit suggestions you can add
+- **Size:** M
+- **Value:** Founder, from an experimenting session
+  (2026-10-21): "I treat this trip page as its own
+  dedicated chat and you should be able to do whatever you
+  want." Today the trip chat only rewrites the packing
+  plan, and the plan's ~2 suggested outfits are a closed
+  set — ask for more and nothing happens; like one and
+  there's no way to keep it. His model: suggest an outfit
+  in the trip chat → it gets added to the trip AND to the
+  overall list of outfits, tagged with the trip. A default
+  plan with a couple of outfits is fine; the incomplete
+  experience is having no way to ask for more or to keep
+  the ones you like.
+- **Scope:** (1) Trip mode gains outfit proposals on
+  demand — "suggest more outfits" returns additional,
+  distinct outfit suggestions (from the packed pieces; the
+  whole-wardrobe scope from the 2026-10-21 fix applies),
+  not a silent plan rewrite. (2) Suggestions render in
+  chat as outfit cards with a Save/Add action, in the same
+  card language as the trip page and normal chat.
+  (3) Saving creates the outfit — dedup by hash, like
+  saveChatOutfit — tagged with the trip (the outfit model
+  already carries a tripId field), so it appears on the
+  trip page and in the Outfits list with its trip tag.
+  (4) The trip page's outfit section reflects saved trip
+  outfits alongside the plan's suggestions.
+- **Acceptance:** in the Vancouver chat: "suggest three
+  more outfits from what I'm packing" → three outfit
+  cards; saving one puts it on the trip page and in
+  Outfits tagged Vancouver; asking again produces new
+  suggestions, not repeats.
+- **Status:** Not started. Filed 2026-10-21. The two bugs
+  from the same session — Today's Pick inside the trip
+  chat, and a raw-JSON reply — shipped as a fix buffer the
+  same day; this card is the capability they were blocking.
+
 ### PC-35: Beginner guide — ways to add clothes (incl. Google Photos)
 - **Size:** S
 - **Value:** Founder discovery (2026-10-21, verified by doing
