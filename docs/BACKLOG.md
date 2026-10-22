@@ -446,6 +446,23 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   starts, no uncertainty score, no trial evidence yet). His
   call after deliberation; the provider seam makes it a
   one-module swap, and nothing costs anything while dormant.
+  BiRefNet comparison evidence landed 2026-10-22: the open
+  model (run locally on CPU) over the same 14 raw photos plus
+  the 20 trial originals — quality parity with Photoroom on
+  the 10 head-to-head items (alpha stats within ~0.3pt,
+  visually near-identical), and on the translucent-lens
+  sunglasses (Photoroom's weakest, uncertainty 0.84–1.0) it
+  kept the source's dark lenses where Photoroom washed them
+  translucent. All 14 raw photos extracted cleanly off
+  bed/carpet; only blemishes were slivers of adjacent dark
+  objects on the two most cluttered shots. Full record in
+  the studio research note and `photoroom-trial/results.md`.
+  Bramble's recommendation now: the no-floor route (BiRefNet
+  via Replicate behind the same provider module), giving up
+  the uncertainty score. Founder's call still open; if
+  BiRefNet is chosen, the pending sandbox-key paste is moot
+  and a Replicate token via the same secure-paste pattern
+  takes its place.
 
 ### PC-36: Photo of a person → individual articles + the outfit
 - **Size:** Spike shared with PC-34, then size from findings
