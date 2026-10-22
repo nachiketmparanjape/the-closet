@@ -438,7 +438,14 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   `users/{uid}/renders/<sha256(storagePath)>.png`; the photo
   entry gains renderUrl / renderStoragePath /
   renderUncertainty; tiles prefer the render and fall back to
-  the original on any failure.
+  the original on any failure. Build landed dark 2026-10-22
+  (commit ce5d130; client live, callable awaiting its secret).
+  Provider choice reopened the same day: the founder is
+  weighing Photoroom's $20/mo floor against BiRefNet via
+  Replicate (pay-per-use, ~$0.001/image, no floor, cold
+  starts, no uncertainty score, no trial evidence yet). His
+  call after deliberation; the provider seam makes it a
+  one-module swap, and nothing costs anything while dormant.
 
 ### PC-36: Photo of a person → individual articles + the outfit
 - **Size:** Spike shared with PC-34, then size from findings
