@@ -3195,6 +3195,10 @@
       // (Persisted threads are the full design: PC-32 proposal.)
       var chatThreads = {};
       var activeThreadKey = "general";
+      // PC-37: per-thread memory of trip outfit combinations already
+      // suggested, sent with the trip payload so repeat asks produce
+      // new outfits instead of the same ones again.
+      var chatThreadSuggested = {};
       function switchThread(key) {
         if (key === activeThreadKey) return;
         chatThreads[activeThreadKey] = stylistMessages;
@@ -3267,6 +3271,20 @@
           // PC-12: structured outfit card under the reply, with a Save action.
           if (m.outfit && m.outfit.itemIds && m.outfit.itemIds.length >= 2) {
             chatList.appendChild(renderOutfitCard(m));
+          }
+          // PC-37: trip outfit suggestions — one saveable card each.
+          // The wrap's outfit IS the stored suggestion object, so the
+          // saved state set by the save flow survives re-renders.
+          if (m.tripOutfits && m.tripOutfits.length) {
+            m.tripOutfits.forEach(function (s) {
+              if (!s.itemIds || s.itemIds.length < 2) return;
+              chatList.appendChild(renderOutfitCard({
+                outfit: s,
+                title: "Trip outfit idea",
+                reasoningInCard: true,
+                tripSave: m.tripSaveCtx || null
+              }));
+            });
           }
           // Sprint 17 (CONTEXT PINS): proposal confirm card — propose,
           // never append. The user taps Save or Dismiss. A removal card
@@ -3716,7 +3734,8 @@
                 outfits: (tpk.outfits || []).map(function (o) {
                   return { itemIds: o.itemIds || [], reasoning: o.reasoning || "" };
                 })
-              }
+              },
+              suggestedOutfits: (chatThreadSuggested[activeThreadKey] || [])
             };
           }
         }
@@ -3724,6 +3743,15 @@
         callAskStylist(payload).then(function (res) {
           thinking.thinking = false;
           var d = res.data || {};
+          // PC-37: trip outfit suggestions ride along either branch —
+          // the model may update the packing and suggest in one turn.
+          var tripSugs = (tripChat && Array.isArray(d.outfitSuggestions)) ? d.outfitSuggestions : [];
+          if (tripSugs.length) {
+            thinking.tripOutfits = tripSugs;
+            thinking.tripSaveCtx = tripChat.tripId;
+            var acc = chatThreadSuggested[activeThreadKey] || (chatThreadSuggested[activeThreadKey] = []);
+            tripSugs.forEach(function (s) { acc.push(s.itemIds); });
+          }
           // Sprint 16: the model called updateTripPacking — the client
           // executes it (model proposes, client disposes).
           if (d.toolCall && d.toolCall.name === "updateTripPacking" && tripChat) {
@@ -4361,17 +4389,44 @@
           el.appendChild(h2);
           outfits.forEach(function (o, i) {
             // Buffer 6: label and reasoning live inside the card now.
-            var wrap = { outfit: { itemIds: o.itemIds, reasoning: o.reasoning }, title: "Option " + (i + 1), reasoningInCard: true };
+            // PC-37: saving from the trip page tags the outfit with
+            // this trip, same as saving from the trip chat.
+            var wrap = { outfit: { itemIds: o.itemIds, reasoning: o.reasoning }, title: "Option " + (i + 1), reasoningInCard: true, tripSave: trip.id };
             // Saved state derives from the wardrobe's actual data: this
             // render rebuilds the wraps on every pass, so a savedId set
             // on an old wrap is forgotten and the button looked dead
             // (founder bug report, 2026-10-21). If an outfit with this
             // exact combination exists, the suggestion is already saved.
             var existing = allOutfits.filter(function (x) {
-              return x.dedupHash && x.dedupHash === outfitDedupHash(o.itemIds, "stylist");
+              return x.dedupHash && (x.dedupHash === outfitDedupHash(o.itemIds, "stylist") || x.dedupHash === outfitDedupHash(o.itemIds, "trip"));
             })[0];
             if (existing) wrap.outfit.savedId = existing.versionGroup || existing.id;
             el.appendChild(renderOutfitCard(wrap, renderTripDetail));
+          });
+        }
+        // PC-37: outfits kept for this trip (saved from the trip chat
+        // or the plan cards) — the trip's saved looks, as their own
+        // section. Plan outfits already shown above are excluded by
+        // hash so a saved plan option never appears twice.
+        var planHashes = {};
+        outfits.forEach(function (o) {
+          planHashes[outfitDedupHash(o.itemIds, "stylist")] = true;
+          planHashes[outfitDedupHash(o.itemIds, "trip")] = true;
+        });
+        var savedForTrip = (allOutfits || []).filter(function (x) {
+          return x.tripId === trip.id && !(x.dedupHash && planHashes[x.dedupHash]);
+        });
+        if (savedForTrip.length) {
+          var sh = document.createElement("h3");
+          sh.className = "trip-section-h";
+          sh.textContent = "Saved for this trip";
+          el.appendChild(sh);
+          savedForTrip.forEach(function (x) {
+            el.appendChild(renderOutfitCard({
+              outfit: { itemIds: x.itemIds, reasoning: x.appReasoning || "", savedId: x.versionGroup || x.id },
+              title: x.name || "Saved outfit",
+              reasoningInCard: true
+            }, renderTripDetail));
           });
         }
       }
@@ -5424,7 +5479,8 @@
           var span = document.createElement("span");
           span.textContent = (o.itemIds || []).length + " pieces" +
             (o.occasion ? " · " + o.occasion : "") +
-            (o.source === "stylist" ? " · Stylist pick" : "");
+            (o.source === "stylist" ? " · Stylist pick" : "") +
+            (o.tripId ? " · " + ((tripById(o.tripId) || {}).name || "Trip") + " trip" : "");
           meta.appendChild(span);
           details.appendChild(name);
           details.appendChild(meta);
@@ -7024,13 +7080,30 @@
       function saveChatOutfit(msg, onDone) {
         var o = msg.outfit;
         if (!currentUser || !o || o.savedId || !o.itemIds) return;
-        // PC-18: identical combination already saved → link to the existing
-        // outfit instead of minting a duplicate.
-        findDuplicateOutfit(o.itemIds, "stylist").then(function (dup) {
+        // PC-37: a save from trip context tags the outfit with the
+        // trip (source "trip" + tripId) — it joins the trip page and
+        // the Outfits list with its tag, per the founder's model.
+        var tripId = typeof msg.tripSave === "string" && msg.tripSave ? msg.tripSave : null;
+        var src = tripId ? "trip" : "stylist";
+        // PC-18: identical combination already saved → link to the
+        // existing outfit instead of minting a duplicate. From trip
+        // context, the same combination saved by the general stylist
+        // is the same outfit — link it and tag it for this trip
+        // rather than minting a twin.
+        findDuplicateOutfit(o.itemIds, src).then(function (dup) {
+          if (dup || !tripId) return dup;
+          return findDuplicateOutfit(o.itemIds, "stylist");
+        }).then(function (dup) {
           if (dup) {
             o.savedId = dup.id;
+            if (tripId && dup.hash !== outfitDedupHash(o.itemIds, "trip")) {
+              db.collection("users").doc(currentUser.uid).collection("outfits").doc(dup.id)
+                .update({ tripId: tripId }).catch(function () {});
+              showToast("Already saved — tagged to this trip.");
+            } else {
+              showToast("This exact outfit is already saved — showing the existing one.");
+            }
             renderChat();
-            showToast("This exact outfit is already saved — showing the existing one.");
             if (typeof onDone === "function") onDone();
             return;
           }
@@ -7045,14 +7118,15 @@
             supersedes: null,
             itemIds: o.itemIds,
             itemNames: names,
-            source: "stylist",
+            source: src,
+            tripId: tripId,
             name: defaultOutfitName(o.itemIds),
             occasion: null,
             weather: null,
             appConfidence: o.confidence != null ? o.confidence : null,
             appReasoning: o.reasoning || "",
             appScores: o.scores || null,
-            dedupHash: outfitDedupHash(o.itemIds, "stylist"),
+            dedupHash: outfitDedupHash(o.itemIds, src),
             favorite: false,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
           }).then(function () {

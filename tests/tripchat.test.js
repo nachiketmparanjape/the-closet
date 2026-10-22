@@ -6,6 +6,7 @@ const {
   extractToolCall,
   extractToolCalls,
   mapUpdateTripPacking,
+  mapSuggestTripOutfits,
   handleIndex,
   unwrapJsonReply,
   buildStylistRequest,
@@ -167,6 +168,35 @@ describe("unwrapJsonReply", () => {
     assert.strictEqual(unwrapJsonReply('{"something": "else"}'), '{"something": "else"}');
     assert.strictEqual(unwrapJsonReply(""), "");
     assert.strictEqual(unwrapJsonReply(null), null);
+  });
+});
+
+describe("mapSuggestTripOutfits", () => {
+  const items = [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "d" }];
+  test("maps handles to ids, restricted to plan pieces", () => {
+    const out = mapSuggestTripOutfits({ outfits: [
+      { handles: ["[i1]", "[i2]"], reasoning: "packed pair" },
+      { handles: ["[i3]", "[i4]"], reasoning: "d is not packed" },
+    ] }, items, ["a", "b", "c"]);
+    assert.strictEqual(out.length, 1);
+    assert.deepStrictEqual(out[0].itemIds, ["a", "b"]);
+    assert.strictEqual(out[0].reasoning, "packed pair");
+  });
+  test("dedupes identical combinations, drops sub-2-piece outfits, caps at 4", () => {
+    const out = mapSuggestTripOutfits({ outfits: [
+      { handles: ["[i1]", "[i2]"] },
+      { handles: ["[i2]", "[i1]"] },
+      { handles: ["[i1]"] },
+      { handles: ["[i1]", "[i3]"] },
+      { handles: ["[i2]", "[i3]"] },
+      { handles: ["[i1]", "[i2]", "[i3]"] },
+      { handles: ["[i3]", "[i2]", "[i1]"] },
+    ] }, items, []);
+    assert.strictEqual(out.length, 4);
+  });
+  test("no plan restriction when plan ids are unknown", () => {
+    const out = mapSuggestTripOutfits({ outfits: [{ handles: ["i4", "[i2]"] }] }, items, []);
+    assert.deepStrictEqual(out[0].itemIds, ["d", "b"]);
   });
 });
 

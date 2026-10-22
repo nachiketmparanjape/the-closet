@@ -488,10 +488,22 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   cards; saving one puts it on the trip page and in
   Outfits tagged Vancouver; asking again produces new
   suggestions, not repeats.
-- **Status:** Not started. Filed 2026-10-21. The two bugs
+- **Status:** Built 2026-10-21 (the founder pulled it the
+  same day it was filed): a dedicated suggestTripOutfits
+  tool (suggestions never rewrite the plan), saveable
+  outfit cards in trip chat, saves tagged with the trip,
+  a "Saved for this trip" section on the trip page, and a
+  trip tag in the Outfits list. Founder phone validation
+  pending — the card flips when he confirms on device.
+  Known v1 limits: an outfit carries one tripId (the same
+  combination kept for a second trip links to the first
+  save instead of re-tagging), and suggestion memory is
+  per-session (chat history is not persisted), so a fresh
+  session can re-suggest an older combination — save-time
+  dedup still prevents a duplicate outfit. The two bugs
   from the same session — Today's Pick inside the trip
-  chat, and a raw-JSON reply — went out as a fix buffer the
-  same day; this card is the capability they were blocking.
+  chat, and a raw-JSON reply — went out as a fix buffer
+  earlier that day.
 
 ### PC-35: Beginner guide — ways to add clothes (incl. Google Photos)
 - **Size:** S

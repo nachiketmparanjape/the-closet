@@ -443,6 +443,33 @@ function sanitizePinProposal(obj, todayStr) {
 
 // Sprint 17: the propose-a-pin tool (trip mode). Propose-only — the
 // client shows a confirm card; nothing is ever written by the model.
+// PC-37: outfit ideas for the trip, proposed WITHOUT touching the
+// packing plan. The founder's model of trip chat is a full stylist
+// room: ask for more outfits → get saveable outfit cards; saving one
+// adds it to the trip and to the Outfits list with the trip tag.
+const SUGGEST_TRIP_OUTFITS_DECL = {
+  name: "suggestTripOutfits",
+  description: "Propose outfit combinations built from the pieces in the current packing plan, WITHOUT changing the plan. Call when the user asks for outfit ideas, suggestions, or more outfits for this trip.",
+  parameters: {
+    type: "OBJECT",
+    properties: {
+      outfits: {
+        type: "ARRAY",
+        description: "Up to 4 outfit combinations, each genuinely different from the plan's outfits and from anything already suggested in this chat.",
+        items: {
+          type: "OBJECT",
+          properties: {
+            handles: { type: "ARRAY", items: { type: "STRING" }, description: "Wardrobe handles like [i3] — only pieces in the current packing plan" },
+            reasoning: { type: "STRING", description: "Why this combination works for the trip" },
+          },
+          required: ["handles"],
+        },
+      },
+    },
+    required: ["outfits"],
+  },
+};
+
 const PIN_CONTEXT_DECL = {
   name: "pinContext",
   description: "Propose saving a durable current fact about the user (location, weather they'll be in, or a lasting preference). The user confirms before anything is saved — proposing is all you do.",
@@ -499,9 +526,17 @@ function sanitizeTripContext(value) {
       : [];
     packing = { articleIds: ids, articleReasons: reasons, outfits: outfits };
   }
+  // PC-37: combinations already suggested in this chat thread, so a
+  // repeat ask produces new outfits instead of the same ones again.
+  const suggestedOutfits = Array.isArray(value.suggestedOutfits)
+    ? value.suggestedOutfits.slice(0, 12).map((set) => (Array.isArray(set)
+        ? set.filter((x) => typeof x === "string" && x.length > 0 && x.length <= 100).slice(0, 10)
+        : [])).filter((s) => s.length >= 2)
+    : [];
   return {
     tripId: tripId,
     tripName: cleanText(value.tripName || "", 120),
+    suggestedOutfits: suggestedOutfits,
     leg: leg,
     notes: cleanText(value.notes || "", 500),
     weatherSummary: value.weatherSummary ? cleanText(value.weatherSummary, 500) : null,
@@ -794,6 +829,17 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
           }
         });
         if (outfitLines.length) system += "\n" + outfitLines.join("\n");
+        const sugLines = [];
+        (tripContext.suggestedOutfits || []).forEach((set) => {
+          const parts = (set || []).map((id) => {
+            const idx = byId.get(id);
+            return idx === undefined ? null : "[i" + (idx + 1) + "]";
+          }).filter(Boolean);
+          if (parts.length >= 2) sugLines.push(parts.join(", "));
+        });
+        if (sugLines.length) {
+          system += "\nAlready suggested in this chat — do not repeat these combinations: " + sugLines.join(" | ");
+        }
       }
     } else {
       system += "\n\nNo packing plan exists yet for this trip.";
@@ -834,6 +880,7 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
       "- BOTH TOOLS: if one message asks for a packing change AND states a lasting preference (\"pack light — I always " +
       "pack light\"), call updateTripPacking for the change AND pinContext for the preference in the same response.\n" +
       "- Each article in updateTripPacking is an object like {\"handle\": \"[i3]\", \"reason\": \"...\"} — the handle ALONE in that exact form, no name or other text attached to it.\n" +
+      "- If the user asks for outfit ideas, suggestions, or more outfits for the trip, call suggestTripOutfits with up to 4 outfits built ONLY from the pieces in the current packing plan. Each must be a genuinely different combination — never repeat the plan's outfits or a combination already suggested in this chat. Do NOT call updateTripPacking just to suggest outfits; suggesting leaves the plan untouched.\n" +
       "- ALWAYS include a short prose reply in the same response as any tool call — never send a tool call with no text. " +
       "Say what changed in one sentence; the client shows that line as your answer.";
   }
@@ -850,7 +897,7 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
   if (tripContext) {
     // Function calling is incompatible with a forced JSON mime type —
     // trip mode answers in prose and/or the tool call instead.
-    config.tools = [{ functionDeclarations: [UPDATE_TRIP_PACKING_DECL, PIN_CONTEXT_DECL] }];
+    config.tools = [{ functionDeclarations: [UPDATE_TRIP_PACKING_DECL, SUGGEST_TRIP_OUTFITS_DECL, PIN_CONTEXT_DECL] }];
   } else {
     config.responseMimeType = "application/json";
   }
@@ -949,6 +996,33 @@ function mapUpdateTripPacking(raw, items) {
   };
 }
 
+// PC-37: map a suggestTripOutfits call to id-based outfit
+// suggestions. Pure. Rules: handles resolve tolerantly (handleIndex);
+// an outfit needs 2+ distinct pieces; when the plan's article ids
+// are known, every piece must be in the plan (suggestions are built
+// from what's packed); identical combinations dedupe; cap 4.
+function mapSuggestTripOutfits(raw, items, planIds) {
+  const args = raw && typeof raw === "object" ? raw : {};
+  const plan = new Set(Array.isArray(planIds) ? planIds : []);
+  const seenSets = new Set();
+  const out = [];
+  for (const o of (Array.isArray(args.outfits) ? args.outfits : [])) {
+    const ids = ((o && Array.isArray(o.handles)) ? o.handles : [])
+      .map((h) => handleIndex(h, items))
+      .filter((idx) => idx >= 0)
+      .map((idx) => items[idx].id);
+    const uniq = [...new Set(ids)];
+    if (uniq.length < 2) continue;
+    if (plan.size && !uniq.every((id) => plan.has(id))) continue;
+    const key = uniq.slice().sort().join(",");
+    if (seenSets.has(key)) continue;
+    seenSets.add(key);
+    out.push({ itemIds: uniq, reasoning: cleanText((o && o.reasoning) || "", 200) });
+    if (out.length >= 4) break;
+  }
+  return out;
+}
+
 // OBS-1: rejected trip-tool args, WITH a sample of the raw values —
 // keys/types alone left the 2026-10-21 failure undiagnosable beyond
 // "structurally complete, mapped to zero."
@@ -995,6 +1069,10 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
     let { text, toolCalls } = await callStylistModelTrip(ai, model, contents, config);
     const updCall = toolCalls.find((c) => c.name === "updateTripPacking");
     const pinCall = toolCalls.find((c) => c.name === "pinContext");
+    const sugCall = toolCalls.find((c) => c.name === "suggestTripOutfits");
+    let outfitSuggestions = sugCall
+      ? mapSuggestTripOutfits(sugCall.args, items, (tripContext.packing && tripContext.packing.articleIds) || [])
+      : [];
     let mappedCall = updCall ? mapUpdateTripPacking(updCall.args, items) : null;
     let retrySawUpd = false;
     if (updCall && !mappedCall) {
@@ -1016,6 +1094,9 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
         if (!pinCall && c.name === "pinContext") {
           toolCalls.push(c);
         }
+        if (!outfitSuggestions.length && c.name === "suggestTripOutfits") {
+          outfitSuggestions = mapSuggestTripOutfits(c.args, items, (tripContext.packing && tripContext.packing.articleIds) || []);
+        }
       }
     }
     const pinProposal = toolCalls.some((c) => c.name === "pinContext")
@@ -1030,11 +1111,13 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
       text = mappedCall
         ? ("Packing updated — " + (mappedCall.whatChanged || "got it."))
         : (pinProposal ? "Got it."
-          : planFailed
-            ? "I drafted a plan but couldn't apply it cleanly — your packing is unchanged. Mind asking once more?"
-            : "Hmm — that came back empty on my end. Try again?");
+          : outfitSuggestions.length
+            ? "A few outfit ideas from your packing — tap Save on any you'd like to keep."
+            : planFailed
+              ? "I drafted a plan but couldn't apply it cleanly — your packing is unchanged. Mind asking once more?"
+              : "Hmm — that came back empty on my end. Try again?");
     }
-    return { reply: text, toolCall: mappedCall, pinProposal: pinProposal };
+    return { reply: text, toolCall: mappedCall, pinProposal: pinProposal, outfitSuggestions: outfitSuggestions };
   }
   let parsed = await callStylistModel(ai, model, contents, config, "askStylist", todayStr);
 
@@ -1073,4 +1156,4 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
   };
 }
 
-module.exports = { askStylist, buildStylistRequest, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins, sanitizePinProposal, extractToolCall, extractToolCalls, mapUpdateTripPacking, handleIndex, unwrapJsonReply, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM, VIBE_TAGS };
+module.exports = { askStylist, buildStylistRequest, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins, sanitizePinProposal, extractToolCall, extractToolCalls, mapUpdateTripPacking, mapSuggestTripOutfits, handleIndex, unwrapJsonReply, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM, VIBE_TAGS };
