@@ -150,6 +150,13 @@ work re-plans as waves; DESIGN-CHAT-1 folds in as W5.
   outfits show the sheet minus the style-note card.
 - **W4 DESIGN-MASONRY-1: category-wall wardrobe entry (M)** —
   A5; hero per category (passed render preferred, photo
-  fallback); item grid stays one level down.
+  fallback); item grid stays one level down. Built + deployed
+  2026-10-23 (client-only): Wardrobe at All/no-search now opens
+  on a staggered two-column category wall — hero photo per
+  category (passed PC-34 render preferred when one exists,
+  else newest piece), serif label + count; tapping a card (or
+  a chip, or searching) drops into the existing grid. Known
+  refinement parked: hero by wear-count once item-level wear
+  aggregation exists (wear data is outfit-level today).
 - **W5 DESIGN-CHAT-1** — as originally carded, now on the
   finished §10 system.

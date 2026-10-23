@@ -439,6 +439,18 @@
     .count { color: var(--muted); font-size: 13px; }
 
     .gallery { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(12px, 2vw, 24px); }
+    /* DESIGN-MASONRY-1 (§10 A5): the category wall — the wardrobe
+       opens as a closet door, not a database. */
+    .cat-wall { columns: 2; column-gap: 12px; }
+    .cat-card { display: block; width: 100%; break-inside: avoid; margin: 0 0 12px; padding: 0; text-align: left; background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; cursor: pointer; font: inherit; color: var(--ink); }
+    .cat-hero { background: var(--paper-soft); overflow: hidden; }
+    .cat-hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .cat-hero.r0 { aspect-ratio: 4 / 5; }
+    .cat-hero.r1 { aspect-ratio: 1 / 1; }
+    .cat-hero.r2 { aspect-ratio: 5 / 4; }
+    .cat-label { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 12px 14px; }
+    .cat-name { font-family: "Closet Serif", serif; font-size: 19px; font-weight: 500; }
+    .cat-count { font-size: 12px; color: var(--muted); white-space: nowrap; }
     .item { min-width: 0; }
     .item-image { aspect-ratio: 4 / 5; overflow: hidden; background: var(--paper-soft); position: relative; border-radius: var(--r-md); }
     .item-image img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -2448,6 +2460,68 @@
         });
       });
 
+      // DESIGN-MASONRY-1 (§10 A5): the category wall. One hero piece
+      // per category on a paper card; tapping a card enters that
+      // category's grid (DESIGN-GRID-1, one level down). Hero = a
+      // piece with a passed PC-34 cutout when one exists, else the
+      // most recently added piece in the category.
+      var WALL_ORDER = ["Tops", "Bottoms", "Outerwear", "Shoes", "Accessories", "Other"];
+      function setGalleryFilter(cat) {
+        filter = cat;
+        document.querySelectorAll(".chip").forEach(function (chip) {
+          chip.classList.toggle("active", chip.getAttribute("data-filter") === cat);
+        });
+        renderGallery();
+      }
+      function categoryWallEl() {
+        var wall = document.createElement("div");
+        wall.className = "cat-wall";
+        wall.style.gridColumn = "1 / -1";
+        var byCat = {};
+        allItems.forEach(function (it) {
+          var c = it.category || "Other";
+          (byCat[c] = byCat[c] || []).push(it);
+        });
+        var cats = WALL_ORDER.filter(function (c) { return byCat[c]; });
+        Object.keys(byCat).forEach(function (c) { if (cats.indexOf(c) < 0) cats.push(c); });
+        cats.forEach(function (cat, idx) {
+          var items = byCat[cat];
+          var hero = items[0];
+          for (var i = 0; i < items.length; i++) {
+            var hp = itemPhotos(items[i]);
+            if (hp.length && hp[0].renderUrl) { hero = items[i]; break; }
+          }
+          var card = document.createElement("button");
+          card.type = "button";
+          card.className = "cat-card";
+          var fig = document.createElement("div");
+          fig.className = "cat-hero r" + (idx % 3);
+          var ps = itemPhotos(hero);
+          if (ps.length && ps[0].url) {
+            var img = document.createElement("img");
+            img.src = photoDisplayUrl(ps[0]);
+            img.alt = hero.name || cat;
+            img.loading = "lazy";
+            fig.appendChild(img);
+          }
+          card.appendChild(fig);
+          var lab = document.createElement("div");
+          lab.className = "cat-label";
+          var nm = document.createElement("span");
+          nm.className = "cat-name";
+          nm.textContent = cat;
+          var ct = document.createElement("span");
+          ct.className = "cat-count";
+          ct.textContent = items.length + (items.length === 1 ? " piece" : " pieces");
+          lab.appendChild(nm);
+          lab.appendChild(ct);
+          card.appendChild(lab);
+          card.addEventListener("click", function () { setGalleryFilter(cat); });
+          wall.appendChild(card);
+        });
+        return wall;
+      }
+
       function renderGallery() {
         var query = searchInput.value.trim().toLowerCase();
         var visible = allItems.filter(function (item) {
@@ -2460,6 +2534,8 @@
         gallery.textContent = "";
         if (!currentUser || allItems.length === 0) {
           gallery.appendChild(emptyState);
+        } else if (filter === "All" && !query) {
+          gallery.appendChild(categoryWallEl());
         } else if (visible.length === 0) {
           var noResults = document.createElement("div");
           noResults.className = "empty-copy";
