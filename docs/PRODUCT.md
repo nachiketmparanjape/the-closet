@@ -238,6 +238,12 @@ Decided topics stay as compact records; full reports live in `research_notes/`.
   warm-shift our tokens + type voice and add named looks,
   the Behind-the-Look sheet, and category masonry when PC-34
   lands; C file and wait.
-- **Status:** Awaiting the founder's call on the fork. Full
-  study: `~/workspace/studio/research_notes/closet-combina-aesthetic.md`
+- **Status:** Resolved 2026-10-23 — the founder widened the
+  brief (UI elements included; any high-adoption design-led
+  app as reference) and delegated the decisions to Bramble
+  outright, iterating until he's happy. Direction: Option B,
+  recorded as DESIGN.md §10 "Warm Editorial" (decisions
+  A1–A5); W1 tokens live the same day, waves W2–W5 carded in
+  the Sprint 18 plan. Full study:
+  `~/workspace/studio/research_notes/closet-combina-aesthetic.md`
   (frames archived alongside it).
