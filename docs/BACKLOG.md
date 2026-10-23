@@ -244,6 +244,42 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
 - **Status:** Not started. Builds on OBS-1 (Sprint 15 fix buffer).
   Sprint candidate — pull at a planning walk.
 
+### OBS-3: AI consumption analytics — cost attribution (M)
+- **Idea (founder 2026-10-23):** know exactly where AI spend
+  comes from — per feature, per model, per outcome — so
+  optimize / cut-back decisions are made on data, not on a
+  provider bill total. Raised alongside PC-34, which adds two
+  new AI consumers (Replicate extraction + a Gemini gate check)
+  to the existing seven Gemini callables. Design spec:
+  `docs/OBSERVABILITY.md` (proposal v1, 2026-10-23).
+- **Scope:**
+  - One append-only Firestore event per AI call (`ai_usage`):
+    correlationId, feature, provider, model, surface, token
+    counts / predict seconds, latency, outcome, USD estimate
+    stamped with its pricing version, raw units kept so any
+    window can be re-priced. Metadata only — no prompts, no
+    photo bytes. Written via one helper (`functions/usage.js`),
+    fire-and-forget so analytics can never break a user call.
+  - Pricing table in code (`functions/pricing.js`, versioned):
+    Vertex per-1M-token rates per model; Replicate per-second
+    hardware rate × predict_time.
+  - Report (`usage-report.js`, extending the metrics.js
+    pattern): spend by feature × provider × model, trend,
+    success/error rates beside cost (cost per successful
+    outcome is the headline), unit economics (per item
+    catalogued, per stylist turn), top drivers named.
+  - Offline analysis: JSONL/CSV export → DuckDB locally.
+    Graduation path only if volume demands: Firestore →
+    BigQuery export, same schema (BigQuery plays the
+    Hive/Presto role in this stack; nothing fancier is
+    warranted at hundreds–thousands of calls a month).
+- **Slices:** 3a instrument extractGarment's two calls (rides
+  the PC-34 build); 3b retrofit the seven existing callables;
+  3c the report. Sibling to OBS-2 (error quality) — same
+  events philosophy, cost lens instead of failure lens.
+- **Status:** Proposal written 2026-10-23, awaiting founder
+  validation + sequencing call. Not started as a build.
+
 ### PC-32: Chat threads — side chats per context (M)
 - **Idea (founder 2026-10-19):** one chat for everything mixes
   contexts (a New York pin surfacing inside the Vancouver trip chat)
