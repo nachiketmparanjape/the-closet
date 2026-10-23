@@ -212,3 +212,32 @@ Decided topics stay as compact records; full reports live in `research_notes/`.
   (OBS-3a). Remaining: the founder adds his Replicate token
   to Secret Manager, the callable deploys, one live smoke
   call, and his phone validation.
+
+### [RESEARCH 2026-10-23] Combina aesthetic study — copy / improve
+
+- **Question (founder):** study Combina (iOS AI outfit planner)
+  thoroughly, especially its aesthetic; what do we copy and
+  improve? His bar: "It has to look like that for people to
+  adopt."
+- **Findings:** the polish is a system — warm ivory/ink + one
+  brass accent; Didone serif doing all brand work with italic
+  gold serif reserved for the payoff word; outfits as named
+  magazine features ("Today's Feature: LOBBY HANDSHAKE");
+  rationale composed as a "Behind the Look" bento sheet, not
+  prose; wardrobe as category masonry of cutouts on cream
+  cards (exactly what PC-34 renders unlock). Our DESIGN.md
+  principles already agree; the gaps are temperature (Sprint
+  18 just went cool Gallery-blue), named looks, composed
+  explanation, and imagery discipline. Honesty notes: Combina
+  has 5 ratings since 2026-04 (craft proven, adoption not);
+  its frames are renders — its own site's real screenshot has
+  a polo filed under "Shoes"; its hero imagery is AI models
+  (PC-36 territory), and its register skews feminine-luxury —
+  copy the system, re-aim the mood.
+- **Options:** A adopt the register wholesale; B (recommended)
+  warm-shift our tokens + type voice and add named looks,
+  the Behind-the-Look sheet, and category masonry when PC-34
+  lands; C file and wait.
+- **Status:** Awaiting the founder's call on the fork. Full
+  study: `~/workspace/studio/research_notes/closet-combina-aesthetic.md`
+  (frames archived alongside it).
