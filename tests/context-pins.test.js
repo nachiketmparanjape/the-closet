@@ -129,4 +129,32 @@ describe("parseStylistJson", () => {
     const r2 = parseStylistJson(JSON.stringify({ reply: "Hi.", outfit: null }));
     assert.equal(r2.pinProposal, null);
   });
+  test("carries the look name + tagline, capped (DESIGN-LOOK-1)", () => {
+    const scores = { color: 8, formality: 7, weather: 9, proportion: 6, occasion: 8 };
+    const r = parseStylistJson(JSON.stringify({
+      reply: "Here you go.",
+      outfit: {
+        items: ["[i1]", "[i2]"], reasoning: "Anchored by the jacket.",
+        lookName: "Lobby Handshake", tagline: "Soft center, sharp frame",
+        scores: scores,
+      },
+    }));
+    assert.equal(r.outfit.lookName, "Lobby Handshake");
+    assert.equal(r.outfit.tagline, "Soft center, sharp frame");
+    const long = parseStylistJson(JSON.stringify({
+      reply: "Here you go.",
+      outfit: {
+        items: ["[i1]", "[i2]"], reasoning: "x",
+        lookName: "N".repeat(90), tagline: "T".repeat(120), scores: scores,
+      },
+    }));
+    assert.ok(long.outfit.lookName.length <= 48);
+    assert.ok(long.outfit.tagline.length <= 80);
+    const bare = parseStylistJson(JSON.stringify({
+      reply: "Here you go.",
+      outfit: { items: ["[i1]", "[i2]"], reasoning: "x", scores: scores },
+    }));
+    assert.equal(bare.outfit.lookName, "");
+    assert.equal(bare.outfit.tagline, "");
+  });
 });

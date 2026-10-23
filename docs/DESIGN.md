@@ -125,10 +125,12 @@ below 12px; body copy never in `--faint`.
   Screen padding 16 (compact) / 24 (wide). Card padding 16.
   Section gap 24. If a value isn't on the scale, the layout is
   wrong, not the scale.
-- Radius scale: **8** (buttons, inputs, small media) · **14**
-  (cards, proposal cards) · **20** (sheets, top corners) ·
+- Radius scale: **8** (buttons, inputs, small media) · **18**
+  (cards, proposal cards) · **24** (sheets, top corners) ·
   **full** (chips, badges, pills). Photos inside a card take
   the card radius minus 4. The 4/5/6px one-offs are retired.
+  (Cards/sheets were 14/20 until the §10 W2 pass — the design
+  references are visibly rounder, and so are we now.)
 
 ### 2.4 Elevation
 

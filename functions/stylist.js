@@ -130,6 +130,7 @@ RULES — follow them strictly:
 - Recommend ONLY items from the list, referenced by their HANDLE ([i1], [i2], ...). Never invent, assume, or name an item that is not listed — not even "a plain white tee" unless it appears below.
 - Suggest one complete outfit per reply: exactly one top and exactly one bottom. Add shoes, outerwear, or accessories only where the wardrobe has them AND the occasion calls for them — never force shoes into an answer that didn't ask for them.
 - Use the STYLING RUBRIC to judge the outfit. Write your reasoning FIRST (two sentences: what anchors the look, what ties the colors together), then score it.
+- Name the outfit like a magazine feature: a 2–4 word editorial title ("Lobby Handshake", "Harbour Luxe") plus a tagline of at most 7 words capturing its feel ("Soft center, sharp frame"). Evocative and specific to THIS outfit — never generic ("Nice Outfit"), never a list of the items.
 - Keep the conversational reply brief: the outfit first, then why it works.
 - The user's message carries the occasion, weather, and any preferences — use all three.
 - If the wardrobe honestly cannot cover the occasion (e.g. no formal wear for a wedding), say so plainly and offer the closest workable option instead of faking it.
@@ -143,6 +144,8 @@ OUTPUT FORMAT — respond with ONLY a JSON object, no markdown, no prose:
   "reply": "<your conversational reply, markdown, as the user sees it>",
   "outfit": {
     "reasoning": "<two sentences: what anchors the look, what ties the colors>",
+    "lookName": "<2-4 word editorial title for this outfit>",
+    "tagline": "<at most 7 words: the feel of the look>",
     "items": ["<handle>", ...],
     "scores": {"color": 0, "formality": 0, "weather": 0, "proportion": 0, "occasion": 0}
   }
@@ -376,6 +379,9 @@ function parseStylistJson(text, todayStr) {
     outfit = {
       items: Array.isArray(raw.items) ? raw.items : [],
       reasoning: cleanText(raw.reasoning, 300),
+      // DESIGN-LOOK-1 (§10 A3): every pick is a named feature.
+      lookName: cleanText(raw.lookName, 48),
+      tagline: cleanText(raw.tagline, 80),
       scores: scores,
     };
   }
@@ -461,6 +467,8 @@ const SUGGEST_TRIP_OUTFITS_DECL = {
           properties: {
             handles: { type: "ARRAY", items: { type: "STRING" }, description: "Wardrobe handles like [i3] — only pieces in the current packing plan" },
             reasoning: { type: "STRING", description: "Why this combination works for the trip" },
+            lookName: { type: "STRING", description: "A 2-4 word editorial title for this outfit, like a magazine feature" },
+            tagline: { type: "STRING", description: "At most 7 words capturing the feel of the look" },
           },
           required: ["handles"],
         },
@@ -522,6 +530,8 @@ function sanitizeTripContext(value) {
             ? o.itemIds.filter((x) => typeof x === "string" && x.length > 0 && x.length <= 100).slice(0, 10)
             : [],
           reasoning: o && typeof o.reasoning === "string" ? cleanText(o.reasoning, 200) : "",
+          lookName: o && typeof o.lookName === "string" ? cleanText(o.lookName, 48) : "",
+          tagline: o && typeof o.tagline === "string" ? cleanText(o.tagline, 80) : "",
         })).filter((o) => o.itemIds.length >= 2)
       : [];
     packing = { articleIds: ids, articleReasons: reasons, outfits: outfits };
@@ -573,6 +583,8 @@ const UPDATE_TRIP_PACKING_DECL = {
           properties: {
             handles: { type: "ARRAY", items: { type: "STRING" }, description: "Wardrobe handles forming the outfit" },
             reasoning: { type: "STRING" },
+            lookName: { type: "STRING", description: "A 2-4 word editorial title for this outfit" },
+            tagline: { type: "STRING", description: "At most 7 words capturing the feel of the look" },
           },
           required: ["handles"],
         },
@@ -955,7 +967,7 @@ function confidenceFromScores(scores) {
 // references: sanitized {articles, outfits} or null (PC-22 @-mentions).
 // vibe: sanitized explicit vibe tag or null (Sprint 13).
 // vibeProfile: sanitized {tags, confidence} or null (Sprint 13).
-// Returns { reply, outfit: { itemIds, confidence, reasoning, scores } | null }.
+// Returns { reply, outfit: { itemIds, confidence, reasoning, scores, lookName, tagline } | null }.
 // tripContext: sanitized trip context from sanitizeTripContext, or null.
 // In trip mode the model may call updateTripPacking instead of (or in
 // addition to) answering in prose — handles are mapped to real item ids
@@ -988,7 +1000,12 @@ function mapUpdateTripPacking(raw, items) {
       .filter((idx) => idx >= 0 && seen.has(items[idx].id))
       .map((idx) => items[idx].id);
     if (ids.length >= 2) {
-      outfits.push({ itemIds: ids, reasoning: cleanText((o && o.reasoning) || "", 200) });
+      outfits.push({
+        itemIds: ids,
+        reasoning: cleanText((o && o.reasoning) || "", 200),
+        lookName: cleanText((o && o.lookName) || "", 48),
+        tagline: cleanText((o && o.tagline) || "", 80),
+      });
     }
   }
   if (!articles.length) return null;
@@ -1021,7 +1038,12 @@ function mapSuggestTripOutfits(raw, items, planIds) {
     const key = uniq.slice().sort().join(",");
     if (seenSets.has(key)) continue;
     seenSets.add(key);
-    out.push({ itemIds: uniq, reasoning: cleanText((o && o.reasoning) || "", 200) });
+    out.push({
+      itemIds: uniq,
+      reasoning: cleanText((o && o.reasoning) || "", 200),
+      lookName: cleanText((o && o.lookName) || "", 48),
+      tagline: cleanText((o && o.tagline) || "", 80),
+    });
     if (out.length >= 4) break;
   }
   return out;
@@ -1154,6 +1176,8 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
       itemNames: mapped.map((m) => m.name),
       confidence: confidenceFromScores(parsed.outfit.scores),
       reasoning: parsed.outfit.reasoning,
+      lookName: parsed.outfit.lookName || null,
+      tagline: parsed.outfit.tagline || null,
       scores: parsed.outfit.scores,
     },
     pinProposal: parsed.pinProposal || null,

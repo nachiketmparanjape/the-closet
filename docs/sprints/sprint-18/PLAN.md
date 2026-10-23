@@ -133,7 +133,11 @@ work re-plans as waves; DESIGN-CHAT-1 folds in as W5.
   phone verdict — his "happy" is the gate, per the mandate.
 - **W2 DESIGN-LOOK-1: named looks (M)** — stylist returns
   lookName + tagline; Today + outfit masthead (A3); radius
-  pass (cards 18, sheets 24). Server + client.
+  pass (cards 18, sheets 24). Server + client. Built +
+  deployed 2026-10-23 (askStylist updated; hosting release
+  1792791186579000; suite 257/257). Names ride the main flow,
+  both trip tools, and the save path (a saved outfit's name IS
+  its look name). Awaiting founder phone verdict.
 - **W3 DESIGN-NOTE-1: Behind-the-Look sheet (M)** — bento
   rationale over critique/reflection data (A4); one
   structured field added to the critique prompt.
