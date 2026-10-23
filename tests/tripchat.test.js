@@ -44,7 +44,7 @@ describe("sanitizeTripContext", () => {
     assert.strictEqual(ctx.weatherSummary, "cold and rainy");
     assert.deepStrictEqual(ctx.packing.articleIds, ["a", "b"]);
     assert.deepStrictEqual(ctx.packing.outfits, [
-      { itemIds: ["a", "b"], reasoning: "city day", lookName: "", tagline: "" },
+      { itemIds: ["a", "b"], reasoning: "city day", lookName: "", tagline: "", styleNote: "" },
     ]);
   });
 
@@ -175,7 +175,7 @@ describe("mapSuggestTripOutfits", () => {
   const items = [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "d" }];
   test("maps handles to ids, restricted to plan pieces", () => {
     const out = mapSuggestTripOutfits({ outfits: [
-      { handles: ["[i1]", "[i2]"], reasoning: "packed pair", lookName: "Harbour Luxe", tagline: "Salt air, clean lines" },
+      { handles: ["[i1]", "[i2]"], reasoning: "packed pair", lookName: "Harbour Luxe", tagline: "Salt air, clean lines", styleNote: "Harbour money, dock hands." },
       { handles: ["[i3]", "[i4]"], reasoning: "d is not packed" },
     ] }, items, ["a", "b", "c"]);
     assert.strictEqual(out.length, 1);
@@ -183,6 +183,7 @@ describe("mapSuggestTripOutfits", () => {
     assert.strictEqual(out[0].reasoning, "packed pair");
     assert.strictEqual(out[0].lookName, "Harbour Luxe");
     assert.strictEqual(out[0].tagline, "Salt air, clean lines");
+    assert.strictEqual(out[0].styleNote, "Harbour money, dock hands.");
   });
   test("dedupes identical combinations, drops sub-2-piece outfits, caps at 4", () => {
     const out = mapSuggestTripOutfits({ outfits: [

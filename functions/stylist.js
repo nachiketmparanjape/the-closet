@@ -131,6 +131,7 @@ RULES — follow them strictly:
 - Suggest one complete outfit per reply: exactly one top and exactly one bottom. Add shoes, outerwear, or accessories only where the wardrobe has them AND the occasion calls for them — never force shoes into an answer that didn't ask for them.
 - Use the STYLING RUBRIC to judge the outfit. Write your reasoning FIRST (two sentences: what anchors the look, what ties the colors together), then score it.
 - Name the outfit like a magazine feature: a 2–4 word editorial title ("Lobby Handshake", "Harbour Luxe") plus a tagline of at most 7 words capturing its feel ("Soft center, sharp frame"). Evocative and specific to THIS outfit — never generic ("Nice Outfit"), never a list of the items.
+- Add a style note: ONE sentence on the look's character — who it reads as, what it signals ("Reads polished without trying — boardroom bones, weekend ease.").
 - Keep the conversational reply brief: the outfit first, then why it works.
 - The user's message carries the occasion, weather, and any preferences — use all three.
 - If the wardrobe honestly cannot cover the occasion (e.g. no formal wear for a wedding), say so plainly and offer the closest workable option instead of faking it.
@@ -146,6 +147,7 @@ OUTPUT FORMAT — respond with ONLY a JSON object, no markdown, no prose:
     "reasoning": "<two sentences: what anchors the look, what ties the colors>",
     "lookName": "<2-4 word editorial title for this outfit>",
     "tagline": "<at most 7 words: the feel of the look>",
+    "styleNote": "<one sentence: the character of this look>",
     "items": ["<handle>", ...],
     "scores": {"color": 0, "formality": 0, "weather": 0, "proportion": 0, "occasion": 0}
   }
@@ -382,6 +384,8 @@ function parseStylistJson(text, todayStr) {
       // DESIGN-LOOK-1 (§10 A3): every pick is a named feature.
       lookName: cleanText(raw.lookName, 48),
       tagline: cleanText(raw.tagline, 80),
+      // DESIGN-NOTE-1 (§10 A4): the sheet's style-note card.
+      styleNote: cleanText(raw.styleNote, 140),
       scores: scores,
     };
   }
@@ -469,6 +473,7 @@ const SUGGEST_TRIP_OUTFITS_DECL = {
             reasoning: { type: "STRING", description: "Why this combination works for the trip" },
             lookName: { type: "STRING", description: "A 2-4 word editorial title for this outfit, like a magazine feature" },
             tagline: { type: "STRING", description: "At most 7 words capturing the feel of the look" },
+            styleNote: { type: "STRING", description: "One sentence on the character of this look" },
           },
           required: ["handles"],
         },
@@ -532,6 +537,7 @@ function sanitizeTripContext(value) {
           reasoning: o && typeof o.reasoning === "string" ? cleanText(o.reasoning, 200) : "",
           lookName: o && typeof o.lookName === "string" ? cleanText(o.lookName, 48) : "",
           tagline: o && typeof o.tagline === "string" ? cleanText(o.tagline, 80) : "",
+          styleNote: o && typeof o.styleNote === "string" ? cleanText(o.styleNote, 140) : "",
         })).filter((o) => o.itemIds.length >= 2)
       : [];
     packing = { articleIds: ids, articleReasons: reasons, outfits: outfits };
@@ -585,6 +591,7 @@ const UPDATE_TRIP_PACKING_DECL = {
             reasoning: { type: "STRING" },
             lookName: { type: "STRING", description: "A 2-4 word editorial title for this outfit" },
             tagline: { type: "STRING", description: "At most 7 words capturing the feel of the look" },
+            styleNote: { type: "STRING", description: "One sentence on the character of this look" },
           },
           required: ["handles"],
         },
@@ -1005,6 +1012,7 @@ function mapUpdateTripPacking(raw, items) {
         reasoning: cleanText((o && o.reasoning) || "", 200),
         lookName: cleanText((o && o.lookName) || "", 48),
         tagline: cleanText((o && o.tagline) || "", 80),
+        styleNote: cleanText((o && o.styleNote) || "", 140),
       });
     }
   }
@@ -1043,6 +1051,7 @@ function mapSuggestTripOutfits(raw, items, planIds) {
       reasoning: cleanText((o && o.reasoning) || "", 200),
       lookName: cleanText((o && o.lookName) || "", 48),
       tagline: cleanText((o && o.tagline) || "", 80),
+      styleNote: cleanText((o && o.styleNote) || "", 140),
     });
     if (out.length >= 4) break;
   }
@@ -1178,6 +1187,7 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
       reasoning: parsed.outfit.reasoning,
       lookName: parsed.outfit.lookName || null,
       tagline: parsed.outfit.tagline || null,
+      styleNote: parsed.outfit.styleNote || null,
       scores: parsed.outfit.scores,
     },
     pinProposal: parsed.pinProposal || null,

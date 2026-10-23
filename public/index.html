@@ -357,6 +357,22 @@
     .outfit-card ul { margin: 6px 0; padding-left: 18px; font-size: 14px; }
     .outfit-card .conf { font-size: 13px; color: var(--muted); margin: 6px 0; }
     .outfit-card .reason { font-size: 14px; font-style: normal; line-height: 1.5; color: var(--muted-strong); margin: 8px 0 2px; }
+    /* DESIGN-NOTE-1 (§10 A4): Behind the Look bento. */
+    .btl { margin-top: 18px; }
+    .btl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .btl-card { background: var(--paper-soft); border-radius: var(--r-md); padding: 14px; }
+    .btl-card.wide { grid-column: 1 / -1; }
+    .btl-h { font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+    .btl-note { font-family: "Closet Serif", serif; font-style: italic; font-size: 16.5px; line-height: 1.45; margin: 0; }
+    .btl-note.sm { font-size: 15px; }
+    .btl-dots { display: flex; gap: 7px; flex-wrap: wrap; }
+    .btl-dot { width: 22px; height: 22px; border-radius: 999px; border: 1px solid var(--line-strong); display: block; }
+    .btl-names { font-size: 12px; color: var(--muted); margin: 8px 0 0; line-height: 1.4; }
+    .btl-score { display: flex; align-items: center; gap: 8px; font-size: 12.5px; margin-top: 7px; }
+    .btl-score .k { width: 76px; color: var(--muted-strong); text-transform: capitalize; }
+    .btl-bar { flex: 1; height: 5px; border-radius: 999px; background: var(--line); overflow: hidden; display: block; }
+    .btl-bar i { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+    .btl-score .v { width: 16px; text-align: right; font-weight: 600; }
     .outfit-card button { margin-top: 10px; width: 100%; }
     /* Buffer 6: no card-in-card — inside an outfit card the photo row
        sits directly on the card surface (the paper-soft tray stays
@@ -5738,6 +5754,7 @@
             weather: null,
             appConfidence: null,
             appReasoning: "",
+            appStyleNote: "",
             photoUrl: st.photoUrl,
             dedupHash: outfitDedupHash(sel, "photo"),
             favorite: false,
@@ -5786,6 +5803,97 @@
         }).catch(function (err) {
           showToast(friendlyError(err));
         });
+      }
+
+      // DESIGN-NOTE-1 (§10 A4): Behind the Look — the stylist's
+      // explanation composed as a bento sheet. Palette dots use each
+      // piece's primary color family (approximate hex — the dot is a
+      // swatch, the name beside it is the truth).
+      var COLOR_FAMILY_HEX = { black: "#26221e", white: "#f5f1e6", grey: "#8d8578", gray: "#8d8578", charcoal: "#3c3833", navy: "#2b3a55", blue: "#4a6fa5", denim: "#46617e", brown: "#6f4f37", tan: "#c8a87e", beige: "#ddd0b4", cream: "#f0e6cd", khaki: "#b3a284", green: "#5c7350", olive: "#77743f", teal: "#3f7a72", red: "#a63a32", burgundy: "#6e2a33", maroon: "#5f2a2e", pink: "#d9a7b0", purple: "#6b5578", lavender: "#a79bc4", yellow: "#d9b23c", mustard: "#c99a2e", orange: "#c96f35", rust: "#a8542f", silver: "#b9b4a8", gold: "#c9a24b" };
+      function itemPrimaryColor(it) {
+        var cs = (it && it.colors) || [];
+        var first = null;
+        for (var i = 0; i < cs.length; i++) {
+          var c = cs[i];
+          if (typeof c === "string") { if (!first) first = { name: c, family: c.toLowerCase() }; continue; }
+          if (c && typeof c === "object") {
+            var rec = { name: c.name || "", family: (c.family || c.name || "").toLowerCase() };
+            if (c.primary) return rec;
+            if (!first) first = rec;
+          }
+        }
+        return first;
+      }
+      function behindTheLookEl(o) {
+        var sec = document.createElement("div");
+        sec.className = "btl";
+        sec.appendChild(shopCheckEl("p", "today-eyebrow", "Behind the look"));
+        var grid = document.createElement("div");
+        grid.className = "btl-grid";
+        if (o.appReasoning) {
+          var rc = document.createElement("div");
+          rc.className = "btl-card wide";
+          rc.appendChild(shopCheckEl("p", "btl-h", "Why it works"));
+          rc.appendChild(shopCheckEl("p", "btl-note", o.appReasoning));
+          grid.appendChild(rc);
+        }
+        var cols = [];
+        (o.itemIds || []).forEach(function (id) {
+          var c = itemPrimaryColor(itemById(id));
+          if (c && c.name) cols.push(c);
+        });
+        if (cols.length) {
+          var pc = document.createElement("div");
+          pc.className = "btl-card";
+          pc.appendChild(shopCheckEl("p", "btl-h", "Palette"));
+          var dots = document.createElement("div");
+          dots.className = "btl-dots";
+          cols.forEach(function (c) {
+            var d = document.createElement("span");
+            d.className = "btl-dot";
+            d.style.background = COLOR_FAMILY_HEX[c.family] || "#96876c";
+            d.title = c.name;
+            dots.appendChild(d);
+          });
+          pc.appendChild(dots);
+          pc.appendChild(shopCheckEl("p", "btl-names", cols.map(function (c) { return c.name; }).join(" · ")));
+          grid.appendChild(pc);
+        }
+        if (o.appStyleNote) {
+          var sc = document.createElement("div");
+          sc.className = "btl-card";
+          sc.appendChild(shopCheckEl("p", "btl-h", "Style note"));
+          sc.appendChild(shopCheckEl("p", "btl-note sm", o.appStyleNote));
+          grid.appendChild(sc);
+        }
+        if (o.appScores) {
+          var vc = document.createElement("div");
+          vc.className = "btl-card wide";
+          vc.appendChild(shopCheckEl("p", "btl-h", "The rubric"));
+          ["color", "formality", "weather", "proportion", "occasion"].forEach(function (k) {
+            var v = o.appScores[k];
+            var row = document.createElement("div");
+            row.className = "btl-score";
+            var kk = document.createElement("span");
+            kk.className = "k";
+            kk.textContent = k;
+            var bar = document.createElement("span");
+            bar.className = "btl-bar";
+            var fill = document.createElement("i");
+            fill.style.width = (v != null ? Math.max(0, Math.min(10, v)) * 10 : 0) + "%";
+            bar.appendChild(fill);
+            var vv = document.createElement("span");
+            vv.className = "v";
+            vv.textContent = v != null ? v : "–";
+            row.appendChild(kk);
+            row.appendChild(bar);
+            row.appendChild(vv);
+            vc.appendChild(row);
+          });
+          grid.appendChild(vc);
+        }
+        sec.appendChild(grid);
+        return sec;
       }
 
       function renderOutfitDetail() {
@@ -5839,19 +5947,12 @@
         meta.textContent = bits.join(" · ");
         body.appendChild(meta);
 
-        // PC-17: per-dimension scores as labeled chips, not a text blob.
-        if (o.source === "stylist" && o.appScores) {
-          var scoresWrap = document.createElement("div");
-          scoresWrap.className = "score-chips";
-          ["color", "formality", "weather", "proportion", "occasion"].forEach(function (k) {
-            var chip = document.createElement("span");
-            chip.className = "score-chip";
-            var v = o.appScores[k];
-            chip.textContent = k.charAt(0).toUpperCase() + k.slice(1) + " " + (v != null ? v : "–");
-            scoresWrap.appendChild(chip);
-          });
-          body.appendChild(scoresWrap);
-        }
+        // DESIGN-NOTE-1 (§10 A4): stylist outfits explain themselves as
+        // the Behind-the-Look sheet (rationale, palette, style note,
+        // rubric bars) — composed, not prose. Supersedes the PC-17
+        // score chips for stylist outfits.
+        var hasSheet = o.source === "stylist" && !!(o.appReasoning || o.appScores || o.appStyleNote);
+        if (hasSheet) body.appendChild(behindTheLookEl(o));
 
         // PC-27: AI critique for manual/photo outfits — labeled chips + text,
         // rendered by renderCritique below (fetched on open, or after tapping).
@@ -5859,7 +5960,7 @@
         critiqueSec.id = "outfitCritiqueSection";
         body.appendChild(critiqueSec);
 
-        if (o.appReasoning) {
+        if (o.appReasoning && !hasSheet) {
           var reason = document.createElement("p");
           reason.className = "reason";
           reason.textContent = "\u201C" + o.appReasoning + "\u201D";
@@ -6743,6 +6844,7 @@
             weather: null,
             appConfidence: null,
             appReasoning: "",
+            appStyleNote: "",
             dedupHash: outfitDedupHash(sel, "manual"),
             favorite: false,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -7205,6 +7307,7 @@
             weather: null,
             appConfidence: o.confidence != null ? o.confidence : null,
             appReasoning: o.reasoning || "",
+            appStyleNote: o.styleNote || "",
             appScores: o.scores || null,
             dedupHash: outfitDedupHash(o.itemIds, src),
             favorite: false,

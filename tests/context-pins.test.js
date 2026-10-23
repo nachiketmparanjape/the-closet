@@ -136,11 +136,13 @@ describe("parseStylistJson", () => {
       outfit: {
         items: ["[i1]", "[i2]"], reasoning: "Anchored by the jacket.",
         lookName: "Lobby Handshake", tagline: "Soft center, sharp frame",
+        styleNote: "Reads polished without trying.",
         scores: scores,
       },
     }));
     assert.equal(r.outfit.lookName, "Lobby Handshake");
     assert.equal(r.outfit.tagline, "Soft center, sharp frame");
+    assert.equal(r.outfit.styleNote, "Reads polished without trying.");
     const long = parseStylistJson(JSON.stringify({
       reply: "Here you go.",
       outfit: {

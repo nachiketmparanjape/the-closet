@@ -140,7 +140,14 @@ work re-plans as waves; DESIGN-CHAT-1 folds in as W5.
   its look name). Awaiting founder phone verdict.
 - **W3 DESIGN-NOTE-1: Behind-the-Look sheet (M)** — bento
   rationale over critique/reflection data (A4); one
-  structured field added to the critique prompt.
+  structured field added to the critique prompt. Built +
+  deployed 2026-10-23 (hosting release 1792791391136000):
+  outfit detail for stylist outfits now composes Why it works
+  (Note serif), Palette (primary-color dots per piece), Style
+  note (new stylist styleNote field, saved as appStyleNote),
+  and The rubric (five brass score bars) — superseding the
+  PC-17 chips + quoted prose for those outfits. Older saved
+  outfits show the sheet minus the style-note card.
 - **W4 DESIGN-MASONRY-1: category-wall wardrobe entry (M)** —
   A5; hero per category (passed render preferred, photo
   fallback); item grid stays one level down.
