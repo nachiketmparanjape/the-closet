@@ -12,7 +12,7 @@
 
 const { getFirestore } = require("firebase-admin/firestore");
 const { getStorage } = require("firebase-admin/storage");
-const { getClient, MODEL_VERSION } = require("./describe");
+const { getClient, reportUsage, MODEL_VERSION } = require("./describe");
 const { codedError } = require("./errors");
 const { cleanText } = require("./stylist");
 
@@ -98,7 +98,7 @@ function parsePhotoParseJson(text, validIds) {
 
 // Handler: (uid, storagePath, db?) -> { matches, unknown, notes }.
 // db injectable for tests; Storage always real (photo bytes needed).
-async function parseOutfitPhoto(uid, storagePath, db) {
+async function parseOutfitPhoto(uid, storagePath, db, hooks) {
   if (typeof storagePath !== "string" || !storagePath.startsWith("users/" + uid + "/")) {
     throw codedError("NOT_YOUR_PHOTO", "parseOutfitPhoto: bad storage path");
   }
@@ -122,10 +122,12 @@ async function parseOutfitPhoto(uid, storagePath, db) {
   const { model, contents, config } = buildPhotoParseRequest(
     buffer.toString("base64"), metadata.contentType || "image/jpeg", items
   );
+  const callStart = Date.now();
   let text;
   try {
     const ai = getClient();
     const response = await ai.models.generateContent({ model, contents, config });
+    reportUsage(hooks, response, model, callStart);
     text = (response.text || "").trim();
   } catch (err) {
     throw codedError("AI_UNAVAILABLE", "parseOutfitPhoto: generateContent failed: " + (err && err.message));

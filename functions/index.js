@@ -23,7 +23,7 @@ const { critiqueOutfit } = require("./critique");
 const { parseOutfitPhoto } = require("./photo");
 const { shopCheck } = require("./shopcheck");
 const { extractGarmentPhoto } = require("./extract");
-const { makeUsageRecorder } = require("./usage");
+const { makeUsageRecorder, createAiTracker, flushAiUsage } = require("./usage");
 // Sprint 15 (PC-29 Phase 1): trip packing. sanitizeItems/sanitizeVibeProfile
 // come from ./stylist (already imported above); only the trip-specific
 // pieces live here.
@@ -73,6 +73,10 @@ exports.describeItem = onCall(
       fail("NOT_SIGNED_IN");
     }
     const data = request.data || {};
+    // OBS-3b: AI usage tracking for this request (flushed below).
+    const aiTracker = createAiTracker();
+    const recordUsage = makeUsageRecorder(getFirestore());
+    const usageBase = { correlationId, uid, feature: "describeItem", surface: "upload", refId: null };
 
     let buffer = null;
     let mimeType = "image/jpeg";
@@ -107,10 +111,14 @@ exports.describeItem = onCall(
       const photoIds = Array.isArray(data.photoIds)
         ? data.photoIds.filter((p) => typeof p === "string").slice(0, 4)
         : [];
-      return finish("describeItem", correlationId, uid, start, await describeImage(buffer, mimeType, photoIds));
+      usageBase.refId = photoIds[0] || data.storagePath || null;
+      const result = await describeImage(buffer, mimeType, photoIds, aiTracker.hooks);
+      await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: true });
+      return finish("describeItem", correlationId, uid, start, result);
     } catch (err) {
       // Any failure inside describeImage is a downstream AI failure.
       if (!(err instanceof HttpsError) && !err.key) err.key = "DESCRIBE_FAILED";
+      await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
       boundary("describeItem", correlationId, uid, err);
     }
   }
@@ -170,6 +178,10 @@ exports.askStylist = onCall(
     const correlationId = newCorrelationId();
     const uid = request.auth ? request.auth.uid : null;
     const start = Date.now();
+    // OBS-3b: AI usage tracking for this request (flushed below).
+    const aiTracker = createAiTracker();
+    const recordUsage = makeUsageRecorder(getFirestore());
+    const usageBase = { correlationId, uid, feature: "askStylist", surface: "chat", refId: null };
     try {
       if (!request.auth) {
         fail("NOT_SIGNED_IN");
@@ -185,6 +197,7 @@ exports.askStylist = onCall(
       // null; the chat proceeds without it. The client supplies the
       // trip + current packing; item ids are re-validated on execute.
       const tripContext = sanitizeTripContext(data.tripContext);
+      usageBase.surface = tripContext ? "trip" : "chat";
       // Sprint 13: learned vibe profile, read server-side (best-effort like
       // styleProfile — a failed read never blocks the chat). The client
       // never sends it; the server is the source of truth.
@@ -233,10 +246,13 @@ exports.askStylist = onCall(
       // the model resolves relative dates against it, and pins expire
       // by it. Malformed → null (server falls back to its own clock).
       const today = /^\d{4}-\d{2}-\d{2}$/.test(data.today || "") ? data.today : null;
-      return finish("askStylist", correlationId, uid, start, await askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today));
+      const result = await askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, aiTracker.hooks);
+      await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: true });
+      return finish("askStylist", correlationId, uid, start, result);
     } catch (err) {
       // Any failure inside askStylist is a downstream AI failure.
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
+      await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
       boundary("askStylist", correlationId, uid, err);
     }
   }
@@ -257,6 +273,10 @@ exports.reflectOutfit = onCall(
     const correlationId = newCorrelationId();
     const uid = request.auth ? request.auth.uid : null;
     const start = Date.now();
+    // OBS-3b: AI usage tracking for this request (flushed below).
+    const aiTracker = createAiTracker();
+    const recordUsage = makeUsageRecorder(getFirestore());
+    const usageBase = { correlationId, uid, feature: "reflectOutfit", surface: "chat", refId: null };
     try {
       if (!request.auth) {
         fail("NOT_SIGNED_IN");
@@ -266,9 +286,13 @@ exports.reflectOutfit = onCall(
       if (!ratingId || ratingId.length > 100) {
         fail("BAD_REQUEST");
       }
-      return finish("reflectOutfit", correlationId, uid, start, await reflectOutfit(uid, ratingId));
+      usageBase.refId = ratingId;
+      const result = await reflectOutfit(uid, ratingId, aiTracker.hooks);
+      await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: true });
+      return finish("reflectOutfit", correlationId, uid, start, result);
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
+      await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
       boundary("reflectOutfit", correlationId, uid, err);
     }
   }
@@ -285,6 +309,10 @@ exports.critiqueOutfit = onCall(
     const correlationId = newCorrelationId();
     const uid = request.auth ? request.auth.uid : null;
     const start = Date.now();
+    // OBS-3b: AI usage tracking for this request (flushed below).
+    const aiTracker = createAiTracker();
+    const recordUsage = makeUsageRecorder(getFirestore());
+    const usageBase = { correlationId, uid, feature: "critiqueOutfit", surface: "chat", refId: null };
     try {
       if (!request.auth) {
         fail("NOT_SIGNED_IN");
@@ -294,9 +322,13 @@ exports.critiqueOutfit = onCall(
       if (!outfitId || outfitId.length > 100) {
         fail("BAD_REQUEST");
       }
-      return finish("critiqueOutfit", correlationId, uid, start, await critiqueOutfit(uid, outfitId));
+      usageBase.refId = outfitId;
+      const result = await critiqueOutfit(uid, outfitId, undefined, aiTracker.hooks);
+      await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: true });
+      return finish("critiqueOutfit", correlationId, uid, start, result);
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
+      await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
       boundary("critiqueOutfit", correlationId, uid, err);
     }
   }
@@ -313,6 +345,10 @@ exports.parseOutfitPhoto = onCall(
     const correlationId = newCorrelationId();
     const uid = request.auth ? request.auth.uid : null;
     const start = Date.now();
+    // OBS-3b: AI usage tracking for this request (flushed below).
+    const aiTracker = createAiTracker();
+    const recordUsage = makeUsageRecorder(getFirestore());
+    const usageBase = { correlationId, uid, feature: "parseOutfitPhoto", surface: "upload", refId: null };
     try {
       if (!request.auth) {
         fail("NOT_SIGNED_IN");
@@ -322,9 +358,13 @@ exports.parseOutfitPhoto = onCall(
       if (!storagePath || storagePath.length > 300) {
         fail("BAD_REQUEST");
       }
-      return finish("parseOutfitPhoto", correlationId, uid, start, await parseOutfitPhoto(uid, storagePath));
+      usageBase.refId = storagePath;
+      const result = await parseOutfitPhoto(uid, storagePath, undefined, aiTracker.hooks);
+      await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: true });
+      return finish("parseOutfitPhoto", correlationId, uid, start, result);
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
+      await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
       boundary("parseOutfitPhoto", correlationId, uid, err);
     }
   }
@@ -342,6 +382,10 @@ exports.shopCheck = onCall(
     const correlationId = newCorrelationId();
     const uid = request.auth ? request.auth.uid : null;
     const start = Date.now();
+    // OBS-3b: AI usage tracking for this request (flushed below).
+    const aiTracker = createAiTracker();
+    const recordUsage = makeUsageRecorder(getFirestore());
+    const usageBase = { correlationId, uid, feature: "shopCheck", surface: "shop", refId: null };
     try {
       if (!request.auth) {
         fail("NOT_SIGNED_IN");
@@ -351,9 +395,13 @@ exports.shopCheck = onCall(
       if (!storagePath || storagePath.length > 300) {
         fail("BAD_REQUEST");
       }
-      return finish("shopCheck", correlationId, uid, start, await shopCheck(uid, storagePath));
+      usageBase.refId = storagePath;
+      const result = await shopCheck(uid, storagePath, undefined, aiTracker.hooks);
+      await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: true });
+      return finish("shopCheck", correlationId, uid, start, result);
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
+      await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
       boundary("shopCheck", correlationId, uid, err);
     }
   }
@@ -375,6 +423,10 @@ exports.planPacking = onCall(
     const correlationId = newCorrelationId();
     const uid = request.auth ? request.auth.uid : null;
     const start = Date.now();
+    // OBS-3b: AI usage tracking for this request (flushed below).
+    const aiTracker = createAiTracker();
+    const recordUsage = makeUsageRecorder(getFirestore());
+    const usageBase = { correlationId, uid, feature: "planPacking", surface: "trip", refId: null };
     try {
       if (!request.auth) {
         fail("NOT_SIGNED_IN");
@@ -398,9 +450,12 @@ exports.planPacking = onCall(
       } catch (e) {
         logError("planPacking.vibeProfile", e, { uid: uid, correlationId: correlationId });
       }
-      return finish("planPacking", correlationId, uid, start, await planPacking(items, trip.leg, trip.weatherSummary, trip.notes, vibeProfile));
+      const result = await planPacking(items, trip.leg, trip.weatherSummary, trip.notes, vibeProfile, aiTracker.hooks);
+      await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: true });
+      return finish("planPacking", correlationId, uid, start, result);
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
+      await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
       boundary("planPacking", correlationId, uid, err);
     }
   }

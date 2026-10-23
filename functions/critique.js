@@ -15,7 +15,7 @@
 // pollutes pick calibration (predicted confidence vs USER scores only).
 
 const { getFirestore } = require("firebase-admin/firestore");
-const { getClient, MODEL_VERSION } = require("./describe");
+const { getClient, reportUsage, MODEL_VERSION } = require("./describe");
 const { codedError } = require("./errors");
 const { parseScores, confidenceFromScores, itemLine } = require("./stylist");
 
@@ -91,7 +91,7 @@ function parseCritiqueJson(text) {
 // Writes the critique as an app-rater rating (ratingKind "critique").
 // Idempotent: an existing critique for the outfit is returned as-is.
 // db is injectable for tests; defaults to the real Firestore.
-async function critiqueOutfit(uid, outfitId, db) {
+async function critiqueOutfit(uid, outfitId, db, hooks) {
   db = db || getFirestore();
   const outfitSnap = await db.collection("users").doc(uid).collection("outfits").doc(outfitId).get();
   if (!outfitSnap.exists) {
@@ -131,9 +131,11 @@ async function critiqueOutfit(uid, outfitId, db) {
 
   const { model, contents, config } = buildCritiqueRequest(outfit, items, prefs);
   const ai = getClient();
+  const callStart = Date.now();
   let text;
   try {
     const response = await ai.models.generateContent({ model, contents, config });
+    reportUsage(hooks, response, model, callStart);
     text = (response.text || "").trim();
   } catch (err) {
     throw codedError("AI_UNAVAILABLE", "critiqueOutfit: generateContent failed: " + (err && err.message));

@@ -17,7 +17,7 @@
 // validated IDs means no structured outfit (text-only reply).
 
 const { GoogleGenAI } = require("@google/genai");
-const { getClient, logAiFailure, MODEL_VERSION } = require("./describe");
+const { getClient, logAiFailure, reportUsage, MODEL_VERSION } = require("./describe");
 const { codedError } = require("./errors");
 
 const MAX_ITEMS = 500;
@@ -904,13 +904,15 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
   return { model, contents, config };
 }
 
-async function callStylistModel(ai, model, contents, config, label, todayStr) {
+async function callStylistModel(ai, model, contents, config, label, todayStr, hooks) {
+  const callStart = Date.now();
   let response;
   try {
     response = await ai.models.generateContent({ model, contents, config });
   } catch (err) {
     throw codedError("AI_UNAVAILABLE", label + ": generateContent failed: " + (err && err.message));
   }
+  reportUsage(hooks, response, model, callStart);
   const text = (response.text || "").trim();
   if (!text) {
     logAiFailure(label, response);
@@ -921,13 +923,15 @@ async function callStylistModel(ai, model, contents, config, label, todayStr) {
 
 // Sprint 16 (TRIPCHAT-1): trip-mode call. A tool-only response has no
 // text — that is fine as long as a function call came through.
-async function callStylistModelTrip(ai, model, contents, config) {
+async function callStylistModelTrip(ai, model, contents, config, hooks) {
+  const callStart = Date.now();
   let response;
   try {
     response = await ai.models.generateContent({ model, contents, config });
   } catch (err) {
     throw codedError("AI_UNAVAILABLE", "askStylist(trip): generateContent failed: " + (err && err.message));
   }
+  reportUsage(hooks, response, model, callStart);
   const toolCalls = extractToolCalls(response);
   const text = (response.text || "").trim();
   if (!toolCalls.length && !text) {
@@ -1057,7 +1061,7 @@ function unwrapJsonReply(text) {
 }
 
 // here; the client re-validates on execute.
-async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today) {
+async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, hooks) {
   const todayStr = /^\d{4}-\d{2}-\d{2}$/.test(today || "")
     ? today
     : new Date().toISOString().slice(0, 10);
@@ -1066,7 +1070,7 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
   if (tripContext) {
     // Trip mode: the tools are independent — a packing change and a
     // preference pin can land in the same turn. Process both.
-    let { text, toolCalls } = await callStylistModelTrip(ai, model, contents, config);
+    let { text, toolCalls } = await callStylistModelTrip(ai, model, contents, config, hooks);
     const updCall = toolCalls.find((c) => c.name === "updateTripPacking");
     const pinCall = toolCalls.find((c) => c.name === "pinContext");
     const sugCall = toolCalls.find((c) => c.name === "suggestTripOutfits");
@@ -1083,7 +1087,7 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
         role: "user",
         parts: [{ text: "Your packing update didn't go through — the articles didn't match the wardrobe. Call updateTripPacking again using the EXACT [iN] handles from the wardrobe list above (e.g. [i3]), every piece with a reason, and include a short sentence of prose saying what changed." }],
       }]);
-      const retry = await callStylistModelTrip(ai, model, retryContents, config);
+      const retry = await callStylistModelTrip(ai, model, retryContents, config, hooks);
       text = retry.text || text;
       for (const c of retry.toolCalls) {
         if (!mappedCall && c.name === "updateTripPacking") {
@@ -1119,7 +1123,7 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
     }
     return { reply: text, toolCall: mappedCall, pinProposal: pinProposal, outfitSuggestions: outfitSuggestions };
   }
-  let parsed = await callStylistModel(ai, model, contents, config, "askStylist", todayStr);
+  let parsed = await callStylistModel(ai, model, contents, config, "askStylist", todayStr, hooks);
 
   // Slot validation with ONE repair attempt. The repair shows the model
   // its own answer plus what's wrong with it.
@@ -1131,7 +1135,7 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
       { role: "user", parts: [{ text: "That outfit doesn't work: " + (problem || "the handles didn't match the wardrobe") + ". Choose again using only wardrobe handles, following all rules." }] },
     ]);
     try {
-      parsed = await callStylistModel(ai, model, repairContents, config, "askStylist-repair", todayStr);
+      parsed = await callStylistModel(ai, model, repairContents, config, "askStylist-repair", todayStr, hooks);
       mapped = parsed.outfit ? mapHandlesToIds(parsed.outfit, items) : null;
       problem = parsed.outfit ? validateSlots(mapped || [], items) : null;
     } catch (e) {

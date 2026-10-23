@@ -140,6 +140,25 @@ function parseModelJson(text) {
   };
 }
 
+// OBS-3b: normalize one generateContent response into an
+// ai_usage call record and hand it to the caller's tracker hook
+// (usage.js createAiTracker). Every AI module reports through
+// this one function so token fields mean the same thing
+// everywhere. No-op when no hook was passed — instrumentation is
+// always optional for callers and tests.
+function reportUsage(hooks, response, model, startMs) {
+  if (!hooks || typeof hooks.onUsage !== "function") return;
+  const u = (response && response.usageMetadata) || {};
+  hooks.onUsage({
+    provider: "vertex",
+    model,
+    tokensIn: typeof u.promptTokenCount === "number" ? u.promptTokenCount : null,
+    tokensOut: typeof u.candidatesTokenCount === "number" ? u.candidatesTokenCount : null,
+    tokensThinking: typeof u.thoughtsTokenCount === "number" ? u.thoughtsTokenCount : null,
+    latencyMs: Date.now() - startMs,
+  });
+}
+
 let client = null;
 function getClient() {
   if (client) return client;
@@ -156,8 +175,9 @@ function getClient() {
 // client photo identifiers (which photos were analyzed — hook for the
 // future multi-photo garment model). Returns the validated shape plus
 // analysis metadata (v2 raw cache).
-async function describeImage(imageBuffer, mimeType, photoIds) {
+async function describeImage(imageBuffer, mimeType, photoIds, hooks) {
   const model = process.env.GEMINI_MODEL || MODEL_VERSION;
+  const callStart = Date.now();
   let response;
   try {
     const ai = getClient();
@@ -188,6 +208,7 @@ async function describeImage(imageBuffer, mimeType, photoIds) {
     // Network, auth, quota, model errors — a downstream failure, not our bug.
     throw codedError("AI_UNAVAILABLE", "describeItem: generateContent failed: " + (err && err.message));
   }
+  reportUsage(hooks, response, model, callStart);
   if (!response || !response.text || !response.text.trim()) {
     logAiFailure("describeItem", response);
     throw codedError("AI_BAD_RESPONSE", "describeItem: model returned no text");
@@ -221,4 +242,4 @@ function logAiFailure(label, response) {
   } catch (e) { /* logging must never throw */ }
 }
 
-module.exports = { describeImage, parseModelJson, getClient, logAiFailure, MODEL_VERSION, PROMPT, CATEGORIES, STYLE_TAGS };
+module.exports = { describeImage, parseModelJson, getClient, logAiFailure, reportUsage, MODEL_VERSION, PROMPT, CATEGORIES, STYLE_TAGS };

@@ -9,7 +9,7 @@
 // Reuses the stylist's handle machinery (itemLine/mapHandlesToIds) so the
 // model reasons over the same grounded vocabulary.
 
-const { getClient, logAiFailure, MODEL_VERSION } = require("./describe");
+const { getClient, logAiFailure, reportUsage, MODEL_VERSION } = require("./describe");
 const { codedError } = require("./errors");
 const { itemLine, mapHandlesToIds, cleanText, sanitizeItems, sanitizeVibeProfile } = require("./stylist");
 
@@ -147,15 +147,17 @@ function planPackingResult(parsed, items) {
   };
 }
 
-async function planPacking(items, leg, weatherSummary, notes, vibeProfile) {
+async function planPacking(items, leg, weatherSummary, notes, vibeProfile, hooks) {
   const { model, contents, config } = buildPackingRequest(items, leg, weatherSummary, notes, vibeProfile);
   const ai = getClient();
+  const callStart = Date.now();
   let response;
   try {
     response = await ai.models.generateContent({ model, contents, config });
   } catch (err) {
     throw codedError("AI_UNAVAILABLE", "planPacking: generateContent failed: " + (err && err.message));
   }
+  reportUsage(hooks, response, model, callStart);
   const text = (response.text || "").trim();
   if (!text) {
     logAiFailure("planPacking", response);

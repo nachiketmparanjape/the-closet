@@ -12,3 +12,4 @@ deploy-update.js
 deploy-create.js
 deploy-create-extract.js
 metrics.js
+usage-report.js

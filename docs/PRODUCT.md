@@ -197,3 +197,18 @@ Decided topics stay as compact records; full reports live in `research_notes/`.
   a ~20-photo Photoroom trial on the founder's real bed/carpet
   photos (quality + latency), then the PC-34 build and the
   PC-36 prototype get pulled through planning.
+- **Amendment (founder, 2026-10-23) — provider decision
+  superseded:** the trial ran (Photoroom, quality confirmed),
+  the build landed behind the seam, and then the founder held
+  on Photoroom's $20/mo floor and asked for a BiRefNet
+  comparison on the same photos. Result: parity overall,
+  BiRefNet stronger on translucent lenses. **Founder's call:
+  BiRefNet via Replicate (no monthly floor) behind the same
+  seam.** The full package was built the same day: provider
+  swap, EXIF orientation baked in server-side, a two-layer
+  quality gate (mask heuristics + a Gemini vision check; only
+  passed renders are ever displayed), first-photo-only
+  extraction scope, and ai_usage cost events on both AI calls
+  (OBS-3a). Remaining: the founder adds his Replicate token
+  to Secret Manager, the callable deploys, one live smoke
+  call, and his phone validation.

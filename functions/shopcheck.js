@@ -12,7 +12,7 @@
 
 const { getFirestore } = require("firebase-admin/firestore");
 const { getStorage } = require("firebase-admin/storage");
-const { getClient, MODEL_VERSION, CATEGORIES } = require("./describe");
+const { getClient, reportUsage, MODEL_VERSION, CATEGORIES } = require("./describe");
 const { codedError } = require("./errors");
 const { cleanText } = require("./stylist");
 
@@ -149,7 +149,7 @@ function parseShopCheckJson(text, validIds) {
 
 // Handler: (uid, storagePath, db?) -> shop-check result.
 // db injectable for tests; Storage always real (photo bytes needed).
-async function shopCheck(uid, storagePath, db) {
+async function shopCheck(uid, storagePath, db, hooks) {
   if (typeof storagePath !== "string" || !storagePath.startsWith("users/" + uid + "/shop-checks/")) {
     throw codedError("NOT_YOUR_PHOTO", "shopCheck: bad storage path");
   }
@@ -173,10 +173,12 @@ async function shopCheck(uid, storagePath, db) {
   const { model, contents, config } = buildShopCheckRequest(
     buffer.toString("base64"), metadata.contentType || "image/jpeg", items
   );
+  const callStart = Date.now();
   let text;
   try {
     const ai = getClient();
     const response = await ai.models.generateContent({ model, contents, config });
+    reportUsage(hooks, response, model, callStart);
     text = (response.text || "").trim();
   } catch (err) {
     throw codedError("AI_UNAVAILABLE", "shopCheck: generateContent failed: " + (err && err.message));

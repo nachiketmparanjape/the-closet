@@ -1,8 +1,10 @@
 # Observability & AI cost analytics — Closet
 
 Living spec for how the app watches itself: errors, success rates,
-and AI spend. Proposal v1, 2026-10-23 (Bramble), awaiting founder
-validation. Cards: OBS-1 (shipped 2026-10-19), OBS-2 (error
+and AI spend. Proposed 2026-10-23 (Bramble); validated by the
+founder the same day, who chose full instrumentation in one pass.
+OBS-3a/3b/3c built 2026-10-23 (see the OBS-3 card for the build
+record). Cards: OBS-1 (shipped 2026-10-19), OBS-2 (error
 quality), OBS-3 (this doc's cost lens).
 
 ## What exists today (2026-10-23)

@@ -277,8 +277,22 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   the PC-34 build); 3b retrofit the seven existing callables;
   3c the report. Sibling to OBS-2 (error quality) — same
   events philosophy, cost lens instead of failure lens.
-- **Status:** Proposal written 2026-10-23, awaiting founder
-  validation + sequencing call. Not started as a build.
+- **Status:** Validated by the founder 2026-10-23 with the
+  widest sequencing: all three slices in one pass alongside
+  PC-34. Built 2026-10-23 — `functions/usage.js` +
+  `functions/pricing.js` (PRICING_VERSION 2026-10-23.v1;
+  gemini-3.5-flash at the corroborated $1.50/$9.00 per 1M,
+  BiRefNet at the T4 per-second rate), events on extract's
+  two calls plus all seven existing callables (per-call
+  tracker threaded through each module; one event per model
+  call, so multi-call stylist turns attribute honestly), and
+  `usage-report.js` (local, gitignored like metrics.js):
+  spend by feature × provider × model, success/error rates
+  beside cost, unit economics per catalogued item / stylist
+  turn / passed extraction, month-to-date vs a --budget
+  figure. Firestore rules deny client access to `ai_usage`
+  (admin-side reads only). Suite green at 256. Data starts
+  accumulating with the first AI call after the redeploys.
 
 ### PC-32: Chat threads — side chats per context (M)
 - **Idea (founder 2026-10-19):** one chat for everything mixes
@@ -499,6 +513,27 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   BiRefNet is chosen, the pending sandbox-key paste is moot
   and a Replicate token via the same secure-paste pattern
   takes its place.
+  **Founder chose BiRefNet via Replicate 2026-10-23**, and
+  approved the full package in the same pass: orientation
+  baked into the pixels server-side before the provider call
+  (with an aspect assertion in the gate, so a rotated render
+  can never pass silently); a two-layer quality gate — mask
+  heuristics, then a Gemini vision check on the cutout
+  composited over magenta — where the client only ever
+  points a photo at a passed render and a rejection leaves
+  the original showing; extraction scoped to each item's
+  first photo (the only photo any surface displays); both
+  AI calls emitting ai_usage events (OBS-3a). Built
+  2026-10-23: `functions/birefnet.js` replaces
+  `functions/photoroom.js` behind the seam, the
+  `REPLICATE_API_TOKEN` secret exists with its accessor
+  grant (no version yet — the token value is the founder's
+  laptop step), the client side is deployed, and the suite
+  is green at 256. Remaining before this can run live: the
+  founder adds the token version, Bramble deploys
+  `extractGarment`, one smoke call verifies the model id /
+  input name / hardware rate against the real API, and the
+  founder's phone validation is the final gate.
 
 ### PC-36: Photo of a person → individual articles + the outfit
 - **Size:** Spike shared with PC-34, then size from findings

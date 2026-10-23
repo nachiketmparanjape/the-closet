@@ -9,7 +9,7 @@
 "use strict";
 
 const { GoogleGenAI } = require("@google/genai");
-const { getClient, logAiFailure, MODEL_VERSION } = require("./describe");
+const { getClient, logAiFailure, reportUsage, MODEL_VERSION } = require("./describe");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { codedError } = require("./errors");
 
@@ -61,7 +61,7 @@ function parseReflectionJson(text) {
 // ratingId: the user's rating doc id (users/{uid}/ratings/{ratingId}).
 // Returns { reflection, suggestedPreference } and persists the app's
 // reflection as a sibling rating (rater: "app").
-async function reflectOutfit(uid, ratingId) {
+async function reflectOutfit(uid, ratingId, hooks) {
   const db = getFirestore();
   const ratingRef = db.collection("users").doc(uid).collection("ratings").doc(ratingId);
   const ratingSnap = await ratingRef.get();
@@ -139,6 +139,7 @@ async function reflectOutfit(uid, ratingId) {
     (historyLines.length
       ? "\n\nRECENT RATINGS (newest first) — distinguish explicit preferences and repeated patterns from one-offs:\n" + historyLines.join("\n")
       : "\n\nNo earlier ratings yet — treat this as a single data point, not a pattern.");
+  const callStart = Date.now();
   let response;
   try {
     const ai = getClient();
@@ -156,6 +157,7 @@ async function reflectOutfit(uid, ratingId) {
   } catch (err) {
     throw codedError("AI_UNAVAILABLE", "reflectOutfit: generateContent failed: " + (err && err.message));
   }
+  reportUsage(hooks, response, model, callStart);
   const text = (response.text || "").trim();
   if (!text) {
     logAiFailure("reflectOutfit", response);
