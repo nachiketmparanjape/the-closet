@@ -123,7 +123,14 @@ async function segmentImage(buffer, mimeType, apiKey, fetchImpl, opts) {
   if (png.length === 0) {
     throw codedError("EXTRACT_FAILED", "replicate returned an empty image");
   }
-  return { png, uncertainty: null };
+  // predict_time is what Replicate bills on; extract.js records it
+  // on the ai_usage event (OBS-3a) and pricing.js turns it into
+  // the USD estimate.
+  const predictSeconds =
+    prediction.metrics && typeof prediction.metrics.predict_time === "number"
+      ? prediction.metrics.predict_time
+      : null;
+  return { png, uncertainty: null, predictSeconds };
 }
 
 async function readPrediction(res, stage) {

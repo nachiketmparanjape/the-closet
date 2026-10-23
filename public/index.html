@@ -1970,18 +1970,21 @@
 
       // PC-34: ask the server to extract a clean render of one saved
       // photo. Fire-and-forget — the callable reads the ORIGINAL from
-      // Storage (never modifies it) and stores a cutout render; on
-      // success the render is noted on the photo entry and display
-      // picks it up via photoDisplayUrl. Any failure is silent: the
-      // original keeps showing. The PC-19 phash is computed from the
-      // original at selection time and is never touched here.
+      // Storage (never modifies it), stores a cutout render, and runs
+      // the quality gate. The render is noted on the photo entry ONLY
+      // when the gate passed; a rejection just records renderStatus
+      // and display keeps the original (photoDisplayUrl falls back).
+      // Any failure is silent: the original keeps showing. The PC-19
+      // phash is computed from the original at selection time and is
+      // never touched here. Callers fire this for the item's FIRST
+      // photo only — every display surface renders photos[0].
       function requestPhotoRender(itemId, storagePath) {
         if (!functions || !currentUser || !itemId || !storagePath) return;
         functions.httpsCallable("extractGarment")({ storagePath: storagePath }).then(function (res) {
           var d = (res && res.data) || {};
           if (!d.renderStoragePath) return null;
-          return storage.ref().child(d.renderStoragePath).getDownloadURL().then(function (renderUrl) {
-            var ref = db.collection("users").doc(currentUser.uid).collection("items").doc(itemId);
+          var ref = db.collection("users").doc(currentUser.uid).collection("items").doc(itemId);
+          function patchPhotos(extra) {
             return ref.get().then(function (snap) {
               if (!snap.exists) return null;
               var data = snap.data() || {};
@@ -1989,12 +1992,21 @@
                 if (p.storagePath !== storagePath) return p;
                 var copy = {};
                 Object.keys(p).forEach(function (k) { copy[k] = p[k]; });
-                copy.renderUrl = renderUrl;
-                copy.renderStoragePath = d.renderStoragePath;
-                copy.renderUncertainty = typeof d.uncertainty === "number" ? d.uncertainty : null;
+                Object.keys(extra).forEach(function (k) { copy[k] = extra[k]; });
                 return copy;
               });
               return ref.update({ photos: photos });
+            });
+          }
+          if (d.gatePassed === false) {
+            return patchPhotos({ renderStatus: "rejected" });
+          }
+          return storage.ref().child(d.renderStoragePath).getDownloadURL().then(function (renderUrl) {
+            return patchPhotos({
+              renderUrl: renderUrl,
+              renderStoragePath: d.renderStoragePath,
+              renderUncertainty: typeof d.uncertainty === "number" ? d.uncertainty : null,
+              renderStatus: "passed"
             });
           });
         }).catch(function (err) {
@@ -2289,7 +2301,10 @@
           if (failed) return;
           if (idx >= files.length) {
             persistPhotos(existing.concat(newPhotos)).then(function () {
-              newPhotos.forEach(function (p) { requestPhotoRender(activeItem.id, p.storagePath); });
+              // PC-34 scope: extraction runs for the item's first
+              // photo only — fire just when this batch BECAME the
+              // first photo (the item had none before).
+              if (!existing.length && newPhotos.length) requestPhotoRender(activeItem.id, newPhotos[0].storagePath);
               addBtn.disabled = false;
               showToast("Photo added.");
             }).catch(function (error) {
@@ -2852,7 +2867,8 @@
             uploadSubmit.disabled = false;
             closeOverlay(uploadOverlay);
             showToast("Piece added to your wardrobe.");
-            photos.forEach(function (p) { requestPhotoRender(docRef.id, p.storagePath); });
+            // PC-34 scope: first photo only (every surface shows photos[0]).
+            if (photos.length) requestPhotoRender(docRef.id, photos[0].storagePath);
             maybeNudgeUpgrade();
           }).catch(function (error) {
             cleanupUploads();

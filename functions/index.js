@@ -23,6 +23,7 @@ const { critiqueOutfit } = require("./critique");
 const { parseOutfitPhoto } = require("./photo");
 const { shopCheck } = require("./shopcheck");
 const { extractGarmentPhoto } = require("./extract");
+const { makeUsageRecorder } = require("./usage");
 // Sprint 15 (PC-29 Phase 1): trip packing. sanitizeItems/sanitizeVibeProfile
 // come from ./stylist (already imported above); only the trip-specific
 // pieces live here.
@@ -115,19 +116,22 @@ exports.describeItem = onCall(
   }
 );
 
-// PC-34: garment extraction. The client sends the Storage path of a
-// photo it already uploaded; the function reads the original (never
-// writes to it), stores a clean cutout render at a deterministic
-// path, and returns that path plus the provider uncertainty score.
-// The API key lives in Secret Manager (PHOTOROOM_API_KEY), bound in
-// the deploy script's serviceConfig — never in code or the client.
+// PC-34: garment extraction (BiRefNet via Replicate, founder's
+// provider call 2026-10-23). The client sends the Storage path of
+// a photo it already uploaded; the function reads the original
+// (never writes to it), bakes in its EXIF orientation, stores a
+// clean cutout render at a deterministic path, runs the two-layer
+// quality gate, and returns the path + gate verdict — the client
+// only displays a render that passed. The API token lives in
+// Secret Manager (REPLICATE_API_TOKEN), bound in the deploy
+// script's serviceConfig — never in code or the client.
 exports.extractGarment = onCall(
   {
     region: "us-central1",
     timeoutSeconds: 120,
-    memory: "512MiB",
+    memory: "1GiB",
     maxInstances: 5,
-    secrets: ["PHOTOROOM_API_KEY"],
+    secrets: ["REPLICATE_API_TOKEN"],
   },
   async (request) => {
     const correlationId = newCorrelationId();
@@ -143,7 +147,9 @@ exports.extractGarment = onCall(
       }
       const result = await extractGarmentPhoto(uid, data.storagePath, {
         bucket: getStorage().bucket(),
-        apiKey: process.env.PHOTOROOM_API_KEY || null,
+        apiKey: process.env.REPLICATE_API_TOKEN || null,
+        correlationId,
+        recordUsage: makeUsageRecorder(getFirestore()),
       });
       return finish("extractGarment", correlationId, uid, start, result);
     } catch (err) {

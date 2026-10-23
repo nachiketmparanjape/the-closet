@@ -123,5 +123,11 @@ service cloud.firestore {
         && request.resource.data.text.size() <= 5000;
       allow read, update, delete: if false;
     }
+    // OBS-3: AI usage events (cost attribution). Written server-side
+    // only (Admin SDK); reads happen admin-side (usage report /
+    // console), never via the app — same posture as client_errors.
+    match /ai_usage/{eventId} {
+      allow read, create, update, delete: if false;
+    }
   }
 }

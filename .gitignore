@@ -10,4 +10,5 @@ firebase-debug.log
 check-iam.js
 deploy-update.js
 deploy-create.js
+deploy-create-extract.js
 metrics.js
