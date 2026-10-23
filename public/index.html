@@ -208,7 +208,13 @@
     .pin-proposal-actions button { flex: 1; }
     .pin-chip { display: inline-block; font-size: 13px; font-weight: 500; color: var(--ink); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; margin-left: 8px; vertical-align: middle; white-space: nowrap; }
     .chat-list { display: flex; flex-direction: column; gap: 8px; max-height: 52vh; overflow-y: auto; margin: 0 0 12px; }
-    .chat-msg { max-width: 88%; padding: 9px 13px; border-radius: 14px; font-size: 14px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: break-word; }
+    .chat-msg { max-width: 88%; padding: 9px 13px; border-radius: var(--r-md); font-size: 15px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: break-word; }
+    /* DESIGN-CHAT-1 (§10): the chat's first-run moment — serif, one
+       payoff word in italic brass (§10 A2). */
+    .chat-empty { padding: 18px 4px 12px; }
+    .chat-empty-title { font-family: "Closet Serif", serif; font-size: 22px; font-weight: 500; line-height: 1.28; margin: 0; }
+    .chat-empty-title em { font-style: italic; color: var(--accent-dark); }
+    .chat-empty-hint { font-size: 13px; color: var(--muted); margin: 8px 0 0; line-height: 1.5; }
     .chat-msg.user { align-self: flex-end; background: var(--ink); color: var(--bg); border-bottom-right-radius: 4px; }
     .chat-msg.model { align-self: flex-start; background: var(--paper-soft); color: var(--ink); border-bottom-left-radius: 4px; }
     .chat-msg.thinking { color: var(--muted); font-style: italic; }
@@ -222,7 +228,7 @@
     .chat-ref-chip.static { cursor: default; }
     .chat-ref-opt { display: block; width: 100%; text-align: left; border: none; background: transparent; color: var(--ink); padding: 8px 12px; font-size: 14px; cursor: pointer; }
     .chat-ref-opt:hover, .chat-ref-opt.active { background: var(--accent-soft); }
-    .chat-input-row input { flex: 1; min-width: 0; min-height: 46px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--paper); color: var(--ink); padding: 10px 12px; outline: none; }
+    .chat-input-row input { flex: 1; min-width: 0; min-height: 46px; border: 1px solid var(--line-strong); border-radius: var(--r-sm); background: var(--paper); color: var(--ink); padding: 10px 12px; outline: none; }
     .chat-input-row input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
     .pal-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 8px; min-height: 30px; }
     .pal-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 4px 6px 4px 4px; border-radius: 99px; background: var(--paper-soft); border: 1px solid var(--line); }
@@ -291,7 +297,7 @@
     /* Fix buffer 5 (founder): the stylist docks — bottom sheet on phone,
        right-edge panel on desktop. Never a floating card mid-screen. */
     #chatOverlay { place-items: end center; padding: 0; }
-    #chatOverlay .modal { width: 100%; max-height: 92dvh; border-radius: 20px 20px 0 0; }
+    #chatOverlay .modal { width: 100%; max-height: 92dvh; border-radius: var(--r-lg) var(--r-lg) 0 0; }
     @media (min-width: 900px) {
       #chatOverlay { place-items: stretch end; }
       #chatOverlay .modal { width: 420px; height: 100%; max-height: none; border-radius: 0; }
@@ -3412,6 +3418,21 @@
 
       function renderChat() {
         chatList.textContent = "";
+        if (!stylistMessages.length) {
+          // DESIGN-CHAT-1: an empty chat opens like a magazine, not a
+          // blank log — serif headline, one italic-brass payoff word.
+          var empty = document.createElement("div");
+          empty.className = "chat-empty";
+          var title = document.createElement("p");
+          title.className = "chat-empty-title";
+          title.appendChild(document.createTextNode("Tell me the occasion — I'll dress you "));
+          var em = document.createElement("em");
+          em.textContent = "beautifully.";
+          title.appendChild(em);
+          empty.appendChild(title);
+          empty.appendChild(shopCheckEl("p", "chat-empty-hint", "Built entirely from what's already in your closet. Try “casual dinner, 60°F” — or tap @ to point at a specific piece or outfit."));
+          chatList.appendChild(empty);
+        }
         stylistMessages.forEach(function (m) {
           var div = document.createElement("div");
           div.className = "chat-msg " + m.role + (m.thinking ? " thinking" : "");

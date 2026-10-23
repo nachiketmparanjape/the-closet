@@ -159,4 +159,9 @@ work re-plans as waves; DESIGN-CHAT-1 folds in as W5.
   refinement parked: hero by wear-count once item-level wear
   aggregation exists (wear data is outfit-level today).
 - **W5 DESIGN-CHAT-1** — as originally carded, now on the
-  finished §10 system.
+  finished §10 system. Built + deployed 2026-10-23 (hosting
+  release 1792791599670000; client-only): bubbles onto the
+  radius token + Body size, chat sheet corners on --r-lg,
+  composer input on --r-sm, and an empty-chat opening moment
+  (serif headline, one italic-brass payoff word per §10 A2).
+  Modal heads were already serif — no header work needed.
