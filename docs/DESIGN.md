@@ -75,6 +75,9 @@ Honest state of `public/index.html` today:
 
 Keep the existing identity (D1). Code refers to roles only; the
 hexes live in one `:root` block (light) + one dark mapping.
+**Superseded 2026-10-23 by §10 (Warm Editorial)** — the table
+below is the v1 Gallery identity, kept for the record; §10's
+table is the live one.
 
 | Role | Light | Dark | Used for |
 |---|---|---|---|
@@ -507,3 +510,139 @@ components above are the spec it must reproduce.
   Principle 2 keeps pointing at it. Founder's call, separately.
 - An icon set for the tab bar (replacing text-only tabs)
   rides with the framework decision; text tabs are v1-honest.
+
+## 10. Amendment — Warm Editorial (2026-10-23, founder-delegated)
+
+**Mandate.** After the Combina aesthetic study
+(`research_notes/closet-combina-aesthetic.md`), the founder
+delegated design decisions outright: lean into high-quality
+design, reference any high-adoption design-led app, Bramble
+decides and iterates "until I'm happy with it." This amendment
+is the decision record for that mandate (the A-decisions),
+written to the same standard as §7: why, plus what else was on
+the table. Category cross-checks (Indyx, Whering, Acloset —
+real adoption, per 2026 roundups) confirm the baseline moves:
+cutout imagery as the catalogue standard, clean editorial
+grids, analytics worn lightly. Combina contributes the
+register and the components; the category contributes the
+proof that clean catalogues retain.
+
+**A1 — Temperature: warm wins; dark is the primary theme.**
+Ivory / espresso / brass replaces Gallery's cool blue-grey.
+Why: fashion reads warm — every design-led reference in the
+category (Combina, Indyx's editorial flatlays, Whering's
+"best static UI") works in warm neutrals with restrained
+accents, while blue-grey reads "productivity tool." Brass is
+the quietest luxury signal available and the most unisex;
+it also never competes with garment colors (Principle 1).
+Dark is designed first, not inverted as an afterthought: the
+founder's default is dark, so espresso *is* the product and
+ivory is its sibling. Alternatives: keep Gallery (rejected —
+tech register, and the founder's adoption bar points the
+other way); revive the pre-Sprint-18 raspberry (rejected —
+playful, gendered, fights warm garments); true black + white
+minimalism (rejected — cold, and wastes the serif).
+
+| Role | Light (Ivory) | Dark (Espresso) |
+|---|---|---|
+| `--bg` | `#f2ebdb` | `#16120d` |
+| `--paper` | `#fdfaf1` | `#211a12` |
+| `--paper-soft` | `#e9dfc8` | `#2b2317` |
+| `--ink` | `#1e1710` | `#f2e9d8` |
+| `--muted` | `#6f6350` | `#b3a68d` |
+| `--muted-strong` | `#4f4433` | `#d3c6ab` |
+| `--faint` | `#96876c` | `#8d8172` |
+| `--line` | `#ddd0b2` | `#3a3122` |
+| `--line-strong` | `#bfae8c` | `#5a4c33` |
+| `--accent` | `#a87c1c` | `#dfae54` |
+| `--accent-dark` | `#85600f` | `#f0c778` |
+| `--accent-soft` | `#efe3c2` | `#37290f` |
+| `--sage` / `--sage-ink` | `#e2e5d2` / `#44512f` | `#27331f` / `#c4d8b2` |
+| `--danger` | `#b3263e` | `#ff8296` |
+| `--black` / `--on-black` | `#171208` / `#f7efdd` | `#f2e9d8` / `#171208` |
+| `--shadow` | `0 18px 50px rgba(46,34,10,.12)` | `0 18px 55px rgba(0,0,0,.45)` |
+
+Contrast discipline (critique-applied): brass `--accent` is
+for fills, large text, and graphic accents; small accent
+*text* uses `--accent-dark` (≥5.9:1 on ivory, brighter brass
+on espresso). Nothing wears accent except act/attend (D7
+unchanged).
+
+**A2 — Type voice: the payoff word.** The serif gains one
+rule, stolen from Combina's headlines: in hero/empty-state/
+feature moments, set the emotional word in *italic serif*,
+accent-colored — sparingly (one per surface, or it becomes
+noise). Screen titles stay serif roman. Two new styles:
+**LookName** (serif, letterspaced +0.04em, Title size) for
+named outfits, and **Note** (serif italic, Body size) for
+stylist rationale wherever it appears. Alternatives: script
+accent (Combina's Notes pill) — rejected for now, no script
+family in the self-hosted set and it skews the register;
+all-italic rationale in chat — rejected, italics fatigue at
+paragraph length; Note style is for the composed sheet (A4).
+
+**A3 — Outfits get names (the masthead).** The stylist
+returns a `lookName` + `tagline` with every pick; Today and
+the outfit detail render a masthead: eyebrow ("Today's
+feature"), LookName, italic tagline, then the pieces. Why:
+a named look is a *thing* — memorable, saveable, shareable —
+where "today's outfit" is a list. This is the single highest
+quality-per-effort move in the study. Alternatives: names
+only on save (rejected — the name is what makes the morning
+moment); auto-names from a template bank (rejected — the
+model already writes the rationale; a name + 3–6 word
+tagline rides the same call, tracked by OBS-3).
+
+**A4 — Explanation is composed: the Behind-the-Look sheet.**
+Critique/reflection content renders as a bento sheet, not
+chat prose: rationale (Note style) up top; then small cards
+— palette (item color dots on a ring, "color orbit"), a
+material note, a proportion/silhouette note, the weather
+slide-card, the mood/story chip. Data already exists across
+describe tags + critique output; this is presentation, plus
+one structured field from the critique prompt. Alternatives:
+keep prose, restyle it (rejected — prose is why explanations
+feel cheap; the artifact is the difference); generate a
+rendered image card (rejected — text must stay selectable,
+translatable, and cheap).
+
+**A5 — Wardrobe opens as a category masonry.** Two staggered
+columns of category cards, each with ONE hero piece on a
+`--paper` card and a serif label — tap through to the
+existing item grid (DESIGN-GRID-1 stands, one level down).
+Why: recognition over inventory; a 69-item grid is a
+database, a category wall is a closet door. Hero = the
+category's most-worn piece with a passed PC-34 render when
+one exists, else its best photo (honest fallback; cutouts
+take over as renders accumulate). Alternatives: masonry of
+all items Pinterest-style (rejected — chaos at 69 items,
+and it orphans the grid work); keep grid-first (rejected —
+it's the "database" feel the founder keeps flagging).
+
+**Component notes (from the Combina UI inventory).**
+Story chips: named-mood chips (from vibe/style tags); the
+selected chip is a brass fill with ink text — never an
+outline. Day strip: rounded-square day cells, today gets a
+brass ring, planned days a filled dot; serves trips and any
+future plan-ahead. Weather becomes a slide-card (photo sky
++ temperature) inside sheets, stays a quiet line inline.
+Glass pills (frosted, on photos) are reserved for actions
+floating on imagery — masthead only. Radius: cards move
+14 → 18 and sheets 20 → 24 in the W2 pass (the references
+are visibly rounder; §2.3 amends then, with the screens).
+
+**Waves.** W1 tokens + type voice (this amendment's build).
+W2 named looks (stylist fields + masthead) + radius pass.
+W3 Behind-the-Look sheet. W4 category masonry. W5 chat
+re-skin (Sprint 18's DESIGN-CHAT-1) on the finished system.
+Each wave is its own card, phone-validated before the next
+is called done — "verified" means the founder's phone.
+
+**Critique applied before building** (delegated-authority
+rounds, logged in the sprint file): brass-on-ivory small
+text (fixed via accent-dark rule); warm-dark + photo-heavy
+surfaces (garment colors gain saturation against espresso —
+desirable); masonry without cutouts (fallback specced in
+A5, not hand-waved); letterspaced caps shouting (LookName
+capped at Title size); renaming everything at once (names
+land per-wave with their components, not as a find-replace).

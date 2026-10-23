@@ -117,3 +117,28 @@ components) rather than competing with it.
 1. Read the explained DESIGN.md; object anywhere taste disagrees
    (the doc is built to be argued with).
 2. Phone-verify the grid re-skin (Card 2) before chat starts.
+
+## Amendment 2026-10-23 — Warm Editorial waves (founder-delegated)
+
+The Combina study (PRODUCT.md research, 2026-10-23) ended with
+the founder delegating design decisions to Bramble outright
+("make all the decisions… until I'm happy with it"). DESIGN.md
+§10 records the decisions (A1–A5). The remaining Sprint 18
+work re-plans as waves; DESIGN-CHAT-1 folds in as W5.
+
+- **W1 DESIGN-WARM-1: tokens + type voice (S)** — §10 token
+  table in both themes, brass discipline, chat user bubble to
+  ink, theme-color metas. Built + deployed 2026-10-23
+  (release 1792790816577000; suite 256/256). Awaiting founder
+  phone verdict — his "happy" is the gate, per the mandate.
+- **W2 DESIGN-LOOK-1: named looks (M)** — stylist returns
+  lookName + tagline; Today + outfit masthead (A3); radius
+  pass (cards 18, sheets 24). Server + client.
+- **W3 DESIGN-NOTE-1: Behind-the-Look sheet (M)** — bento
+  rationale over critique/reflection data (A4); one
+  structured field added to the critique prompt.
+- **W4 DESIGN-MASONRY-1: category-wall wardrobe entry (M)** —
+  A5; hero per category (passed render preferred, photo
+  fallback); item grid stays one level down.
+- **W5 DESIGN-CHAT-1** — as originally carded, now on the
+  finished §10 system.

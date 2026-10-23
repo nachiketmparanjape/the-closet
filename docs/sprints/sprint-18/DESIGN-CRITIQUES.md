@@ -95,3 +95,16 @@ version._
   real reading on a real phone settles.
 - The "Today home" question (round 2, finding 1) is the
   largest known unknown and it is deliberately the founder's.
+
+## v2 amendment critique (2026-10-23, Bramble under delegated authority)
+
+Three passes over the Warm Editorial amendment before W1 built:
+(1) Contrast — brass on ivory fails small text; fixed by the
+accent-dark rule (§10 A1) and moving the chat user bubble to
+ink. (2) Register drift — script accents and all-italic
+rationale both skew feminine/fatiguing; rejected in A2 with
+reasons recorded. (3) Feasibility honesty — category masonry
+presumes cutouts that don't exist yet (PC-34 pending); A5
+specs the photo fallback instead of pretending, and heroes
+upgrade automatically as renders pass the gate. LookName
+letterspacing capped at Title size so mastheads don't shout.
