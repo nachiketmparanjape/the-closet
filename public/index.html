@@ -273,6 +273,12 @@
     .context-line { display: block; width: 100%; text-align: left; background: none; border: none; border-bottom: 1px solid var(--line); padding: 2px 2px 10px; margin-bottom: 10px; font: inherit; font-size: 13px; color: var(--muted); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .context-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
     .context-row-label { font-size: 14px; color: var(--ink); }
+    .context-form { padding: 14px 0 4px; }
+    .context-form-head { font-size: 13px; font-weight: 600; color: var(--ink); margin: 0 0 8px; }
+    .context-kind-row { display: flex; gap: 8px; margin-bottom: 8px; }
+    .context-kind-row button { flex: 1; }
+    .context-form input { display: block; width: 100%; box-sizing: border-box; margin-bottom: 8px; padding: 9px 10px; font: inherit; font-size: 14px; color: var(--ink); background: var(--paper); border: 1px solid var(--line-strong); border-radius: 10px; }
+    .context-form > button.primary { width: 100%; }
     /* UX-18 W4/W5: in-thread system rows (return divider, saved/window notes). */
     .chat-msg.divider, .chat-msg.note { align-self: center; background: none; border: none; color: var(--muted); font-size: 12.5px; text-align: center; padding: 4px 12px; max-width: 85%; }
     .chat-list { display: flex; flex-direction: column; gap: 8px; max-height: 52vh; overflow-y: auto; margin: 0 0 12px; }
@@ -4771,6 +4777,76 @@
         win.className = "hint";
         win.textContent = "The stylist reads the most recent " + STYLIST_WINDOW + " messages of this conversation.";
         list.appendChild(win);
+        // Add permanent context back (founder, 2026-10-24): removal
+        // in this sheet was one-way — a deleted fact could only
+        // return if the stylist happened to propose it again. The
+        // sheet now adds facts directly, in the same document shape
+        // a saved proposal writes.
+        var form = document.createElement("div");
+        form.className = "context-form";
+        var fh = document.createElement("p");
+        fh.className = "context-form-head";
+        fh.textContent = "Add a fact";
+        form.appendChild(fh);
+        var kindState = { kind: "preference" };
+        var kindRow = document.createElement("div");
+        kindRow.className = "context-kind-row";
+        [["preference", "Preference"], ["location", "Place"], ["weather", "Weather"]].forEach(function (pair) {
+          var kb = document.createElement("button");
+          kb.type = "button";
+          kb.className = pair[0] === kindState.kind ? "primary" : "secondary";
+          kb.textContent = pair[1];
+          kb.addEventListener("click", function () {
+            kindState.kind = pair[0];
+            kindRow.querySelectorAll("button").forEach(function (b) { b.className = "secondary"; });
+            kb.className = "primary";
+          });
+          kindRow.appendChild(kb);
+        });
+        form.appendChild(kindRow);
+        var labelIn = document.createElement("input");
+        labelIn.type = "text";
+        labelIn.maxLength = 80;
+        labelIn.placeholder = "The fact — e.g. Runs cold";
+        labelIn.setAttribute("aria-label", "Fact");
+        form.appendChild(labelIn);
+        var detailIn = document.createElement("input");
+        detailIn.type = "text";
+        detailIn.maxLength = 200;
+        detailIn.placeholder = "Details (optional)";
+        detailIn.setAttribute("aria-label", "Fact details");
+        form.appendChild(detailIn);
+        var untilIn = document.createElement("input");
+        untilIn.type = "date";
+        untilIn.setAttribute("aria-label", "Fact applies until (optional)");
+        form.appendChild(untilIn);
+        var addBtn = document.createElement("button");
+        addBtn.type = "button";
+        addBtn.className = "primary";
+        addBtn.textContent = "Add fact";
+        addBtn.addEventListener("click", function () {
+          var label = labelIn.value.trim();
+          if (!label) { showToast("Write the fact first."); labelIn.focus(); return; }
+          addBtn.disabled = true;
+          db.collection("users").doc(currentUser.uid).collection("context_pins").add({
+            kind: kindState.kind,
+            label: label,
+            detail: detailIn.value.trim(),
+            weatherSummary: "",
+            validUntil: untilIn.value || null,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          }).then(function () {
+            showToast("Added — the stylist will use it from your next message.");
+            renderContextLine();
+            openContextSheet();
+          }).catch(function (err) {
+            addBtn.disabled = false;
+            showToast(friendlyError(err));
+          });
+        });
+        form.appendChild(addBtn);
+        list.appendChild(form);
         // UX-18 W4: Start fresh lives here — visible from inside the
         // conversation, two taps (the second is the confirm).
         var freshRow = document.createElement("div");
