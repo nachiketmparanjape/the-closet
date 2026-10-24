@@ -890,3 +890,38 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   next time Account is opened up for other work.
 - **Lane:** Loop (settings/shell). **Effort:** S.
 - **Status:** Parked 2026-10-24 by founder's own call.
+
+### UX-18 — Stylist audit: one experience + architecture pass, founder session
+
+- **Origin:** founder, 2026-10-24 — "the AI stylist feature
+  has a lot of inconsistencies and we need to sit together
+  and sort it out experience-wise and also architecture-wise
+  at some point." NOT a patch queue: a sit-together design
+  session. Patching entry-point semantics piecemeal is the
+  process that produced the inconsistencies.
+- **Exhibit #1 (headline):** today's pick attaches as chat
+  context by default on EVERY general chat open — including
+  a cold open from the Stylist tab, where the founder did
+  not choose it ("not expected"). Entry-aware seeding was
+  never designed; the context fix seeded unconditionally.
+  The pin makes it visible and removable, but the DEFAULT
+  is the open question.
+- **Experience agenda:** every chat entry point and what
+  context it attaches by default (Today ask, Stylist tab,
+  trip page, outfit/item cards, @-refs); what "a fresh chat"
+  means; pin visibility rules (UX-16 folds in here as the
+  audit workstream); the strip vs pin duplication; thread
+  restore semantics.
+- **Architecture agenda:** the context assembly has grown
+  five mechanisms (todayPick, previousPick, @-references,
+  context pins, tripContext) with no single model of
+  precedence or lifetime. Session outcome: one context
+  model — what exists, who wins, when it expires — written
+  into a living design doc (per the complex-systems rule)
+  before any code moves.
+- **Session shape:** Bramble brings the full inventory
+  (entry points × attached context × disagreements) so the
+  session is decisions, not discovery.
+- **Lane:** Stylist. **Effort:** session + follow-on cuts TBD.
+- **Status:** Parked 2026-10-24, awaiting the founder's
+  word to sit down. UX-16's audit folds into this card.
