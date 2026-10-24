@@ -17,7 +17,7 @@ const { initializeApp } = require("firebase-admin/app");
 const { getStorage } = require("firebase-admin/storage");
 const { getFirestore } = require("firebase-admin/firestore");
 const { describeImage } = require("./describe");
-const { askStylist, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeTodayPick, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins } = require("./stylist");
+const { askStylist, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeTodayPick, sanitizeShopItem, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins } = require("./stylist");
 const { reflectOutfit } = require("./reflect");
 const { critiqueOutfit } = require("./critique");
 const { parseOutfitPhoto } = require("./photo");
@@ -213,6 +213,7 @@ exports.askStylist = onCall(
       const messages = sanitizeMessages(data.messages);
       const previousPick = sanitizePreviousPick(data.previousPick);
       const todayPick = sanitizeTodayPick(data.todayPick);
+      const shopItem = sanitizeShopItem(data.shopItem);
       const references = sanitizeReferences(data.references, items);
       const weatherContext = sanitizeWeatherContext(data.weatherContext);
       const vibe = sanitizeVibe(data.vibe);
@@ -286,7 +287,7 @@ exports.askStylist = onCall(
           });
         },
       });
-      const result = await askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, stylistHooks, todayPick);
+      const result = await askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, stylistHooks, todayPick, shopItem);
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: true });
       return finish("askStylist", correlationId, uid, start, result);
     } catch (err) {

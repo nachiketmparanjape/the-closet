@@ -4212,6 +4212,7 @@
         threadManifests = {};
         chatThreadSuggested = {};
         chatAttachByThread = {};
+        chatAttachShopByThread = {};
         if (activeThreadKey !== "general") { activeThreadKey = "general"; stylistMessages = []; }
         if (uid) {
           loadThread("general", function () {
@@ -4282,6 +4283,7 @@
         threadManifests[key] = null;
         threadWindowNoted[key] = false;
         delete chatAttachByThread[key]; // a new conversation starts unattached
+        delete chatAttachShopByThread[key];
         saveThread(key);
         renderChat();
         renderContextLine();
@@ -4648,6 +4650,42 @@
       }
       function detachTodayPick() { delete chatAttachByThread[activeThreadKey]; }
 
+      // Shop attach (founder, 2026-10-24): a shop-check item joins
+      // a conversation the same way the pick does — an explicit act
+      // from a button about the item ("Ask the stylist about this"
+      // on the check result and the saved check), scoped to one
+      // conversation, refreshed for every new one, removable from
+      // the context sheet. The stylist can then answer follow-ups
+      // with the check's facts in the brief; the item stays OUT of
+      // the wardrobe (outfits remain wardrobe-only, server-side).
+      var chatAttachShopByThread = {};
+      function currentShopAttach() { return chatAttachShopByThread[activeThreadKey] || null; }
+      function detachShopItem() { delete chatAttachShopByThread[activeThreadKey]; }
+      function shopItemFromCheck(r) {
+        if (!r || r.notClothing || !r.item) return null;
+        return {
+          name: r.item.shortName || r.item.name || "Shop item",
+          category: r.item.category || null,
+          colors: Array.isArray(r.item.colors) ? r.item.colors.slice(0, 6) : [],
+          note: r.item.note || null,
+          score: typeof r.score === "number" ? r.score : null,
+          verdict: r.verdict || null,
+          reasons: Array.isArray(r.reasons) ? r.reasons.slice(0, 6) : []
+        };
+      }
+      function askStylistAboutShop(r) {
+        var item = shopItemFromCheck(r);
+        if (!item || !currentUser) return;
+        if (tripChat) exitTripChat();
+        chatAttachShopByThread[activeThreadKey] = item;
+        closeOverlay(document.getElementById("shopCheckOverlay"));
+        closeOverlay(document.getElementById("shopCheckDetailOverlay"));
+        openChat();
+        renderContextLine();
+        showToast("Attached: " + item.name + " — ask away.");
+        chatInput.focus();
+      }
+
       // UX-18 W3 (CONTEXT-MODEL, decisions 2 + 4): ONE display of what
       // the stylist knows — the context line under the chat header.
       // After each answer it renders the assembler's manifest (the
@@ -4676,6 +4714,20 @@
           var att = currentAttach();
           entries.push({ type: "pick", label: "◈ Today's pick" + (att.lookName ? " · " + att.lookName : ""), action: "detachPick" });
         }
+        // Display priority (founder, 2026-10-24): what the user
+        // ADDED to the conversation first — trip, attached pick,
+        // attached shop item — then the weather, then permanent
+        // context (pinned facts, then the memory tail). The line
+        // shows the first three; the rest wait behind "+N more".
+        var shopAtt = currentShopAttach();
+        if (shopAtt && !tripChat) {
+          entries.push({ type: "shop", label: "🛍 " + shopAtt.name, action: "detachShop" });
+        }
+        var wx = (man && man.weather) || (typeof weatherUiState !== "undefined" && weatherUiState.summary);
+        if (wx) entries.push({ type: "weather", label: wx });
+        else if (!tripChat && !(typeof weatherUiState !== "undefined" && weatherUiState.denied)) {
+          entries.push({ type: "setloc", label: "📍 Set location", action: "setLocation" });
+        }
         scopedPinsForLine().forEach(function (p) {
           entries.push({
             type: "pin", id: p.id, kind: p.kind,
@@ -4683,11 +4735,6 @@
             action: "removePin"
           });
         });
-        var wx = (man && man.weather) || (typeof weatherUiState !== "undefined" && weatherUiState.summary);
-        if (wx) entries.push({ type: "weather", label: wx });
-        else if (!tripChat && !(typeof weatherUiState !== "undefined" && weatherUiState.denied)) {
-          entries.push({ type: "setloc", label: "📍 Set location", action: "setLocation" });
-        }
         var tail = ["Wardrobe · " + (man ? man.wardrobe : (typeof allItems !== "undefined" ? allItems.length : 0)) + " pieces"];
         if (man && man.styleNotes) tail.push("Style notes · " + man.styleNotes);
         if (man && man.learnedTaste && man.learnedTaste.applied && man.learnedTaste.top.length) {
@@ -4724,6 +4771,12 @@
         if (e.action === "detachPick") {
           row.appendChild(sheetActionBtn("Remove", function () {
             detachTodayPick();
+            renderContextLine();
+            openContextSheet();
+          }));
+        } else if (e.action === "detachShop") {
+          row.appendChild(sheetActionBtn("Remove", function () {
+            detachShopItem();
             renderContextLine();
             openContextSheet();
           }));
@@ -5070,6 +5123,9 @@
           messages: stylistMessages.filter(function (m) { return !m.thinking; }).slice(-55),
           previousPick: previousPick,
           todayPick: todayPickCtx,
+          // Shop attach: the item under consideration, when the
+          // user attached one in this conversation.
+          shopItem: tripChat ? null : currentShopAttach(),
           // Sprint 13: explicit vibe handle ("dress me streetwear tonight").
           // Server accepts exact vocabulary hits only.
           vibe: detectVibeTag(text),
@@ -5963,8 +6019,7 @@
         tripShopBtn.type = "button";
         tripShopBtn.textContent = "＋ Shop check for this trip";
         tripShopBtn.addEventListener("click", function () {
-          pendingShopTripId = trip.id;
-          document.getElementById("shopCheckButton").click();
+          openShopCheckSheet(trip.id);
         });
         sec.appendChild(tripShopBtn);
         // Founder (2026-10-24): shopping sits with packing,
@@ -7828,9 +7883,20 @@
       // close the sheet directly — clearing here was the bug
       // that ate the trip tag (founder report, 2026-10-24).
       function closeShopCheckSheet() { pendingShopTripId = null; closeOverlay(shopCheckSheet); }
-      document.getElementById("shopCheckButton").addEventListener("click", function () {
+      // The trip tag is set HERE, by the door that opens the sheet:
+      // the trip page's button passes its trip, every other door
+      // passes null. (Founder bug, 2026-10-24: a general check was
+      // tagged "Hong Kong" — the tag had been armed in an earlier
+      // session and survived its dismissal, because only Cancel
+      // and backdrop taps cleared it, not Esc/swipe. Arming at the
+      // door means a stale tag can never outlive its session.)
+      function openShopCheckSheet(tripId) {
         if (!currentUser) { signIn(); return; }
+        pendingShopTripId = tripId || null;
         openOverlay(shopCheckSheet);
+      }
+      document.getElementById("shopCheckButton").addEventListener("click", function () {
+        openShopCheckSheet(null);
       });
       document.getElementById("shopSheetCamera").addEventListener("click", function () {
         closeOverlay(shopCheckSheet);
@@ -7843,7 +7909,7 @@
       document.getElementById("shopSheetCancel").addEventListener("click", closeShopCheckSheet);
       shopCheckSheet.addEventListener("click", function (event) { if (event.target === shopCheckSheet) closeShopCheckSheet(); });
       document.getElementById("shopListAddBtn").addEventListener("click", function () {
-        document.getElementById("shopCheckButton").click();
+        openShopCheckSheet(null);
       });
       document.getElementById("shopCheckInputCamera").addEventListener("change", function () {
         var file = this.files && this.files[0];
@@ -7879,6 +7945,8 @@
       document.getElementById("pasteChoiceCheck").addEventListener("click", function () {
         var imgs = pastedImages;
         closePasteChoice();
+        // A paste is always a general check — no trip tag rides it.
+        pendingShopTripId = null;
         if (imgs && imgs.length) openShopCropper(imgs[0]);
       });
       document.getElementById("pasteChoiceCancel").addEventListener("click", closePasteChoice);
@@ -8473,13 +8541,14 @@
           photoUrl: st.photoUrl,
           item: r.item, score: r.score, verdict: r.verdict,
           reasons: r.reasons, similarOwned: r.similarOwned, outfits: r.outfits,
-          tripId: (st.tripId || pendingShopTripId) || undefined,
+          // The snapshot on the state is the ONLY source — reading
+          // the live armed tag here re-imported stale trips.
+          tripId: st.tripId || undefined,
           tripName: (r.context && r.context.tripName) || undefined,
           question: (r.context && r.context.question) || undefined
         }, "considering").then(function (id) {
           st.savedId = id;
           st.autoSaving = false;
-          pendingShopTripId = null;
           renderShopCheckResult();
         }).catch(function () {
           // Auto-save failed (offline?) — the re-render falls
@@ -8524,6 +8593,10 @@
             });
           });
           actions.appendChild(add);
+          var askStylistBtn = el("button", "secondary", "Ask the stylist about this");
+          askStylistBtn.type = "button";
+          askStylistBtn.addEventListener("click", function () { askStylistAboutShop(r); });
+          actions.appendChild(askStylistBtn);
         }
         body.appendChild(actions);
       }
@@ -8590,11 +8663,10 @@
           photoUrl: st.photoUrl,
           item: r.item, score: r.score, verdict: r.verdict,
           reasons: r.reasons, similarOwned: r.similarOwned, outfits: r.outfits,
-          tripId: (st.tripId || pendingShopTripId) || undefined,
+          tripId: st.tripId || undefined,
           tripName: (r.context && r.context.tripName) || undefined,
           question: (r.context && r.context.question) || undefined
         }, "considering").then(function (id) {
-          pendingShopTripId = null;
           st.savedId = id;
           saveBtn.textContent = "Saved ✓";
           showToast("Saved to your shop list.");
@@ -8694,6 +8766,13 @@
             : null
         };
         appendShopCheckAnalysis(body, r, c.photoUrl, true);
+
+        var askRow = el("div", "form-actions");
+        var askBtn = el("button", "secondary", "Ask the stylist about this");
+        askBtn.type = "button";
+        askBtn.addEventListener("click", function () { askStylistAboutShop(r); });
+        askRow.appendChild(askBtn);
+        body.appendChild(askRow);
 
         // Your details.
         body.appendChild(el("h3", "shop-section-title", "Your details"));

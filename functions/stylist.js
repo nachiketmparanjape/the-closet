@@ -261,6 +261,26 @@ function sanitizeTodayPick(value) {
   };
 }
 
+// Shop attach (founder, 2026-10-24): a shop-check item the user is
+// deciding about, attached to the conversation explicitly so
+// follow-ups ("would it go with my navy blazer?") have the facts.
+// It is NOT a wardrobe piece — no ids, no handles; the brief marks
+// it as under consideration and outfits stay wardrobe-only.
+function sanitizeShopItem(value) {
+  if (!value || typeof value !== "object") return null;
+  const name = cleanText(value.name, 60);
+  if (!name) return null;
+  return {
+    name: name,
+    category: cleanText(value.category, 40) || null,
+    colors: cleanList(value.colors, 6, 30),
+    note: cleanText(value.note, 200) || null,
+    score: typeof value.score === "number" && isFinite(value.score) ? value.score : null,
+    verdict: cleanText(value.verdict, 300) || null,
+    reasons: cleanList(value.reasons, 6, 160),
+  };
+}
+
 // PC-22: @-mention references. The client sends { articleIds, outfits }
 // where outfits carry their itemIds (resolved from its local cache); every
 // id is re-validated against the real wardrobe here, so the model only
@@ -745,6 +765,9 @@ function buildManifest(input, activePins) {
     todayPick: input.todayPick && input.todayPick.itemIds && input.todayPick.itemIds.length
       ? { attached: true, lookName: input.todayPick.lookName || null }
       : { attached: false, lookName: null },
+    shopItem: input.shopItem
+      ? { attached: true, name: input.shopItem.name }
+      : { attached: false, name: null },
     previousPick: { present: !!iter.base, fromToday: iter.isToday },
     references: {
       articles: input.references && Array.isArray(input.references.articles) ? input.references.articles.length : 0,
@@ -773,13 +796,13 @@ function assembleContext(input) {
   const req = buildStylistRequest(
     input.items, input.messages, input.styleProfile, input.previousPick,
     input.references, input.weatherContext, input.vibe, input.vibeProfile,
-    input.tripContext, input.pins, todayStr, input.todayPick
+    input.tripContext, input.pins, todayStr, input.todayPick, input.shopItem
   );
   const manifest = buildManifest(input, computeActivePins(input.pins, input.tripContext, todayStr));
   return { model: req.model, contents: req.contents, config: req.config, manifest: manifest };
 }
 
-function buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, todayPick) {
+function buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, todayPick, shopItem) {
   const model = process.env.GEMINI_MODEL || MODEL_VERSION;
   const wardrobe = items.map((it, i) => itemLine(it, i)).join("\n");
   let system = SYSTEM + "\n\n" + PRECEDENCE;
@@ -865,6 +888,26 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
         "(\"warmer version of this\", \"dress this up\"); return the COMPLETE new outfit, scored fresh.\n" +
         "- Both present: the outfit is the base, the pieces are must-keeps.";
     }
+  }
+  // Shop attach: an item the user is deciding whether to buy,
+  // attached to this conversation on purpose. It is NOT owned and
+  // NOT in the wardrobe list — outfits keep using wardrobe handles
+  // only; this section is for judgement (fit with owned pieces,
+  // duplication, whether the earlier verdict holds up).
+  if (shopItem) {
+    let shop = "\n\nITEM UNDER CONSIDERATION — the user ran a shop check on this piece and attached it to ask follow-ups. They do NOT own it.\n" +
+      "- Item: " + shopItem.name + (shopItem.category ? " (" + shopItem.category + ")" : "") +
+      (shopItem.colors && shopItem.colors.length ? ", colors: " + shopItem.colors.join(", ") : "") + ".\n";
+    if (shopItem.note) shop += "- Seen as: " + shopItem.note + "\n";
+    if (shopItem.score != null) {
+      shop += "- The shop check scored it " + shopItem.score + "/10 for wardrobe fit" +
+        (shopItem.verdict ? ": " + shopItem.verdict : "") + "\n";
+    }
+    if (shopItem.reasons && shopItem.reasons.length) {
+      shop += "- Why that score: " + shopItem.reasons.join("; ") + "\n";
+    }
+    shop += "- Answer questions about THIS item: what it pairs with (name wardrobe pieces by their handles), whether it duplicates something owned, whether it earns its place. If you suggest an outfit to show how it would be worn, build the outfit from wardrobe pieces and describe the shop item's role in prose — never put the shop item in the outfit's items.";
+    system += shop;
   }
   const contents = [
     { role: "user", parts: [{ text: "WARDROBE (pick only from these items):\n" + wardrobe }] },
@@ -1235,7 +1278,7 @@ function unwrapJsonReply(text) {
 }
 
 // here; the client re-validates on execute.
-async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, hooks, todayPick) {
+async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, hooks, todayPick, shopItem) {
   const todayStr = /^\d{4}-\d{2}-\d{2}$/.test(today || "")
     ? today
     : new Date().toISOString().slice(0, 10);
@@ -1246,6 +1289,7 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
     previousPick: previousPick, references: references,
     weatherContext: weatherContext, vibe: vibe, vibeProfile: vibeProfile,
     tripContext: tripContext, pins: pins, today: todayStr, todayPick: todayPick,
+    shopItem: shopItem,
   });
   const { model, contents, config } = assembled;
   const manifest = assembled.manifest;
@@ -1352,4 +1396,4 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
   };
 }
 
-module.exports = { askStylist, buildStylistRequest, assembleContext, buildManifest, resolveIterBase, computeActivePins, PRECEDENCE, MAX_MESSAGES, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeTodayPick, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins, sanitizePinProposal, extractToolCall, extractToolCalls, mapUpdateTripPacking, mapSuggestTripOutfits, handleIndex, unwrapJsonReply, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM, VIBE_TAGS };
+module.exports = { askStylist, buildStylistRequest, assembleContext, buildManifest, resolveIterBase, computeActivePins, PRECEDENCE, MAX_MESSAGES, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeTodayPick, sanitizeShopItem, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins, sanitizePinProposal, extractToolCall, extractToolCalls, mapUpdateTripPacking, mapSuggestTripOutfits, handleIndex, unwrapJsonReply, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM, VIBE_TAGS };

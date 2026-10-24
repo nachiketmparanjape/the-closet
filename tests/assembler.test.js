@@ -8,6 +8,7 @@ module.paths.unshift(path.join(__dirname, "..", "functions", "node_modules"));
 const {
   assembleContext, buildManifest, resolveIterBase, computeActivePins,
   sanitizeItems, sanitizeMessages, sanitizePins, sanitizeTripContext,
+  sanitizeShopItem,
 } = require("../functions/stylist.js");
 
 const ITEMS = sanitizeItems([
@@ -124,5 +125,33 @@ describe("assembleContext + manifest", () => {
     const out = assembleContext(baseInput({}));
     assert.match(out.config.systemInstruction, /WHO WINS/);
     assert.match(out.config.systemInstruction, /style notes .* beat everything/);
+  });
+  it("shop attach: the item under consideration is in the brief, marked not-owned", () => {
+    const shopItem = sanitizeShopItem({
+      name: "Brown hooded utility jacket", category: "Jacket",
+      colors: ["brown"], note: "canvas utility jacket with hood",
+      score: 8, verdict: "A fantastic addition.", reasons: ["Fills the light-jacket gap"],
+    });
+    const out = assembleContext(baseInput({ shopItem }));
+    assert.match(out.config.systemInstruction, /ITEM UNDER CONSIDERATION/);
+    assert.match(out.config.systemInstruction, /Brown hooded utility jacket/);
+    assert.match(out.config.systemInstruction, /do NOT own it/);
+    assert.equal(out.manifest.shopItem.attached, true);
+    assert.equal(out.manifest.shopItem.name, "Brown hooded utility jacket");
+    const bare = assembleContext(baseInput({}));
+    assert.doesNotMatch(bare.config.systemInstruction, /ITEM UNDER CONSIDERATION/);
+    assert.equal(bare.manifest.shopItem.attached, false);
+  });
+});
+
+describe("sanitizeShopItem", () => {
+  it("requires a name, drops junk types", () => {
+    assert.equal(sanitizeShopItem(null), null);
+    assert.equal(sanitizeShopItem({}), null);
+    assert.equal(sanitizeShopItem({ name: "   " }), null);
+    const s = sanitizeShopItem({ name: " Jacket ", score: "high", reasons: ["ok", 42] });
+    assert.equal(s.name, "Jacket");
+    assert.equal(s.score, null);
+    assert.deepEqual(s.reasons, ["ok"]);
   });
 });
