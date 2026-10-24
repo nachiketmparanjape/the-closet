@@ -684,6 +684,85 @@ function handleIndex(handle, items) {
 // Build the exact model request askStylist sends. Exported so the
 // benchmark runner (tests/benchmark) exercises the real prompt —
 // prompt changes and benchmark stay in sync by construction.
+// UX-18 W1 (one assembler): the two resolutions every brief depends on,
+// factored out so buildStylistRequest and the manifest (below) can never
+// disagree about them — the manifest must describe the brief as built.
+function resolveIterBase(previousPick, todayPick) {
+  const base = previousPick || (todayPick && todayPick.itemIds && todayPick.itemIds.length ? { itemIds: todayPick.itemIds } : null);
+  return { base: base, isToday: !previousPick && !!base };
+}
+
+function computeActivePins(pins, tripContext, todayStr) {
+  let active = (Array.isArray(pins) ? pins : []).filter(
+    (p) => p && (!p.validUntil || p.validUntil >= todayStr)
+  );
+  // Threads scoping (founder 2026-10-19): inside a trip conversation,
+  // global location/weather pins do NOT apply — the trip's own
+  // destination and packing weather are the context there. Preference
+  // pins and pins scoped to this trip still do.
+  if (tripContext) {
+    active = active.filter(
+      (p) => p.kind === "preference" || p.tripId === tripContext.tripId
+    );
+  }
+  return active;
+}
+
+// The manifest: a plain-names list of what the assembler loaded into
+// one brief. Returned with every answer; the client renders the
+// context line from it (CONTEXT-MODEL.md, W1/W3), and one-shot callers
+// keep it with their records. Built from the same resolutions the
+// brief itself used — never a second snapshot.
+function buildManifest(input, activePins) {
+  const items = input.items || [];
+  const messages = input.messages || [];
+  const iter = resolveIterBase(input.previousPick, input.todayPick);
+  const prefs = Array.isArray(input.styleProfile) ? input.styleProfile.filter(Boolean) : [];
+  const vp = input.vibeProfile;
+  const tasteApplied = !input.vibe && !!(vp && vp.confidence >= 0.3 && vp.tags);
+  return {
+    wardrobe: items.length,
+    messagesRead: Math.min(messages.length, MAX_MESSAGES),
+    messagesTotal: messages.length,
+    styleNotes: prefs.length,
+    weather: input.weatherContext || null,
+    todayPick: input.todayPick && input.todayPick.itemIds && input.todayPick.itemIds.length
+      ? { attached: true, lookName: input.todayPick.lookName || null }
+      : { attached: false, lookName: null },
+    previousPick: { present: !!iter.base, fromToday: iter.isToday },
+    references: {
+      articles: input.references && Array.isArray(input.references.articles) ? input.references.articles.length : 0,
+      outfits: input.references && Array.isArray(input.references.outfits) ? input.references.outfits.length : 0,
+    },
+    styleWord: input.vibe || null,
+    learnedTaste: {
+      applied: tasteApplied,
+      top: tasteApplied
+        ? Object.keys(vp.tags).map((t) => ({ tag: t, score: vp.tags[t] }))
+            .sort((a, b) => b.score - a.score).slice(0, 3).map((e) => e.tag)
+        : [],
+    },
+    pins: (activePins || []).map((p) => ({ kind: p.kind, label: p.label })),
+    trip: input.tripContext ? { name: input.tripContext.tripName || "Trip" } : null,
+  };
+}
+
+// THE assembler (UX-18 W1): the single place a brief is built, for
+// every caller of the stylist. Input is the sanitized context object;
+// output is the model request plus the manifest of what went into it.
+function assembleContext(input) {
+  const todayStr = /^\d{4}-\d{2}-\d{2}$/.test(input.today || "")
+    ? input.today
+    : new Date().toISOString().slice(0, 10);
+  const req = buildStylistRequest(
+    input.items, input.messages, input.styleProfile, input.previousPick,
+    input.references, input.weatherContext, input.vibe, input.vibeProfile,
+    input.tripContext, input.pins, todayStr, input.todayPick
+  );
+  const manifest = buildManifest(input, computeActivePins(input.pins, input.tripContext, todayStr));
+  return { model: req.model, contents: req.contents, config: req.config, manifest: manifest };
+}
+
 function buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, todayPick) {
   const model = process.env.GEMINI_MODEL || MODEL_VERSION;
   const wardrobe = items.map((it, i) => itemLine(it, i)).join("\n");
@@ -709,8 +788,9 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
   // chat. It was displayed but never sent, so questions about
   // it arrived context-free. When there is no in-chat pick to
   // iterate on, today's pick IS the iteration base below.
-  const iterBase = previousPick || (todayPick && todayPick.itemIds.length ? { itemIds: todayPick.itemIds } : null);
-  const iterBaseIsToday = !previousPick && !!iterBase;
+  const iterRes = resolveIterBase(previousPick, todayPick);
+  const iterBase = iterRes.base;
+  const iterBaseIsToday = iterRes.isToday;
   if (todayPick && Array.isArray(todayPick.itemIds) && todayPick.itemIds.length) {
     const tpHandles = todayPick.itemIds.map((id) => {
       const idx = items.findIndex((it) => it && it.id === id);
@@ -813,14 +893,7 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
   // global location/weather pins do NOT apply — the trip's own
   // destination and packing weather are the context there. Preference
   // pins and pins scoped to this trip still do.
-  let activePins = (Array.isArray(pins) ? pins : []).filter(
-    (p) => !p.validUntil || p.validUntil >= todayStr
-  );
-  if (tripContext) {
-    activePins = activePins.filter(
-      (p) => p.kind === "preference" || p.tripId === tripContext.tripId
-    );
-  }
+  const activePins = computeActivePins(pins, tripContext, todayStr);
   if (activePins.length) {
     const pinLines = activePins.map((p) => {
       let line = "- [" + p.kind + "] " + p.label;
@@ -1150,7 +1223,16 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
   const todayStr = /^\d{4}-\d{2}-\d{2}$/.test(today || "")
     ? today
     : new Date().toISOString().slice(0, 10);
-  const { model, contents, config } = buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, todayStr, todayPick);
+  // UX-18 W1: every stylist call goes through the one assembler; the
+  // manifest of what was loaded rides back with the answer.
+  const assembled = assembleContext({
+    items: items, messages: messages, styleProfile: styleProfile,
+    previousPick: previousPick, references: references,
+    weatherContext: weatherContext, vibe: vibe, vibeProfile: vibeProfile,
+    tripContext: tripContext, pins: pins, today: todayStr, todayPick: todayPick,
+  });
+  const { model, contents, config } = assembled;
+  const manifest = assembled.manifest;
   const ai = getClient();
   if (tripContext) {
     // Trip mode: the tools are independent — a packing change and a
@@ -1208,7 +1290,7 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
               ? "I drafted a plan but couldn't apply it cleanly — your packing is unchanged. Mind asking once more?"
               : "Hmm — that came back empty on my end. Try again?");
     }
-    return { reply: text, toolCall: mappedCall, pinProposal: pinProposal, outfitSuggestions: outfitSuggestions };
+    return { reply: text, toolCall: mappedCall, pinProposal: pinProposal, outfitSuggestions: outfitSuggestions, manifest: manifest };
   }
   let parsed = await callStylistModel(ai, model, contents, config, "askStylist", todayStr, hooks);
 
@@ -1235,10 +1317,11 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
 
   if (!parsed.outfit || !mapped || problem) {
     if (parsed.outfit) emitEvent(hooks, "rejection", "outfit_discarded", { problem: problem || "unmapped" });
-    return { reply: parsed.reply, outfit: null, pinProposal: parsed.pinProposal || null };
+    return { reply: parsed.reply, outfit: null, pinProposal: parsed.pinProposal || null, manifest: manifest };
   }
   return {
     reply: parsed.reply,
+    manifest: manifest,
     outfit: {
       itemIds: mapped.map((m) => m.id),
       itemNames: mapped.map((m) => m.name),
@@ -1253,4 +1336,4 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
   };
 }
 
-module.exports = { askStylist, buildStylistRequest, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeTodayPick, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins, sanitizePinProposal, extractToolCall, extractToolCalls, mapUpdateTripPacking, mapSuggestTripOutfits, handleIndex, unwrapJsonReply, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM, VIBE_TAGS };
+module.exports = { askStylist, buildStylistRequest, assembleContext, buildManifest, resolveIterBase, computeActivePins, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeTodayPick, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins, sanitizePinProposal, extractToolCall, extractToolCalls, mapUpdateTripPacking, mapSuggestTripOutfits, handleIndex, unwrapJsonReply, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM, VIBE_TAGS };
