@@ -110,3 +110,47 @@ describe("shopCheck handler", () => {
     );
   });
 });
+
+describe("PC-40: contextual shop checks", () => {
+  const { loadTripContext } = require("../functions/shopcheck.js");
+  const trip = {
+    id: "t1", name: "Hong Kong", location: "Hong Kong",
+    startDate: "2026-11-23", endDate: "2026-11-29",
+    weather: "highs 75°F, lows 65°F", notes: "",
+    packedNames: ["Black tee"],
+  };
+  it("the prompt carries the trip + the question when context is given", () => {
+    const { contents } = buildShopCheckRequest("Zm9v", "image/jpeg", items, { trip, question: "Warm enough for evenings?" });
+    const text = contents[0].parts[0].text;
+    assert.ok(text.includes("TRIP CONTEXT"));
+    assert.ok(text.includes("Hong Kong"));
+    assert.ok(text.includes("Already packed for this trip: Black tee"));
+    assert.ok(text.includes("THE WEARER'S QUESTION"));
+    assert.ok(text.includes("Warm enough for evenings?"));
+  });
+  it("without context the prompt is the original wardrobe-only check", () => {
+    const { contents } = buildShopCheckRequest("Zm9v", "image/jpeg", items);
+    const text = contents[0].parts[0].text;
+    assert.ok(!text.includes("TRIP CONTEXT"));
+    assert.ok(!text.includes("WEARER'S QUESTION"));
+  });
+  it("loadTripContext shapes the trip and degrades to null", async () => {
+    const fakeDb = {
+      collection: () => ({ doc: () => ({ collection: () => ({ doc: () => ({ get: async () => ({
+        exists: true,
+        data: () => ({
+          name: "Hong Kong", notes: "",
+          legs: [{ location: "HK", resolvedName: "Hong Kong", startDate: "2026-11-23", endDate: "2026-11-29" }],
+          weatherSnapshot: "highs 75°F",
+          packing: { articleIds: ["a", "zzz"] },
+        }),
+      }) }) }) }) }),
+    };
+    const ctx = await loadTripContext(fakeDb, "u1", "t1", items);
+    assert.equal(ctx.name, "Hong Kong");
+    assert.deepEqual(ctx.packedNames, ["Black tee"]);
+    assert.equal(await loadTripContext(fakeDb, "u1", null, items), null);
+    const boomDb = { collection: () => { throw new Error("nope"); } };
+    assert.equal(await loadTripContext(boomDb, "u1", "t1", items), null);
+  });
+});

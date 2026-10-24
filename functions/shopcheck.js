@@ -29,8 +29,38 @@ function cleanScore(v) {
   return Math.max(0, Math.min(10, Math.round(n)));
 }
 
+// PC-40: read the trip a check belongs to and shape it for the
+// prompt. Any failure (bad id, missing doc) degrades to null —
+// a trip ref must never break a check.
+async function loadTripContext(db, uid, tripId, items) {
+  try {
+    if (!tripId || typeof tripId !== "string") return null;
+    const snap = await db.collection("users").doc(uid).collection("trips").doc(tripId).get();
+    if (!snap.exists) return null;
+    const t = snap.data();
+    const leg = (t.legs && t.legs[0]) || {};
+    const nameById = {};
+    (items || []).forEach((it) => { nameById[it.id] = it.name; });
+    const packedIds = (t.packing && t.packing.articleIds) || [];
+    return {
+      id: tripId,
+      name: cleanText(t.name, 80) || "the trip",
+      location: cleanText(leg.resolvedName || leg.location || "", 80),
+      startDate: typeof leg.startDate === "string" ? leg.startDate : null,
+      endDate: typeof leg.endDate === "string" ? leg.endDate : null,
+      weather: cleanText(t.weatherSnapshot || (t.packing && t.packing.weatherSnapshot) || "", 200),
+      notes: cleanText(t.notes || "", 200),
+      packedNames: packedIds.map((id) => nameById[id]).filter(Boolean).slice(0, 40),
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
 // Pure: build the exact model request. Exported for tests.
-function buildShopCheckRequest(imageBase64, mimeType, items) {
+// PC-40: `context` ({trip, question}) is optional — without it
+// the prompt is exactly the original wardrobe-only check.
+function buildShopCheckRequest(imageBase64, mimeType, items, context) {
   const model = process.env.GEMINI_MODEL || MODEL_VERSION;
   const wardrobe = items
     .map((it, i) => {
@@ -54,6 +84,21 @@ function buildShopCheckRequest(imageBase64, mimeType, items) {
     "their things? Never comment on price, value for money, where to buy it, " +
     "or availability — judge fit with THIS wardrobe only.\n\n" +
     "WARDROBE:\n" + wardrobe + "\n\n" +
+    ((context && context.trip)
+      ? "TRIP CONTEXT: the wearer is considering this item FOR a trip — \"" + context.trip.name + "\"" +
+        (context.trip.location ? " (" + context.trip.location + ")" : "") +
+        (context.trip.startDate ? ", " + context.trip.startDate + " to " + (context.trip.endDate || context.trip.startDate) : "") + ". " +
+        (context.trip.weather ? "Expected weather: " + context.trip.weather + ". " : "") +
+        (context.trip.notes ? "Trip notes: " + context.trip.notes + ". " : "") +
+        (context.trip.packedNames && context.trip.packedNames.length
+          ? "Already packed for this trip: " + context.trip.packedNames.join(", ") + ". "
+          : "Nothing is packed for this trip yet. ") +
+        "Judge how well it serves THIS trip: does it fit the weather, fill a packing gap or duplicate a packed piece, " +
+        "and combine with the packed pieces? Weigh that alongside the general wardrobe fit, and name the trip in the verdict when it drives the call.\n\n"
+      : "") +
+    ((context && context.question)
+      ? "THE WEARER'S QUESTION: \"" + context.question + "\" — answer it directly in the verdict or reasons.\n\n"
+      : "") +
     'Respond with JSON only: {"item": {"name": "short 2-4 word product name", "category": one of ' + JSON.stringify(CATEGORIES) + ', "colors": ["..."], ' +
     '"pattern": "...", "formality": 0.0-1.0, "note": "one-line description"}, ' +
     '"score": 0-10, "verdict": "one honest sentence", ' +
@@ -152,9 +197,11 @@ function parseShopCheckJson(text, validIds) {
   };
 }
 
-// Handler: (uid, storagePath, db?) -> shop-check result.
+// Handler: (uid, storagePath, db?, hooks?, ctx?) -> result.
 // db injectable for tests; Storage always real (photo bytes needed).
-async function shopCheck(uid, storagePath, db, hooks) {
+// PC-40: ctx = { tripId, question } — the server reads the trip
+// itself; the client only names it.
+async function shopCheck(uid, storagePath, db, hooks, ctx) {
   if (typeof storagePath !== "string" || !storagePath.startsWith("users/" + uid + "/shop-checks/")) {
     throw codedError("NOT_YOUR_PHOTO", "shopCheck: bad storage path");
   }
@@ -175,8 +222,11 @@ async function shopCheck(uid, storagePath, db, hooks) {
     throw codedError("EMPTY_WARDROBE", "shopCheck: no items to compare against");
   }
 
+  const trip = ctx && ctx.tripId ? await loadTripContext(db, uid, ctx.tripId, items) : null;
+  const question = ctx && ctx.question ? cleanText(ctx.question, 200) : "";
   const { model, contents, config } = buildShopCheckRequest(
-    buffer.toString("base64"), metadata.contentType || "image/jpeg", items
+    buffer.toString("base64"), metadata.contentType || "image/jpeg", items,
+    { trip: trip, question: question }
   );
   const callStart = Date.now();
   let text;
@@ -191,7 +241,17 @@ async function shopCheck(uid, storagePath, db, hooks) {
   if (!text) {
     throw codedError("AI_BAD_RESPONSE", "shopCheck: model returned no text");
   }
-  return parseShopCheckJson(text, items.map((it) => it.id));
+  const result = parseShopCheckJson(text, items.map((it) => it.id));
+  // PC-40: echo what context actually drove the judgment, so the
+  // client stamps the saved check with the server's truth.
+  if (trip || question) {
+    result.context = {
+      tripId: trip ? trip.id : null,
+      tripName: trip ? trip.name : null,
+      question: question || null,
+    };
+  }
+  return result;
 }
 
-module.exports = { shopCheck, buildShopCheckRequest, parseShopCheckJson };
+module.exports = { shopCheck, buildShopCheckRequest, parseShopCheckJson, loadTripContext };

@@ -191,6 +191,9 @@
     .shop-score .num { font-family: "Closet Serif", serif; font-size: 58px; font-weight: 500; letter-spacing: -.03em; line-height: 1; }
     .shop-score .of { color: var(--muted); font-size: 14px; }
     .shop-verdict { margin: 8px 0 0; font-size: 15px; line-height: 1.55; }
+    .shop-q-field { margin: 0 2px 14px; }
+    .shop-context { margin: 10px 0 0; font-size: 13px; color: var(--muted-strong); }
+    .shop-context .q { font-style: italic; }
     .shop-section-title { margin: 22px 0 8px; font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
     .shop-reasons { margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.65; }
     .shop-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
@@ -977,6 +980,10 @@
     <section class="sheet">
       <h2 class="sheet-title" id="shopCheckSheetTitle">Check a shop item</h2>
       <p class="sheet-intro">Before you buy it, check it against your wardrobe — snap it and I'll give you a straight verdict.</p>
+      <div class="field shop-q-field">
+        <label for="shopQuestionInput">Anything specific? <span class="hint">(optional)</span></label>
+        <input type="text" id="shopQuestionInput" maxlength="200" placeholder="e.g. Will it work for cold evenings in Hong Kong?">
+      </div>
       <button class="sheet-option" id="shopSheetCamera" type="button">
         <span><span class="opt-title">Take photo</span><span class="opt-sub">Snap it in the store</span></span>
       </button>
@@ -7192,9 +7199,14 @@
           // Snapshot the armed trip context into THIS check,
           // then disarm — the state is the single source of
           // truth from here, so no later close can eat the tag.
-          tripId: pendingShopTripId || null
+          tripId: pendingShopTripId || null,
+          // PC-40: the wearer's own question, snapshotted the
+          // same way and the sheet field cleared — a later
+          // plain check must not silently inherit it.
+          question: (document.getElementById("shopQuestionInput").value || "").trim()
         };
         pendingShopTripId = null;
+        document.getElementById("shopQuestionInput").value = "";
         renderShopCheckLoading();
         openOverlay(document.getElementById("shopCheckOverlay"));
         var fileRef = storage.ref().child(storagePath);
@@ -7202,7 +7214,11 @@
           return fileRef.getDownloadURL();
         }).then(function (url) {
           shopCheckState.photoUrl = url;
-          return functions.httpsCallable("shopCheck")({ storagePath: storagePath });
+          return functions.httpsCallable("shopCheck")({
+            storagePath: storagePath,
+            tripId: shopCheckState.tripId || undefined,
+            question: shopCheckState.question || undefined
+          });
         }).then(function (res) {
           shopCheckState.result = res.data || {};
           if (shopCheckState.objectUrl) {
@@ -7406,6 +7422,19 @@
           if (r.item && r.item.note) {
             body.appendChild(el("p", "hint", "Seen as: " + r.item.note));
           }
+          // PC-40: the context the verdict was judged in —
+          // a trip name and/or the wearer's own question.
+          if (r.context && (r.context.tripName || r.context.question)) {
+            var ctxLine = el("p", "shop-context");
+            if (r.context.tripName) ctxLine.appendChild(el("span", null, "Judged for: " + r.context.tripName));
+            if (r.context.tripName && r.context.question) ctxLine.appendChild(el("span", null, " · "));
+            if (r.context.question) {
+              var qSpan = el("span", "q");
+              qSpan.textContent = "You asked: “" + r.context.question + "”";
+              ctxLine.appendChild(qSpan);
+            }
+            body.appendChild(ctxLine);
+          }
           if (r.reasons && r.reasons.length) {
             body.appendChild(el("h3", "shop-section-title", "Why this score"));
             var ul = el("ul", "shop-reasons");
@@ -7462,7 +7491,9 @@
           photoUrl: st.photoUrl,
           item: r.item, score: r.score, verdict: r.verdict,
           reasons: r.reasons, similarOwned: r.similarOwned, outfits: r.outfits,
-          tripId: (st.tripId || pendingShopTripId) || undefined
+          tripId: (st.tripId || pendingShopTripId) || undefined,
+          tripName: (r.context && r.context.tripName) || undefined,
+          question: (r.context && r.context.question) || undefined
         }, "considering").then(function (id) {
           st.savedId = id;
           st.autoSaving = false;
@@ -7559,6 +7590,11 @@
         // tagged later from its detail view.
         var tagTrip = d.tripId || (typeof tripChat !== "undefined" && tripChat ? tripChat.tripId : null);
         if (tagTrip) doc.tripId = tagTrip;
+        // PC-40: the context the check was judged in, for the
+        // detail view — the trip's name as the server read it,
+        // and the wearer's own question.
+        if (d.tripName) doc.tripName = d.tripName;
+        if (d.question) doc.question = d.question;
         return ref.set(doc).then(function () { return ref.id; });
       }
 
@@ -7572,7 +7608,9 @@
           photoUrl: st.photoUrl,
           item: r.item, score: r.score, verdict: r.verdict,
           reasons: r.reasons, similarOwned: r.similarOwned, outfits: r.outfits,
-          tripId: (st.tripId || pendingShopTripId) || undefined
+          tripId: (st.tripId || pendingShopTripId) || undefined,
+          tripName: (r.context && r.context.tripName) || undefined,
+          question: (r.context && r.context.question) || undefined
         }, "considering").then(function (id) {
           pendingShopTripId = null;
           st.savedId = id;
@@ -7667,7 +7705,11 @@
         var r = {
           notClothing: false,
           item: c.item, score: c.score, verdict: c.verdict,
-          reasons: c.reasons, similarOwned: c.similarOwned, outfits: c.outfits
+          reasons: c.reasons, similarOwned: c.similarOwned, outfits: c.outfits,
+          // PC-40: what the check was judged for / asked about.
+          context: (c.tripName || c.question)
+            ? { tripName: c.tripName || null, question: c.question || null }
+            : null
         };
         appendShopCheckAnalysis(body, r, c.photoUrl, true);
 

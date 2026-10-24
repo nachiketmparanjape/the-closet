@@ -435,7 +435,14 @@ exports.shopCheck = onCall(
         fail("BAD_REQUEST");
       }
       usageBase.refId = storagePath;
-      const result = await shopCheck(uid, storagePath, undefined, aiTracker.hooks);
+      // PC-40: optional context — a trip this check is for (the
+      // server reads the trip doc itself) and the wearer's own
+      // question. Both sanitized; absence = the plain check.
+      const shopCtx = {
+        tripId: typeof data.tripId === "string" && data.tripId.length <= 80 ? data.tripId : null,
+        question: typeof data.question === "string" ? data.question.trim().slice(0, 200) : "",
+      };
+      const result = await shopCheck(uid, storagePath, undefined, aiTracker.hooks, shopCtx);
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: true });
       return finish("shopCheck", correlationId, uid, start, result);
     } catch (err) {
