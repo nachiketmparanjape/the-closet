@@ -213,49 +213,88 @@ evidence is one click away in AUDIT.md.
     in silence. No single rule says how a conversation
     starts.
 
-## Decisions still open
+## Decisions
 
-These are the sit-down's decisions. Each is written as a
-plain question. The document changes when they are made,
-and this section is replaced by the answers.
+The sit-down is happening in chat, decision by decision
+(started 2026-10-24). Made decisions are recorded with the
+founder's answer; open ones keep their question.
 
-1. For each entry point: should today's pick join the
-   conversation by itself (you remove it if you do not
-   want it), or only when you tap to add it? Feel of
-   the first: one tap less, and the stylist sometimes
-   assumes wrong. Feel of the second: the stylist never
-   assumes, and you tap once when you do mean today's
-   outfit.
+**Made (founder, 2026-10-24):**
+
+1. **Today's pick attaches only on an explicit tap of a
+   button that is about the pick** (for example, asking
+   the stylist from the Today screen). In a general
+   stylist session or a trip session it does not appear
+   by default, and there is nothing to remove. This
+   replaces the current behavior (auto-attach on open,
+   remove by tapping the x on its label). Exhibit #1 is
+   decided: no silent attachment, ever; attachment is an
+   act, not a default.
+8. **The starting rule holds** (founder: "I guess" --
+   recorded as yes): no entry point sends a message for
+   you; some may type text you can edit and send; context
+   attaches only as decision 1 says. Surprise-me's
+   auto-send goes away when this is built.
+7. **The reading limit rises from 20 to 50 messages, and
+   the experience is honest about it:** when a
+   conversation passes the limit, the app says plainly
+   that the stylist now reads only the most recent 50.
+   No summarizing for now. The founder expects more
+   opinions here once he uses long conversations more;
+   revisit then.
+
+**Direction confirmed by the founder's agreement with
+AGENT-FUNDAMENTALS.md; the concrete form is Bramble's to
+draft and the founder's to confirm:**
+
+3. The rule for "which outfit are we changing" lives in
+   **one place: the server's single assembler** (principle
+   F1), not split between phone and server.
+5. The who-wins table in this document **becomes the
+   rule**, and the stylist's instructions are written to
+   match it (principle F5: precedence as a table, not
+   prose).
+
+**Open:**
+
 2. Should the row of fact labels be the only display
    of what the stylist knows? That means the top outfit
    card goes away, or stays only as a picture that is
-   clearly not the context itself.
-3. The rule for "which outfit are we changing" should
-   live in one place. The phone, or the server?
+   clearly not the context itself. *(Founder did not
+   understand the question as written; re-asked in
+   plainer words in the sit-down chat, 2026-10-24.)*
 4. Should every pinned fact show a label at the top of
-   the chat, so the full context is visible — and
-   removable — in one row?
-5. Should the who-wins table in this document become
-   the rule, with the stylist's instructions written to
-   match the table word for word in order?
+   the chat, so the full context is visible -- and
+   removable -- in one row? **Founder: yes in principle**
+   ("I think so") -- what is open is the design: an elegant
+   way to surface up to 20 facts without eating the
+   screen. Bramble's proposals are in the sit-down chat
+   (a single "what the stylist knows" line that expands
+   to the full list is the recommended one, and it would
+   also settle decision 2's "one display" question).
 6. Should conversations be saved, so a conversation is
-   still there after the app closes — on the phone and
-   across your devices?
-7. When a conversation grows past 20 messages, what
-   should happen? Options: the app tells you the
-   stylist now reads only the recent part; the app
-   sums up the early part into a short note the stylist
-   keeps reading; or the limit rises and we accept the
-   cost.
-8. One rule for how a conversation starts, for every
-   entry point: no entry point sends a message for you;
-   some may type text you can edit and send; context is
-   attached only as the answers to decision 1 say.
-   Does that rule hold?
+   still there after the app closes -- on the phone and
+   across your devices? **Founder: ideally yes, with
+   deliberation.** He wants a proper threads design --
+   all threads tracked, transcripts stored, like the
+   major agent apps -- at low effort, without the app
+   becoming a general chat product. Bramble's ladder is
+   in the sit-down chat; the recommended rung is one
+   stored conversation per key we already have (general,
+   one per trip), no thread list, no titles, no
+   new-thread button. Deliberation points: how much
+   transcript to keep, and trip threads living and dying
+   with their trip.
 9. The morning pick and the outfit composer call the
    same stylist. Should they follow the same context
    rules as the chat, or a smaller written set? Either
-   way, the set gets written down.
+   way, the set gets written down. *(Explained in plainer
+   words in the sit-down chat, 2026-10-24; Bramble's
+   recommendation: one rulebook -- the same who-wins table
+   and the same memory applied everywhere; the one-shot
+   callers simply have fewer inputs, because there is no
+   conversation and no pointers. Awaiting the founder's
+   call.)*
 
 ## Code pointers (as of commit 2c37032, 2026-10-24)
 
