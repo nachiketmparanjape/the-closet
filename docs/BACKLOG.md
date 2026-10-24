@@ -907,7 +907,7 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
 - **Lane:** Loop (settings/shell). **Effort:** S.
 - **Status:** DONE 2026-10-24 (Sprint 21).
 
-### UX-18 — Stylist audit: one experience + architecture pass, founder session
+### UX-18: Stylist audit: one experience + architecture pass, founder session
 
 - **Origin:** founder, 2026-10-24 — "the AI stylist feature
   has a lot of inconsistencies and we need to sit together
@@ -939,8 +939,12 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   (entry points × attached context × disagreements) so the
   session is decisions, not discovery.
 - **Lane:** Stylist. **Effort:** session + follow-on cuts TBD.
-- **Status:** Parked 2026-10-24, awaiting the founder's
-  word to sit down. UX-16's audit folds into this card.
+- **Status:** SPRINT 23 FOCUS (founder, 2026-10-24: "the
+  key remaining big change that makes the app seamless").
+  Bramble brings the audit inventory to the sit-down;
+  the session's output is docs/CONTEXT-MODEL.md, then
+  build waves follow from it. Held behind it: PC-38,
+  PC-41, PC-45, PC-32, PC-33. UX-16 folds in.
 
 ### OBS-4: Data-model drift spot-check (S)
 
@@ -987,7 +991,20 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   source-labeled; saving works; swapping in your own photo
   later keeps everything else.
 - **Lane:** Catalogue. **Effort:** L.
-- **Status:** DONE 2026-10-24 (Sprint 22).
+- **Status:** DONE 2026-10-24 (Sprint 22) — then the link
+  slice was REMOVED + PARKED the same day (founder call):
+  plain fetching only works for Open-Graph-friendly
+  stores (Uniqlo yes; Amazon/Patagonia/REI no), and
+  offering users a door that fails most of the time is
+  worse than not offering it. UI removed from Add pieces;
+  the `fetchLinkItem` function stays deployed but
+  unreferenced, and the retail-label plumbing stays for
+  pieces saved during its life. **Revisit trigger:** a
+  fetch approach measured at 90%+ success across a fixed
+  representative store panel (incl. Amazon) — e.g.
+  headless-browser rendering or a product-data API.
+  Screenshot / copy + paste (PC-51) is the sanctioned
+  path meanwhile.
 
 ### PC-45: Explain-the-no → a proposed, confirmable style rule (M)
 
@@ -1132,10 +1149,11 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   friendly message and the photo route still works.
 - **Lane:** Stylist (shop). **Effort:** S.
 - **Status:** SHIPPED 2026-10-24 (founder pulled it the
-  same day it was filed). Sheet order aligned with Add
-  pieces (photos first, link last) on a founder catch;
-  `fetchLinkItem` body-read timeout fix shipped with it.
-  Awaiting founder phone validation.
+  same day it was filed), then REMOVED + PARKED the same
+  day on the founder's reliability call — see PC-44's
+  status for the reasoning and the 90%+ revisit trigger.
+  The shared snapshot helper it introduced stays (the
+  photo flow uses it).
 
 ### PC-51: Paste a photo from the clipboard (S)
 
@@ -1172,5 +1190,8 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   chooser appears; pasting a link into either link field
   still pastes text, untouched.
 - **Lane:** Catalogue + Stylist (intake). **Effort:** S.
-- **Status:** Filed sprint-ready 2026-10-24 (founder
-  report). Awaiting the founder's pull decision.
+- **Status:** SHIPPED 2026-10-24 — pulled by the founder
+  as the replacement path the same day link intake was
+  parked ("advise users to take screenshots / copy images
+  and paste them"). Awaiting founder phone/desktop
+  validation.

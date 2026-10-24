@@ -210,6 +210,7 @@
     .shop-score .of { color: var(--muted); font-size: 14px; }
     .shop-verdict { margin: 8px 0 0; font-size: 15px; line-height: 1.55; }
     .shop-q-field { margin: 0 2px 14px; }
+    .sheet-fine { font-size: 13px; color: var(--muted); margin: 0 2px 14px; }
     #shopCropStage { position: relative; width: 100%; aspect-ratio: 1 / 1; overflow: hidden; border-radius: 14px; background: #000; touch-action: none; margin: 10px 0 4px; }
     #shopCropImg { position: absolute; left: 0; top: 0; max-width: none; user-select: none; -webkit-user-drag: none; transform-origin: 0 0; }
     .shop-crop-zoom { margin-top: 10px; }
@@ -909,12 +910,7 @@
           <button class="secondary" id="captureCameraBtn" type="button">Take a photo</button>
         </div>
         <div class="capture-link">
-          <label for="captureLinkInput">…or paste a product link</label>
-          <div class="capture-link-row">
-            <input id="captureLinkInput" type="url" inputmode="url" placeholder="https://store.example/item…" autocomplete="off">
-            <button class="secondary" id="captureLinkBtn" type="button">Fetch</button>
-          </div>
-          <p class="capture-fine">Bought it online? We'll pull the store's photo as the draft — clearly labeled, and you can swap in your own photo anytime.</p>
+          <p class="capture-fine">Shopping online? Copy the product photo (right-click → Copy image) or take a screenshot, then paste it right here — Ctrl+V, or Cmd+V on a Mac.</p>
         </div>
         <input id="captureFilesInput" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden />
         <input id="captureCameraInput" type="file" accept="image/*" capture="environment" hidden />
@@ -956,9 +952,9 @@
           <button class="secondary" type="button" data-guide-add>Add from your photos</button>
         </div>
         <div class="guide-path">
-          <h3>🛍️ From a link</h3>
-          <p>Bought it online? Paste the product link on the Add pieces screen and we'll pull the store's photo in as a draft. It's labeled as the store's photo — swap in your own whenever you like.</p>
-          <button class="secondary" type="button" data-guide-add>Add from a link</button>
+          <h3>📋 From your clipboard</h3>
+          <p>Seeing it online? Copy the product photo — right-click it and choose Copy image — or take a screenshot, then paste it straight in: Ctrl+V on Windows, Cmd+V on a Mac. Works on the Add pieces screen, in a shop check, or anywhere in the app — we'll ask whether it's a new piece or a check. No saving files first.</p>
+          <button class="secondary" type="button" data-guide-add>Add from clipboard</button>
         </div>
       </div>
     </section>
@@ -1039,13 +1035,7 @@
       <button class="sheet-option" id="shopSheetUpload" type="button">
         <span><span class="opt-title">Upload photo</span><span class="opt-sub">Screenshot or saved photo</span></span>
       </button>
-      <div class="field shop-q-field">
-        <label for="shopLinkInput">…or paste its product link <span class="hint">(online finds)</span></label>
-        <div class="capture-link-row">
-          <input type="url" id="shopLinkInput" inputmode="url" placeholder="https://store.example/item…" autocomplete="off">
-          <button class="secondary" id="shopLinkBtn" type="button">Check link</button>
-        </div>
-      </div>
+      <p class="sheet-fine">Shopping online? Take a screenshot — or copy the product photo and paste it here (Ctrl+V / Cmd+V).</p>
       <button class="sheet-option sheet-cancel" id="shopSheetCancel" type="button">
         <span><span class="opt-title">Cancel</span></span>
       </button>
@@ -1053,6 +1043,24 @@
   </div>
   <input type="file" id="shopCheckInput" accept="image/*" hidden>
   <input type="file" id="shopCheckInputCamera" accept="image/*" capture="environment" hidden>
+
+  <!-- PC-51: paste-with-nothing-open lands here — the photo
+       is in hand, the intent isn't; ask, don't guess. -->
+  <div class="overlay sheet-overlay" id="pasteChoiceSheet" hidden role="dialog" aria-modal="true" aria-labelledby="pasteChoiceTitle">
+    <section class="sheet">
+      <h2 class="sheet-title" id="pasteChoiceTitle">You pasted a photo</h2>
+      <p class="sheet-intro">What should happen to it?</p>
+      <button class="sheet-option" id="pasteChoiceAdd" type="button">
+        <span><span class="opt-title">Add to wardrobe</span><span class="opt-sub">It's a piece — catalogue it</span></span>
+      </button>
+      <button class="sheet-option" id="pasteChoiceCheck" type="button">
+        <span><span class="opt-title">Check against wardrobe</span><span class="opt-sub">Thinking of buying it? Get a verdict first</span></span>
+      </button>
+      <button class="sheet-option sheet-cancel" id="pasteChoiceCancel" type="button">
+        <span><span class="opt-title">Cancel</span></span>
+      </button>
+    </section>
+  </div>
 
   <!-- PC-42: crop the shop-check photo to the garment before it
        is uploaded or analyzed. -->
@@ -3229,58 +3237,6 @@
       document.getElementById("captureFilesBtn").addEventListener("click", function () { document.getElementById("captureFilesInput").click(); });
       document.getElementById("captureCameraBtn").addEventListener("click", function () { document.getElementById("captureCameraInput").click(); });
 
-      // PC-44: paste a product link → the server fetches the
-      // retail photo → the photo joins the ordinary add flow as
-      // a File, with linkImport remembering its source so the
-      // saved cover can be labeled "retail".
-      document.getElementById("captureLinkBtn").addEventListener("click", function () {
-        var input = document.getElementById("captureLinkInput");
-        var btn = document.getElementById("captureLinkBtn");
-        var url = (input.value || "").trim();
-        if (!url) { showToast("Paste a product link first."); return; }
-        if (!currentUser) { showToast("Still starting — one moment."); return; }
-        btn.disabled = true;
-        btn.textContent = "Fetching…";
-        functions.httpsCallable("fetchLinkItem")({ url: url }).then(function (res) {
-          var d = res.data || {};
-          if (!d.storagePath) throw new Error("no photo");
-          return storage.ref().child(d.storagePath).getDownloadURL().then(function (dl) {
-            return fetch(dl).then(function (r) { return r.blob(); }).then(function (blob) {
-              var ext = (d.storagePath.split(".").pop() || "jpg").toLowerCase();
-              var file = new File([blob], "retail-photo." + ext, { type: blob.type || "image/jpeg" });
-              input.value = "";
-              closeCapture();
-              beginAdd();
-              pendingSingleFiles = null;
-              if (!handFiles(document.getElementById("photoInput"), [file])) {
-                pendingSingleFiles = [file];
-                handlePhotoInputFiles(document.getElementById("photoInput"), [file]);
-              }
-              // Set AFTER the hand-in: the label binds to this
-              // exact File at save time.
-              linkImport = { file: file, title: d.title || "", sourceUrl: d.sourceUrl || url };
-              showToast("Store photo pulled in — check the details, then save.");
-            });
-          });
-        }).catch(function (err) {
-          // Our callable's message IS the catalog copy (client-
-          // safe by design) — show it; SDK errors go through
-          // the generic choke point instead. Toast FIRST, log
-          // second: a logging hiccup must never eat the message
-          // (the 2026-10-24 logError typo froze both link
-          // buttons on "Fetching…" — the call had already
-          // answered; the catch itself threw).
-          if (err && typeof err.code === "string" && err.code.indexOf("functions/") === 0 && err.message) {
-            showToast(err.message);
-          } else {
-            showToast(friendlyError(err));
-          }
-          reportError("link-import", err);
-        }).then(function () {
-          btn.disabled = false;
-          btn.textContent = "Fetch";
-        });
-      });
       // Snapshot to a real Array BEFORE clearing the input: a live
       // FileList empties when value resets (Safari) — passing the
       // list itself silently routed zero photos (founder, 2026-10-23).
@@ -7469,6 +7425,70 @@
         if (file) openShopCropper(file);
       });
 
+      // PC-51: paste a photo from the clipboard — the natural
+      // desktop gesture for anything seen online (and the
+      // sanctioned path for stores whose pages expose no
+      // fetchable photo, after link intake was parked
+      // 2026-10-24). Images are snapshotted out of the event
+      // immediately; clipboard data does not outlive the
+      // handler. Text pastes are never hijacked: when the
+      // clipboard carries text AND the paste target is a text
+      // field, the field keeps it, exactly as always.
+      var pastedImages = null;
+      var pasteChoiceSheet = document.getElementById("pasteChoiceSheet");
+      function closePasteChoice() {
+        pastedImages = null;
+        closeOverlay(pasteChoiceSheet);
+      }
+      document.getElementById("pasteChoiceAdd").addEventListener("click", function () {
+        var imgs = pastedImages;
+        closePasteChoice();
+        if (imgs && imgs.length) routeFilesToAdd(imgs);
+      });
+      document.getElementById("pasteChoiceCheck").addEventListener("click", function () {
+        var imgs = pastedImages;
+        closePasteChoice();
+        if (imgs && imgs.length) openShopCropper(imgs[0]);
+      });
+      document.getElementById("pasteChoiceCancel").addEventListener("click", closePasteChoice);
+      pasteChoiceSheet.addEventListener("click", function (event) {
+        if (event.target === pasteChoiceSheet) closePasteChoice();
+      });
+      document.addEventListener("paste", function (e) {
+        if (!currentUser) return;
+        var dt = e.clipboardData;
+        if (!dt || !dt.items) return;
+        var images = [];
+        for (var i = 0; i < dt.items.length; i++) {
+          var it = dt.items[i];
+          if (it.kind === "file" && it.type.indexOf("image/") === 0) {
+            var f = it.getAsFile();
+            if (f) images.push(f);
+          }
+        }
+        if (!images.length) return;
+        var t = e.target;
+        var inField = !!(t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable));
+        var text = "";
+        try { text = (dt.getData("text/plain") || "").trim(); } catch (err) { text = ""; }
+        if (inField && text) return;
+        var shopSheetOpen = !shopCheckSheet.hidden;
+        var captureOpen = !document.getElementById("captureOverlay").hidden;
+        if (!shopSheetOpen && !captureOpen && document.querySelector(".overlay:not([hidden])")) {
+          return; // another flow owns the screen — don't stack
+        }
+        e.preventDefault();
+        if (shopSheetOpen) {
+          closeOverlay(shopCheckSheet);
+          openShopCropper(images[0]);
+        } else if (captureOpen) {
+          routeFilesToAdd(images);
+        } else {
+          pastedImages = images;
+          openOverlay(pasteChoiceSheet);
+        }
+      });
+
       // PC-42: the crop step. The photo pauses here before any
       // upload; "Use full photo" reproduces the pre-crop flow
       // exactly, and cancelling abandons the check (which also
@@ -7628,59 +7648,6 @@
           renderShopCheckError();
         });
       }
-      // PC-50: a link check — fetchLinkItem already put the
-      // retail photo in Storage; the check runs on it directly
-      // (no upload, no crop — a clean product shot needs
-      // neither). The photo route stays the fallback.
-      function startShopCheckFromPath(storagePath, photoUrl, sourceUrl) {
-        if (!currentUser) return;
-        if (shopCheckState && shopCheckState.objectUrl) URL.revokeObjectURL(shopCheckState.objectUrl);
-        var snap = snapshotShopContext();
-        shopCheckState = {
-          file: null,
-          linkPath: storagePath,
-          sourceUrl: sourceUrl || null,
-          objectUrl: null,
-          photoUrl: photoUrl,
-          storagePath: storagePath,
-          fileName: "retail-photo",
-          fileType: "image/jpeg",
-          result: null,
-          savedId: null,
-          error: null,
-          tripId: snap.tripId,
-          question: snap.question
-        };
-        renderShopCheckLoading();
-        openOverlay(document.getElementById("shopCheckOverlay"));
-        callShopCheckAnalysis();
-      }
-      document.getElementById("shopLinkBtn").addEventListener("click", function () {
-        var input = document.getElementById("shopLinkInput");
-        var btn = document.getElementById("shopLinkBtn");
-        var url = (input.value || "").trim();
-        if (!url) { showToast("Paste a product link first."); return; }
-        if (!currentUser) { showToast("Still starting — one moment."); return; }
-        btn.disabled = true;
-        btn.textContent = "Fetching…";
-        functions.httpsCallable("fetchLinkItem")({ url: url }).then(function (res) {
-          var d = res.data || {};
-          if (!d.storagePath) throw new Error("no photo");
-          return storage.ref().child(d.storagePath).getDownloadURL().then(function (dl) {
-            input.value = "";
-            closeOverlay(shopCheckSheet);
-            startShopCheckFromPath(d.storagePath, dl, d.sourceUrl || url);
-          });
-        }).catch(function (err) {
-          if (err && typeof err.code === "string" && err.code.indexOf("functions/") === 0 && err.message) showToast(err.message);
-          else showToast(friendlyError(err));
-          reportError("shop-link-import", err);
-        }).then(function () {
-          btn.disabled = false;
-          btn.textContent = "Check link";
-        });
-      });
-
       function handleShopCheckFile(file) {
         if (!file || !currentUser) return;
         // Open the result window immediately with a loading state — the
@@ -7762,17 +7729,7 @@
         retry.className = "primary";
         retry.textContent = "Try again";
         retry.addEventListener("click", function () {
-          if (!st) return;
-          if (st.file) handleShopCheckFile(st.file);
-          else if (st.linkPath) {
-            // PC-50: a link check retries the analysis on the
-            // same stored photo — state (incl. its trip tag and
-            // question) is already snapshotted, so no re-entry.
-            st.error = null;
-            st.result = null;
-            renderShopCheckLoading();
-            callShopCheckAnalysis();
-          }
+          if (st && st.file) handleShopCheckFile(st.file);
         });
         actions.appendChild(retry);
         wrap.appendChild(actions);

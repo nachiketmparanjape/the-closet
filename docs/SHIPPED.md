@@ -4,6 +4,28 @@ What went live. Momentum you can see.
 
 ## Sprint 19 (2026-10-24 → )
 
+- **PC-51 — Paste a photo from the clipboard** (2026-10-24):
+  a document-level paste handler snapshots image files off
+  the clipboard and routes by what owns the screen — shop
+  sheet open → the check via the cropper; Add pieces open
+  → the ordinary capture ingest; nothing open → a small
+  chooser (Add to wardrobe / Check against wardrobe). Text
+  pastes are never hijacked (clipboard text + a text field
+  = the field keeps it), and a paste never stacks over an
+  unrelated open flow. Copy on both surfaces + the guide
+  now advise screenshot / copy-and-paste for online finds.
+- **Link intake REMOVED + PARKED** (2026-10-24, founder
+  call): PC-44's Add-pieces link route and PC-50's
+  shop-check link route are out of the product. Plain
+  fetching only works for Open-Graph-friendly stores —
+  Uniqlo yes; Amazon (script shell, no photo tags),
+  Patagonia (bot page), REI (503) no — and a door that
+  fails most of the time is worse than none. The
+  `fetchLinkItem` function stays deployed but
+  unreferenced; retail-label rendering stays for pieces
+  saved during its life. Revisit only with a fetch
+  approach measured 90%+ across a representative store
+  panel. Both cards carry the full note.
 - **PC-50 — Link intake for shop check** (2026-10-24,
   founder pull minutes after filing): the shop-check sheet
   gains the same paste-a-link route as Add pieces —
