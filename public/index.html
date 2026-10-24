@@ -150,6 +150,10 @@
     .overlay.sheet-overlay { place-items: end center; padding: 0; }
     .sheet { width: min(560px, 100%); background: var(--paper); border-radius: var(--r-lg) var(--r-lg) 0 0; padding: 10px 10px calc(10px + env(safe-area-inset-bottom)); box-shadow: var(--shadow); }
     .sheet-title { margin: 0; padding: 10px 14px 6px; font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+    .sheet-intro { margin: 0; padding: 0 14px 12px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+    /* Founder note 2026-10-23: the Shop list header copy sat too
+       tight against the first card. */
+    #shopListView .gallery { margin-top: 22px; }
     .sheet-option { display: flex; align-items: center; width: 100%; padding: 15px 14px; background: none; border: none; border-radius: 10px; font: inherit; text-align: left; cursor: pointer; color: var(--ink); }
     .sheet-option:hover { background: var(--paper-soft); }
     .sheet-option .opt-title { display: block; font-weight: 600; font-size: 15px; }
@@ -644,7 +648,7 @@
         <h2>Shop list</h2>
         <span class="count" id="shopCheckCount">0 saved</span>
       </div>
-      <p class="hint">Items you've checked and saved — revisit them here before you buy.</p>
+      <p class="hint">Things you're eyeing — each one checked against your wardrobe before you buy.</p>
       <div class="gallery" id="shopListGallery"></div>
     </section>
 
@@ -733,24 +737,27 @@
     </section>
   </div>
 
-  <!-- Fix buffer 2026-10-23: ONE Add door (founder review). Single vs
-       bulk is a quantity choice made inside the sheet, where the
-       context is — not two rival top-level CTAs. Small wardrobes get
-       the bulk path first: it's the fastest start. -->
-  <div class="overlay sheet-overlay" id="addSheet" hidden role="dialog" aria-modal="true" aria-labelledby="addSheetTitle">
-    <section class="sheet">
-      <h2 class="sheet-title" id="addSheetTitle">Add to your wardrobe</h2>
-      <div id="addSheetOptions">
-        <button class="sheet-option" id="addOneBtn" type="button">
-          <span><span class="opt-title">📷 Add one piece</span><span class="opt-sub">Snap or pick a photo — the AI tags it for you</span></span>
-        </button>
-        <button class="sheet-option" id="addBulkBtn" type="button">
-          <span><span class="opt-title">🗂️ Add many at once</span><span class="opt-sub">Pick up to 100 photos — they tag themselves in the background</span></span>
-        </button>
+  <!-- Fix buffer 2026-10-23 (founder design, supersedes the Add
+       sheet from earlier the same day): ONE capture screen. The user
+       never picks single vs bulk — the photo count routes: 1 photo
+       → the piece form; several → bulk. One photo per piece at
+       capture; extra angles are added later from the piece. -->
+  <div class="overlay" id="captureOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="captureTitle">
+    <section class="modal">
+      <div class="modal-head">
+        <h2 id="captureTitle">Add pieces</h2>
+        <button class="icon-button" id="captureClose" type="button" aria-label="Close">×</button>
       </div>
-      <button class="sheet-option sheet-cancel" id="addCancel" type="button">
-        <span><span class="opt-title">Cancel</span></span>
-      </button>
+      <div class="modal-body form-grid">
+        <div class="photo-actions">
+          <button class="primary" id="captureFilesBtn" type="button">Upload photos</button>
+          <button class="secondary" id="captureCameraBtn" type="button">Take a photo</button>
+        </div>
+        <input id="captureFilesInput" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden />
+        <input id="captureCameraInput" type="file" accept="image/*" capture="environment" hidden />
+        <p class="hint">One photo per piece. Add one photo and you'll fine-tune its details next; add several and each becomes its own piece, tagged automatically in the background. Need more angles of a single piece? Add them later from the piece itself.</p>
+        <button class="secondary" id="captureCancel" type="button">Cancel</button>
+      </div>
     </section>
   </div>
 
@@ -819,6 +826,7 @@
   <div class="overlay sheet-overlay" id="shopCheckSheet" hidden role="dialog" aria-modal="true" aria-labelledby="shopCheckSheetTitle">
     <section class="sheet">
       <h2 class="sheet-title" id="shopCheckSheetTitle">Check a shop item</h2>
+      <p class="sheet-intro">Before you buy it, check it against your wardrobe — snap it and I'll give you a straight verdict.</p>
       <button class="sheet-option" id="shopSheetCamera" type="button">
         <span><span class="opt-title">Take photo</span><span class="opt-sub">Snap it in the store</span></span>
       </button>
@@ -2614,23 +2622,36 @@
       });
       document.getElementById("uploadClose").addEventListener("click", function () { closeOverlay(uploadOverlay); });
       document.getElementById("uploadCancel").addEventListener("click", function () { closeOverlay(uploadOverlay); });
-      // Fix buffer 2026-10-23: the consolidated Add door. One primary
-      // opens the sheet; the sheet forks to the single-piece flow or
-      // the bulk flow. Small wardrobes see bulk first (fastest start).
-      function openAddSheet() {
-        var opts = document.getElementById("addSheetOptions");
-        var bulk = document.getElementById("addBulkBtn");
-        if (opts && bulk && allItems.length < 10 && opts.firstElementChild !== bulk) {
-          opts.insertBefore(bulk, opts.firstElementChild);
-        }
-        openOverlay(document.getElementById("addSheet"));
+      // Fix buffer 2026-10-23 (founder design): ONE capture screen.
+      // The user never chooses single vs bulk — the photo count
+      // routes: 1 photo → the piece form; several → bulk. Handing
+      // files to the existing inputs reuses both ingest pipelines
+      // (validation, pHash dupe check, upload / bulk job queue).
+      function openCapture() { openOverlay(document.getElementById("captureOverlay")); }
+      function closeCapture() { closeOverlay(document.getElementById("captureOverlay")); }
+      function handFiles(input, files) {
+        try {
+          var dt = new DataTransfer();
+          files.forEach(function (f) { dt.items.add(f); });
+          input.files = dt.files;
+          input.dispatchEvent(new Event("change", { bubbles: true }));
+        } catch (e) { input.click(); }
       }
-      function closeAddSheet() { closeOverlay(document.getElementById("addSheet")); }
-      document.getElementById("addButton").addEventListener("click", openAddSheet);
-      document.getElementById("emptyAddButton").addEventListener("click", openAddSheet);
-      document.getElementById("addCancel").addEventListener("click", closeAddSheet);
-      document.getElementById("addOneBtn").addEventListener("click", function () { closeAddSheet(); beginAdd(); });
-      document.getElementById("addBulkBtn").addEventListener("click", function () { closeAddSheet(); beginBulk(); });
+      function routeFilesToAdd(files) {
+        var list = Array.prototype.slice.call(files || []);
+        if (!list.length) return;
+        closeCapture();
+        if (list.length === 1) { beginAdd(); handFiles(document.getElementById("photoInput"), list); }
+        else { beginBulk(); handFiles(bulkInput, list); }
+      }
+      document.getElementById("addButton").addEventListener("click", openCapture);
+      document.getElementById("emptyAddButton").addEventListener("click", openCapture);
+      document.getElementById("captureClose").addEventListener("click", closeCapture);
+      document.getElementById("captureCancel").addEventListener("click", closeCapture);
+      document.getElementById("captureFilesBtn").addEventListener("click", function () { document.getElementById("captureFilesInput").click(); });
+      document.getElementById("captureCameraBtn").addEventListener("click", function () { document.getElementById("captureCameraInput").click(); });
+      document.getElementById("captureFilesInput").addEventListener("change", function () { var f = this.files; this.value = ""; routeFilesToAdd(f); });
+      document.getElementById("captureCameraInput").addEventListener("change", function () { var f = this.files; this.value = ""; routeFilesToAdd(f); });
 
       // Dismissal parity (UX-15): EVERY overlay dismisses on a
       // backdrop tap, not just some — the founder hit the Pick-an-
@@ -2644,6 +2665,7 @@
           else if (!uploadOverlay.hidden) closeOverlay(uploadOverlay);
           else if (!bulkOverlay.hidden) closeOverlay(bulkOverlay);
           else if (!chatOverlay.hidden) closeOverlay(chatOverlay);
+          else if (!document.getElementById("captureOverlay").hidden) closeOverlay(document.getElementById("captureOverlay"));
           else if (!document.getElementById("addOutfitSheet").hidden) closeOverlay(document.getElementById("addOutfitSheet"));
           else if (!document.getElementById("shopCheckSheet").hidden) closeOverlay(document.getElementById("shopCheckSheet"));
           else if (!document.getElementById("shopCheckOverlay").hidden) closeOverlay(document.getElementById("shopCheckOverlay"));
@@ -3388,8 +3410,8 @@
       document.getElementById("bulkDupeAnyway").addEventListener("click", function () { startBulkRun(); });
       document.getElementById("bulkDupeCancel").addEventListener("click", function () { hideBulkDupeBar(); });
       document.getElementById("bulkMini").addEventListener("click", function () { openOverlay(bulkOverlay); syncBulkMini(); });
-      // (The hero's old Bulk add button is gone — bulk lives in the
-      // Add sheet now; see openAddSheet. beginBulk is called there.)
+      // (The hero's old Bulk add button is gone — bulk is reached by
+      // photo count from the capture screen; see routeFilesToAdd.)
 
       // PC-10: chat stylist — text-only outfit picks over the cached
       // descriptions. The model never sees photos here.
@@ -5667,6 +5689,30 @@
           .sort(function (a, b) { return (b.version || 1) - (a.version || 1); });
       }
 
+      // Naming discipline (founder note 2026-10-23; teardown
+      // evidence: reference apps never title cards with prose —
+      // prose lives in the detail view). Cards get SHORT names:
+      // a stylist look name when there is one, else the hero piece
+      // + "+ N more". The data-level standard is NAMING-1.
+      function shortItemName(name) {
+        var s = String(name || "").replace(/^(a|an|the)\s+/i, "").split(",")[0].trim();
+        var w = s.split(/\s+/).slice(0, 5).join(" ");
+        return w ? w.charAt(0).toUpperCase() + w.slice(1) : "Piece";
+      }
+      function outfitDisplayName(o) {
+        var n = String(o.name || "");
+        if (n && n.length <= 44 && n.indexOf(" + ") === -1) return n;
+        var ids = Array.isArray(o.itemIds) ? o.itemIds : [];
+        var first = null;
+        for (var i = 0; i < allItems.length; i++) { if (ids.indexOf(allItems[i].id) !== -1) { first = allItems[i]; break; } }
+        var base = first ? shortItemName(first.name) : "Outfit";
+        return ids.length > 1 ? base + " + " + (ids.length - 1) + " more" : base;
+      }
+      function shopDisplayTitle(note) {
+        var s = String(note || "Shop item").replace(/^(a|an|the)\s+/i, "").split(/,| with | featuring | and has /)[0].trim();
+        var w = s.split(/\s+/).slice(0, 6).join(" ");
+        return w ? w.charAt(0).toUpperCase() + w.slice(1) : "Shop item";
+      }
       function renderOutfits() {
         var gallery = document.getElementById("outfitsGallery");
         gallery.textContent = "";
@@ -5696,7 +5742,7 @@
           details.className = "item-details";
           var name = document.createElement("p");
           name.className = "item-name outfit-name";
-          name.textContent = (o.favorite ? "★ " : "") + (o.name || "Outfit");
+          name.textContent = (o.favorite ? "★ " : "") + outfitDisplayName(o);
           if ((o.version || 1) > 1) {
             var badge = document.createElement("span");
             badge.className = "ver-badge";
@@ -5709,7 +5755,7 @@
           span.textContent = (o.itemIds || []).length + " pieces" +
             (o.occasion ? " · " + o.occasion : "") +
             (o.source === "stylist" ? " · Stylist pick" : "") +
-            (o.tripId ? " · " + ((tripById(o.tripId) || {}).name || "Trip") + " trip" : "");
+            (o.tripId ? " · " + (((tripById(o.tripId) || {}).name) ? tripById(o.tripId).name + " trip" : "Trip") : "");
           meta.appendChild(span);
           details.appendChild(name);
           details.appendChild(meta);
@@ -6036,7 +6082,7 @@
         var body = document.getElementById("outfitDetailBody");
         body.textContent = "";
         if (!o) { closeOutfit(); return; }
-        document.getElementById("outfitTitle").textContent = o.name || "Outfit";
+        document.getElementById("outfitTitle").textContent = outfitDisplayName(o);
 
         // PC-13: the outfit photo, when one was parsed or added.
         if (o.photoUrl) {
@@ -6759,7 +6805,7 @@
           }
           card.appendChild(imgWrap);
           var name = (c.item && (c.item.note || c.item.category)) || "Shop item";
-          card.appendChild(el("p", "shop-card-name", name));
+          card.appendChild(el("p", "shop-card-name", shopDisplayTitle(name)));
           if (c.verdict) card.appendChild(el("p", "shop-card-verdict", c.verdict));
           card.appendChild(el("span", "shop-status " + (c.status || "considering"), STATUS_LABELS[c.status] || "Considering"));
           function open() { openShopCheckDetail(c.id); }
