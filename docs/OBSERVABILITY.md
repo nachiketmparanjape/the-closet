@@ -254,8 +254,8 @@ session and loop-guarded, so a failing page cannot flood its own ledger.
 - **The brief itself is not recorded.** For the stylist, we record that a
   call happened and what it cost — not the facts the model was shown. So
   "why did it answer that?" still cannot be answered from the records.
-  That gap belongs to the stylist overhaul (AGENT-ARCHITECTURE.md, gap
-  A6).
+  That gap belongs to the stylist overhaul (its working documents live
+  in `docs/sprints/sprint-23/`).
 
 ## Decisions still open
 

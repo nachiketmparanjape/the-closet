@@ -427,5 +427,4 @@ As of 2026-10-24.
 - The motion system as built: UX-15's record in `docs/SHIPPED.md`
   (2026-10-24).
 - Where the data behind the surfaces lives: `docs/DATA_MODEL.md`;
-  what the stylist's surfaces must show about context:
-  `docs/sprints/sprint-23/AGENT-ARCHITECTURE.md`.
+  how the stylist itself is built: `docs/AGENT-ARCHITECTURE.md`.
