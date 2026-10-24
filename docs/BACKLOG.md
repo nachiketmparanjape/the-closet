@@ -987,8 +987,8 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   source-labeled; saving works; swapping in your own photo
   later keeps everything else.
 - **Lane:** Catalogue. **Effort:** L.
-- **Status:** Filed from teardown 2026-10-24 (founder-saved).
-  Competes at the next planning walk.
+- **Status:** IN SPRINT 22 (pulled at the 2026-10-24 walk,
+  ranked #1, the sprint anchor).
 
 ### PC-45: Explain-the-no → a proposed, confirmable style rule (M)
 
@@ -1031,9 +1031,8 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   outfit previews naming real owned pieces; previews use
   the same composer as Today picks.
 - **Lane:** Stylist. **Effort:** M.
-- **Status:** Filed from teardown 2026-10-24 (founder-
-  saved). Any chat-shaped follow-up waits for UX-18;
-  the result-surface version competes at the next walk.
+- **Status:** IN SPRINT 22 (pulled at the 2026-10-24 walk,
+  ranked #3; result-surface version only).
 
 ### PC-47: Forgotten-pieces utilization surface (S/M)
 
@@ -1054,8 +1053,8 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   wear counts; a never-worn piece can start a look in one
   tap.
 - **Lane:** Loop + Personalization. **Effort:** S/M.
-- **Status:** Filed from teardown 2026-10-24 (founder-
-  saved). Competes at the next planning walk.
+- **Status:** IN SPRINT 22 (pulled at the 2026-10-24 walk,
+  ranked #2).
 
 ### PC-48: Activity + luggage-aware trip planning (M/L)
 
@@ -1078,8 +1077,12 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   a visibly smaller, activity-shaped plan vs the same
   trip without them.
 - **Lane:** Outfits (trips). **Effort:** M/L.
-- **Status:** Filed from teardown 2026-10-24 (founder-
-  saved). Competes at the next planning walk.
+- **Status:** FIRST ALTERNATE (2026-10-24 walk). Ranked #1
+  in the first proposed slate on a Hong Kong deadline that
+  turned out not to exist (the in-app trips are test trips —
+  founder correction, 2026-10-24). Pull trigger: a real
+  trip lands on the calendar (the pre-Canada sprint, if the
+  visa lands, is its natural home).
 
 ### PC-49: Personal avatar outfit preview (L)
 
