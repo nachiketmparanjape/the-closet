@@ -163,6 +163,10 @@
     @media (max-width: 899px) {
       .feedback-fab { width: 40px; height: 40px; padding: 0; border-radius: 50%; font-size: 15px; display: flex; align-items: center; justify-content: center; opacity: .94; }
       .feedback-fab .fb-label { display: none; }
+      /* The pencil is its own element so flex centers the GLYPH —
+         as raw text it carried a trailing space (and the word
+         span), which pushed it visibly off-center. */
+      .feedback-fab .fb-icon { display: block; line-height: 1; }
     }
     .feedback-fab:hover { border-color: var(--ink); }
     /* UX-11: bottom-sheet chooser for the three ways to add an outfit. */
@@ -1251,7 +1255,7 @@
   </div>
 
   <button class="chat-fab" id="chatFab" type="button"><span aria-hidden="true">✨</span><span>Ask the stylist</span></button>
-  <button class="feedback-fab" id="feedbackFab" type="button" hidden aria-label="Send feedback">✎ <span class="fb-label">Feedback</span></button>
+  <button class="feedback-fab" id="feedbackFab" type="button" hidden aria-label="Send feedback"><span class="fb-icon" aria-hidden="true">✎</span> <span class="fb-label">Feedback</span></button>
 
   <div class="overlay" id="feedbackOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="feedbackTitle">
     <section class="modal">
