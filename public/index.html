@@ -341,7 +341,7 @@
        only the state. Backdrop fades via background-color (see the
        .overlay base rule); panels travel on transform/opacity
        only — no layout animation, no teleporting. */
-    .overlay.is-open { background: rgba(12, 14, 12, .58); }
+    .overlay.is-open { background: rgba(12, 14, 12, .66); }
     .overlay .modal, .overlay .sheet { opacity: 0; transform: translateY(16px) scale(.99); transition: transform 300ms cubic-bezier(.32,.72,.24,1), opacity 230ms ease; }
     .overlay.is-open .modal, .overlay.is-open .sheet { opacity: 1; transform: translateY(0) scale(1); }
     .overlay.is-closing .modal, .overlay.is-closing .sheet { transition-duration: 200ms, 170ms; }
@@ -407,6 +407,18 @@
     .pack-reason { font-size: 13.5px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    }
+    /* UNIVERSAL OVERLAY RULE (founder, 2026-10-24): on phones
+       every overlay panel is a bottom sheet — full width,
+       anchored to the bottom, top corners rounded, never
+       taller than 92dvh. No centered floating cards on
+       mobile, ever: each window had grown its own placement
+       over the sprints, which is why pages kept looking
+       unformatted. One exception: the capture window
+       (full-screen). Guarded by tests/layout-invariants. */
+    @media (max-width: 899px) {
+      .overlay:not(#captureOverlay) { place-items: end center; padding: 0; }
+      .overlay:not(#captureOverlay) .modal, .overlay:not(#captureOverlay) .sheet { width: 100%; max-width: none; max-height: 92dvh; border-radius: 20px 20px 0 0; }
     }
     .chat-fab { display: none !important; }
     .outfit-card { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-md); padding: 16px; margin-top: 8px; }
@@ -1229,7 +1241,7 @@
         <button class="icon-button" id="feedbackClose" type="button" aria-label="Close feedback">×</button>
       </div>
       <div class="modal-body">
-        <p class="hint" style="margin-top:0">One person builds Closet — feedback is how it learns. Spotted a bug, confused by something, or wishing for a feature? Write it here; every note gets read. Dictating works too, the keyboard mic is fine.</p>
+        <p class="hint" style="margin-top:0">This experience is built and maintained by a single person. If something's off — a bug, a confusing screen, a feature you wish existed — write it here. Every note gets read. Dictating works too, the keyboard mic is fine.</p>
         <p class="hint" id="feedbackContextLine" hidden></p>
         <textarea class="feedback-text" id="feedbackText" rows="5" enterkeyhint="send"
           placeholder="What happened? What confused you? What do you wish it did?"></textarea>
@@ -2021,7 +2033,7 @@
         // Founder (2026-10-24): give it the one-person pitch — a bare
         // button reads as a utility; the invitation is the point.
         body.appendChild(h("Feedback"));
-        body.appendChild(el("p", "hint", "One person builds Closet. Feedback is how it learns — if something could be better, say it here. Every note gets read; plenty get built."));
+        body.appendChild(el("p", "hint", "This experience is built and maintained by a single person. If something could be better, say it here — every note gets read, and plenty get built."));
         var fb = el("button", "secondary", "Send feedback");
         fb.type = "button";
         fb.style.marginTop = "10px";
