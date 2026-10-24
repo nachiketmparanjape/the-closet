@@ -189,6 +189,11 @@
     .capture-link .capture-fine { color: var(--muted); margin: 0; }
     .src-note { margin: 8px 2px 0; font-size: 12.5px; color: var(--muted); }
     .src-tag { color: var(--accent-dark); font-weight: 600; }
+    .catalog-sort { margin-left: auto; display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--muted); }
+    .catalog-sort select { font: inherit; font-size: 13.5px; color: var(--ink); background: var(--paper); border: 1px solid var(--line-strong); border-radius: 999px; padding: 6px 10px; min-height: 36px; }
+    .wear-badge { display: inline-block; margin-top: 5px; font-size: 12px; color: var(--muted-strong); background: var(--paper-soft); border-radius: 999px; padding: 2.5px 9px; }
+    .wear-badge.never { color: var(--accent-dark); background: var(--accent-soft); font-weight: 600; }
+    .look-btn { margin-top: 8px; width: 100%; border: 1px solid var(--accent); color: var(--accent-dark); background: none; border-radius: 999px; padding: 7px 10px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; min-height: 38px; }
     .capture-note p { margin: 0; }
     .capture-lead { color: var(--ink); font-family: "Closet Serif", serif; font-size: 20px; line-height: 1.25; }
     .capture-fine { font-size: 13px; }
@@ -748,6 +753,14 @@
       <div class="catalog-head">
         <h2>Every piece</h2>
         <span class="count" id="itemCount">0 pieces</span>
+        <label class="catalog-sort">Sort
+          <select id="wardrobeSort" aria-label="Sort the wardrobe">
+            <option value="browse">Browse</option>
+            <option value="most">Most worn</option>
+            <option value="least">Least worn</option>
+            <option value="never">Never worn</option>
+          </select>
+        </label>
       </div>
 
       <div class="gallery" id="gallery">
@@ -2354,6 +2367,26 @@
         }
         details.appendChild(name);
         details.appendChild(meta);
+        if (wardrobeSortMode !== "browse" && wearStatsById) {
+          var w = wearOf(item);
+          var badge = document.createElement("span");
+          if (w.count === 0) {
+            badge.className = "wear-badge never";
+            badge.textContent = "Never worn";
+          } else {
+            badge.className = "wear-badge";
+            badge.textContent = "Worn " + w.count + "×" + (w.last ? " · last " + new Date(w.last).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "");
+          }
+          details.appendChild(badge);
+          if (w.count === 0) {
+            var lookBtn = document.createElement("button");
+            lookBtn.className = "look-btn";
+            lookBtn.type = "button";
+            lookBtn.textContent = "Build a look around this";
+            lookBtn.addEventListener("click", function (e) { e.stopPropagation(); buildLookAround(item); });
+            details.appendChild(lookBtn);
+          }
+        }
         article.appendChild(imageWrap);
         article.appendChild(details);
         article.style.cursor = "pointer";
@@ -2921,6 +2954,57 @@
         return wall;
       }
 
+      // PC-47: forgotten-pieces utilization. Wear modes sort
+      // the flat grid by real wear (one aggregate query over
+      // wear_events, cached, refreshed when stale); "Browse"
+      // keeps the category wall exactly as it was.
+      var wardrobeSortMode = "browse";
+      var wearStatsById = null;
+      var wearStatsLoadedAt = 0;
+      var wearStatsLoading = false;
+      function ensureWearStats() {
+        if (wearStatsLoading || !currentUser) return;
+        if (wearStatsById && Date.now() - wearStatsLoadedAt < 60000) return;
+        wearStatsLoading = true;
+        db.collection("users").doc(currentUser.uid).collection("wear_events").limit(1000).get()
+          .then(function (snap) {
+            var map = {};
+            snap.forEach(function (d) {
+              var w = d.data();
+              var t = w.wornAt && w.wornAt.toDate ? w.wornAt.toDate().getTime() : 0;
+              (w.articleIds || []).forEach(function (id) {
+                var e = map[id] || (map[id] = { count: 0, last: 0 });
+                e.count++;
+                if (t > e.last) e.last = t;
+              });
+            });
+            wearStatsById = map;
+            wearStatsLoadedAt = Date.now();
+          })
+          .catch(function () { wearStatsById = {}; wearStatsLoadedAt = Date.now(); })
+          .then(function () { wearStatsLoading = false; renderGallery(); });
+      }
+      function wearOf(item) {
+        return (wearStatsById && wearStatsById[item.id]) || { count: 0, last: 0 };
+      }
+      function itemCreatedMs(item) {
+        var c = item && item.createdAt;
+        if (!c) return 0;
+        if (typeof c.toDate === "function") return c.toDate().getTime();
+        if (typeof c === "number") return c;
+        var t = Date.parse(c);
+        return isNaN(t) ? 0 : t;
+      }
+      function buildLookAround(item) {
+        if (!item || !currentUser) return;
+        var exists = chatRefs.articles.some(function (a) { return a.id === item.id; });
+        if (!exists) chatRefs.articles.push({ kind: "article", id: item.id, label: item.shortName || item.name || "Piece" });
+        renderRefChips();
+        openChat();
+        chatInput.value = "Build a look around this piece.";
+        chatInput.focus();
+      }
+
       function renderGallery() {
         var query = searchInput.value.trim().toLowerCase();
         var visible = allItems.filter(function (item) {
@@ -2930,10 +3014,32 @@
           return categoryMatch && textMatch;
         });
 
+        if (wardrobeSortMode !== "browse") {
+          if (!wearStatsById) {
+            ensureWearStats();
+            gallery.textContent = "";
+            var counting = document.createElement("div");
+            counting.className = "empty-copy";
+            counting.style.gridColumn = "1 / -1";
+            counting.innerHTML = "<h3>Counting wears…</h3><p>Reading your wear history.</p>";
+            gallery.appendChild(counting);
+            itemCount.textContent = allItems.length + " pieces";
+            return;
+          }
+          if (wardrobeSortMode === "never") {
+            visible = visible.filter(function (item) { return wearOf(item).count === 0; });
+            visible.sort(function (a, z) { return itemCreatedMs(a) - itemCreatedMs(z); });
+          } else if (wardrobeSortMode === "most") {
+            visible.sort(function (a, z) { return wearOf(z).count - wearOf(a).count || wearOf(z).last - wearOf(a).last; });
+          } else if (wardrobeSortMode === "least") {
+            visible.sort(function (a, z) { return wearOf(a).count - wearOf(z).count || wearOf(a).last - wearOf(z).last; });
+          }
+        }
+
         gallery.textContent = "";
         if (!currentUser || allItems.length === 0) {
           gallery.appendChild(emptyState);
-        } else if (filter === "All" && !query) {
+        } else if (filter === "All" && !query && wardrobeSortMode === "browse") {
           gallery.appendChild(categoryWallEl());
         } else if (visible.length === 0) {
           var noResults = document.createElement("div");
@@ -3103,6 +3209,11 @@
         if (n) n.addEventListener("click", openGuide);
       });
       document.getElementById("captureClose").addEventListener("click", closeCapture);
+      document.getElementById("wardrobeSort").addEventListener("change", function () {
+        wardrobeSortMode = this.value;
+        if (wardrobeSortMode !== "browse") ensureWearStats();
+        renderGallery();
+      });
       document.getElementById("captureFilesBtn").addEventListener("click", function () { document.getElementById("captureFilesInput").click(); });
       document.getElementById("captureCameraBtn").addEventListener("click", function () { document.getElementById("captureCameraInput").click(); });
 
