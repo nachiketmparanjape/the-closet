@@ -207,6 +207,7 @@
     /* WX-1: shows the weather the stylist is working with. Hidden until a
        reading succeeds — no chip is better than a stale or "unknown" one. */
     .weather-chip { display: inline-block; font-size: 13px; font-weight: 400; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; margin-left: 10px; vertical-align: middle; white-space: nowrap; }
+    .weather-chip.chip-action { cursor: pointer; color: var(--ink); border-color: var(--line-strong); }
     .trip-chip { display: inline-block; font-size: 13px; font-weight: 500; color: var(--ink); border: 1px solid var(--line-strong); border-radius: 999px; padding: 3px 10px; margin-left: 8px; vertical-align: middle; white-space: nowrap; }
     .trip-chip button { background: none; border: none; color: inherit; font-size: 13px; cursor: pointer; padding: 0 0 0 6px; }
     .pin-proposal { background: var(--paper-soft); border: 1px solid var(--accent, #a87c1c); border-radius: 10px; padding: 12px 14px; margin-top: 8px; }
@@ -4933,15 +4934,76 @@
         var word = weatherCodeToWord(current.weather_code);
         return Math.round(current.temperature_2m) + "°F" + (word ? ", " + word : "");
       }
-      function getUserPosition() {
+      // Permission-respecting position (founder, 2026-10-23: Safari
+      // re-asked on EVERY refresh — intrusive). Rules now:
+      //  - granted coordinates are cached on-device for a week and
+      //    used silently; a stale cache still beats a prompt;
+      //  - a silent refresh happens only when the browser reports
+      //    the permission as already granted;
+      //  - otherwise the app auto-asks AT MOST ONCE per device, ever;
+      //  - after that, the only door is the tappable weather chip.
+      var COORDS_KEY = "closet.coords.v1";
+      var coordsMem = null;
+      function readCachedCoords() {
+        if (coordsMem) return coordsMem;
+        try {
+          var raw = window.localStorage.getItem(COORDS_KEY);
+          if (raw) { var c = JSON.parse(raw); if (c && typeof c.lat === "number" && typeof c.lon === "number" && c.at) coordsMem = c; }
+        } catch (e) {}
+        return coordsMem;
+      }
+      function saveCoords(coords) {
+        var c = { lat: coords.latitude, lon: coords.longitude, at: Date.now() };
+        coordsMem = c;
+        try { window.localStorage.setItem(COORDS_KEY, JSON.stringify(c)); } catch (e) {}
+        return c;
+      }
+      function fromCache(c) { return { latitude: c.lat, longitude: c.lon }; }
+      function requestPositionNow() {
         return new Promise(function (resolve) {
           if (!navigator.geolocation) return resolve(null);
           navigator.geolocation.getCurrentPosition(
-            function (pos) { resolve(pos.coords); },
-            function () { resolve(null); }, // denied/unavailable: degrade gracefully
+            function (pos) { resolve(saveCoords(pos.coords)); },
+            function (err) {
+              if (err && err.code === 1) { try { window.localStorage.setItem("closet.locDenied.v1", "1"); } catch (e) {} }
+              resolve(null);
+            },
             { timeout: 10000, maximumAge: 600000 }
           );
         });
+      }
+      var positionPromise = null;
+      function getUserPosition() {
+        if (!positionPromise) positionPromise = computeUserPosition();
+        return positionPromise;
+      }
+      function computeUserPosition() {
+        var cached = readCachedCoords();
+        if (cached && Date.now() - cached.at < 24 * 3600 * 1000) {
+          return Promise.resolve(fromCache(cached));
+        }
+        var staleOrNull = function () { return cached ? fromCache(cached) : null; };
+        var silentRefresh = function () {
+          return requestPositionNow().then(function (c) { return c ? fromCache(c) : staleOrNull(); });
+        };
+        var oneLifetimeAsk = function () {
+          var asked = false, denied = false;
+          try {
+            asked = !!window.localStorage.getItem("closet.locAsked.v1");
+            denied = !!window.localStorage.getItem("closet.locDenied.v1");
+          } catch (e) {}
+          if (asked || denied) return Promise.resolve(staleOrNull());
+          try { window.localStorage.setItem("closet.locAsked.v1", "1"); } catch (e) {}
+          return silentRefresh();
+        };
+        if (navigator.permissions && navigator.permissions.query) {
+          return navigator.permissions.query({ name: "geolocation" }).then(function (st) {
+            if (st.state === "granted") return silentRefresh();
+            if (st.state === "denied") return staleOrNull();
+            return oneLifetimeAsk();
+          }).catch(oneLifetimeAsk);
+        }
+        return oneLifetimeAsk();
       }
       function getWeatherSummary() {
         var now = Date.now();
@@ -4966,8 +5028,30 @@
       function refreshWeatherChip() {
         var chip = document.getElementById("weatherChip");
         getWeatherSummary().then(function (summary) {
-          if (summary) { chip.textContent = summary; chip.hidden = false; }
-          else { chip.hidden = true; }
+          if (summary) {
+            chip.textContent = summary;
+            chip.hidden = false;
+            chip.classList.remove("chip-action");
+            chip.onclick = null;
+          } else {
+            // No silent weather available: offer the door instead
+            // of either prompting or vanishing — unless the browser
+            // has recorded a denial, in which case stay out of sight.
+            var denied = false;
+            try { denied = !!window.localStorage.getItem("closet.locDenied.v1"); } catch (e) {}
+            if (denied) { chip.hidden = true; return; }
+            chip.textContent = "📍 Set location";
+            chip.hidden = false;
+            chip.classList.add("chip-action");
+            chip.onclick = function () {
+              requestPositionNow().then(function (c) {
+                positionPromise = null;
+                weatherCache = { summary: null, at: 0 };
+                if (c) { refreshWeatherChip(); showToast("Location set — your picks now use local weather."); }
+                else { chip.hidden = true; showToast("Couldn't get your location."); }
+              });
+            };
+          }
         });
       }
 
