@@ -1195,3 +1195,40 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   parked ("advise users to take screenshots / copy images
   and paste them"). Awaiting founder phone/desktop
   validation.
+
+### PC-52: The stylist may propose an attachment (S)
+
+- **Origin:** Founder, 2026-10-24, on the UX-18 build: "can
+  we educate user on attaching during conversation, or in
+  some cases attaching things on our [behalf] based on chat
+  context?" Decision 1 stands — nothing attaches silently,
+  ever. But the app may notice the conversation has turned
+  on something unattached and PROPOSE attaching it, exactly
+  the way pinned facts are proposed today (model proposes,
+  user taps, nothing happens without the tap). Education
+  shipped alongside the question: the context sheet now
+  also attaches (an Attach row for today's pick + the @
+  tip), and the empty state teaches both routes.
+- **In scope:** an `attachProposal` answer field alongside
+  `pinProposal` in the general conversation — the model
+  proposes attaching today's pick when the user's words
+  clearly turn on it ("make it warmer", "why did you pick
+  this?") and no pick is attached and the conversation has
+  no pick of its own. The client renders a proposal card
+  (Attach / Dismiss) mirroring the pin-proposal card;
+  Attach runs attachTodayPick(). The assembler states the
+  rule in the brief (propose only on a clear referent, at
+  most one per conversation unless the subject changes).
+- **Out of scope:** proposing pointers to pieces (the @
+  gesture is the user's; a future card may generalize),
+  any silent or timed auto-attach (barred by decision 1),
+  trip conversations.
+- **Acceptance:** in a fresh general conversation with a
+  pick on Today, "make this warmer" earns an Attach
+  proposal card; tapping Attach puts the pick in the
+  context line and the next message iterates from it;
+  Dismiss leaves the conversation pick-free and the model
+  does not re-propose on the next turn.
+- **Lane:** Stylist. **Effort:** S.
+- **Status:** Filed 2026-10-24. Enters work only via a
+  planning walk (no ad hoc build).

@@ -4200,6 +4200,7 @@
         threadWindowNoted = {};
         threadManifests = {};
         chatThreadSuggested = {};
+        chatAttachByThread = {};
         if (activeThreadKey !== "general") { activeThreadKey = "general"; stylistMessages = []; }
         if (uid) {
           loadThread("general", function () {
@@ -4269,6 +4270,7 @@
         chatThreadSuggested[key] = [];
         threadManifests[key] = null;
         threadWindowNoted[key] = false;
+        delete chatAttachByThread[key]; // a new conversation starts unattached
         saveThread(key);
         renderChat();
         renderContextLine();
@@ -4331,7 +4333,7 @@
           em.textContent = "beautifully.";
           title.appendChild(em);
           empty.appendChild(title);
-          empty.appendChild(shopCheckEl("p", "chat-empty-hint", "Built entirely from what's already in your closet. Try “casual dinner, 60°F” — or tap @ to point at a specific piece or outfit."));
+          empty.appendChild(shopCheckEl("p", "chat-empty-hint", "Built entirely from what's already in your closet. Try “casual dinner, 60°F” — tap @ to build around a specific piece, or tap the line above to attach today's pick and talk about it."));
           chatList.appendChild(empty);
         }
         stylistMessages.forEach(function (m) {
@@ -4598,29 +4600,42 @@
 
       // UX-18 W2 (CONTEXT-MODEL, decisions 1 + 8): today's pick
       // attaches ONLY on an explicit tap of a button that is about
-      // the pick — attachTodayPick(), called from Today screen's
-      // "Ask the stylist" and the in-chat strip's "Ask about this".
-      // A plain stylist session never receives it by default, and
-      // reopening the chat no longer re-attaches it (the pre-UX-18
-      // auto-attach machinery — seedTodayChip/renderTodayChip and
-      // the header chip — is gone). The attachment shows in the
-      // context line (W3) and is removed from the context sheet.
-      var chatAttachPick = null;
-      function attachTodayPick() {
-        if (typeof todayHomeOn !== "function" || !todayHomeOn()) return false;
+      // the pick — attachTodayPick(), called from the Today page's
+      // "Ask the stylist" and the context sheet's Attach row. (The
+      // in-chat pick card that once carried an attach button was
+      // removed by founder verdict, 2026-10-24.) A plain stylist session
+      // never receives it by default, and reopening the chat no
+      // longer re-attaches it (the pre-UX-18 auto-attach machinery
+      // — seedTodayChip/renderTodayChip and the header chip — is
+      // gone). The attachment shows in the context line (W3) and is
+      // removed from the context sheet.
+      // Lifecycle (founder, 2026-10-24): an attachment belongs to
+      // ONE conversation. It is stored per thread, is NOT saved
+      // with the transcript, and is refreshed — born empty — for
+      // every new conversation: Start fresh clears it, switching
+      // threads scopes it, and a resumed thread starts unattached
+      // until the user attaches again.
+      var chatAttachByThread = {};
+      function currentAttach() { return chatAttachByThread[activeThreadKey] || null; }
+      function todayPickReady() {
+        if (typeof todayHomeOn !== "function" || !todayHomeOn()) return null;
         restoreToday();
         var tw = todayState.picks[todayState.idx];
-        if (tw && tw.outfit && tw.outfit.itemIds && tw.outfit.itemIds.length) {
-          chatAttachPick = {
-            itemIds: tw.outfit.itemIds.slice(),
-            lookName: tw.outfit.lookName || null,
-            reasoning: tw.outfit.reasoning || tw.outfit.tagline || null
-          };
-          return true;
-        }
-        return false;
+        if (tw && tw.outfit && tw.outfit.itemIds && tw.outfit.itemIds.length) return tw.outfit;
+        return null;
       }
-      function detachTodayPick() { chatAttachPick = null; }
+      function attachTodayPick() {
+        if (tripChat) return false;
+        var o = todayPickReady();
+        if (!o) return false;
+        chatAttachByThread[activeThreadKey] = {
+          itemIds: o.itemIds.slice(),
+          lookName: o.lookName || null,
+          reasoning: o.reasoning || o.tagline || null
+        };
+        return true;
+      }
+      function detachTodayPick() { delete chatAttachByThread[activeThreadKey]; }
 
       // UX-18 W3 (CONTEXT-MODEL, decisions 2 + 4): ONE display of what
       // the stylist knows — the context line under the chat header.
@@ -4646,8 +4661,9 @@
         if (tripChat) {
           var t = tripById(tripChat.tripId);
           entries.push({ type: "trip", label: "🧳 " + ((t && t.name) || "Trip"), action: "leaveTrip" });
-        } else if (chatAttachPick) {
-          entries.push({ type: "pick", label: "◈ Today's pick" + (chatAttachPick.lookName ? " · " + chatAttachPick.lookName : ""), action: "detachPick" });
+        } else if (currentAttach()) {
+          var att = currentAttach();
+          entries.push({ type: "pick", label: "◈ Today's pick" + (att.lookName ? " · " + att.lookName : ""), action: "detachPick" });
         }
         scopedPinsForLine().forEach(function (p) {
           entries.push({
@@ -4730,6 +4746,27 @@
         if (!list) return;
         list.textContent = "";
         contextEntries().forEach(function (e) { list.appendChild(contextSheetRow(e)); });
+        // Education, in place (founder ask, 2026-10-24): the sheet
+        // that removes context also ADDS it — one surface, both
+        // directions. Attaching today's pick is offered here when it
+        // exists and is not attached; the @ pointer is taught as a
+        // line, since it is done from the keyboard, not a button.
+        if (!tripChat && !currentAttach() && todayPickReady()) {
+          var addRow = document.createElement("div");
+          addRow.className = "context-row";
+          var al = document.createElement("span");
+          al.className = "context-row-label";
+          al.textContent = "◈ Today's pick — not attached";
+          addRow.appendChild(al);
+          addRow.appendChild(sheetActionBtn("Attach", function () {
+            if (attachTodayPick()) { renderContextLine(); openContextSheet(); }
+          }));
+          list.appendChild(addRow);
+        }
+        var tip = document.createElement("p");
+        tip.className = "hint";
+        tip.textContent = "Tip: the more the stylist knows, the better the pick. Type @ in a message to build around a specific piece or outfit, and state facts (\"I'm in Tahoe until Sunday\") — it will offer to remember them.";
+        list.appendChild(tip);
         var win = document.createElement("p");
         win.className = "hint";
         win.textContent = "The stylist reads the most recent " + STYLIST_WINDOW + " messages of this conversation.";
@@ -4929,19 +4966,20 @@
           }
         }
         // UX-18 W2: today's pick rides along ONLY when the user
-        // attached it explicitly (chatAttachPick — set by the
-        // pick's own buttons, see attachTodayPick). When attached
-        // it also becomes the iteration base if this conversation
-        // has no pick of its own yet. Otherwise it is simply not
-        // in the brief — no display-only context, ever.
+        // attached it explicitly in THIS conversation (see
+        // attachTodayPick). When attached it also becomes the
+        // iteration base if this conversation has no pick of its
+        // own yet. Otherwise it is simply not in the brief — no
+        // display-only context, ever.
         var todayPickCtx = null;
-        if (!tripChat && chatAttachPick) {
+        var attachSnap = currentAttach();
+        if (!tripChat && attachSnap) {
           todayPickCtx = {
-            itemIds: chatAttachPick.itemIds.slice(),
-            lookName: chatAttachPick.lookName,
-            reasoning: chatAttachPick.reasoning
+            itemIds: attachSnap.itemIds.slice(),
+            lookName: attachSnap.lookName,
+            reasoning: attachSnap.reasoning
           };
-          if (!previousPick) previousPick = { itemIds: chatAttachPick.itemIds.slice() };
+          if (!previousPick) previousPick = { itemIds: attachSnap.itemIds.slice() };
         }
         var payload = {
           items: stylistItems(),
@@ -6592,68 +6630,23 @@
         if (tripChat) { strip.hidden = true; strip.textContent = ""; return; }
         strip.textContent = "";
         if (!todayHomeOn() || !currentUser) { strip.hidden = true; return; }
-        restoreToday();
-        var wrap = todayState.picks[todayState.idx];
-        if (!wrap) {
-          if (todayThresholdMet() && allItems.length) {
-            strip.hidden = false;
-            var row = document.createElement("div");
-            row.className = "today-actions";
-            row.style.marginTop = "0";
-            row.appendChild(shopCheckEl("p", "today-why", "Today's pick lives on the Today home."));
-            row.appendChild(mkBtn("secondary", "Go to Today", function () {
-              closeOverlay(chatOverlay);
-              switchView("today");
-            }));
-            strip.appendChild(row);
-          } else {
-            strip.hidden = true;
-          }
-          return;
-        }
+        // Founder verdict (2026-10-24, phone test of UX-18): the
+        // pick CARD does not belong in the chat thread — it lives
+        // on the Today page, and that's enough. What stays here is
+        // only the way back: one slim navigation row. (Attaching
+        // the pick to the conversation happens from Today's own
+        // Ask button or the context sheet — never from a card in
+        // the thread.)
         strip.hidden = false;
-        var o = wrap.outfit;
-        var worn = !!(o.savedId && todayState.wornSet && todayState.wornSet[o.savedId]);
-        strip.appendChild(shopCheckEl("p", "today-eyebrow", (o.lookName ? "Today's feature" : "Today's pick") + (worn ? " · worn ✓" : "")));
-        if (o.lookName) {
-          strip.appendChild(shopCheckEl("h3", "look-name sm", o.lookName));
-          if (o.tagline) strip.appendChild(shopCheckEl("p", "look-tagline", o.tagline));
-        }
-        var photos = document.createElement("div");
-        photos.className = "today-pick-photos";
-        (o.itemIds || []).forEach(function (id) {
-          var it = itemById(id);
-          var ps = it ? itemPhotos(it) : [];
-          var fig = document.createElement("figure");
-          if (ps.length && ps[0].url) {
-            var img = document.createElement("img");
-            img.src = photoDisplayUrl(ps[0]);
-            img.alt = it ? it.name : "item photo";
-            img.loading = "lazy";
-            fig.appendChild(img);
-          }
-          var cap = document.createElement("figcaption");
-          cap.textContent = it ? it.name : "Unknown item";
-          fig.appendChild(cap);
-          photos.appendChild(fig);
-        });
-        strip.appendChild(photos);
-        if (wrap.note) strip.appendChild(shopCheckEl("p", "today-why", cleanTodayNote(wrap.note)));
-        var actions = document.createElement("div");
-        actions.className = "today-actions";
-        if (!worn) actions.appendChild(mkBtn("primary", "Wear this", function () { todayWear(); }));
-        actions.appendChild(mkBtn("secondary", "Another", function () { if (!todayState.generating) todayAnother(); }));
-        actions.appendChild(mkBtn("secondary", "Ask about this", function () {
-          if (attachTodayPick()) {
-            if (typeof renderContextLine === "function") renderContextLine();
-            chatInput.focus();
-          }
-        }));
-        actions.appendChild(mkBtn("secondary", "Open Today", function () {
+        var row = document.createElement("div");
+        row.className = "today-actions";
+        row.style.marginTop = "0";
+        row.appendChild(shopCheckEl("p", "today-why", "Today's pick lives on the Today page."));
+        row.appendChild(mkBtn("secondary", "Go to Today", function () {
           closeOverlay(chatOverlay);
           switchView("today");
         }));
-        strip.appendChild(actions);
+        strip.appendChild(row);
       }
 
       function renderToday() {
