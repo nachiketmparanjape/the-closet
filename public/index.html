@@ -588,6 +588,18 @@
       .hero-copy { gap: 8px; padding-bottom: 0; }
       .hero-copy p { display: none; }
       .hero-copy .primary, .hero-copy .secondary { min-height: 48px; padding-top: 10px; padding-bottom: 10px; font-size: 15.5px; }
+      /* Founder question (2026-10-24): the three CTAs as ONE row
+         on phones. Recommendation shipped: a single action bar —
+         Add keeps the ivory primary fill (hierarchy survives),
+         the + glyph goes (in a row it is noise), labels at
+         14.5px so "Pick an outfit" fits a 360px screen. One
+         media-query flip reverts to the stack if it feels
+         cramped on his phone. */
+      .hero-copy { grid-template-columns: 1fr 1fr 1fr; }
+      .hero-copy .primary { grid-column: auto; font-size: 14.5px; padding-left: 6px; padding-right: 6px; }
+      .hero-copy .secondary { font-size: 14.5px; padding-left: 6px; padding-right: 6px; }
+      #addButton svg { display: none; }
+      .today-actions .primary, .today-actions .secondary { min-height: 48px; }
       .utility { grid-template-columns: 1fr; }
       .filters { justify-content: flex-start; overflow: visible; }
       .chip { padding-left: 10px; padding-right: 10px; }
@@ -619,7 +631,7 @@
     </div>
 
     <section class="hero" aria-labelledby="heroTitle">
-      <h1 id="heroTitle">Your wardrobe,<br />laid out.</h1>
+      <h1 id="heroTitle">Your wardrobe, <br />laid out.</h1>
       <div class="hero-copy">
         <p>Photograph each piece once. Then search, sort, and see what you already own before deciding what comes next.</p>
         <button class="primary" id="addButton" type="button">
@@ -4134,10 +4146,30 @@
             break;
           }
         }
+        // Founder bug (2026-10-24): today's pick is DISPLAYED at
+        // the top of this chat (the strip) but was never SENT —
+        // questions about it went in context-free. Strip and
+        // payload now read the same source: when the pick is on
+        // screen it rides along, and it becomes the iteration
+        // base when the chat has no pick of its own yet.
+        var todayPickCtx = null;
+        if (!tripChat && typeof todayHomeOn === "function" && todayHomeOn()) {
+          restoreToday();
+          var twrap = todayState.picks[todayState.idx];
+          if (twrap && twrap.outfit && twrap.outfit.itemIds && twrap.outfit.itemIds.length) {
+            todayPickCtx = {
+              itemIds: twrap.outfit.itemIds.slice(),
+              lookName: twrap.outfit.lookName || null,
+              reasoning: twrap.outfit.reasoning || twrap.outfit.tagline || null
+            };
+            if (!previousPick) previousPick = { itemIds: twrap.outfit.itemIds.slice() };
+          }
+        }
         var payload = {
           items: stylistItems(),
           messages: stylistMessages.filter(function (m) { return !m.thinking; }),
           previousPick: previousPick,
+          todayPick: todayPickCtx,
           // Sprint 13: explicit vibe handle ("dress me streetwear tonight").
           // Server accepts exact vocabulary hits only.
           vibe: detectVibeTag(text),
@@ -6097,13 +6129,28 @@
       function shortItemName(name) {
         return capShortName(name) || "Piece";
       }
+      // NAMING-1 refinement (founder, 2026-10-24): an outfit named
+      // after its first piece reads as a PIECE, not a look. The
+      // fallback name is the anchor pair — two pieces, two words
+      // each: "Grey sweater + Cream corduroy" — which stays
+      // inside the short-name budget and reads as an outfit.
+      function outfitComboName(itemIds) {
+        var parts = (itemIds || []).map(function (id) {
+          var it = itemById(id);
+          if (!it) return null;
+          var n = (it.shortName || it.name || "").trim();
+          return n ? n.split(/\s+/).slice(0, 2).join(" ") : null;
+        }).filter(Boolean);
+        if (!parts.length) return "";
+        if (parts.length === 1) return capShortName(parts[0]);
+        return capShortName(parts[0] + " + " + parts[1]);
+      }
       function outfitDisplayName(o) {
-        // NAMING-1: the stored shortName is the card label now.
-        var oids = Array.isArray(o.itemIds) ? o.itemIds : [];
-        if (o.shortName) {
-          if (o.lookName || o.source === "stylist" || o.source === "trip") return o.shortName;
-          return oids.length > 1 ? o.shortName + " + " + (oids.length - 1) + " more" : o.shortName;
-        }
+        // NAMING-1: the stored shortName is the card label now —
+        // for every source. (The old "+ N more" suffix was a
+        // crutch for first-piece names; combo names made it
+        // noise, founder 2026-10-24.)
+        if (o.shortName) return o.shortName;
         var n = String(o.name || "");
         if (n && n.length <= 44 && n.indexOf(" + ") === -1) return n;
         var ids = Array.isArray(o.itemIds) ? o.itemIds : [];
@@ -6334,7 +6381,7 @@
             itemNames: names,
             source: "photo",
             name: defaultOutfitName(sel),
-            shortName: capShortName(names[0]),
+            shortName: outfitComboName(sel),
             occasion: null,
             weather: null,
             appConfidence: null,
@@ -7516,7 +7563,9 @@
             itemNames: names,
             source: "manual",
             name: document.getElementById("builderName").value.trim() || defaultOutfitName(sel),
-            shortName: capShortName(document.getElementById("builderName").value.trim() || names[0]),
+            shortName: document.getElementById("builderName").value.trim()
+              ? capShortName(document.getElementById("builderName").value.trim())
+              : outfitComboName(sel),
             occasion: document.getElementById("builderOccasion").value.trim() || null,
             weather: null,
             appConfidence: null,
@@ -7979,7 +8028,7 @@
             source: src,
             tripId: tripId,
             name: o.lookName || defaultOutfitName(o.itemIds),
-            shortName: o.lookName ? capShortName(o.lookName) : capShortName(names[0]),
+            shortName: o.lookName ? capShortName(o.lookName) : outfitComboName(o.itemIds),
             tagline: o.tagline || null,
             occasion: null,
             weather: null,

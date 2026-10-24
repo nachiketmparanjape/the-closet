@@ -226,6 +226,25 @@ function sanitizePreviousPick(value) {
   return { itemIds: ids };
 }
 
+// Founder bug (2026-10-24): today's home-screen pick is DISPLAYED
+// at the top of the stylist chat but was never SENT — questions
+// about it ("why this?", "make it warmer") arrived context-free
+// and the model answered generically. The pick now rides along
+// as structured context; ids are resolved to handles (and the
+// unknown dropped) in buildStylistRequest, like previousPick.
+function sanitizeTodayPick(value) {
+  if (!value || typeof value !== "object") return null;
+  const ids = Array.isArray(value.itemIds)
+    ? value.itemIds.filter((id) => typeof id === "string" && id).slice(0, 6)
+    : [];
+  if (!ids.length) return null;
+  return {
+    itemIds: ids,
+    lookName: cleanText(value.lookName, 80) || null,
+    reasoning: cleanText(value.reasoning, 400) || null,
+  };
+}
+
 // PC-22: @-mention references. The client sends { articleIds, outfits }
 // where outfits carry their itemIds (resolved from its local cache); every
 // id is re-validated against the real wardrobe here, so the model only
@@ -665,7 +684,7 @@ function handleIndex(handle, items) {
 // Build the exact model request askStylist sends. Exported so the
 // benchmark runner (tests/benchmark) exercises the real prompt —
 // prompt changes and benchmark stay in sync by construction.
-function buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today) {
+function buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, todayPick) {
   const model = process.env.GEMINI_MODEL || MODEL_VERSION;
   const wardrobe = items.map((it, i) => itemLine(it, i)).join("\n");
   let system = SYSTEM;
@@ -685,17 +704,40 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
       "(e.g. \"I'm in Tahoe this weekend, snowing\"), THAT is the active weather for the rest of this " +
       "conversation — score against it and ignore the measured value above until they state something new.";
   }
+  // Founder bug (2026-10-24): TODAY'S PICK — the outfit on the
+  // user's home screen right now, also shown at the top of this
+  // chat. It was displayed but never sent, so questions about
+  // it arrived context-free. When there is no in-chat pick to
+  // iterate on, today's pick IS the iteration base below.
+  const iterBase = previousPick || (todayPick && todayPick.itemIds.length ? { itemIds: todayPick.itemIds } : null);
+  const iterBaseIsToday = !previousPick && !!iterBase;
+  if (todayPick && Array.isArray(todayPick.itemIds) && todayPick.itemIds.length) {
+    const tpHandles = todayPick.itemIds.map((id) => {
+      const idx = items.findIndex((it) => it && it.id === id);
+      if (idx === -1) return null;
+      return "[i" + (idx + 1) + '] "' + cleanText(items[idx].name, 60) + '"';
+    }).filter(Boolean);
+    if (tpHandles.length) {
+      system += "\n\nTODAY'S PICK — the outfit on the user's home screen today, shown at the top of this chat: " +
+        tpHandles.join(", ") +
+        (todayPick.lookName ? '. It is named "' + todayPick.lookName + '"' : "") +
+        (todayPick.reasoning ? ". Why it was picked: " + todayPick.reasoning : "") +
+        ".\n" +
+        "- If the user's message refers to \"this\", \"it\", today's outfit, or asks a follow-up with no new subject, they mean THIS pick: answer about it directly (why it works, whether it fits the weather, what to change).\n" +
+        "- A change request (\"warmer\", \"swap the shoes\") iterates from THIS pick — same rules as ITERATION below.";
+    }
+  }
   // PC-16: iteration. The user is refining the previous pick, not starting
   // over — resolve its ids to wardrobe handles so the model can address
   // slots ("swap the shorts") precisely.
-  if (previousPick && Array.isArray(previousPick.itemIds) && previousPick.itemIds.length) {
-    const prevHandles = previousPick.itemIds.map((id) => {
+  if (iterBase && Array.isArray(iterBase.itemIds) && iterBase.itemIds.length) {
+    const prevHandles = iterBase.itemIds.map((id) => {
       const idx = items.findIndex((it) => it && it.id === id);
       if (idx === -1) return null;
       return "[i" + (idx + 1) + '] "' + cleanText(items[idx].name, 60) + '"';
     }).filter(Boolean);
     if (prevHandles.length) {
-      system += "\n\nITERATION — the user is refining your previous pick, not starting over.\n" +
+      system += "\n\nITERATION — the user is refining " + (iterBaseIsToday ? "today's pick (above)" : "your previous pick") + ", not starting over.\n" +
         "Previous pick: " + prevHandles.join(", ") + ".\n" +
         "- \"swap/change the X\" → replace only that slot's item; keep the rest.\n" +
         "- \"something warmer/cooler/dressier/…\" → adjust the pick in that direction, keeping what still works.\n" +
@@ -1092,11 +1134,11 @@ function unwrapJsonReply(text) {
 }
 
 // here; the client re-validates on execute.
-async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, hooks) {
+async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, hooks, todayPick) {
   const todayStr = /^\d{4}-\d{2}-\d{2}$/.test(today || "")
     ? today
     : new Date().toISOString().slice(0, 10);
-  const { model, contents, config } = buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, todayStr);
+  const { model, contents, config } = buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, todayStr, todayPick);
   const ai = getClient();
   if (tripContext) {
     // Trip mode: the tools are independent — a packing change and a
@@ -1194,4 +1236,4 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
   };
 }
 
-module.exports = { askStylist, buildStylistRequest, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins, sanitizePinProposal, extractToolCall, extractToolCalls, mapUpdateTripPacking, mapSuggestTripOutfits, handleIndex, unwrapJsonReply, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM, VIBE_TAGS };
+module.exports = { askStylist, buildStylistRequest, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeTodayPick, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins, sanitizePinProposal, extractToolCall, extractToolCalls, mapUpdateTripPacking, mapSuggestTripOutfits, handleIndex, unwrapJsonReply, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM, VIBE_TAGS };

@@ -4,7 +4,7 @@ const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
 const path = require("node:path");
 module.paths.unshift(path.join(__dirname, "..", "functions", "node_modules"));
-const { sanitizeItems, sanitizePreviousPick, sanitizeReferences, sanitizeStyleProfile, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, buildStylistRequest } = require("../functions/stylist.js");
+const { sanitizeItems, sanitizePreviousPick, sanitizeTodayPick, sanitizeReferences, sanitizeStyleProfile, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, buildStylistRequest } = require("../functions/stylist.js");
 
 describe("sanitizeItems (PC-12)", () => {
   it("keeps a cleaned id for server-side handle→id mapping", () => {
@@ -166,6 +166,50 @@ describe("buildStylistRequest iteration block (PC-16)", () => {
   });
   it("skips ids that are not in the wardrobe", () => {
     const { config } = buildStylistRequest(items, messages, [], { itemIds: ["zzz"] });
+    assert.ok(!config.systemInstruction.includes("ITERATION"));
+  });
+});
+
+describe("sanitizeTodayPick + TODAY'S PICK block (founder bug, 2026-10-24)", () => {
+  const items = sanitizeItems([
+    { id: "aaa", name: "Navy Tee", category: "Tops" },
+    { id: "bbb", name: "Tan Shorts", category: "Bottoms" },
+  ]);
+  const messages = [{ role: "user", text: "why this one?" }];
+  it("keeps ids, look name and reasoning, capped and cleaned", () => {
+    const p = sanitizeTodayPick({ itemIds: ["aaa", "bbb"], lookName: "Harbor Light", reasoning: "Breezy for a warm day." });
+    assert.deepEqual(p, { itemIds: ["aaa", "bbb"], lookName: "Harbor Light", reasoning: "Breezy for a warm day." });
+  });
+  it("returns null for missing/empty/non-object input", () => {
+    assert.equal(sanitizeTodayPick(null), null);
+    assert.equal(sanitizeTodayPick({}), null);
+    assert.equal(sanitizeTodayPick({ itemIds: [] }), null);
+    assert.equal(sanitizeTodayPick("nope"), null);
+  });
+  it("the prompt names the pick, its handles and its reasoning", () => {
+    const tp = sanitizeTodayPick({ itemIds: ["aaa", "bbb"], lookName: "Harbor Light", reasoning: "Breezy for a warm day." });
+    const { config } = buildStylistRequest(items, messages, [], null, null, null, null, null, null, null, "2026-10-24", tp);
+    const sys = config.systemInstruction;
+    assert.ok(sys.includes("TODAY'S PICK"));
+    assert.ok(sys.includes('[i1] "Navy Tee"'));
+    assert.ok(sys.includes("Harbor Light"));
+    assert.ok(sys.includes("Breezy for a warm day."));
+  });
+  it("today's pick becomes the iteration base when the chat has none", () => {
+    const tp = sanitizeTodayPick({ itemIds: ["aaa", "bbb"] });
+    const { config } = buildStylistRequest(items, messages, [], null, null, null, null, null, null, null, "2026-10-24", tp);
+    assert.ok(config.systemInstruction.includes("ITERATION"));
+    assert.ok(config.systemInstruction.includes("today's pick (above)"));
+  });
+  it("an in-chat previous pick outranks today's pick as the base", () => {
+    const tp = sanitizeTodayPick({ itemIds: ["aaa"] });
+    const { config } = buildStylistRequest(items, messages, [], { itemIds: ["bbb"] }, null, null, null, null, null, null, "2026-10-24", tp);
+    assert.ok(config.systemInstruction.includes("your previous pick"));
+  });
+  it("hallucinated ids in today's pick resolve to nothing and add no block", () => {
+    const tp = sanitizeTodayPick({ itemIds: ["zzz"] });
+    const { config } = buildStylistRequest(items, messages, [], null, null, null, null, null, null, null, "2026-10-24", tp);
+    assert.ok(!config.systemInstruction.includes("TODAY'S PICK"));
     assert.ok(!config.systemInstruction.includes("ITERATION"));
   });
 });

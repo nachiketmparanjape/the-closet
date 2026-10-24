@@ -817,3 +817,27 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
 - **Lane:** Stylist. **Effort:** M.
 - **Status:** Filed sprint-ready 2026-10-24 (founder
   direction). Competes at the next planning walk.
+
+### UX-16: Context-handoff audit — a chat opened from a surface carries that surface's subject (S)
+- **Origin:** Founder bug, 2026-10-24: asking the stylist
+  about Today's pick went in context-free (the pick was
+  DISPLAYED in the chat but never SENT), with the standing
+  note: "these kinds of things in general should not happen."
+  The instance is fixed (the pick now rides the payload and
+  is the iteration base). This card audits the CLASS.
+- **Inventory to verify (each entry point: does the subject
+  ride the payload?):** Today strip → stylist (FIXED
+  2026-10-24, `todayPick`); trip chat → trip context (by
+  design, TRIPCHAT-1 ✓); @-references (PC-22 ✓); piece /
+  outfit card "ask" affordances if any exist; shop check →
+  PC-41 (must carry the check by construction — acceptance
+  there covers it); Today "Ask the stylist" button vs the
+  chat opened from Wardrobe (no subject — correct for the
+  generic room).
+- **Acceptance:** every row of the inventory is either
+  verified-carrying (with the payload field named), verified
+  intentionally context-free, or filed as its own fix;
+  results recorded on this card.
+- **Lane:** Stylist. **Effort:** S.
+- **Status:** Filed 2026-10-24. Competes at the next
+  planning walk; the Today instance is already fixed.
