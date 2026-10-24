@@ -374,7 +374,9 @@
        dividers (the modern list pattern) instead of floating rows. */
     #tripBackBtn { min-height: 36px; border: none; background: none; padding: 0 8px 0 0; color: var(--muted-strong); font-size: 15px; }
     #tripDetailMeta { font-size: 14px; color: var(--muted-strong); margin: 0 0 2px; }
-    #tripDetailWeather { display: inline-block; background: var(--paper-soft); color: var(--muted-strong); border-radius: 999px; padding: 5px 12px; font-size: 13px; margin: 8px 0 2px; }
+    #tripDetailWeather { display: inline-block; background: var(--paper-soft); color: var(--muted-strong); border: 0; border-radius: 999px; padding: 5px 12px; font-size: 13px; font: inherit; font-size: 13px; margin: 8px 0 2px; cursor: pointer; }
+    #tripDetailWeather:active { transform: scale(.97); }
+    #tripDetailWeather[disabled] { opacity: .6; cursor: default; }
     #tripDeleteBtn { color: var(--danger); }
     .trip-section-h { font-size: 17px; font-weight: 650; letter-spacing: -.01em; margin: 24px 0 8px; }
     .trip-shop { margin: 26px 0 4px; }
@@ -783,7 +785,7 @@
       <h2 class="trip-title" id="tripDetailTitle">Trip</h2>
       <p class="hint" id="tripDetailMeta" style="margin-top:0"></p>
       <p class="hint" id="tripDetailNotes" hidden></p>
-      <p class="hint" id="tripDetailWeather" hidden></p>
+      <button type="button" id="tripDetailWeather" hidden></button>
       <div style="display:flex;gap:8px;margin:10px 0;">
         <button class="primary" id="tripPlanBtn" type="button" style="flex:1">Plan packing</button>
         <button class="secondary" id="tripDeleteBtn" type="button">Delete</button>
@@ -4922,6 +4924,77 @@
         renderTripDetail();
       }
 
+      // PC-39: one weather truth for a trip — the trip-level
+      // fields when present, the plan's snapshot for trips
+      // planned before this card.
+      function tripWeatherState(trip) {
+        var ts = trip.weatherCheckedAt;
+        var checkedMs = null;
+        if (ts && typeof ts.toDate === "function") checkedMs = ts.toDate().getTime();
+        else if (typeof ts === "string") checkedMs = Date.parse(ts) || null;
+        var p = trip.packing || {};
+        if (trip.weatherSnapshot) return { summary: trip.weatherSnapshot, forecastAvailable: !!trip.forecastAvailable, checkedMs: checkedMs };
+        if (p.weatherSnapshot) {
+          var pTs = p.generatedAt;
+          var pMs = pTs && typeof pTs.toDate === "function" ? pTs.toDate().getTime() : checkedMs;
+          return { summary: p.weatherSnapshot, forecastAvailable: !!p.forecastAvailable, checkedMs: pMs };
+        }
+        return { summary: null, forecastAvailable: false, checkedMs: null };
+      }
+      var weatherAutoChecked = {};
+      var weatherRefreshing = false;
+      function maybeAutoRecheckWeather(trip, ws) {
+        if (!currentUser || weatherRefreshing || weatherAutoChecked[trip.id]) return;
+        var leg = (trip.legs && trip.legs[0]) || {};
+        if (leg.lat == null || leg.lng == null) return;
+        var now = Date.now();
+        var today = new Date(); today.setHours(0, 0, 0, 0);
+        var firstDay = leg.startDate ? new Date(leg.startDate + "T12:00:00").getTime() : null;
+        // Stale when: nothing known, older than 24h, or the first
+        // leg day is here/approaching but the snapshot is still
+        // the climate-normals fallback.
+        var stale = !ws.summary ||
+          (ws.checkedMs && now - ws.checkedMs > 86400000) ||
+          (firstDay && today.getTime() >= firstDay - 86400000 && !ws.forecastAvailable);
+        if (!stale) return;
+        weatherAutoChecked[trip.id] = true;
+        refreshTripWeather(trip, false);
+      }
+      function refreshTripWeather(trip, manual) {
+        var leg = (trip.legs && trip.legs[0]) || {};
+        if (!currentUser || leg.lat == null || leg.lng == null) return;
+        weatherRefreshing = true;
+        renderTripDetail();
+        fetchLegWeather(leg).then(function (w) {
+          weatherRefreshing = false;
+          if (!w) {
+            if (manual) showToast("Forecast isn't out yet for those dates — the plan uses typical weather.");
+            renderTripDetail();
+            return;
+          }
+          var upd = {
+            weatherSnapshot: w.summary,
+            forecastAvailable: true,
+            weatherCheckedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          };
+          if (trip.packing) { upd["packing.weatherSnapshot"] = w.summary; upd["packing.forecastAvailable"] = true; }
+          return db.collection("users").doc(currentUser.uid).collection("trips").doc(trip.id).update(upd)
+            .then(function () { if (manual) showToast("Forecast updated."); })
+            .catch(function (err) { reportError("refreshTripWeather", err); if (manual) showToast(friendlyError(err)); })
+            .then(function () { renderTripDetail(); });
+        }).catch(function (err) {
+          weatherRefreshing = false;
+          reportError("refreshTripWeather", err);
+          if (manual) showToast(friendlyError(err));
+          renderTripDetail();
+        });
+      }
+      document.getElementById("tripDetailWeather").addEventListener("click", function () {
+        var trip = tripById(activeTripId);
+        if (trip) refreshTripWeather(trip, true);
+      });
+
       function renderTripDetail() {
         var trip = tripById(activeTripId);
         if (!trip) { if (activeTripId) { activeTripId = null; switchView("trips"); } return; }
@@ -4936,9 +5009,17 @@
         if (trip.notes) { notesEl.textContent = trip.notes; notesEl.hidden = false; }
         else notesEl.hidden = true;
         var wEl = document.getElementById("tripDetailWeather");
-        if (trip.packing && trip.packing.weatherSnapshot) {
-          wEl.textContent = trip.packing.weatherSnapshot;
+        // PC-39: the weather line is a tappable pill. It always
+        // shows on a located trip — forecast when we have one,
+        // an invitation to check when we don't.
+        var ws = tripWeatherState(trip);
+        if (leg.lat != null && leg.lng != null) {
           wEl.hidden = false;
+          if (weatherRefreshing) { wEl.textContent = "🌦 Checking…"; wEl.disabled = true; }
+          else if (ws.summary && ws.forecastAvailable) { wEl.textContent = "🌦 " + ws.summary + " · ↻"; wEl.disabled = false; }
+          else if (ws.summary) { wEl.textContent = "🌦 Typical weather · tap to check forecast"; wEl.disabled = false; }
+          else { wEl.textContent = "🌦 Check forecast"; wEl.disabled = false; }
+          maybeAutoRecheckWeather(trip, ws);
         } else wEl.hidden = true;
         // Sprint 16: with a plan in place, iteration is conversational —
         // the button opens trip chat instead of blindly re-planning.
@@ -5259,12 +5340,21 @@
               forecastAvailable: !!weather,
               generatedAt: firebase.firestore.FieldValue.serverTimestamp()
             };
+            // PC-39: planning also stamps the trip-level weather
+            // fields, so the pill stays current without a second
+            // fetch.
+            var tripUpd = {
+              packing: packing,
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            if (weather) {
+              tripUpd.weatherSnapshot = weather.summary;
+              tripUpd.forecastAvailable = true;
+              tripUpd.weatherCheckedAt = firebase.firestore.FieldValue.serverTimestamp();
+            }
             return db.collection("users").doc(currentUser.uid)
               .collection("trips").doc(trip.id)
-              .update({
-                packing: packing,
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-              });
+              .update(tripUpd);
           }).catch(function (err) {
             if (!retried) return attempt(true);
             throw err;
