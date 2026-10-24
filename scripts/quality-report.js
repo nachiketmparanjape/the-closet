@@ -22,8 +22,16 @@ const os = require("os");
 const PROJECT = "closet-404e9";
 const BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`;
 const args = process.argv.slice(2);
-const DAYS = Number((args[args.indexOf("--days") + 1] || 7)) || 7;
-const UID = (args[args.indexOf("--uid") + 1] || "67ghFBwpy3Qu7dF0sZFDH2BdRwm2");
+// Parse flags by name — the naive indexOf()+1 pattern silently
+// reads args[0] when a flag is absent (the uid became "--days"
+// and every per-user section read an empty account, reporting
+// a false "all clean". Found by OBS-4's first census run.)
+const flagVal = (name) => {
+  const i = args.indexOf(name);
+  return i >= 0 ? args[i + 1] : undefined;
+};
+const DAYS = Number(flagVal("--days") || 7) || 7;
+const UID = flagVal("--uid") || "67ghFBwpy3Qu7dF0sZFDH2BdRwm2";
 // The heartbeat probe's own events are excluded from the stats
 // (they are synthetic) and reported as a liveness line instead.
 let PROBE_UID = null;
@@ -68,6 +76,24 @@ async function listAll(tok, collPath, sinceIso) {
       for (const k in d.fields || {}) o[k] = dec(d.fields[k]);
       const ts = o.ts || o.createdAt;
       if (ts && ts >= sinceIso) out.push(o);
+    }
+    if (!j.nextPageToken) break;
+    pageToken = j.nextPageToken;
+  }
+  return out;
+}
+
+async function listAllDocs(tok, collPath) {
+  const out = [];
+  let pageToken = "";
+  for (;;) {
+    const url = `${BASE}/${collPath}?pageSize=300${pageToken ? "&pageToken=" + encodeURIComponent(pageToken) : ""}`;
+    const r = await fetch(url, { headers: { Authorization: "Bearer " + tok } });
+    const j = await r.json();
+    for (const d of j.documents || []) {
+      const o = { _id: (d.name || "").split("/").pop() };
+      for (const k in d.fields || {}) o[k] = dec(d.fields[k]);
+      out.push(o);
     }
     if (!j.nextPageToken) break;
     pageToken = j.nextPageToken;
@@ -162,6 +188,44 @@ const pct = (arr, p) => {
     const b = byFeat[f];
     console.log(`  ${f}: ${b.ok} ok / ${b.fail} failed · p50 ${pct(b.lat, 50) ?? "–"}ms · p95 ${pct(b.lat, 95) ?? "–"}ms`);
   }
+
+  // OBS-4: data-model drift census — the live documents vs
+  // docs/DATA_MODEL.md (v2) + the NAMING-1 standard. Read-only;
+  // drift found here becomes its own cut, never an auto-repair.
+  const [items, trips, checks] = await Promise.all([
+    listAllDocs(tok, `users/${UID}/items`),
+    listAllDocs(tok, `users/${UID}/trips`).catch(() => []),
+    listAllDocs(tok, `users/${UID}/shopChecks`).catch(() => []),
+  ]);
+  const drift = {};
+  const flag = (kind, id) => {
+    const d = drift[kind] || (drift[kind] = { n: 0, ids: [] });
+    d.n++; if (d.ids.length < 3) d.ids.push(id);
+  };
+  for (const it of items) {
+    if (!it.name || !String(it.name).trim() || it.name === "Untitled item") flag("item:missing-name", it._id);
+    if (!it.shortName || !String(it.shortName).trim()) flag("item:missing-shortName", it._id);
+    else if (String(it.shortName).length > 48 || String(it.shortName).trim().split(/\s+/).length > 5) flag("item:shortName-over-budget", it._id);
+    if (!it.category) flag("item:missing-category", it._id);
+    if (!Array.isArray(it.colors) || !it.colors.length) flag("item:no-colors-array(v1 remnant)", it._id);
+    if (!it.imageUrl && !(it.photos && it.photos[0] && it.photos[0].url)) flag("item:missing-photo", it._id);
+    if (!it.ai && it.needsAi !== true) flag("item:unnamed-unflagged(no ai, no needsAi)", it._id);
+    if (!it.createdAt) flag("item:missing-createdAt", it._id);
+  }
+  for (const t of trips) {
+    if (!t.name) flag("trip:missing-name", t._id);
+    const leg = (t.legs && t.legs[0]) || null;
+    if (!leg || !(leg.location || leg.resolvedName) || !leg.startDate) flag("trip:missing-leg", t._id);
+  }
+  for (const c of checks) {
+    if (!c.item || !c.item.name) flag("check:missing-item-name", c._id);
+    if (!["considering", "bought", "dismissed"].includes(c.status)) flag("check:bad-status", c._id);
+    if (!c.photoUrl && !c.photoPath) flag("check:missing-photo", c._id);
+  }
+  console.log(`\nDATA DRIFT (census: ${items.length} items · ${trips.length} trips · ${checks.length} checks, vs DATA_MODEL v2 + NAMING-1)`);
+  const kinds = Object.entries(drift).sort((a, z) => z[1].n - a[1].n);
+  if (!kinds.length) console.log("  none — the live documents match the model");
+  for (const [kind, d] of kinds) console.log(`  ${kind}: ${d.n} (e.g. ${d.ids.join(", ")})`);
 
   // Client errors.
   console.log(`\nCLIENT ERRORS (${clientErrs.length})`);

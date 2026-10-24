@@ -4,6 +4,34 @@ What went live. Momentum you can see.
 
 ## Sprint 19 (2026-10-24 → )
 
+- **PC-42 — Crop the shop-check photo** (Sprint 21, 2026-10-24):
+  picking a check photo now pauses at a crop step (fixed square
+  frame, drag to pan, zoom slider + wheel, canvas render capped
+  at 1600px JPEG); the cropped photo is what uploads, gets
+  judged, and is saved as the subject of record. "Use full
+  photo" reproduces the old flow exactly; cancelling abandons
+  the check (and disarms the trip tag, like the sheet's Cancel).
+- **OBS-4 — Data-model drift spot-check** (Sprint 21,
+  2026-10-24): scripts/quality-report.js gains a DATA DRIFT
+  census — every live item/trip/check vs DATA_MODEL v2 +
+  NAMING-1, drift counted by kind with example ids, read-only.
+  First run told the truth in both directions: it caught a bug
+  in the report itself (the --uid flag fell back to "--days",
+  so per-user sections had been reading an empty account and
+  printing false all-cleans — fixed), and two real findings:
+  8 v1-remnant items with no colors array (legal under the
+  lazy-migration design; normalization offered as a follow-up)
+  and one old dismissed check with no item name (benign; the
+  list falls back to its note). Acceptance verified against a
+  deliberately corrupted throwaway doc (flagged on 6 kinds,
+  then deleted).
+- **UX-17 — Manual theme choice** (Sprint 21, 2026-10-24):
+  Account → Appearance: System / Light / Dark, stored per
+  device. A head resolver stamps data-theme before first paint
+  and the dark tokens now key off it (so manual Light beats a
+  dark phone and vice versa); System still follows the phone
+  live. Side fix: pc8-helpers' script extraction now takes the
+  last inline script (the head resolver made it a second one).
 - **UX-15: Sheets & popups feel native** — built 2026-10-24.
   One sheet system for all 17 overlays: JS manages state only
   (.is-open / .is-closing + an overlay stack), CSS owns the

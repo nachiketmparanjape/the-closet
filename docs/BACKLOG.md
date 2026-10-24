@@ -823,8 +823,7 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   full photo" reproduces today's behavior exactly; the
   saved check's photo is the cropped one.
 - **Lane:** Stylist. **Effort:** M.
-- **Status:** IN SPRINT 21 (pulled at the 2026-10-24 walk,
-  ranked #1).
+- **Status:** DONE 2026-10-24 (Sprint 21).
 
 ### UX-16: Context-handoff audit — a chat opened from a surface carries that surface's subject (S)
 - **Origin:** Founder bug, 2026-10-24: asking the stylist
@@ -898,8 +897,7 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
 - **Revisit trigger:** first user request for it, or the
   next time Account is opened up for other work.
 - **Lane:** Loop (settings/shell). **Effort:** S.
-- **Status:** IN SPRINT 21 (pulled at the 2026-10-24 walk,
-  ranked #3 — small, closes the founder's own question).
+- **Status:** DONE 2026-10-24 (Sprint 21).
 
 ### UX-18 — Stylist audit: one experience + architecture pass, founder session
 
@@ -955,5 +953,4 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   numbers on live data; a deliberately corrupted test doc is
   flagged.
 - **Lane:** platform/observability. **Effort:** S.
-- **Status:** IN SPRINT 21 (filed and pulled at the 2026-10-24
-  walk, ranked #2).
+- **Status:** DONE 2026-10-24 (Sprint 21).

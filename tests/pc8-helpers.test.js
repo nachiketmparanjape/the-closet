@@ -8,7 +8,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const html = fs.readFileSync(path.join(__dirname, "..", "public", "index.html"), "utf8");
-const js = html.split("<script>")[1].split("</script>")[0];
+const js = html.split("<script>").pop().split("</script>")[0];
 // The helpers reference window.Palette (browser global) — shim it with the
 // real client module so the tests exercise the actual palette.
 global.window = {};
