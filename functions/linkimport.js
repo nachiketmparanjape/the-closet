@@ -138,11 +138,22 @@ function assertPublicHttpUrl(raw) {
   return u;
 }
 
-async function fetchWithTimeout(url, ms, headers) {
+async function fetchTextWithTimeout(url, ms, headers) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), ms);
   try {
-    return await fetch(url, { signal: ctrl.signal, headers, redirect: "follow" });
+    const res = await fetch(url, { signal: ctrl.signal, headers, redirect: "follow" });
+    return { res, body: await res.text() };
+  } finally {
+    clearTimeout(t);
+  }
+}
+async function fetchBufferWithTimeout(url, ms, headers) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const res = await fetch(url, { signal: ctrl.signal, headers, redirect: "follow" });
+    return { res, body: Buffer.from(await res.arrayBuffer()) };
   } finally {
     clearTimeout(t);
   }
@@ -150,23 +161,23 @@ async function fetchWithTimeout(url, ms, headers) {
 
 async function fetchLinkItem(uid, rawUrl) {
   const pageUrl = assertPublicHttpUrl(rawUrl);
-  let pageRes;
+  let pageRes, pageBody;
   try {
-    pageRes = await fetchWithTimeout(pageUrl.toString(), 12000, {
+    ({ res: pageRes, body: pageBody } = await fetchTextWithTimeout(pageUrl.toString(), 12000, {
       "User-Agent": UA,
       Accept: "text/html,application/xhtml+xml",
-    });
+    }));
   } catch (e) {
     fail("LINK_UNREACHABLE");
   }
   if (!pageRes.ok) fail("LINK_UNREACHABLE");
-  const html = (await pageRes.text()).slice(0, 600000);
+  const html = String(pageBody || "").slice(0, 600000);
   const meta = extractLinkMeta(html, pageUrl.toString());
   if (!meta.imageUrl) fail("LINK_NO_IMAGE");
 
-  let imgRes;
+  let imgRes, imgBuf;
   try {
-    imgRes = await fetchWithTimeout(meta.imageUrl, 15000, { "User-Agent": UA, Referer: pageUrl.toString() });
+    ({ res: imgRes, body: imgBuf } = await fetchBufferWithTimeout(meta.imageUrl, 15000, { "User-Agent": UA, Referer: pageUrl.toString() }));
   } catch (e) {
     fail("LINK_UNREACHABLE");
   }
@@ -179,7 +190,7 @@ async function fetchLinkItem(uid, rawUrl) {
     if (m) ext = m[1].toLowerCase().replace("jpeg", "jpg");
   }
   if (!ext) fail("LINK_NO_IMAGE");
-  const buf = Buffer.from(await imgRes.arrayBuffer());
+  const buf = imgBuf;
   if (!buf.length || buf.length > 10 * 1024 * 1024) fail("LINK_NO_IMAGE");
 
   const storagePath =

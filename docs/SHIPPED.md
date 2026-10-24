@@ -4,6 +4,24 @@ What went live. Momentum you can see.
 
 ## Sprint 19 (2026-10-24 → )
 
+- **PC-50 — Link intake for shop check** (2026-10-24,
+  founder pull minutes after filing): the shop-check sheet
+  gains the same paste-a-link route as Add pieces —
+  `fetchLinkItem` pulls the retail photo to Storage and the
+  check runs on it directly (no upload, no crop; a clean
+  product shot needs neither). The trip/question snapshot
+  was refactored into one helper both entries share, so a
+  link check carries PC-40 context identically; retry
+  re-runs the analysis on the stored photo without
+  re-snapshotting. Photo/screenshot remains the fallback
+  route, untouched. Sheet ordering matches Add pieces —
+  photos first, link last under its "…or" label (founder
+  catch, same day). Same-day fix in `fetchLinkItem`: the
+  abort timer now covers the body read, not just the
+  headers — some retail CDNs tarpit datacenter IPs by
+  trickling the body, which had left a founder test
+  spinning ~1 min; worst case is now the 12s page + 15s
+  photo budget, hard-capped by the function's 60s.
 - **PC-44 — Non-photo catalogue intake** (Sprint 22,
   2026-10-24): paste a product link on the Add pieces screen
   → new callable `fetchLinkItem` fetches the page server-

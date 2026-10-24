@@ -1039,6 +1039,13 @@
       <button class="sheet-option" id="shopSheetUpload" type="button">
         <span><span class="opt-title">Upload photo</span><span class="opt-sub">Screenshot or saved photo</span></span>
       </button>
+      <div class="field shop-q-field">
+        <label for="shopLinkInput">…or paste its product link <span class="hint">(online finds)</span></label>
+        <div class="capture-link-row">
+          <input type="url" id="shopLinkInput" inputmode="url" placeholder="https://store.example/item…" autocomplete="off">
+          <button class="secondary" id="shopLinkBtn" type="button">Check link</button>
+        </div>
+      </div>
       <button class="sheet-option sheet-cancel" id="shopSheetCancel" type="button">
         <span><span class="opt-title">Cancel</span></span>
       </button>
@@ -7587,6 +7594,89 @@
         closeOverlay(document.getElementById("shopCheckOverlay"));
       });
 
+      // PC-50: the trip/question snapshot, shared by the photo
+      // and link entries — taken at state creation so no later
+      // close can eat the tag (the PC-31 bug's standing fix).
+      function snapshotShopContext() {
+        var snap = {
+          tripId: pendingShopTripId || null,
+          question: (document.getElementById("shopQuestionInput").value || "").trim()
+        };
+        pendingShopTripId = null;
+        document.getElementById("shopQuestionInput").value = "";
+        return snap;
+      }
+      function callShopCheckAnalysis() {
+        var st = shopCheckState;
+        functions.httpsCallable("shopCheck")({
+          storagePath: st.storagePath,
+          tripId: st.tripId || undefined,
+          question: st.question || undefined
+        }).then(function (res) {
+          st.result = res.data || {};
+          if (st.objectUrl) {
+            URL.revokeObjectURL(st.objectUrl);
+            st.objectUrl = null;
+          }
+          renderShopCheckResult();
+        }).catch(function (err) {
+          st.error = err;
+          renderShopCheckError();
+        });
+      }
+      // PC-50: a link check — fetchLinkItem already put the
+      // retail photo in Storage; the check runs on it directly
+      // (no upload, no crop — a clean product shot needs
+      // neither). The photo route stays the fallback.
+      function startShopCheckFromPath(storagePath, photoUrl, sourceUrl) {
+        if (!currentUser) return;
+        if (shopCheckState && shopCheckState.objectUrl) URL.revokeObjectURL(shopCheckState.objectUrl);
+        var snap = snapshotShopContext();
+        shopCheckState = {
+          file: null,
+          linkPath: storagePath,
+          sourceUrl: sourceUrl || null,
+          objectUrl: null,
+          photoUrl: photoUrl,
+          storagePath: storagePath,
+          fileName: "retail-photo",
+          fileType: "image/jpeg",
+          result: null,
+          savedId: null,
+          error: null,
+          tripId: snap.tripId,
+          question: snap.question
+        };
+        renderShopCheckLoading();
+        openOverlay(document.getElementById("shopCheckOverlay"));
+        callShopCheckAnalysis();
+      }
+      document.getElementById("shopLinkBtn").addEventListener("click", function () {
+        var input = document.getElementById("shopLinkInput");
+        var btn = document.getElementById("shopLinkBtn");
+        var url = (input.value || "").trim();
+        if (!url) { showToast("Paste a product link first."); return; }
+        if (!currentUser) { showToast("Still starting — one moment."); return; }
+        btn.disabled = true;
+        btn.textContent = "Fetching…";
+        functions.httpsCallable("fetchLinkItem")({ url: url }).then(function (res) {
+          var d = res.data || {};
+          if (!d.storagePath) throw new Error("no photo");
+          return storage.ref().child(d.storagePath).getDownloadURL().then(function (dl) {
+            input.value = "";
+            closeOverlay(shopCheckSheet);
+            startShopCheckFromPath(d.storagePath, dl, d.sourceUrl || url);
+          });
+        }).catch(function (err) {
+          logError(err, "shop-link-import");
+          if (err && typeof err.code === "string" && err.code.indexOf("functions/") === 0 && err.message) showToast(err.message);
+          else showToast(friendlyError(err));
+        }).then(function () {
+          btn.disabled = false;
+          btn.textContent = "Check link";
+        });
+      });
+
       function handleShopCheckFile(file) {
         if (!file || !currentUser) return;
         // Open the result window immediately with a loading state — the
@@ -7596,6 +7686,7 @@
         }
         var safeName = Date.now() + "-" + (file.name || "shop-check.jpg").replace(/[^a-zA-Z0-9._-]/g, "-");
         var storagePath = "users/" + currentUser.uid + "/shop-checks/" + safeName;
+        var snap = snapshotShopContext();
         shopCheckState = {
           file: file,
           objectUrl: URL.createObjectURL(file),
@@ -7606,17 +7697,12 @@
           result: null,
           savedId: null,
           error: null,
-          // Snapshot the armed trip context into THIS check,
-          // then disarm — the state is the single source of
-          // truth from here, so no later close can eat the tag.
-          tripId: pendingShopTripId || null,
-          // PC-40: the wearer's own question, snapshotted the
-          // same way and the sheet field cleared — a later
-          // plain check must not silently inherit it.
-          question: (document.getElementById("shopQuestionInput").value || "").trim()
+          // PC-50: snapshot via the shared helper (same
+          // semantics the inline code had: state is the single
+          // source of truth from here).
+          tripId: snap.tripId,
+          question: snap.question
         };
-        pendingShopTripId = null;
-        document.getElementById("shopQuestionInput").value = "";
         renderShopCheckLoading();
         openOverlay(document.getElementById("shopCheckOverlay"));
         var fileRef = storage.ref().child(storagePath);
@@ -7624,18 +7710,7 @@
           return fileRef.getDownloadURL();
         }).then(function (url) {
           shopCheckState.photoUrl = url;
-          return functions.httpsCallable("shopCheck")({
-            storagePath: storagePath,
-            tripId: shopCheckState.tripId || undefined,
-            question: shopCheckState.question || undefined
-          });
-        }).then(function (res) {
-          shopCheckState.result = res.data || {};
-          if (shopCheckState.objectUrl) {
-            URL.revokeObjectURL(shopCheckState.objectUrl);
-            shopCheckState.objectUrl = null;
-          }
-          renderShopCheckResult();
+          callShopCheckAnalysis();
         }).catch(function (err) {
           // The photo stays in shop-checks (ephemeral history); the user can retry.
           shopCheckState.error = err;
@@ -7683,7 +7758,17 @@
         retry.className = "primary";
         retry.textContent = "Try again";
         retry.addEventListener("click", function () {
-          if (st && st.file) handleShopCheckFile(st.file);
+          if (!st) return;
+          if (st.file) handleShopCheckFile(st.file);
+          else if (st.linkPath) {
+            // PC-50: a link check retries the analysis on the
+            // same stored photo — state (incl. its trip tag and
+            // question) is already snapshotted, so no re-entry.
+            st.error = null;
+            st.result = null;
+            renderShopCheckLoading();
+            callShopCheckAnalysis();
+          }
         });
         actions.appendChild(retry);
         wrap.appendChild(actions);

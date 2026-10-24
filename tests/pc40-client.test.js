@@ -12,8 +12,10 @@ test("the sheet carries the optional question field", () => {
 
 test("the question is snapshotted, cleared, and sent", () => {
   assert.ok(html.includes('question: (document.getElementById("shopQuestionInput").value || "").trim()'), "snapshot missing");
-  assert.ok(html.includes('question: shopCheckState.question || undefined'), "payload missing");
-  assert.ok(html.includes('tripId: shopCheckState.tripId || undefined'), "trip payload missing");
+  // PC-50: the payload now lives in the shared callShopCheckAnalysis
+  // (st = shopCheckState) so photo and link checks send identically.
+  assert.ok(html.includes("question: st.question || undefined"), "payload missing");
+  assert.ok(html.includes("tripId: st.tripId || undefined"), "trip payload missing");
 });
 
 test("saved docs and the detail view carry the context", () => {

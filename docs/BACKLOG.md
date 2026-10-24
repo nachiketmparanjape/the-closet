@@ -1131,5 +1131,8 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   the shop list like any check; a blocked store shows the
   friendly message and the photo route still works.
 - **Lane:** Stylist (shop). **Effort:** S.
-- **Status:** Filed sprint-ready 2026-10-24 (founder
-  direction). Awaiting the founder's pull decision.
+- **Status:** SHIPPED 2026-10-24 (founder pulled it the
+  same day it was filed). Sheet order aligned with Add
+  pieces (photos first, link last) on a founder catch;
+  `fetchLinkItem` body-read timeout fix shipped with it.
+  Awaiting founder phone validation.
