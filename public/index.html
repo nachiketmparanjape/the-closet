@@ -212,7 +212,7 @@
     .shop-q-field { margin: 0 2px 14px; }
     .sheet-fine { font-size: 13px; color: var(--muted); margin: 0 2px 14px; }
     #shopCropStage { position: relative; width: 100%; overflow: hidden; border-radius: 14px; background: #000; touch-action: none; margin: 10px auto 4px; }
-    #shopCropImg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; user-select: none; -webkit-user-drag: none; }
+    #shopCropImg { position: absolute; user-select: none; -webkit-user-drag: none; }
     #shopCropBox { position: absolute; border: 2px solid var(--accent); box-shadow: 0 0 0 9999px rgba(0,0,0,0.45); cursor: move; box-sizing: border-box; }
     .crop-handle { position: absolute; width: 26px; height: 26px; margin: -13px 0 0 -13px; background: var(--paper); border: 2px solid var(--accent-dark); border-radius: 50%; box-sizing: border-box; }
     .crop-handle[data-handle="nw"] { left: 0; top: 0; cursor: nwse-resize; }
@@ -8010,6 +8010,17 @@
         var y = Math.min(1 - h, Math.max(0, b.y));
         return { x: x, y: y, w: w, h: h };
       }
+      // Pure (tested): fit a natural image inside a frame,
+      // whole and centered (letterbox). The upload frame has a
+      // forced shape (below) so no upload, however extreme its
+      // aspect, can make the floating window scroll — the crop
+      // tool selects within the whole photo, letterboxed.
+      function fitContainRect(cw, ch, iw, ih) {
+        var scale = Math.min(cw / iw, ch / ih);
+        var w = Math.round(iw * scale);
+        var h = Math.round(ih * scale);
+        return { x: Math.round((cw - w) / 2), y: Math.round((ch - h) / 2), w: w, h: h };
+      }
       // Pure (tested): the box in natural pixels.
       function cropRectPixels(b, iw, ih) {
         var sx = Math.round(b.x * iw);
@@ -8023,12 +8034,12 @@
       function shopCropRenderBox() {
         var st = shopCrop; if (!st) return;
         var box = document.getElementById("shopCropBox");
-        if (st.mode !== "crop") { box.hidden = true; return; }
+        if (st.mode !== "crop" || !st.fit) { box.hidden = true; return; }
         box.hidden = false;
-        box.style.left = (st.box.x * 100) + "%";
-        box.style.top = (st.box.y * 100) + "%";
-        box.style.width = (st.box.w * 100) + "%";
-        box.style.height = (st.box.h * 100) + "%";
+        box.style.left = (st.fit.x + st.box.x * st.fit.w) + "px";
+        box.style.top = (st.fit.y + st.box.y * st.fit.h) + "px";
+        box.style.width = (st.box.w * st.fit.w) + "px";
+        box.style.height = (st.box.h * st.fit.h) + "px";
       }
       function setShopCropMode(mode) {
         var st = shopCrop; if (!st) return;
@@ -8048,16 +8059,20 @@
       function layoutShopCropStage() {
         var st = shopCrop; if (!st) return;
         var stageEl = document.getElementById("shopCropStage");
-        stageEl.style.width = "";
+        var imgEl = document.getElementById("shopCropImg");
         var w = stageEl.clientWidth || 300;
-        var h = w * st.ih / st.iw;
-        var maxH = Math.round(window.innerHeight * 0.55);
-        if (h > maxH) {
-          h = maxH;
-          w = Math.round(h * st.iw / st.ih);
-          stageEl.style.width = w + "px";
-        }
+        // The frame's shape is forced: full width, height capped
+        // at half the screen AND at 1.25x the width — so the
+        // whole window (title, hint, frame, buttons) fits the
+        // screen with no scrolling, whatever the photo's shape.
+        var h = Math.max(160, Math.min(Math.round(window.innerHeight * 0.5), Math.round(w * 1.25)));
         stageEl.style.height = h + "px";
+        st.fit = fitContainRect(w, h, st.iw, st.ih);
+        imgEl.style.left = st.fit.x + "px";
+        imgEl.style.top = st.fit.y + "px";
+        imgEl.style.width = st.fit.w + "px";
+        imgEl.style.height = st.fit.h + "px";
+        shopCropRenderBox();
       }
       function openShopCropper(file) {
         if (!currentUser) return;
@@ -8088,11 +8103,13 @@
         var drag = null;
         function stagePoint(e) {
           var r = stage.getBoundingClientRect();
+          var f = (shopCrop && shopCrop.fit) || { x: 0, y: 0, w: r.width, h: r.height };
           return {
-            fx: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)),
-            fy: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))
+            fx: Math.min(1, Math.max(0, (e.clientX - r.left - f.x) / f.w)),
+            fy: Math.min(1, Math.max(0, (e.clientY - r.top - f.y) / f.h))
           };
         }
+        window.addEventListener("resize", function () { if (shopCrop) layoutShopCropStage(); });
         stage.addEventListener("pointerdown", function (e) {
           if (!shopCrop || shopCrop.mode !== "crop") return;
           var p = stagePoint(e);

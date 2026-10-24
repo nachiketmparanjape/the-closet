@@ -47,6 +47,28 @@ test("cancelling the photo step disarms the trip tag like the sheet cancel", () 
 
 const clampCropBox = extractClientFn("clampCropBox", "b");
 const cropRectPixels = extractClientFn("cropRectPixels", "b, iw, ih");
+const fitContainRect = extractClientFn("fitContainRect", "cw, ch, iw, ih");
+
+test("fitContainRect letterboxes any aspect whole and centered", () => {
+  // Ridiculous tall screenshot in a phone frame: whole, narrow, centered.
+  const tall = fitContainRect(340, 340, 400, 4000);
+  assert.equal(tall.h, 340);
+  assert.equal(tall.w, 34);
+  assert.equal(tall.x, 153);
+  // Panorama: full width, short, centered vertically.
+  const wide = fitContainRect(340, 340, 4000, 400);
+  assert.equal(wide.w, 340);
+  assert.equal(wide.h, 34);
+  assert.equal(wide.y, 153);
+  // Ordinary portrait photo fills by width.
+  const norm = fitContainRect(340, 425, 800, 1000);
+  assert.deepEqual(norm, { x: 0, y: 0, w: 340, h: 425 });
+});
+
+test("the stage frame is forced: half the screen, at most 1.25x wide-tall", () => {
+  assert.ok(html.includes("window.innerHeight * 0.5"), "screen-half cap missing");
+  assert.ok(html.includes("w * 1.25"), "frame aspect clamp missing");
+});
 
 test("clampCropBox keeps the box inside the image with a minimum size", () => {
   assert.deepEqual(clampCropBox({ x: 0, y: 0, w: 1, h: 1 }), { x: 0, y: 0, w: 1, h: 1 });
