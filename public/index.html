@@ -1206,7 +1206,7 @@
   <div class="overlay" id="chatOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="chatTitle">
     <section class="modal">
       <div class="modal-head">
-        <h2 id="chatTitle">Stylist <span class="weather-chip" id="weatherChip" hidden></span> <span class="trip-chip" id="tripChip" hidden></span> <span class="today-chip" id="todayChip" hidden></span> <span class="pin-chip" id="pinChip" hidden></span></h2>
+        <h2 id="chatTitle">Stylist <span class="weather-chip" id="weatherChip" hidden></span> <span class="trip-chip" id="tripChip" hidden></span> <span class="pin-chip" id="pinChip" hidden></span></h2>
         <button class="icon-button" id="chatClose" type="button" aria-label="Close stylist chat">×</button>
       </div>
       <div class="modal-body">
@@ -4306,9 +4306,8 @@
         }
         renderChat();
         renderTripChip();
-        seedTodayChip();
-        renderTodayChip();
         renderPinChip();
+        if (typeof renderContextLine === "function") renderContextLine();
         openOverlay(chatOverlay);
         // Sprint 16 fix: no geolocation in trip mode — the browser would
         // prompt for *your* location, but the trip already has its own
@@ -4344,11 +4343,10 @@
         tripChat = null;
         switchThread("general");
         renderTripChip();
-        seedTodayChip();
-        renderTodayChip();
         renderPinChip();
         renderChat();
         renderChatTodayStrip();
+        if (typeof renderContextLine === "function") renderContextLine();
       }
 
       function renderTripChip() {
@@ -4372,45 +4370,31 @@
         el.appendChild(x);
       }
 
-      // Today's pick as chat context (founder, 2026-10-24): what
-      // is in the context must SHOW. The pick rides into the
-      // conversation automatically (payload below reads this same
-      // object), so it gets the same pin the trip context gets —
-      // and removing the pin removes the context, not just the
-      // display. Per chat session: reopening re-attaches it.
-      var todayChipCtx = null;
-      function seedTodayChip() {
-        if (tripChat) { todayChipCtx = null; return; }
-        if (typeof todayHomeOn !== "function" || !todayHomeOn()) { todayChipCtx = null; return; }
+      // UX-18 W2 (CONTEXT-MODEL, decisions 1 + 8): today's pick
+      // attaches ONLY on an explicit tap of a button that is about
+      // the pick — attachTodayPick(), called from Today screen's
+      // "Ask the stylist" and the in-chat strip's "Ask about this".
+      // A plain stylist session never receives it by default, and
+      // reopening the chat no longer re-attaches it (the pre-UX-18
+      // auto-attach machinery — seedTodayChip/renderTodayChip and
+      // the header chip — is gone). The attachment shows in the
+      // context line (W3) and is removed from the context sheet.
+      var chatAttachPick = null;
+      function attachTodayPick() {
+        if (typeof todayHomeOn !== "function" || !todayHomeOn()) return false;
         restoreToday();
         var tw = todayState.picks[todayState.idx];
         if (tw && tw.outfit && tw.outfit.itemIds && tw.outfit.itemIds.length) {
-          todayChipCtx = {
+          chatAttachPick = {
             itemIds: tw.outfit.itemIds.slice(),
             lookName: tw.outfit.lookName || null,
             reasoning: tw.outfit.reasoning || tw.outfit.tagline || null
           };
-        } else todayChipCtx = null;
+          return true;
+        }
+        return false;
       }
-      function renderTodayChip() {
-        var el = document.getElementById("todayChip");
-        if (tripChat || !todayChipCtx) { el.hidden = true; el.textContent = ""; return; }
-        el.textContent = "";
-        el.hidden = false;
-        var label = document.createElement("span");
-        label.textContent = "◈ Today's pick" + (todayChipCtx.lookName ? " · " + todayChipCtx.lookName : "");
-        el.appendChild(label);
-        var x = document.createElement("button");
-        x.type = "button";
-        x.setAttribute("aria-label", "Remove today's pick from the chat context");
-        x.textContent = "×";
-        x.addEventListener("click", function () {
-          todayChipCtx = null;
-          renderTodayChip();
-          chatInput.focus();
-        });
-        el.appendChild(x);
-      }
+      function detachTodayPick() { chatAttachPick = null; }
 
       // Executes a validated updateTripPacking tool call against the
       // trip doc. Resolves true on write, false on validation/write
@@ -4588,21 +4572,20 @@
             break;
           }
         }
-        // Founder bug (2026-10-24): today's pick is DISPLAYED at
-        // the top of this chat (the strip) but was never SENT —
-        // questions about it went in context-free. Chip, strip
-        // and payload now read one source (todayChipCtx): when
-        // the pin shows, the pick rides along and becomes the
-        // iteration base when the chat has no pick of its own
-        // yet; when the user removes the pin, it stops riding.
+        // UX-18 W2: today's pick rides along ONLY when the user
+        // attached it explicitly (chatAttachPick — set by the
+        // pick's own buttons, see attachTodayPick). When attached
+        // it also becomes the iteration base if this conversation
+        // has no pick of its own yet. Otherwise it is simply not
+        // in the brief — no display-only context, ever.
         var todayPickCtx = null;
-        if (!tripChat && todayChipCtx) {
+        if (!tripChat && chatAttachPick) {
           todayPickCtx = {
-            itemIds: todayChipCtx.itemIds.slice(),
-            lookName: todayChipCtx.lookName,
-            reasoning: todayChipCtx.reasoning
+            itemIds: chatAttachPick.itemIds.slice(),
+            lookName: chatAttachPick.lookName,
+            reasoning: chatAttachPick.reasoning
           };
-          if (!previousPick) previousPick = { itemIds: todayChipCtx.itemIds.slice() };
+          if (!previousPick) previousPick = { itemIds: chatAttachPick.itemIds.slice() };
         }
         var payload = {
           items: stylistItems(),
@@ -6226,6 +6209,9 @@
           }).catch(function () {});
       }
       function todayAsk() {
+        // UX-18 W2: this button is ABOUT the pick — tapping it is
+        // the explicit act that attaches today's pick to the chat.
+        attachTodayPick();
         openChat();
         renderChatTodayStrip();
       }
@@ -6292,6 +6278,12 @@
         actions.className = "today-actions";
         if (!worn) actions.appendChild(mkBtn("primary", "Wear this", function () { todayWear(); }));
         actions.appendChild(mkBtn("secondary", "Another", function () { if (!todayState.generating) todayAnother(); }));
+        actions.appendChild(mkBtn("secondary", "Ask about this", function () {
+          if (attachTodayPick()) {
+            if (typeof renderContextLine === "function") renderContextLine();
+            chatInput.focus();
+          }
+        }));
         actions.appendChild(mkBtn("secondary", "Open Today", function () {
           closeOverlay(chatOverlay);
           switchView("today");
