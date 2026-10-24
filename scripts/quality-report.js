@@ -24,6 +24,13 @@ const BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/
 const args = process.argv.slice(2);
 const DAYS = Number((args[args.indexOf("--days") + 1] || 7)) || 7;
 const UID = (args[args.indexOf("--uid") + 1] || "67ghFBwpy3Qu7dF0sZFDH2BdRwm2");
+// The heartbeat probe's own events are excluded from the stats
+// (they are synthetic) and reported as a liveness line instead.
+let PROBE_UID = null;
+try {
+  const probeCreds = JSON.parse(fs.readFileSync(path.join(__dirname, "..", ".heartbeat-probe.json"), "utf8"));
+  PROBE_UID = probeCreds.uid || null;
+} catch (e) { /* no probe bootstrapped yet */ }
 
 function getToken() {
   const upd = fs.readFileSync(path.join(__dirname, "..", "deploy-update.js"), "utf8");
@@ -90,7 +97,12 @@ const pct = (arr, p) => {
 
   // Per-function ledger from error_events.
   const byFn = {};
+  let probeLatest = null;
   for (const e of events) {
+    if (PROBE_UID && e.uid === PROBE_UID) {
+      if (e.kind === "failure" && e.key === "EMPTY_WARDROBE" && (!probeLatest || (e.ts || "") > probeLatest)) probeLatest = e.ts;
+      continue;
+    }
     const fn = (e.fn || "?").split(":")[0];
     const b = byFn[fn] || (byFn[fn] = { ok: 0, fail: 0, keys: {}, durs: [], fail24: 0, calls24: 0, failBase: 0, callsBase: 0 });
     const in24 = (e.ts || "") >= dayAgoIso;
@@ -117,9 +129,15 @@ const pct = (arr, p) => {
     }
   }
 
+  console.log("\nHEARTBEAT (synthetic probe, excluded from the stats above)");
+  console.log(probeLatest
+    ? `  last probe failure recorded with its key at ${probeLatest} — the ledger is alive`
+    : "  ⚠ no probe event in this window — either the probe has not run or the ledger is not recording");
+
   // Non-failure events — the used-to-be-silent bucket.
   const evCounts = {};
   for (const e of events) {
+    if (PROBE_UID && e.uid === PROBE_UID) continue;
     if (e.kind === "success" || e.kind === "failure") continue;
     const k = `${e.kind} · ${e.fn || "?"}`;
     evCounts[k] = (evCounts[k] || 0) + 1;

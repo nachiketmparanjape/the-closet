@@ -193,6 +193,17 @@ events for that user.
   runs ≥2× its window baseline. Notify-only by decision: the
   report is the alerting surface until a scheduled digest is
   built (OP-1).
+- **Heartbeat probe (`scripts/heartbeat-probe.js`, weekly cron,
+  added 2026-10-24).** With one user, an empty ledger is
+  ambiguous — healthy, or the recorder died. The probe resolves
+  it: a dedicated probe account makes the one call that must
+  always fail the same way (empty-wardrobe askStylist) and the
+  probe verifies the failure landed in `error_events` *with its
+  key*. Silence on PASS; the founder hears only about a double
+  FAIL. The probe's events are excluded from the report's stats
+  (synthetic) and surface as a liveness line instead. Probe
+  credentials live in `.heartbeat-probe.json` (gitignored, 600)
+  — a data-less test account, not a user credential.
 - **`usage-report.js`** — spend by feature × provider × model,
   trend, success/error beside cost, cost per successful outcome,
   unit economics (per item catalogued, per stylist turn).
@@ -236,7 +247,10 @@ events for that user.
 - **OP-1 — Scheduled digest.** The quality report is on-demand;
   a weekly digest (and spike push) is the named follow-up,
   deliberately not built until the on-demand report proves its
-  shape.
+  shape. *Partially answered 2026-10-24:* the heartbeat probe
+  (see Reporting) covers the "is it alive at all" half on the
+  same weekly cadence; the digest half still waits for a second
+  user or real report-reading pain.
 - **OP-2 — Retention.** Ledgers are append-only forever at
   current volume (a few KB/day). If volume grows: TTL or
   rollup-and-prune, decided from real numbers.

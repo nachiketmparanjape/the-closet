@@ -14,3 +14,4 @@ deploy-create-extract.js
 metrics.js
 usage-report.js
 backfill-shortnames.js
+.heartbeat-probe.json
