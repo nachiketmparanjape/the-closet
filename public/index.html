@@ -90,6 +90,9 @@
     .top-actions { display: flex; align-items: center; gap: 14px; }
     .text-button { border: 0; background: transparent; padding: 7px 0; font-weight: 600; font-size: 13px; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
     .auth-button { min-height: 44px; border: 1px solid var(--line-strong); background: var(--paper); border-radius: var(--r-sm); padding: 0 13px; font-size: 12px; font-weight: 600; cursor: pointer; }
+    /* Signed-in: the account button becomes an initial avatar
+       (the Google/Spotify pattern — identity IS the button). */
+    .auth-button.is-avatar { width: 38px; height: 38px; min-height: 38px; padding: 0; border-radius: 50%; border-color: var(--accent); background: var(--paper-soft); color: var(--ink); font-size: 15px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
     .auth-button:disabled { color: var(--muted); cursor: not-allowed; opacity: .75; }
     .guest-banner { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 10px; margin: 10px 0 0; padding: 11px 14px; background: #fdf6e3; border: 1px solid #e5cf8a; border-radius: 10px; font-size: 13px; color: #6b5312; box-shadow: 0 2px 10px rgba(120, 90, 20, .08); }
     .guest-banner[hidden] { display: none; }
@@ -569,10 +572,22 @@
     }
     @media (max-width: 620px) {
       .app { padding: 18px 16px calc(96px + env(safe-area-inset-bottom)); }
-      .topline { padding-bottom: 18px; align-items: flex-start; flex-direction: column; gap: 12px; }
-      .top-actions { width: 100%; justify-content: space-between; }
-      .hero { padding: 42px 0 36px; }
-      h1 { font-size: clamp(44px, 16vw, 70px); }
+      /* Compact top (founder, 2026-10-24 — popular-app chrome
+         patterns: Instagram/Spotify/Google one-row mastheads).
+         One row: wordmark left, account right; the "Signed in
+         as…" line moves into the Account sheet where it
+         belongs. The hero keeps its editorial voice at reading
+         size, loses the onboarding paragraph, and the CTA grid
+         tightens — content reaches the first screen again. */
+      .topline { padding-bottom: 12px; align-items: center; flex-direction: row; gap: 10px; }
+      .status { display: none; }
+      .top-actions { width: auto; justify-content: flex-end; margin-left: auto; }
+      .hero { padding: 18px 0 20px; gap: 12px; }
+      h1 { font-size: clamp(27px, 8vw, 34px); line-height: 1.05; }
+      h1 br { display: none; }
+      .hero-copy { gap: 8px; padding-bottom: 0; }
+      .hero-copy p { display: none; }
+      .hero-copy .primary, .hero-copy .secondary { min-height: 48px; padding-top: 10px; padding-bottom: 10px; font-size: 15.5px; }
       .utility { grid-template-columns: 1fr; }
       .filters { justify-content: flex-start; overflow: visible; }
       .chip { padding-left: 10px; padding-right: 10px; }
@@ -2087,6 +2102,7 @@
           label.textContent = "Firebase setup needed";
           statusDot.classList.remove("ready");
           authButton.disabled = true;
+          authButton.classList.remove("is-avatar");
           authButton.textContent = "Sign in with Google · setup needed";
           return;
         }
@@ -2095,15 +2111,24 @@
           if (user.isAnonymous) {
             label.textContent = "Guest mode — connect to keep your wardrobe";
             statusDot.classList.remove("ready");
+            authButton.classList.remove("is-avatar");
+            authButton.removeAttribute("aria-label");
             authButton.textContent = "Connect account";
           } else {
             label.textContent = "Signed in as " + (user.displayName || user.email || "you");
             statusDot.classList.add("ready");
-            authButton.textContent = "Account";
+            // Avatar pattern: the initial carries identity;
+            // the click still opens the Account sheet.
+            authButton.classList.add("is-avatar");
+            authButton.setAttribute("aria-label", "Account");
+            authButton.title = "Account — " + (user.displayName || user.email || "");
+            authButton.textContent = ((user.displayName || user.email || "Y").trim().charAt(0) || "Y").toUpperCase();
           }
         } else {
           label.textContent = "Starting…";
           statusDot.classList.remove("ready");
+          authButton.classList.remove("is-avatar");
+          authButton.removeAttribute("aria-label");
           authButton.textContent = "Account";
         }
       }
