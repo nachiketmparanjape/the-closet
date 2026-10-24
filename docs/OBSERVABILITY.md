@@ -1,281 +1,300 @@
-# Observability — Closet (living design doc)
+# Observability — How the App Watches Itself
 
-How the app watches itself: what broke, what it cost, and what the
-user was doing when it happened. This is the presentable design
-surface for a structure that is invisible by nature — if it can't
-be read and challenged here, it doesn't get to carry weight.
+This document explains how the Closet app records what happened inside
+itself: what broke, what the AI cost, and what you were doing when
+something failed. It is the living design document for that recording
+system. When the recording system changes, this document changes in the
+same commit — a document that lags the code is a defect here.
 
-**History.** OBS-1 (2026-10-19): structured logs + client error
-capture. OBS-3 (2026-10-23, founder chose full instrumentation in
-one pass): the `ai_usage` cost ledger. OBS-2 (2026-10-24, Sprint
-20): the error taxonomy repair, the `error_events` ledger, client
-correlation, and the quality report. This doc is the single
-living spec for all three; cut records live in `docs/SHIPPED.md`
-and the sprint folders.
+Built in three steps: OBS-1 (2026-10-19, structured logs and browser
+error capture), OBS-3 (2026-10-23, the cost ledger), OBS-2 (2026-10-24,
+the error-name repair, the outcome ledger, and the quality report). Cut
+records live in `docs/SHIPPED.md` and the sprint folders.
 
-**How to suggest an improvement.** The open points at the bottom
-are numbered (OP-n). Improvements are proposed against a section
-or an OP, decided with the founder, and this doc is edited in the
-same commit as the code — the doc lagging the code is itself a
-defect under the studio's important-invisibles doctrine.
+## Words we use
 
----
+| Word | What it means | Example |
+|---|---|---|
+| An event | One small record written at the moment something happens: what it was, when, and a few numbers. Events are counted and summed later. | "askStylist failed at 9:28, error name EMPTY_WARDROBE, took 1.2 seconds." |
+| A log line | A line of text kept for reading one single case in detail. Logs are for tracing one story, not for counting. | The full record of one failed call, read while fixing it. |
+| A ledger | A table of events kept forever, that reports are built from. We keep two: one for AI cost, one for outcomes. | The `ai_usage` ledger holds one event per AI call. |
+| A catalog key | The official name of one kind of failure, from a fixed list (the catalog). Every failure must be recorded under its key. | `AI_BAD_RESPONSE` — the model answered in a shape the code could not use. |
+| A category | The catalog's grouping for a key: whose fault the failure is. One of: auth, validation, dependency, internal. | `EMPTY_WARDROBE` is validation — the request itself could not be served. |
+| A correlation id | One random id stamped on every event a single request causes, so its cost event, outcome event, and log lines can be read as one story. | One chat message produces three records, all carrying the same id. |
+| An outcome kind | What sort of ending an event records. Five kinds exist; the table below defines each. | A `self_heal` event: the system caught its own bad answer and asked again. |
+| Shape-only detail | A note about a failure that records structure, never content: which fields a bad answer had, never their values. | "detail: args had keys [items, note]" — the note's text is never stored. |
+| A pricing version | The name of the price table used to turn raw usage (tokens, seconds) into a dollar estimate. The version is stored on every cost event. | `2026-10-23.v1`. If prices change, old events keep their version and can be re-priced. |
+| Cost per successful outcome | The headline cost number: total AI spend divided by the number of calls that worked. | "One catalogued item costs about $0.04 of AI." |
+| The probe | A test account that makes one call designed to fail in exactly one known way, once a week, to prove the recording system itself is still alive. | The probe asks the stylist with an empty wardrobe; the failure must appear in the ledger, with its key. |
+| A spike flag | The quality report's warning mark: a function whose recent failures jumped compared with its own normal rate. | "describeItem failed 4 times in 24 hours, 3× its usual rate." |
 
-## The three questions
+## The pictures
 
-1. **What broke?** — per function: success/failure rates, which
-   named errors, and the failures that *aren't* errors (rejected
-   model output, degraded fallbacks, self-heal retries).
-2. **What did it cost?** — per AI call: tokens or predict-seconds,
-   latency, a versioned USD estimate, and the headline figure,
-   **cost per successful outcome**.
-3. **What was the user doing?** — client failures carry the
-   session and the last few actions, so "it broke at 9:28" can be
-   matched to its moment and its server events.
+### Where every kind of record goes
 
-## Principles
-
-- **Events for aggregation, logs for traces.** Anything we roll
-  up is written as a structured event at the moment it happens —
-  never reconstructed by scraping logs after the fact.
-- **Metadata only.** No prompts, no photo bytes, no user content
-  in any event. Ids, counts, timings, outcomes, and *shapes*
-  (which fields a rejected payload had — never their values).
-- **One join key per request.** Every event carries the request's
-  `correlationId`, so cost, outcome, and latency for a single
-  call read as one story across logs and ledgers.
-- **Errors carry their names.** A failure's catalog key must
-  survive from the throw site to the log, the ledger, and the
-  report. A failure recorded without its name is a failed
-  recording (this was a real bug class — see Taxonomy).
-- **Nothing silent.** If the system handled it, the system can
-  show it: a fallback, a rejection, a retry, or a degradation is
-  an event, not an absence.
-- **Estimates are stamped, inputs are kept.** Cost events store
-  the raw units *and* the USD estimate under a named
-  `pricingVersion`. Price changes never rewrite history; history
-  can be re-priced on demand.
-- **Fail-safe.** An observability write must never break the
-  user-facing call: fire-and-forget, and its own failures degrade
-  to a log line.
-
-## Shape of the system
-
-```
- request ──► callable boundary (functions/index.js)
-               │  ├─ success ─► logSuccess ──────────────┐
-               │  └─ failure ─► logError (key resolved) ─┤ Cloud Logging
-               │                                          │ (30-day traces)
-               ├─ AI calls ─► ai_usage event ────────┐    │
-               ├─ outcome ───► error_events event ───┤ Firestore ledgers
-               └─ sub-events ► error_events event ───┘ (append-only,
-                                                        server-only)
- browser ──► reportError ──► users/{uid}/client_errors
-               (+ sessionId + action trail)
-
- ledgers ──► scripts/quality-report.js  (health lens)
-         └─► usage-report.js            (cost lens)
+```mermaid
+flowchart TD
+    Req["A request reaches a server function"] --> Boundary["The boundary<br/>(one doorway every call passes through)"]
+    Boundary -->|"worked"| LogOk["Log line: success"]
+    Boundary -->|"failed"| LogErr["Log line: failure,<br/>with its catalog key"]
+    LogOk --> CloudLog["Cloud Logging<br/>kept 30 days — for tracing one case"]
+    LogErr --> CloudLog
+    Boundary -->|"each AI call inside"| Usage[("Cost ledger — ai_usage<br/>one event per AI call")]
+    Boundary -->|"the ending, and notable<br/>non-endings inside"| Events[("Outcome ledger — error_events<br/>success, failure, rejection,<br/>degraded, self_heal")]
+    Browser["Your browser, when the page itself fails"] -->|"reportError()"| ClientErr[("Browser error rows<br/>users/{you}/client_errors")]
+    Usage --> Reports["Two reports read the ledgers"]
+    Events --> Reports
+    ClientErr --> Reports
+    Reports --> Quality["Quality report — the health lens"]
+    Reports --> Cost["Usage report — the cost lens"]
 ```
 
-Writers: `functions/errors.js` (taxonomy + logs),
-`functions/events.js` (error_events), `functions/usage.js`
-(ai_usage), the stylist's `emitEvent` funnel (sub-events via
-`hooks.onEvent`). Client: `reportError()` in `public/index.html`.
-Rules: both ledgers deny all client access (`firestore.rules`);
-`client_errors` is owner-create-only.
+### How a failure keeps its name
 
-## The error taxonomy (`functions/errors.js`)
+```mermaid
+flowchart TD
+    A["Code hits a failure and calls fail(key)"] --> B["The thrown error carries<br/>the key AND the safe message"]
+    B --> C["The boundary catches it"]
+    C --> D["keyOf() reads the key back:<br/>from the error itself, or by matching<br/>its message against the catalog"]
+    D --> E["Log line, ledger event, and report<br/>all record the same key"]
+    E --> F["You see only the catalog's<br/>plain message — never internals"]
+```
 
-One catalog (`CATALOG`) is the single vocabulary of failure.
-Every entry: a **key** (`AI_BAD_RESPONSE`), a **category**
-(`auth | validation | dependency | internal`), a **gRPC code**
-(what the client receives), and a **client-safe message** (the
-client sees catalog messages verbatim — never internals).
+Before OBS-2, step one did not attach the key. Failures arrived at the
+ledger named "(uncoded)" — the name existed where the failure happened
+and was lost on the way. The tests now prove the key survives.
 
-- `fail(key)` throws an `HttpsError` carrying the message *and
-  the key itself* (`err.key`).
-- `codedError(key, detail)` is the downstream counterpart: a
-  plain Error whose internal detail is logged but never sent.
-- `keyOf(err)` resolves a key from any carrier: explicit `.key`,
-  a reverse lookup of the catalog message, or a `.code` that is
-  itself a key. `logError` and the boundary both go through it.
+### The three stores and their readers
 
-**The failure this prevents:** before OBS-2, `fail()` did not
-attach the key, so a boundary logging the thrown HttpsError saw
-only "internal" and the failure landed in metrics as
-*(uncoded)* — the name existed at the throw and was lost in
-transit. The taxonomy is now guarded by tests: every catalog
-entry has a message + valid gRPC + category, `fail()` provably
-carries its key, and every gRPC code the catalog uses has a
-human line in the client's `friendlyError` map.
+```mermaid
+flowchart LR
+    subgraph Writers["Who writes"]
+        W1["functions/errors.js — names + logs"]
+        W2["functions/events.js — outcomes"]
+        W3["functions/usage.js — AI cost"]
+        W4["The browser — reportError()"]
+    end
+    subgraph Stores["What is kept"]
+        S1[("Cloud Logging — 30 days")]
+        S2[("error_events — forever")]
+        S3[("ai_usage — forever")]
+        S4[("client_errors — per user")]
+    end
+    subgraph Readers["Who reads"]
+        R1["Quality report"]
+        R2["Usage report"]
+        R3["DuckDB on exported files<br/>(one-off questions)"]
+        R4["The weekly probe<br/>(checks the writers still write)"]
+    end
+    W1 --> S1
+    W1 --> S2
+    W2 --> S2
+    W3 --> S3
+    W4 --> S4
+    S2 --> R1
+    S4 --> R1
+    S3 --> R2
+    S2 --> R4
+    S2 --> R3
+    S3 --> R3
+```
 
-## The ledgers
+## How it works
 
-### `ai_usage` — one event per AI call (OBS-3)
+1. **Every server call passes one doorway.** The callable boundary in
+   `functions/index.js` wraps each function. It starts the correlation
+   id and records how the call ends.
+2. **A call that works** writes a success log line and a `success`
+   outcome event with its duration.
+3. **A call that fails** throws through `fail(key)` or `codedError(key)`.
+   The boundary resolves the key with `keyOf()`, writes the failure log
+   line and the `failure` outcome event, and returns only the catalog's
+   plain message to the app.
+4. **Every AI call inside** writes one `ai_usage` event: the raw units
+   (tokens or predict-seconds), the time it took, whether it worked, and
+   a dollar estimate stamped with its pricing version.
+5. **Notable non-failures write events too.** Feature code sends them
+   through one funnel per module (the stylist's `emitEvent`, the
+   boundary's `onEvent` hook): a result the system refused
+   (`rejection`), a lesser result the user silently got (`degraded`), a
+   retry that fixed the system's own bad answer (`self_heal`).
+6. **Browser failures** go through `reportError()`, which writes one row
+   per failure with the session id and the last 12 things you did in the
+   app (which screen, which window opened), so a page failure can be
+   matched by time to the server's events.
+7. **Recording never breaks the call.** Every observability write is
+   fire-and-forget: if a write fails, the failure degrades to a log line
+   and the user's call continues.
+8. **Reports read the ledgers, never the logs**, when the question is a
+   count or a rate. Logs are read only to trace one case.
+9. **Once a week, the probe checks the checker.** A test account makes
+   the empty-wardrobe stylist call. The probe then reads the outcome
+   ledger: the failure must be there, with the key `EMPTY_WARDROBE`.
+   Silence means it passed. You hear only about a double failure.
 
-Written by `makeUsageRecorder` (`functions/usage.js`) through the
-per-request tracker in each callable.
+## Rules in tables
+
+### The catalog — the fixed list of failure names
+
+One list (`CATALOG`, in `functions/errors.js`) is the whole vocabulary
+of failure. Every entry has four parts: the **key** (`AI_BAD_RESPONSE`),
+the **category** (auth, validation, dependency, or internal), the
+**gRPC code** (the technical code the app receives), and the **plain
+message** (the only text the app ever shows — catalog messages reach
+you word for word; internal detail never does). Tests guard the list:
+every entry must have all four parts, `fail()` must provably carry its
+key, and every gRPC code in the catalog must have a matching plain line
+in the app's own error wording (`friendlyError`).
+
+### The standing rules
+
+| Rule | Why | Example |
+|---|---|---|
+| Events for counting, logs for tracing. Never rebuild a count by scraping logs later. | Logs expire in 30 days and were not written to be summed. | "Failures per day this month" comes from `error_events`, not from log searches. |
+| Metadata only. No prompts, no photo bytes, no user content in any event. | The ledgers are kept forever; they must be safe to keep forever. | A rejected answer is recorded as its field names, never its text. |
+| One correlation id per request, on every record it causes. | Cost, outcome, and logs must join into one story. | One chat message: one cost event + one outcome event + log lines, one id. |
+| A failure is recorded under its catalog key, always. A failure recorded without its name is a failed recording. | "(uncoded)" failures cannot be counted, trended, or fixed by kind. | The pre-OBS-2 bug this rule now names. |
+| Nothing silent. A fallback, a refusal, a retry, or a lesser result is an event. | The failures that hurt most are the ones where nothing threw. | The stylist discards a bad outfit and answers in text only: a `rejection` and a `degraded` event, not silence. |
+| Raw units are kept next to every estimate, with the pricing version named. | Prices change; history must not be rewritten by a price change. | Tokens stored as counted; dollars recomputed under any version. |
+| Observability writes are fail-safe: fire-and-forget. | The watcher must never become the thing that breaks the app. | If the ledger write fails, the user's call still succeeds. |
+| The ledgers are server-written only. Browsers cannot write them at all (denied in the database rules). | A browser cannot be trusted to report its own server's failures, and a guest has no identity to write with. | The boundary is the one place every outcome passes exactly once. |
+| Browser error rows are owner-create-only: you can write your own, read none back from the app. | Enough to report, never a reading surface. | `reportError()` creates; only the reports read. |
+
+### The five outcome kinds (`error_events`)
+
+| Kind | Means | Example |
+|---|---|---|
+| `success` | The call worked. | A stylist answer returned, with its duration. |
+| `failure` | The call failed with a catalog key. | `AI_BAD_RESPONSE` on a catalogue call. |
+| `rejection` | The system refused a result it was handed. | Trip packing arguments that did not map to real pieces (`trip_tool_args_rejected`); a stylist outfit thrown away after checking (`outfit_discarded`). |
+| `degraded` | The user got a lesser result and would never have known. | A best-effort profile read failed (`subcall_degraded`); a repair failed and the chat fell back to text only. |
+| `self_heal` | The system caught its own problem and tried again. | The trip packing re-ask; the outfit slot repair. Counted, so "how often does the first try fail?" is a number. |
+
+### The cost ledger — one event per AI call (`ai_usage`)
 
 | Field | Meaning |
-| --- | --- |
-| `ts` | server timestamp |
-| `correlationId` | joins to logs + error_events |
-| `feature` | callable or sub-call (`describeItem`, `askStylist`, `extractGarment.provider`, …) |
-| `provider` | `vertex` \| `replicate` |
-| `model` | model id as called |
-| `uid` | caller |
-| `surface` | `upload` \| `chat` \| `trip` \| `shop` \| `background` |
-| `tokensIn` / `tokensOut` / `tokensThinking` | provider-reported usage, when available |
-| `predictSeconds` | Replicate predict time, when applicable |
-| `latencyMs` | wall time of the AI call itself |
-| `outcome` | `success` \| `error:<key>` \| `gate_rejected` |
-| `costUsd` | estimate under `pricingVersion` |
-| `pricingVersion` | which pricing table priced this event (`functions/pricing.js`) |
-| `refId` | item / photo / trip id where one exists |
+|---|---|
+| `ts` | Server timestamp |
+| `correlationId` | Joins to logs and outcome events |
+| `feature` | The function or sub-call (`describeItem`, `askStylist`, `extractGarment.provider`, …) |
+| `provider` | `vertex` or `replicate` |
+| `model` | The model id, as called |
+| `uid` | Who called |
+| `surface` | `upload`, `chat`, `trip`, `shop`, or `background` |
+| `tokensIn` / `tokensOut` / `tokensThinking` | Provider-reported token counts, when available |
+| `predictSeconds` | Replicate run time, when it applies |
+| `latencyMs` | Wall-clock time of the AI call itself |
+| `outcome` | `success`, `error:<key>`, or `gate_rejected` |
+| `costUsd` | The estimate, priced under `pricingVersion` |
+| `pricingVersion` | Which price table priced this event (`functions/pricing.js`) |
+| `refId` | Item, photo, or trip id, where one exists |
 
-Pricing: Vertex per-1M-token rates per model (thinking tokens
-bill as output); Replicate per-second by hardware class. A price
-change ships as a new `pricingVersion`; any window can be
+Prices: Vertex charges per million tokens, per model (thinking tokens
+bill as output). Replicate charges per second, by hardware class. A
+price change ships as a new `pricingVersion`; any past window can be
 re-priced from the stored raw units.
 
-### `error_events` — one event per outcome or notable non-outcome (OBS-2)
-
-Written by `makeErrorEventRecorder` (`functions/events.js`).
-The callable boundary writes `success` (with duration) and
-`failure` outcomes; feature code writes the rest through one
-funnel per module.
+### The outcome ledger — one event per ending (`error_events`)
 
 | Field | Meaning |
-| --- | --- |
-| `ts` | server timestamp |
-| `kind` | `success` \| `failure` \| `rejection` \| `degraded` \| `self_heal` |
-| `fn` | callable, or `callable:event` for sub-events (`askStylist:outfit_discarded`) |
-| `key` | catalog key when the event is a failure |
-| `category` | the key's catalog category |
-| `correlationId` | joins to logs + ai_usage |
-| `uid` | caller |
-| `durationMs` | successes only |
-| `detail` | shape-only context (arg keys, stage names), capped at 300 chars |
+|---|---|
+| `ts` | Server timestamp |
+| `kind` | One of the five outcome kinds above |
+| `fn` | The function, or `function:event` for a sub-event (`askStylist:outfit_discarded`) |
+| `key` | The catalog key, when the event is a failure |
+| `category` | The key's category |
+| `correlationId` | Joins to logs and cost events |
+| `uid` | Who called |
+| `durationMs` | Successes only |
+| `detail` | Shape-only context (argument names, stage names), at most 300 characters |
 
-The **non-failure kinds** are the point of the design — the
-failures that used to be invisible because nothing threw:
+### The browser's rows (`users/{uid}/client_errors`)
 
-- `rejection` — the system refused a result: trip packing args
-  that didn't map (`trip_tool_args_rejected`), a packing plan
-  drafted but not applied, a stylist outfit discarded after
-  validation (`outfit_discarded`).
-- `degraded` — the user got a lesser result and nobody knew: a
-  best-effort profile read failed (`subcall_degraded`), a slot
-  repair threw and the chat fell back to text-only.
-- `self_heal` — the system caught its own problem and retried:
-  the trip packing re-ask, the slot-validation repair attempt.
-  Counted, so "how often does the first attempt fail?" is a
-  number, not a feeling.
+Written by `reportError()`: `where` (which part of the page), `code`,
+`message` (capped), `page`, `userAgent`, `createdAt` — plus `sessionId`
+(one per page load) and `trail` (your last 12 stamped actions, fed by
+hooks in the screen-switch and window-open code). Writes are capped per
+session and loop-guarded, so a failing page cannot flood its own ledger.
 
-### `users/{uid}/client_errors` — the browser's side (OBS-1 + OBS-2)
+### The reports
 
-`reportError()` writes (owner-create-only, capped per session,
-loop-guarded): `where`, `code`, `message` (capped), `page`,
-`userAgent`, `createdAt` — plus, since OBS-2, **`sessionId`**
-(one per page load, `sessionStorage`) and **`trail`**: the last
-12 stamped actions (`view …`, `open <window>`), fed by hooks in
-`switchView` and `openOverlay`. An error report is now joinable
-to the session's other errors and, by time, to the server's
-events for that user.
+| Report | Answers | Notes |
+|---|---|---|
+| `scripts/quality-report.js [--days N]` | Per function: counts and rates of success and failure, top error keys, success time (middle and 95th percentile), the non-failure kind counts, AI outcomes, browser-error summary. | Spike flag rule: a function's last-24-hours failure rate is flagged when it has at least 3 failures AND runs at least 2× its window baseline. Notify-only by decision — the report is the alerting surface until a digest is built (OP-1). |
+| `usage-report.js` | Spend by feature × provider × model, the trend, success beside cost, cost per successful outcome, and unit costs (per item catalogued, per stylist turn). | The cost lens to the quality report's health lens. |
+| The probe (`scripts/heartbeat-probe.js`, weekly) | Is the recording system itself alive? | The probe account's events are excluded from report statistics (they are synthetic) and shown as a liveness line instead. Its credentials live in `.heartbeat-probe.json` (gitignored, private) — a data-less test account, not a user credential. |
+| One-off questions | Anything else. | Export a window, query locally with DuckDB over files — no extra infrastructure. |
 
-## Reporting
+### Choices made, and what was rejected
 
-- **`scripts/quality-report.js [--days N]`** — per-function
-  success/failure counts and rates, top error keys, success
-  latency p50/p95, the non-failure event counts, AI outcomes,
-  client-error summary — and **spike flags**: a function's
-  last-24h failure rate is flagged when it has ≥3 failures and
-  runs ≥2× its window baseline. Notify-only by decision: the
-  report is the alerting surface until a scheduled digest is
-  built (OP-1).
-- **Heartbeat probe (`scripts/heartbeat-probe.js`, weekly cron,
-  added 2026-10-24).** With one user, an empty ledger is
-  ambiguous — healthy, or the recorder died. The probe resolves
-  it: a dedicated probe account makes the one call that must
-  always fail the same way (empty-wardrobe askStylist) and the
-  probe verifies the failure landed in `error_events` *with its
-  key*. Silence on PASS; the founder hears only about a double
-  FAIL. The probe's events are excluded from the report's stats
-  (synthetic) and surface as a liveness line instead. Probe
-  credentials live in `.heartbeat-probe.json` (gitignored, 600)
-  — a data-less test account, not a user credential.
-- **`usage-report.js`** — spend by feature × provider × model,
-  trend, success/error beside cost, cost per successful outcome,
-  unit economics (per item catalogued, per stylist turn).
-- **Ad-hoc analysis:** export a window and query locally with
-  DuckDB over files — zero infra. **Graduation path, only when
-  volume demands it:** Firestore → BigQuery with the same
-  schema; the event shapes drop in unremodeled. No streaming
-  pipeline, no warehouse, until a report actually hurts.
-- GCP billing alerts stay the hard backstop for *total* cloud
-  spend. The ledgers answer what billing can't: **which feature,
-  on what, and whether it worked.**
+| Choice | Why | Rejected alternative |
+|---|---|---|
+| Ledgers in the database, not log queries only | Logs expire in 30 days and sum badly; the standing questions are "since when?" questions. Append-only events are queryable forever at this size, for about no cost. | The OBS-1 logging-only design — it is why failures stayed invisible until a user reported them. |
+| No Sentry (yet) | The studio standard names Sentry's free tier as the default crash surface, but Closet's failures are domain-shaped (refusals, gates, self-heals) that a crash tool does not model. The ledger and report cover the need with no new vendor. | Revisit when a second product needs crash aggregation across stacks (OP-5). |
+| Server-side writes only | See the standing rules. | Letting the browser report server outcomes. |
+| Shape-only detail | Enough to classify a failure, never user content. | Storing full payloads "for debugging" — unsafe to keep forever. |
+| One funnel per module for sub-events | "Did we record X?" has exactly two places to check, and the tests can guard both. | Recording calls scattered through feature code. |
+| Growth path: database → BigQuery, same event shapes | Only when a report actually hurts. No warehouse, no streaming pipeline before then. | Building the pipeline now. GCP billing alerts stay the backstop for *total* cloud spend — the ledgers answer what billing cannot: which feature, on what, and whether it worked. |
 
-## Decisions & alternatives (why it is this way)
+## Known limits today
 
-- **Firestore ledgers, not just Cloud Logging queries.** Logs
-  expire (30 days) and aggregate poorly; the questions above are
-  longitudinal ("since when?"). Append-only Firestore events are
-  queryable forever at this scale for ~no cost. Alternative
-  rejected: a logging-only design (OBS-1) — it is why failures
-  were undiscoverable without a user report.
-- **Not Sentry (yet).** The studio standard names Sentry's free
-  tier as the default crash surface; the Closet's failure modes
-  are domain-shaped (rejections, gates, self-heals) that a crash
-  tool doesn't model, and the ledger + report cover the need
-  with zero new vendor. Revisit if a second product needs crash
-  aggregation across stacks (OP-5).
-- **Server-side writes only.** Clients can't be trusted to
-  report their own server's failures (and a guest has no
-  Firestore identity to write with); the boundary is the one
-  place every outcome passes through exactly once.
-- **Shape-only details.** `detail` records *structure* (which
-  args, which stage) — enough to classify a failure, never user
-  content. This keeps the ledger safe to keep forever.
-- **One funnel per module.** Sub-events enter through
-  `emitEvent` / `hooks.onEvent`, outcomes through the boundary —
-  so "did we instrument X?" has exactly two places to check,
-  and the invariant tests can guard them.
+- **The quality report is on-demand.** Nothing runs it on a schedule and
+  nothing pushes a spike warning. By decision, that waits until the
+  report's shape has proved itself (OP-1); the probe covers only the
+  "is it alive" half.
+- **The ledgers grow forever.** At today's size (a few KB a day) that is
+  fine and deliberate. It stops being fine at a volume we have not set a
+  number for (OP-2).
+- **Browser errors are raw rows.** The report groups them by place and
+  session; it does not yet merge repeats of the same error into one
+  counted item (OP-3).
+- **The spike rule is a first guess.** At least 3 failures and at least
+  2× baseline has not yet been tested against a month of real flags
+  (OP-4).
+- **The brief itself is not recorded.** For the stylist, we record that a
+  call happened and what it cost — not the facts the model was shown. So
+  "why did it answer that?" still cannot be answered from the records.
+  That gap belongs to the stylist overhaul (AGENT-ARCHITECTURE.md, gap
+  A6).
 
-## Open improvement points
+## Decisions still open
 
-- **OP-1 — Scheduled digest.** The quality report is on-demand;
-  a weekly digest (and spike push) is the named follow-up,
-  deliberately not built until the on-demand report proves its
-  shape. *Partially answered 2026-10-24:* the heartbeat probe
-  (see Reporting) covers the "is it alive at all" half on the
-  same weekly cadence; the digest half still waits for a second
-  user or real report-reading pain.
-- **OP-2 — Retention.** Ledgers are append-only forever at
-  current volume (a few KB/day). If volume grows: TTL or
-  rollup-and-prune, decided from real numbers.
-- **OP-3 — Client-error grouping.** client_errors are raw rows;
-  grouping by `where` + session already happens in the report,
-  fingerprint dedupe does not.
-- **OP-4 — Alert thresholds.** Spike flags are heuristic
-  (≥3 failures, ≥2× baseline). Tune from the first month of
-  real flags — or record why they're right.
-- **OP-5 — Cross-product shape.** This design is Closet's. A
-  second product adopting it is the trigger to lift the shared
-  parts into the studio's logging-and-observability standard.
+Propose improvements against these numbers.
 
-## Code pointers (as of 2026-10-24)
+- **OP-1 — Scheduled digest.** A weekly digest (and a pushed spike
+  warning) is the named follow-up, deliberately not built until the
+  on-demand report proves its shape. *Partly answered 2026-10-24:* the
+  probe covers the "is it alive at all" half, on the same weekly
+  cadence; the digest half still waits for a second user or real
+  report-reading pain.
+- **OP-2 — Retention.** The ledgers are append-only forever at current
+  volume. If volume grows: time-to-live expiry, or rollup-and-prune —
+  decided from real numbers.
+- **OP-3 — Browser-error grouping.** Grouping by place + session happens
+  in the report; fingerprint dedupe (merging repeats of the same error)
+  does not.
+- **OP-4 — Alert thresholds.** The spike rule (≥3 failures, ≥2×
+  baseline) is a heuristic. Tune it from the first month of real flags —
+  or record why it is right.
+- **OP-5 — Cross-product shape.** This design is the Closet's. A second
+  product adopting it is the trigger to lift the shared parts into the
+  studio's logging-and-observability standard.
 
-- Taxonomy + logging: `functions/errors.js` (`CATALOG`, `fail`,
-  `codedError`, `keyOf`, `logError`, `logEvent`).
-- Boundary + wiring: `functions/index.js` (`boundary`, `finish`,
-  `recordErrorEvent`, the `onEvent` hooks wrap at the askStylist
-  call).
-- Sinks: `functions/events.js`, `functions/usage.js`,
+## Code pointers
+
+As of 2026-10-24.
+
+- Names and logging: `functions/errors.js` — the catalog (`CATALOG`),
+  `fail`, `codedError`, `keyOf`, `logError`, `logEvent`.
+- The doorway and its wiring: `functions/index.js` — `boundary`,
+  `finish`, `recordErrorEvent`, the `onEvent` wrap at the askStylist
+  call.
+- The ledger writers: `functions/events.js`, `functions/usage.js`,
   `functions/pricing.js`.
-- Sub-event funnel: `emitEvent` in `functions/stylist.js`.
-- Client: `reportError`, `closetSessionId`, `noteTrail` in
+- The stylist's sub-event funnel: `emitEvent` in `functions/stylist.js`.
+- The browser side: `reportError`, `closetSessionId`, `noteTrail` in
   `public/index.html`.
-- Reports: `scripts/quality-report.js`, `usage-report.js`.
-- Guards: `tests/errors-server.test.js`,
+- Reports: `scripts/quality-report.js`, `usage-report.js` (repo root of
+  the hosting folder), `scripts/heartbeat-probe.js`.
+- Tests guarding the name-keeping rule: `tests/errors-server.test.js`,
   `tests/errors-client.test.js`, `tests/usage-retrofit.test.js`.
