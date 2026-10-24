@@ -871,3 +871,22 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
 - **Lane:** Catalogue. **Effort:** S–M.
 - **Status:** Filed 2026-10-24. Data incident repaired the
   same night; this is the prevention half.
+
+### UX-17 — Manual theme choice in Account (System / Light / Dark)
+
+- **Origin:** founder curiosity, 2026-10-24 — explicitly NOT
+  a priority ("the way we are right now looks pretty good").
+- **Now:** theme follows the phone's system setting only
+  (light base tokens, dark via prefers-color-scheme). No
+  in-app control, no stored preference.
+- **In scope (when pulled):** a three-way choice in Account
+  (System / Light / Dark), stored per device, applied via a
+  data-theme attribute that overrides the media query both
+  ways; default stays System.
+- **Why it might matter:** app-light on a dark phone for
+  bright-sunlight readability; comparing the two looks
+  without flipping the whole phone.
+- **Revisit trigger:** first user request for it, or the
+  next time Account is opened up for other work.
+- **Lane:** Loop (settings/shell). **Effort:** S.
+- **Status:** Parked 2026-10-24 by founder's own call.
