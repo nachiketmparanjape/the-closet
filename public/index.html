@@ -348,6 +348,10 @@
     #tripDetailWeather { display: inline-block; background: var(--paper-soft); color: var(--muted-strong); border-radius: 999px; padding: 5px 12px; font-size: 13px; margin: 8px 0 2px; }
     #tripDeleteBtn { color: var(--danger); }
     .trip-section-h { font-size: 17px; font-weight: 650; letter-spacing: -.01em; margin: 24px 0 8px; }
+    .trip-shop { margin: 26px 0 4px; }
+    .trip-shop .trip-section-h { margin-top: 0; }
+    .trip-shop .hint { margin: 0 0 12px; line-height: 1.5; }
+    .trip-shop .secondary { margin-top: 12px; }
     /* PC-35: the beginner guide's three paths. */
     .guide-body { display: grid; gap: 22px; }
     .guide-intro { color: var(--muted); margin: 0; line-height: 1.55; }
@@ -4863,16 +4867,18 @@
         tagged.sort(function (a, b) {
           return (order[a.status] == null ? 0 : order[a.status]) - (order[b.status] == null ? 0 : order[b.status]);
         });
+        var sec = document.createElement("div");
+        sec.className = "trip-shop";
         var h = document.createElement("h3");
         h.className = "trip-section-h";
         h.textContent = "Shopping for this trip" + (tagged.length ? " (" + tagged.length + ")" : "");
-        box.appendChild(h);
+        sec.appendChild(h);
         var intro = document.createElement("p");
         intro.className = "hint";
         intro.textContent = tagged.length
           ? "Pieces you're eyeing for this trip — each checked against your wardrobe before you buy."
           : "Nothing tagged yet. Check something you're eyeing for this trip and it will live here, next to the packing list.";
-        box.appendChild(intro);
+        sec.appendChild(intro);
         tagged.forEach(function (c) {
           var row = document.createElement("div");
           row.className = "pack-row trip-shop-row";
@@ -4905,7 +4911,7 @@
           row.addEventListener("keydown", function (ev) {
             if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); open(); }
           });
-          box.appendChild(row);
+          sec.appendChild(row);
         });
         var tripShopBtn = document.createElement("button");
         tripShopBtn.className = "secondary";
@@ -4915,7 +4921,16 @@
           pendingShopTripId = trip.id;
           document.getElementById("shopCheckButton").click();
         });
-        box.appendChild(tripShopBtn);
+        sec.appendChild(tripShopBtn);
+        // Founder (2026-10-24): shopping sits with packing,
+        // BEFORE the outfit options — at the bottom of the page
+        // nobody found it.
+        var anchor = null;
+        var heads = box.querySelectorAll(".trip-section-h");
+        for (var hi = 0; hi < heads.length; hi++) {
+          if (heads[hi].textContent === "Outfits" || heads[hi].textContent === "Saved for this trip") { anchor = heads[hi]; break; }
+        }
+        if (anchor) box.insertBefore(sec, anchor); else box.appendChild(sec);
       }
 
       // Open-Meteo daily forecast for the leg. Null when out of range
@@ -7024,6 +7039,32 @@
           if (!savedNote) body.appendChild(el("p", "hint", "Nothing was saved — this item isn't in your wardrobe."));
         }
       }
+      // Founder (2026-10-24): a finished check saves itself to
+      // the shop list — Done just closes, and deleting happens
+      // later from the list. Nobody loses a check by tapping the
+      // wrong button again. Only real clothing results save.
+      function autoSaveShopCheck(st) {
+        if (!st || !st.result || st.savedId || st.autoSaving || st.result.notClothing || !currentUser) return;
+        st.autoSaving = true;
+        var r = st.result;
+        writeShopCheckDoc({
+          photoPath: st.storagePath,
+          photoUrl: st.photoUrl,
+          item: r.item, score: r.score, verdict: r.verdict,
+          reasons: r.reasons, similarOwned: r.similarOwned, outfits: r.outfits,
+          tripId: pendingShopTripId || undefined
+        }, "considering").then(function (id) {
+          st.savedId = id;
+          st.autoSaving = false;
+          pendingShopTripId = null;
+          renderShopCheckResult();
+        }).catch(function () {
+          // Auto-save failed (offline?) — the re-render falls
+          // back to the manual Save button so the check survives.
+          st.autoSaving = false;
+          renderShopCheckResult();
+        });
+      }
       function renderShopCheckResult() {
         var st = shopCheckState;
         var body = document.getElementById("shopCheckBody");
@@ -7031,16 +7072,20 @@
         var r = st ? st.result : null;
         if (!r) return;
         var el = shopCheckEl;
-        appendShopCheckAnalysis(body, r, st.photoUrl, false);
+        appendShopCheckAnalysis(body, r, st.photoUrl, true);
+        if (!r.notClothing) {
+          autoSaveShopCheck(st);
+          if (st.savedId) body.appendChild(el("p", "hint", "Saved to your shop list ✓ — delete it there anytime."));
+          else if (st.autoSaving) body.appendChild(el("p", "hint", "Saving to your shop list…"));
+        }
         var actions = el("div", "form-actions");
         if (!r.notClothing) {
-          var save = el("button", "primary", st.savedId ? "Saved ✓" : "Save to shop list");
-          save.type = "button";
-          save.disabled = !!st.savedId;
-          if (!st.savedId) {
+          if (!st.savedId && !st.autoSaving) {
+            var save = el("button", "primary", "Save to shop list");
+            save.type = "button";
             save.addEventListener("click", function () { saveShopCheck(st, save); });
+            actions.appendChild(save);
           }
-          actions.appendChild(save);
           var add = el("button", "secondary", "Add it to your wardrobe");
           add.type = "button";
           add.addEventListener("click", function () {
