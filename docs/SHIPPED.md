@@ -52,6 +52,17 @@ What went live. Momentum you can see.
   (new parse cases), both callables redeployed, client
   live. Founder phone spot-check is the final gate.
 
+- **PC-35: Beginner guide — ways to add clothes** — built
+  2026-10-24. A "Ways to add your clothes" dialog with the
+  three paths (one piece at a time · a whole pile at once ·
+  from Google Photos, stated honestly as save-then-add),
+  each with its action onto the single capture door.
+  Reachable in one tap from the Today zero card, the
+  wardrobe empty state, and the capture screen itself.
+  Verified end-to-end in a live guest session: guide opens
+  from both entry points, all three paths render, and a
+  path action closes the guide into the capture screen.
+
 ## Sprint 18 (2026-10-21 → )
 
 - **DESIGN-HOME-1 — Today, the stylist-first home (experimental).**

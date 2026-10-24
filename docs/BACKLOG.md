@@ -645,8 +645,9 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
 - **Acceptance:** a new user with an empty wardrobe reaches
   the guide in one tap, reads it in under a minute, and can
   follow the Google Photos path without guessing a step.
-- **Status:** In Sprint 19 (card 3). Filed 2026-10-21 from the founder's
-  screenshots; pairs with UX-14 (attack line 1) and PC-34.
+- **Status:** In Sprint 19 (card 3). BUILT 2026-10-24 — guide live from
+  the zero card, wardrobe empty state, and capture screen;
+  verified in a live guest session.
 
 ### NAMING-1: Short-name standard at the data level
 - **Problem (founder, 2026-10-23):** outfit titles and shop-item
