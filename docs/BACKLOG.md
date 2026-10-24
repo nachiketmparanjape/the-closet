@@ -1259,3 +1259,30 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
 - **Status:** Filed 2026-10-24 with the design; founder
   reviewed it the same day and parked it — it enters work
   only via the next planning walk.
+
+### PC-54: Paste intake on phones (S)
+
+- **Origin:** Founder, 2026-10-24, mid phone test of PC-51:
+  "how would pasting from clipboard work on a smartphone?"
+  It mostly wouldn't — PC-51 rides the keyboard paste event,
+  which phones don't have. Phones gate the clipboard behind
+  gestures and permissions; iOS Safari is the strictest (no
+  programmatic clipboard read at all).
+- **In scope:** a visible "Paste a photo" button in the shop
+  sheet and the capture screen that tries the async
+  clipboard read where the browser allows it (Android Chrome:
+  works with a permission prompt) and degrades honestly where
+  it doesn't (iOS: one line — "on iPhone, save the photo and
+  upload it, or share it here" once the share target exists).
+  Separately, the real phone answer: a Web Share Target so
+  the system share sheet can send a photo straight into the
+  app (manifest + service worker) — scope it in the walk.
+- **Out of scope:** hijacking long-press paste in text
+  fields (flaky, and text fields are for text).
+- **Acceptance:** on Android Chrome, copy a product photo,
+  tap Paste a photo in the shop sheet, land in the photo
+  step; on iPhone, the same tap gives the honest fallback,
+  never a silent nothing.
+- **Lane:** Catalogue. **Effort:** S (share target may split
+  out as its own card at the walk).
+- **Status:** Filed 2026-10-24. Enters via a planning walk.
