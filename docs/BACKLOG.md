@@ -1232,3 +1232,30 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
 - **Lane:** Stylist. **Effort:** S.
 - **Status:** Filed 2026-10-24. Enters work only via a
   planning walk (no ad hoc build).
+
+### PC-53: New-user empty states on every tab (S)
+
+- **Origin:** Founder, 2026-10-24, phone-testing as a new
+  user: the Start-here prompt belongs on every screen for
+  users with zero things (the tabs are otherwise empty real
+  estate), and users with few things get a designed "add
+  more" treatment (that tier delegated to Bramble). Full
+  design: `docs/proposals/NEW-USER-EMPTY-STATES.md`.
+- **In scope:** tier 0 (0 pieces) intro cards on Outfits,
+  Shop, Trips + the stylist empty state's extra line (Today
+  and Wardrobe already comply); tier 1 (below the existing
+  `todayThresholdMet()` bar: ≥4 pieces incl. top + bottom)
+  slim gap-naming banner on Wardrobe and Outfits (Today's
+  progress card is the same component); the shop list's
+  stale "tap Save" empty line replaced (checks auto-save).
+- **Out of scope:** banners on Shop/Trips at tier 1, any
+  stored dismissal state (graduation is count-derived),
+  a first-run wizard.
+- **Acceptance:** fresh account sees an intro treatment on
+  all five tabs; 2 tops-only pieces → the missing bottom is
+  named on Today/Wardrobe/Outfits; threshold crossed → no
+  intro UI anywhere.
+- **Lane:** Catalogue (onboarding surface). **Effort:** S.
+- **Status:** Filed 2026-10-24 with the design; founder
+  validation pending, then it enters via a planning walk
+  or his direct call.
