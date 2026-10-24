@@ -22,6 +22,7 @@ const { reflectOutfit } = require("./reflect");
 const { critiqueOutfit } = require("./critique");
 const { parseOutfitPhoto } = require("./photo");
 const { shopCheck } = require("./shopcheck");
+const { fetchLinkItem } = require("./linkimport");
 const { extractGarmentPhoto } = require("./extract");
 const { makeUsageRecorder, createAiTracker, flushAiUsage } = require("./usage");
 // Sprint 15 (PC-29 Phase 1): trip packing. sanitizeItems/sanitizeVibeProfile
@@ -449,6 +450,45 @@ exports.shopCheck = onCall(
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
       boundary("shopCheck", correlationId, uid, err);
+    }
+  }
+);
+
+// PC-44: non-photo catalogue intake. Fetches a product page,
+// stores its retail photo, and hands the client a storagePath
+// to run through the ordinary add flow. No AI call here —
+// describe runs on the photo afterwards, as usual.
+exports.fetchLinkItem = onCall(
+  {
+    region: "us-central1",
+    timeoutSeconds: 60,
+    memory: "512MiB",
+    maxInstances: 5,
+  },
+  async (request) => {
+    const correlationId = newCorrelationId();
+    const uid = request.auth ? request.auth.uid : null;
+    const start = Date.now();
+    const aiTracker = createAiTracker();
+    const recordUsage = makeUsageRecorder(getFirestore());
+    const usageBase = { correlationId, uid, feature: "linkImport", surface: "catalogue", refId: null };
+    try {
+      if (!request.auth) {
+        fail("NOT_SIGNED_IN");
+      }
+      const data = request.data || {};
+      const url = typeof data.url === "string" ? data.url.trim() : "";
+      if (!url || url.length > 2000) {
+        fail("LINK_BAD_URL");
+      }
+      usageBase.refId = url.slice(0, 200);
+      const result = await fetchLinkItem(uid, url);
+      await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: true });
+      return finish("fetchLinkItem", correlationId, uid, start, result);
+    } catch (err) {
+      if (!(err instanceof HttpsError) && !err.key) err.key = "LINK_UNREACHABLE";
+      await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
+      boundary("fetchLinkItem", correlationId, uid, err);
     }
   }
 );

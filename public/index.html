@@ -182,6 +182,13 @@
     /* Capture note: a serif lead carries the one rule; the rest is
        quiet explanation, the fine print last (founder: "beautify"). */
     .capture-note { display: grid; gap: 8px; color: var(--muted); font-size: 14.5px; line-height: 1.55; }
+    .capture-link { border-top: 1px dashed var(--line-strong); padding-top: 14px; display: grid; gap: 8px; }
+    .capture-link label { font-size: 14px; font-weight: 600; color: var(--ink); }
+    .capture-link-row { display: flex; gap: 8px; }
+    .capture-link-row input { flex: 1; min-width: 0; }
+    .capture-link .capture-fine { color: var(--muted); margin: 0; }
+    .src-note { margin: 8px 2px 0; font-size: 12.5px; color: var(--muted); }
+    .src-tag { color: var(--accent-dark); font-weight: 600; }
     .capture-note p { margin: 0; }
     .capture-lead { color: var(--ink); font-family: "Closet Serif", serif; font-size: 20px; line-height: 1.25; }
     .capture-fine { font-size: 13px; }
@@ -883,6 +890,14 @@
           <button class="primary" id="captureFilesBtn" type="button">Upload photos</button>
           <button class="secondary" id="captureCameraBtn" type="button">Take a photo</button>
         </div>
+        <div class="capture-link">
+          <label for="captureLinkInput">…or paste a product link</label>
+          <div class="capture-link-row">
+            <input id="captureLinkInput" type="url" inputmode="url" placeholder="https://store.example/item…" autocomplete="off">
+            <button class="secondary" id="captureLinkBtn" type="button">Fetch</button>
+          </div>
+          <p class="capture-fine">Bought it online? We'll pull the store's photo as the draft — clearly labeled, and you can swap in your own photo anytime.</p>
+        </div>
         <input id="captureFilesInput" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden />
         <input id="captureCameraInput" type="file" accept="image/*" capture="environment" hidden />
         <div class="capture-note">
@@ -906,7 +921,7 @@
         <button class="icon-button" id="guideClose" type="button" aria-label="Close">×</button>
       </div>
       <div class="modal-body guide-body">
-        <p class="guide-intro">Three ways in — pick whichever matches the pile in front of you.</p>
+        <p class="guide-intro">Four ways in — pick whichever matches the pile in front of you.</p>
         <div class="guide-path">
           <h3>📸 One piece at a time</h3>
           <p>Photograph a piece, add it, done. Best for new buys and one-offs — you confirm its name and details as you go.</p>
@@ -921,6 +936,11 @@
           <h3>✨ From Google Photos</h3>
           <p>On Android, Google Photos quietly builds a wardrobe collection from photos of you — clean cutouts of your pieces, ready-made. Open Google Photos, find the collection, save the pieces you want to your camera roll, then add them here like any photo. Closet doesn't connect to Google Photos directly — it's a save-then-add path, and the pieces arrive looking clean.</p>
           <button class="secondary" type="button" data-guide-add>Add from your photos</button>
+        </div>
+        <div class="guide-path">
+          <h3>🛍️ From a link</h3>
+          <p>Bought it online? Paste the product link on the Add pieces screen and we'll pull the store's photo in as a draft. It's labeled as the store's photo — swap in your own whenever you like.</p>
+          <button class="secondary" type="button" data-guide-add>Add from a link</button>
         </div>
       </div>
     </section>
@@ -1177,6 +1197,7 @@
       </div>
       <div class="modal-body">
         <img class="item-photo" id="itemPhoto" alt="Wardrobe piece" />
+        <p class="src-note" id="itemSourceNote" hidden></p>
         <div class="thumb-strip" id="thumbStrip" hidden></div>
         <div class="photo-manage">
           <button class="secondary" id="addPhotosBtn" type="button">Add photos</button>
@@ -1400,6 +1421,7 @@
       var unsubscribe = null;
       var toastTimer = null;
       var aiSuggestion = null;   // latest describeItem result for the upload form
+      var linkImport = null;     // PC-44: {file, title, sourceUrl} while a link import is in the form
       var aiRequestId = 0;       // guards against out-of-order AI responses
       var aiRendered = false;    // true once the AI box has rendered (it then supersedes the on-device hint)
       var uploadPalette = [];    // PC-8: working palette for the upload form
@@ -2323,6 +2345,13 @@
         category.textContent = item.category || "Other";
         meta.appendChild(dot);
         meta.appendChild(category);
+        var coverPhoto = itemPhotos(item)[0];
+        if (coverPhoto && coverPhoto.source === "retail") {
+          var stag = document.createElement("span");
+          stag.className = "src-tag";
+          stag.textContent = "· Retail photo";
+          meta.appendChild(stag);
+        }
         details.appendChild(name);
         details.appendChild(meta);
         article.appendChild(imageWrap);
@@ -2735,6 +2764,16 @@
         itemPhoto.src = photos.length ? photos[0].url : "";
         itemPhoto.alt = item.name || "Wardrobe item";
         renderThumbs();
+        var srcNote = document.getElementById("itemSourceNote");
+        var cover0 = photos.length ? photos[0] : null;
+        if (cover0 && cover0.source === "retail") {
+          var srcHost = "";
+          try { srcHost = new URL(cover0.sourceUrl || "").hostname.replace(/^www\./, ""); } catch (e) {}
+          srcNote.textContent = "Cover photo is the store's, from " + (srcHost || "the product page") + " — add your own photo anytime and set it as cover to replace it.";
+          srcNote.hidden = false;
+        } else {
+          srcNote.hidden = true;
+        }
         itemNameInput.value = item.name || "";
         itemCategoryInput.value = item.category || "Other";
         // PC-8: palette (deep copy — the editor mutates) + editable fields,
@@ -3066,6 +3105,55 @@
       document.getElementById("captureClose").addEventListener("click", closeCapture);
       document.getElementById("captureFilesBtn").addEventListener("click", function () { document.getElementById("captureFilesInput").click(); });
       document.getElementById("captureCameraBtn").addEventListener("click", function () { document.getElementById("captureCameraInput").click(); });
+
+      // PC-44: paste a product link → the server fetches the
+      // retail photo → the photo joins the ordinary add flow as
+      // a File, with linkImport remembering its source so the
+      // saved cover can be labeled "retail".
+      document.getElementById("captureLinkBtn").addEventListener("click", function () {
+        var input = document.getElementById("captureLinkInput");
+        var btn = document.getElementById("captureLinkBtn");
+        var url = (input.value || "").trim();
+        if (!url) { showToast("Paste a product link first."); return; }
+        if (!currentUser) { showToast("Still starting — one moment."); return; }
+        btn.disabled = true;
+        btn.textContent = "Fetching…";
+        functions.httpsCallable("fetchLinkItem")({ url: url }).then(function (res) {
+          var d = res.data || {};
+          if (!d.storagePath) throw new Error("no photo");
+          return storage.ref().child(d.storagePath).getDownloadURL().then(function (dl) {
+            return fetch(dl).then(function (r) { return r.blob(); }).then(function (blob) {
+              var ext = (d.storagePath.split(".").pop() || "jpg").toLowerCase();
+              var file = new File([blob], "retail-photo." + ext, { type: blob.type || "image/jpeg" });
+              input.value = "";
+              closeCapture();
+              beginAdd();
+              pendingSingleFiles = null;
+              if (!handFiles(document.getElementById("photoInput"), [file])) {
+                pendingSingleFiles = [file];
+                handlePhotoInputFiles(document.getElementById("photoInput"), [file]);
+              }
+              // Set AFTER the hand-in: the label binds to this
+              // exact File at save time.
+              linkImport = { file: file, title: d.title || "", sourceUrl: d.sourceUrl || url };
+              showToast("Store photo pulled in — check the details, then save.");
+            });
+          });
+        }).catch(function (err) {
+          logError(err, "link-import");
+          // Our callable's message IS the catalog copy (client-
+          // safe by design) — show it; SDK errors go through
+          // the generic choke point instead.
+          if (err && typeof err.code === "string" && err.code.indexOf("functions/") === 0 && err.message) {
+            showToast(err.message);
+          } else {
+            showToast(friendlyError(err));
+          }
+        }).then(function () {
+          btn.disabled = false;
+          btn.textContent = "Fetch";
+        });
+      });
       // Snapshot to a real Array BEFORE clearing the input: a live
       // FileList empties when value resets (Safari) — passing the
       // list itself silently routed zero photos (founder, 2026-10-23).
@@ -3305,6 +3393,12 @@
           if (myId !== aiRequestId) return;
           aiSuggestion = null;
           box.hidden = true;
+          // PC-44: a link import whose describe failed still has
+          // the page title — a far better name than blank.
+          if (linkImport && linkImport.title) {
+            var ni = document.getElementById("nameInput");
+            if (!ni.value.trim()) ni.value = linkImport.title;
+          }
         });
       }
 
@@ -3415,6 +3509,13 @@
         }
 
         function saveDoc() {
+          // PC-44: label the cover as a retail photo only when
+          // the photo being saved IS the imported file — if the
+          // user swapped in their own photo, no label.
+          if (linkImport && files.length && files[0] === linkImport.file && photos.length) {
+            photos[0].source = "retail";
+            photos[0].sourceUrl = linkImport.sourceUrl;
+          }
           // PC-8: v2 doc — top-level editable fields pre-filled from the AI
           // (or safe defaults). The v1 `color` field is no longer written.
           var v2 = buildV2Fields(aiSuggestion, document.getElementById("colorInput").value);
@@ -3441,6 +3542,7 @@
           if (!aiSuggestion && !doc.name) doc.needsAi = true;
           docRef.set(doc).then(function () {
             uploadForm.reset();
+            linkImport = null;
             document.getElementById("colorInput").value = "#5c6673";
             setPalette(uploadPalette, []);
             renderUploadPalette();

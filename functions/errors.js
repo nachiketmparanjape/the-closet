@@ -53,6 +53,22 @@ const CATALOG = {
     grpc: "invalid-argument",
     message: "Something in that request wasn't right.",
   },
+  LINK_BAD_URL: {
+    category: "validation",
+    grpc: "invalid-argument",
+    message: "That link doesn't look right — paste the full product-page link.",
+  },
+  LINK_UNREACHABLE: {
+    category: "dependency",
+    grpc: "unavailable",
+    message: "Couldn't open that page — some stores block fetching. Saving the product photo and uploading it instead always works.",
+    retryable: true,
+  },
+  LINK_NO_IMAGE: {
+    category: "validation",
+    grpc: "invalid-argument",
+    message: "That page didn't have a product photo we can use.",
+  },
   EMPTY_WARDROBE: {
     category: "validation",
     grpc: "invalid-argument",
