@@ -272,7 +272,7 @@ stacks — Save above Dismiss — never wraps mid-label.
 Bottom sheet (existing pattern, standardized): radius 20 top,
 handle bar, Eyebrow title, options as full-width rows (title
 15px/600 + optional Small muted sub), cancel row last,
-safe-area bottom padding, rises in 260ms (§5). Sheets are for
+safe-area bottom padding, rises per §5 (UX-15 system). Sheets are for
 choices; dialogs (centered) are only for destructive confirms.
 
 ### 4.8 Forms
@@ -321,9 +321,9 @@ the pick. (c) **A trip is a page** (`#tripView`, back to the
 list), not a floating window; the editor remains a sheet.
 (d) **The stylist docks**: bottom sheet on phone, a 420px
 right-edge panel on desktop. (e) **Motion basics shipped**
-(§5): 200ms view fade-rise, 260ms overlay entrances (the
-docked stylist slides), press compression, all of it off
-under reduced-motion.
+(§5): 200ms view fade-rise, overlay entrances per the
+UX-15 sheet system (the docked stylist slides), press
+compression, all of it off under reduced-motion.
 **Graduation (founder, 2026-10-21):** "make the experimental
 experience default — it looks good enough to me." Today is now
 the default home: with no stored choice anywhere, the app
@@ -355,6 +355,26 @@ an opt-out, relabeled from "Experimental" to "Today home."
 - No `backdrop-filter` blur in v1 — it's a low-end-phone
   performance trap; the tab bar is a solid `--paper` fill
   (Critiques, round 1).
+
+**As built (UX-15, 2026-10-24 — this section's promise, made
+literal):** every overlay runs ONE system. JS manages state
+only (`.is-open` / `.is-closing` + an overlay stack);
+CSS owns the motion. Backdrop fades via background-color
+(260ms). Panels travel on transform/opacity only: centered
+dialogs rise 16px + settle (300ms in, ~200ms out, easing
+`cubic-bezier(.32,.72,.24,1)`); bottom sheets travel their
+full height; the stylist docks upward on phone and slides
+from the right edge ≥900px. **Dismissal parity:** every
+sheet closes by backdrop tap, its close control, Esc
+(topmost first), and — for bottom sheets and the phone
+chat drawer — swipe-down from the sheet's head (drag
+follows the finger; 90px or a flick dismisses, otherwise
+it snaps back). Centered dialogs don't swipe: a drag
+affordance there would fight their own scrolling. Focus
+is never stolen on open. `prefers-reduced-motion`: 120ms
+opacity crossfade, no travel. In-flight work is never
+destroyed by a dismissal — the bulk sheet's minimize
+semantics are the model.
 
 ## 6. Accessibility floors (non-negotiable)
 

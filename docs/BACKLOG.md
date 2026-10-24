@@ -427,9 +427,9 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   nothing teleports; DESIGN.md §5 is updated to describe
   the system as built (the spec already promises motion —
   this cut makes the promise true).
-- **Status:** In Sprint 19 (card 1). Filed 2026-10-21. (Backdrop-tap
-  parity shipped in the 2026-10-23 fix buffer; the motion
-  system is this cut.)
+- **Status:** In Sprint 19 (card 1). BUILT 2026-10-24 — one sheet
+  system live on all 17 overlays; browser-smoke verified;
+  founder phone validation (the acceptance gate) pending.
 
 ### PC-34: Garment extraction & clean rendering (research spike)
 - **Size:** Spike S, then size from findings

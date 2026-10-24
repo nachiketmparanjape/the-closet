@@ -2,6 +2,26 @@
 
 What went live. Momentum you can see.
 
+## Sprint 19 (2026-10-24 → )
+
+- **UX-15: Sheets & popups feel native** — built 2026-10-24.
+  One sheet system for all 17 overlays: JS manages state only
+  (.is-open / .is-closing + an overlay stack), CSS owns the
+  motion — backdrop fades, centered dialogs rise-and-settle,
+  bottom sheets travel full height, the stylist docks up on
+  phone / slides from the right on desktop; exit animations
+  (nothing vanishes instantly); Esc closes the topmost sheet;
+  swipe-down from a sheet's head dismisses bottom sheets
+  (drag follows the finger, flick/90px threshold, snap-back
+  otherwise); no focus theft on open; reduced-motion is a
+  120ms crossfade. DESIGN.md §5 updated to describe the
+  system as built. Backdrop-tap parity had shipped in the
+  2026-10-23 fix buffer. Verification: suite 257/257, live
+  browser smoke (guest) — capture modal + stylist chat open
+  and close cleanly via backdrop, Esc, and close controls,
+  no scroll-lock after close. Motion *feel* itself awaits
+  founder phone validation (the card's acceptance gate).
+
 ## Sprint 18 (2026-10-21 → )
 
 - **DESIGN-HOME-1 — Today, the stylist-first home (experimental).**

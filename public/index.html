@@ -314,11 +314,25 @@
     /* Motion basics (DESIGN.md §5) — shipped with fix buffer 5. */
     .view-enter { animation: view-in 200ms cubic-bezier(.2,.7,.2,1); }
     @keyframes view-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-    .overlay:not([hidden]) .modal { animation: modal-in 260ms cubic-bezier(.2,.7,.2,1); }
-    @keyframes modal-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-    #chatOverlay:not([hidden]) .modal { animation-name: chat-in; }
-    @keyframes chat-in { from { opacity: .3; transform: translateY(24px); } to { opacity: 1; transform: none; } }
-    @media (min-width: 900px) { @keyframes chat-in { from { opacity: .3; transform: translateX(36px); } to { opacity: 1; transform: none; } } }
+    /* UX-15: ONE sheet system for every overlay — CSS transitions
+       driven by .is-open / .is-closing on the overlay; JS manages
+       only the state. Backdrop fades via background-color (see the
+       .overlay base rule); panels travel on transform/opacity
+       only — no layout animation, no teleporting. */
+    .overlay.is-open { background: rgba(12, 14, 12, .58); }
+    .overlay .modal, .overlay .sheet { opacity: 0; transform: translateY(16px) scale(.99); transition: transform 300ms cubic-bezier(.32,.72,.24,1), opacity 230ms ease; }
+    .overlay.is-open .modal, .overlay.is-open .sheet { opacity: 1; transform: translateY(0) scale(1); }
+    .overlay.is-closing .modal, .overlay.is-closing .sheet { transition-duration: 200ms, 170ms; }
+    .sheet-overlay .sheet { transform: translateY(103%); }
+    #chatOverlay .modal { transform: translateY(103%); }
+    .sheet-overlay.is-open .sheet, #chatOverlay.is-open .modal { transform: translateY(0); }
+    @media (min-width: 900px) { #chatOverlay .modal { transform: translateX(104%); } #chatOverlay.is-open .modal { transform: translateX(0); } }
+    .overlay .modal.dragging, .overlay .sheet.dragging { transition: none; }
+    .sheet-overlay .modal-head, .sheet-overlay .sheet-title, #chatOverlay .modal-head { touch-action: none; }
+    @media (prefers-reduced-motion: reduce) {
+      .overlay { transition: background-color 120ms ease; }
+      .overlay .modal, .overlay .sheet, #chatOverlay .modal { transform: none !important; transition: opacity 120ms ease; }
+    }
     .primary, .secondary, .chip, .auth-button { transition: transform 120ms ease, background 150ms ease, border-color 150ms ease; }
     .primary:active, .secondary:active, .chip:active, .tab-action:active { transform: scale(.98); }
     #tripView .trip-title { font-family: "Closet Serif", serif; font-size: 27px; font-weight: 500; letter-spacing: -.02em; line-height: 1.1; margin: 0 0 6px; }
@@ -490,7 +504,7 @@
     .toast { position: fixed; left: 50%; bottom: max(22px, env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(18px); width: min(calc(100vw - 32px), 520px); background: var(--black); color: var(--on-black); padding: 13px 16px; border-radius: 6px; box-shadow: var(--shadow); opacity: 0; pointer-events: none; transition: opacity .2s ease, transform .2s ease; z-index: 30; font-size: 14px; }
     .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-    .overlay { position: fixed; inset: 0; z-index: 20; background: rgba(12, 14, 12, .58); display: grid; place-items: center; padding: 18px; }
+    .overlay { position: fixed; inset: 0; z-index: 20; background: rgba(12, 14, 12, 0); transition: background-color 260ms ease; display: grid; place-items: center; padding: 18px; }
     .modal { width: min(700px, 100%); max-height: min(860px, calc(100vh - 36px)); overflow: auto; background: var(--paper); box-shadow: var(--shadow); border-radius: 8px; }
     .modal-head { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 23px 26px; border-bottom: 1px solid var(--line); background: var(--paper); }
     .modal-head h2 { margin: 0; font-family: "Closet Serif", serif; font-size: 26px; font-weight: 500; }
@@ -1392,17 +1406,82 @@
         categoryTouched = true;
       });
 
+      // UX-15: one sheet system. openOverlay/closeOverlay manage
+      // state only (.is-open / .is-closing + a stack); the CSS
+      // owns all motion. The stack makes Esc close the topmost
+      // sheet and restores body scroll only when the last sheet
+      // is gone. No programmatic focus on open — focus moves
+      // only when a sheet's own job needs the keyboard, never
+      // an instant focus that jumps the layout (the card's
+      // no-focus-theft rule).
+      var overlayStack = [];
       function openOverlay(el) {
+        if (el._ux15Timer) { window.clearTimeout(el._ux15Timer); el._ux15Timer = null; }
+        el.classList.remove("is-closing");
         el.hidden = false;
+        if (overlayStack.indexOf(el) === -1) overlayStack.push(el);
         document.body.style.overflow = "hidden";
-        var focusable = el.querySelector("button, input, select, a");
-        if (focusable) focusable.focus();
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () { el.classList.add("is-open"); });
+        });
       }
-
       function closeOverlay(el) {
-        el.hidden = true;
-        document.body.style.overflow = "";
+        if (el.hidden || el.classList.contains("is-closing")) return;
+        var i = overlayStack.indexOf(el);
+        if (i !== -1) overlayStack.splice(i, 1);
+        el.classList.remove("is-open");
+        el.classList.add("is-closing");
+        var panel = el.querySelector(".modal, .sheet");
+        if (panel) { panel.style.transform = ""; panel.classList.remove("dragging"); }
+        el._ux15Timer = window.setTimeout(function () {
+          el._ux15Timer = null;
+          el.hidden = true;
+          el.classList.remove("is-closing");
+          if (!overlayStack.length) document.body.style.overflow = "";
+        }, 230);
       }
+      document.addEventListener("keydown", function (event) {
+        if (event.key !== "Escape") return;
+        var top = overlayStack[overlayStack.length - 1];
+        if (top) closeOverlay(top);
+      });
+      // Swipe-down to dismiss, bottom sheets + the chat drawer
+      // (mobile) only — centered dialogs dismiss by backdrop,
+      // Esc, and their close control (platform convention; the
+      // drag zone there would fight the panel's own scrolling).
+      // The drag handle is the sheet's head; the drag follows
+      // the finger and snaps on distance or velocity.
+      function attachSheetSwipe(overlay) {
+        var panel = overlay.querySelector(".modal, .sheet");
+        if (!panel) return;
+        var handle = panel.querySelector(".modal-head, .sheet-title") || panel.firstElementChild;
+        if (!handle) return;
+        var startY = 0, dy = 0, startT = 0, dragging = false;
+        handle.addEventListener("pointerdown", function (e) {
+          if (overlay.hidden || !overlay.classList.contains("is-open")) return;
+          if (overlay.id === "chatOverlay" && window.innerWidth >= 900) return;
+          if (e.target.closest("button, input, select, textarea, a")) return;
+          dragging = true; startY = e.clientY; dy = 0; startT = Date.now();
+          panel.classList.add("dragging");
+          try { handle.setPointerCapture(e.pointerId); } catch (err) {}
+        });
+        handle.addEventListener("pointermove", function (e) {
+          if (!dragging) return;
+          dy = Math.max(0, e.clientY - startY);
+          panel.style.transform = "translateY(" + dy + "px)";
+        });
+        function endDrag() {
+          if (!dragging) return;
+          dragging = false;
+          panel.classList.remove("dragging");
+          var v = dy / Math.max(1, Date.now() - startT);
+          panel.style.transform = "";
+          if (dy > 90 || (dy > 40 && v > 0.45)) closeOverlay(overlay);
+        }
+        handle.addEventListener("pointerup", endDrag);
+        handle.addEventListener("pointercancel", endDrag);
+      }
+      document.querySelectorAll(".sheet-overlay, #chatOverlay").forEach(attachSheetSwipe);
 
       function showToast(message) {
         var toast = document.getElementById("toast");
