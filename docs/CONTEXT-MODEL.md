@@ -21,7 +21,13 @@ stored server-side under that id exactly like a signed-in user's;
 there is no device-only tier and no merge step (an upgrade that
 keeps the account id keeps the threads). (2) Start fresh lives in
 the context sheet, not a separate chat menu — one surface for
-everything about the conversation's context.
+everything about the conversation's context. Founder phone-test
+addenda, same day: attachments are per-conversation and refreshed
+for every new conversation (never saved with the transcript); the
+in-chat Today pick card is removed (it lives on the Today page;
+the chat keeps a slim Go-to-Today row); the context sheet also
+ADDS facts (an Add-a-fact form), so removing permanent context is
+no longer one-way.
 
 The whole design is one sentence: **there is one way context is
 loaded, one display of what was loaded, one rulebook for every

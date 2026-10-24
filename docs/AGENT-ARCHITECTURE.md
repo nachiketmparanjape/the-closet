@@ -50,7 +50,7 @@ a path the code fixed in advance.
 | A pinned fact | A short fact you approved for the stylist to always remember ("I run cold", "the trip is in Tahoe"). The stylist may propose one; it is saved only when you tap Save. | Up to 20 are read into every brief. |
 | The assembler | The one server function that builds every brief, for every caller, and returns the manifest beside each answer. Nothing else may gather context. | A new kind of fact is added in exactly one place, and every caller gets it. |
 | The manifest | The list the assembler returns with each answer: what it actually loaded into that brief, in plain names. | "Loaded: wardrobe (69), style notes (3), pinned facts (2)." |
-| The context line | The one slim display under the chat header. It renders the manifest, so what it shows is what the assembler loaded — the two cannot disagree. It opens the context sheet: every fact in play, each removable. | `Knows: Tahoe · runs cold · +2 more` |
+| The context line | The one slim display under the chat header. It renders the manifest, so what it shows is what the assembler loaded — the two cannot disagree. It opens the context sheet: every fact in play, each removable — and new facts addable there too. | `Knows: Tahoe · runs cold · +2 more` |
 | A thread | A saved conversation: one for general chat, one per trip, kept on your account. | You reopen the app on Tuesday; Tuesday's thread is where Monday's ended. |
 | Today's pick | The outfit the app composed for you this morning. | Joins a conversation only when you tap a button that is about the pick (see the entry-point table). |
 | The previous pick | The last outfit the stylist proposed in this conversation — the thing "warmer" or "more formal" changes. | You write "warmer"; the previous pick is the base that changes. |
@@ -191,7 +191,7 @@ is not an attachment: it applies to every brief, always.
 | Entry point | Conversation | What attaches | What you see of it |
 |---|---|---|---|
 | Stylist tab / chat button | General | Nothing. The conversation starts clean. | The context line: memory only (wardrobe, style notes, pinned facts, weather). |
-| Today screen: Ask the stylist — and "Ask about this" on the pick card inside the chat | General | Today's pick. It also becomes the base that changes build on, until this conversation has a pick of its own. | The context line names it; the context sheet can remove it. |
+| Today screen: Ask the stylist — or the context sheet's Attach row | General | Today's pick. It also becomes the base that changes build on, until this conversation has a pick of its own. | The context line names it; the context sheet can remove it. (The pick card itself lives only on the Today page — founder verdict, 2026-10-24; the chat keeps a slim "Go to Today" row.) |
 | Build a look around this | General | A pointer to that piece, plus text typed for you that waits unsent. | The pointer shows as a label above the typing box; removable before sending. |
 | Surprise me | General | A message the app writes and sends — from that button only. Today's pick does not attach; the result is something new. | The sent message, after it is sent. |
 | A trip page | That trip's | The trip, its packing list, its stored weather. Today's pick and place pins are left out on purpose. | The context line names the trip; "Leave trip" lives in the context sheet. |
