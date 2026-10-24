@@ -268,6 +268,11 @@
     .pin-proposal-actions { display: flex; gap: 8px; }
     .pin-proposal-actions button { flex: 1; }
     .pin-chip { display: inline-block; font-size: 13px; font-weight: 500; color: var(--ink); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; margin-left: 8px; vertical-align: middle; white-space: nowrap; }
+    /* UX-18 W3: the one context display — a slim line under the chat
+       header; tapping opens the context sheet with every fact. */
+    .context-line { display: block; width: 100%; text-align: left; background: none; border: none; border-bottom: 1px solid var(--line); padding: 2px 2px 10px; margin-bottom: 10px; font: inherit; font-size: 13px; color: var(--muted); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .context-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+    .context-row-label { font-size: 14px; color: var(--ink); }
     .chat-list { display: flex; flex-direction: column; gap: 8px; max-height: 52vh; overflow-y: auto; margin: 0 0 12px; }
     .chat-msg { max-width: 88%; padding: 9px 13px; border-radius: var(--r-md); font-size: 15px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: break-word; }
     /* DESIGN-CHAT-1 (§10): the chat's first-run moment — serif, one
@@ -1206,10 +1211,11 @@
   <div class="overlay" id="chatOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="chatTitle">
     <section class="modal">
       <div class="modal-head">
-        <h2 id="chatTitle">Stylist <span class="weather-chip" id="weatherChip" hidden></span> <span class="trip-chip" id="tripChip" hidden></span> <span class="pin-chip" id="pinChip" hidden></span></h2>
+        <h2 id="chatTitle">Stylist</h2>
         <button class="icon-button" id="chatClose" type="button" aria-label="Close stylist chat">×</button>
       </div>
       <div class="modal-body">
+        <button class="context-line" id="chatContextLine" type="button" hidden aria-label="What the stylist knows — tap for details"></button>
         <div id="chatTodayStrip" hidden></div>
         <div class="chat-list" id="chatList" aria-live="polite"></div>
         <form class="chat-input-row" id="chatForm" style="position:relative;">
@@ -1219,6 +1225,17 @@
           <button class="primary" id="chatSend" type="submit">Send</button>
         </form>
       </div>
+    </section>
+  </div>
+
+  <!-- UX-18 W3: the context sheet — every fact in play, each removable. -->
+  <div class="overlay sheet-overlay" id="contextSheet" hidden role="dialog" aria-modal="true" aria-labelledby="contextSheetTitle">
+    <section class="sheet">
+      <h2 class="sheet-title" id="contextSheetTitle">What the stylist knows</h2>
+      <div id="contextSheetList"></div>
+      <button class="sheet-option sheet-cancel" id="contextSheetClose" type="button">
+        <span><span class="opt-title">Done</span></span>
+      </button>
     </section>
   </div>
 
@@ -4350,24 +4367,11 @@
       }
 
       function renderTripChip() {
-        var el = document.getElementById("tripChip");
-        if (!tripChat) { el.hidden = true; el.textContent = ""; return; }
-        var trip = tripById(tripChat.tripId);
-        if (!trip) { exitTripChat(); return; }
-        var leg = (trip.legs && trip.legs[0]) || {};
-        el.textContent = "";
-        el.hidden = false;
-        var label = document.createElement("span");
-        label.textContent = "🧳 " + (trip.name || "Trip");
-        var dates = fmtTripDates(leg);
-        if (dates) label.textContent += " · " + dates;
-        el.appendChild(label);
-        var x = document.createElement("button");
-        x.type = "button";
-        x.setAttribute("aria-label", "Leave trip mode");
-        x.textContent = "×";
-        x.addEventListener("click", exitTripChat);
-        el.appendChild(x);
+        // UX-18 W3: the trip chip retired into the context line; this
+        // keeps its one real job — leaving trip mode when the trip
+        // itself is gone — and refreshes the line.
+        if (tripChat && !tripById(tripChat.tripId)) { exitTripChat(); return; }
+        renderContextLine();
       }
 
       // UX-18 W2 (CONTEXT-MODEL, decisions 1 + 8): today's pick
@@ -4395,6 +4399,121 @@
         return false;
       }
       function detachTodayPick() { chatAttachPick = null; }
+
+      // UX-18 W3 (CONTEXT-MODEL, decisions 2 + 4): ONE display of what
+      // the stylist knows — the context line under the chat header.
+      // After each answer it renders the assembler's manifest (the
+      // server's own list of what it loaded), so the display and the
+      // brief cannot disagree; between answers it renders live state
+      // (attachment, trip, pinned facts). The old per-fact chips in
+      // the title (weather / trip / pin / today's pick) are retired —
+      // their renderers now just refresh this line.
+      var threadManifests = {};
+      var STYLIST_WINDOW = 50;
+      function scopedPinsForLine() {
+        var today = new Date().toISOString().slice(0, 10);
+        return (typeof allPins !== "undefined" ? allPins : []).filter(function (p) {
+          if (p.validUntil && p.validUntil < today) return false;
+          if (tripChat) return p.kind === "preference" || p.tripId === tripChat.tripId;
+          return true;
+        });
+      }
+      function contextEntries() {
+        var entries = [];
+        var man = threadManifests[activeThreadKey] || null;
+        if (tripChat) {
+          var t = tripById(tripChat.tripId);
+          entries.push({ type: "trip", label: "🧳 " + ((t && t.name) || "Trip"), action: "leaveTrip" });
+        } else if (chatAttachPick) {
+          entries.push({ type: "pick", label: "◈ Today's pick" + (chatAttachPick.lookName ? " · " + chatAttachPick.lookName : ""), action: "detachPick" });
+        }
+        scopedPinsForLine().forEach(function (p) {
+          entries.push({
+            type: "pin", id: p.id, kind: p.kind,
+            label: (p.kind === "location" ? "📍 " : "") + p.label + (p.validUntil ? " · until " + p.validUntil.slice(5) : ""),
+            action: "removePin"
+          });
+        });
+        var wx = (man && man.weather) || (typeof weatherUiState !== "undefined" && weatherUiState.summary);
+        if (wx) entries.push({ type: "weather", label: wx });
+        else if (!tripChat && !(typeof weatherUiState !== "undefined" && weatherUiState.denied)) {
+          entries.push({ type: "setloc", label: "📍 Set location", action: "setLocation" });
+        }
+        var tail = ["Wardrobe · " + (man ? man.wardrobe : (typeof allItems !== "undefined" ? allItems.length : 0)) + " pieces"];
+        if (man && man.styleNotes) tail.push("Style notes · " + man.styleNotes);
+        if (man && man.learnedTaste && man.learnedTaste.applied && man.learnedTaste.top.length) {
+          tail.push("Taste: " + man.learnedTaste.top.join(", "));
+        }
+        entries.push({ type: "memory", label: tail.join(" · ") });
+        return entries;
+      }
+      function renderContextLine() {
+        var el = document.getElementById("chatContextLine");
+        if (!el) return;
+        if (!currentUser) { el.hidden = true; return; }
+        var labels = contextEntries().map(function (e) { return e.label; });
+        var text = labels.slice(0, 3).join("  ·  ");
+        if (labels.length > 3) text += "  ·  +" + (labels.length - 3) + " more";
+        el.textContent = "Knows: " + text;
+        el.hidden = false;
+      }
+      function sheetActionBtn(text, fn) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "secondary";
+        b.textContent = text;
+        b.addEventListener("click", fn);
+        return b;
+      }
+      function contextSheetRow(e) {
+        var row = document.createElement("div");
+        row.className = "context-row";
+        var label = document.createElement("span");
+        label.className = "context-row-label";
+        label.textContent = e.label;
+        row.appendChild(label);
+        if (e.action === "detachPick") {
+          row.appendChild(sheetActionBtn("Remove", function () {
+            detachTodayPick();
+            renderContextLine();
+            openContextSheet();
+          }));
+        } else if (e.action === "removePin") {
+          var btn = sheetActionBtn("Remove", function () {
+            if (btn.dataset.confirm) {
+              db.collection("users").doc(currentUser.uid).collection("context_pins").doc(e.id).delete()
+                .then(function () { showToast("Fact removed."); renderContextLine(); openContextSheet(); })
+                .catch(function (err) { showToast(friendlyError(err)); });
+            } else {
+              btn.dataset.confirm = "1";
+              btn.textContent = "Tap again to remove";
+            }
+          });
+          row.appendChild(btn);
+        } else if (e.action === "leaveTrip") {
+          row.appendChild(sheetActionBtn("Leave trip", function () {
+            closeOverlay(document.getElementById("contextSheet"));
+            exitTripChat();
+          }));
+        } else if (e.action === "setLocation") {
+          row.appendChild(sheetActionBtn("Set location", function () {
+            closeOverlay(document.getElementById("contextSheet"));
+            setLocationFromSheet();
+          }));
+        }
+        return row;
+      }
+      function openContextSheet() {
+        var list = document.getElementById("contextSheetList");
+        if (!list) return;
+        list.textContent = "";
+        contextEntries().forEach(function (e) { list.appendChild(contextSheetRow(e)); });
+        var win = document.createElement("p");
+        win.className = "hint";
+        win.textContent = "The stylist reads the most recent " + STYLIST_WINDOW + " messages of this conversation.";
+        list.appendChild(win);
+        openOverlay(document.getElementById("contextSheet"));
+      }
 
       // Executes a validated updateTripPacking tool call against the
       // trip doc. Resolves true on write, false on validation/write
@@ -4641,9 +4760,16 @@
           }
         }
         renderRefChips();
+        var sentThreadKey = activeThreadKey;
         callAskStylist(payload).then(function (res) {
           thinking.thinking = false;
           var d = res.data || {};
+          // UX-18 W1/W3: the assembler's manifest — the context line
+          // renders it, so the display is the loader's own list.
+          if (d.manifest) {
+            threadManifests[sentThreadKey] = d.manifest;
+            if (sentThreadKey === activeThreadKey) renderContextLine();
+          }
           // PC-37: trip outfit suggestions ride along either branch —
           // the model may update the packing and suggest in one turn.
           var tripSugs = (tripChat && Array.isArray(d.outfitSuggestions)) ? d.outfitSuggestions : [];
@@ -4684,6 +4810,10 @@
         });
       }
 
+      document.getElementById("chatContextLine").addEventListener("click", openContextSheet);
+      document.getElementById("contextSheetClose").addEventListener("click", function () {
+        closeOverlay(document.getElementById("contextSheet"));
+      });
       document.getElementById("chatFab").addEventListener("click", openChat);
       document.getElementById("tabChat").addEventListener("click", openChat);
       document.getElementById("chatClose").addEventListener("click", function () { exitTripChat(); closeOverlay(chatOverlay); });
@@ -4948,14 +5078,9 @@
       }
 
       function renderPinChip() {
-        var el = document.getElementById("pinChip");
-        // In a trip thread the trip chip carries the location context;
-        // a global location pin would just mix contexts.
-        if (tripChat) { el.hidden = true; el.textContent = ""; return; }
-        var pin = activePin("location");
-        if (!pin) { el.hidden = true; el.textContent = ""; return; }
-        el.hidden = false;
-        el.textContent = "📍 " + pin.label + (pin.validUntil ? " · until " + pin.validUntil.slice(5) : "");
+        // UX-18 W3: the pin chip retired into the context line (which
+        // shows every pinned fact in play, scoped like the server).
+        renderContextLine();
       }
 
       function watchTrips(user) {
@@ -5863,33 +5988,26 @@
           }).catch(function () { return null; });
         });
       }
+      // UX-18 W3: the weather chip retired into the context line.
+      // This keeps only the state: the latest summary, and whether
+      // the browser recorded a location denial. The "Set location"
+      // door (the standing rule: never auto-prompt; one tappable
+      // door) now lives in the context sheet.
+      var weatherUiState = { summary: null, denied: false };
       function refreshWeatherChip() {
-        var chip = document.getElementById("weatherChip");
         getWeatherSummary().then(function (summary) {
-          if (summary) {
-            chip.textContent = summary;
-            chip.hidden = false;
-            chip.classList.remove("chip-action");
-            chip.onclick = null;
-          } else {
-            // No silent weather available: offer the door instead
-            // of either prompting or vanishing — unless the browser
-            // has recorded a denial, in which case stay out of sight.
-            var denied = false;
-            try { denied = !!window.localStorage.getItem("closet.locDenied.v1"); } catch (e) {}
-            if (denied) { chip.hidden = true; return; }
-            chip.textContent = "📍 Set location";
-            chip.hidden = false;
-            chip.classList.add("chip-action");
-            chip.onclick = function () {
-              requestPositionNow().then(function (c) {
-                positionPromise = null;
-                weatherCache = { summary: null, at: 0 };
-                if (c) { refreshWeatherChip(); showToast("Location set — your picks now use local weather."); }
-                else { chip.hidden = true; showToast("Couldn't get your location."); }
-              });
-            };
-          }
+          var denied = false;
+          try { denied = !!window.localStorage.getItem("closet.locDenied.v1"); } catch (e) {}
+          weatherUiState = { summary: summary, denied: denied };
+          renderContextLine();
+        });
+      }
+      function setLocationFromSheet() {
+        requestPositionNow().then(function (c) {
+          positionPromise = null;
+          weatherCache = { summary: null, at: 0 };
+          if (c) { refreshWeatherChip(); showToast("Location set — your picks now use local weather."); }
+          else showToast("Couldn't get your location.");
         });
       }
 
