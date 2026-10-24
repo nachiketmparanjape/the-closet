@@ -93,10 +93,30 @@ const CATALOG = {
 };
 
 // Throw the catalog entry for key. Unknown keys become INTERNAL —
-// failing closed, never leaking.
+// failing closed, never leaking. OBS-2: the thrown HttpsError
+// CARRIES its catalog key (err.key) — without it, a boundary
+// that logs the error downstream sees only the gRPC code
+// ("internal") and the failure lands in metrics as uncoded.
 function fail(key) {
   const entry = CATALOG[key] || CATALOG.INTERNAL;
-  throw new HttpsError(entry.grpc, entry.message);
+  const err = new HttpsError(entry.grpc, entry.message);
+  err.key = CATALOG[key] ? key : "INTERNAL";
+  throw err;
+}
+
+// Resolve the catalog key for any thrown value, from whichever
+// carrier it has: an explicit .key (codedError / fail), the
+// catalog message itself (an HttpsError built by fail() carries
+// the message verbatim — reverse-lookup), or a .code that is a
+// catalog key. Returns null when nothing resolves.
+const MESSAGE_TO_KEY = {};
+for (const k of Object.keys(CATALOG)) MESSAGE_TO_KEY[CATALOG[k].message] = k;
+function keyOf(err) {
+  if (!err) return null;
+  if (typeof err.key === "string" && CATALOG[err.key]) return err.key;
+  if (typeof err.message === "string" && MESSAGE_TO_KEY[err.message]) return MESSAGE_TO_KEY[err.message];
+  if (typeof err.code === "string" && CATALOG[err.code]) return err.code;
+  return null;
 }
 
 // A plain Error carrying a catalog key plus an internal-only detail.
@@ -116,13 +136,29 @@ function newCorrelationId() {
 
 // Structured server log for a failed request. Server-side only —
 // err.message and stack are fine here, they never reach the client.
+// OBS-2: the key resolves via keyOf() (not just err.key), and the
+// category rides along so log queries can group by failure kind.
 function logError(where, err, context) {
+  const key = keyOf(err);
   const fields = Object.assign({}, context || {}, {
     err: err && err.message,
-    key: (err && err.key) || undefined,
+    key: key || undefined,
+    category: key ? CATALOG[key].category : undefined,
   });
   if (err && err.stack) fields.stack = err.stack;
   logErrorRaw(where + " failed", fields);
+}
+
+// OBS-2: a structured NON-failure event — a rejection, a
+// degradation, a self-heal. These used to be silent or ad-hoc
+// console lines; now they share one shape in the log (and the
+// error_events sink, via index.js's recorder). Shape only —
+// never user content. Never throws.
+const { info: logInfoEventRaw } = require("firebase-functions/logger");
+function logEvent(event, fields) {
+  try {
+    logInfoEventRaw(event, Object.assign({ event: event }, fields || {}));
+  } catch (e) { /* logging must never throw */ }
 }
 
 // Structured server log for a successful callable request. Pairs with
@@ -132,4 +168,4 @@ function logSuccess(where, context) {
   logInfoRaw(where + " succeeded", Object.assign({ outcome: "success" }, context || {}));
 }
 
-module.exports = { CATALOG, fail, codedError, newCorrelationId, logError, logSuccess };
+module.exports = { CATALOG, fail, codedError, newCorrelationId, logError, logSuccess, keyOf, logEvent };

@@ -18,7 +18,7 @@
 
 const { GoogleGenAI } = require("@google/genai");
 const { getClient, logAiFailure, reportUsage, MODEL_VERSION } = require("./describe");
-const { codedError } = require("./errors");
+const { codedError, logEvent } = require("./errors");
 
 const MAX_ITEMS = 500;
 const MAX_MESSAGES = 20;
@@ -1103,7 +1103,18 @@ function mapSuggestTripOutfits(raw, items, planIds) {
 // OBS-1: rejected trip-tool args, WITH a sample of the raw values —
 // keys/types alone left the 2026-10-21 failure undiagnosable beyond
 // "structurally complete, mapped to zero."
-function logTripArgsRejected(stage, args) {
+
+// OBS-2: one funnel for the stylist's non-failure events —
+// rejections, self-heals, degradations. Structured log always;
+// the error_events sink when the caller wired hooks.onEvent.
+function emitEvent(hooks, kind, name, fields) {
+  try {
+    logEvent(name, Object.assign({ kind: kind }, fields || {}));
+    if (hooks && typeof hooks.onEvent === "function") hooks.onEvent(kind, name, fields || {});
+  } catch (e) { /* events must never break the request */ }
+}
+
+function logTripArgsRejected(stage, args, hooks) {
   try {
     console.error(JSON.stringify({
       event: "trip_tool_args_rejected",
@@ -1114,6 +1125,7 @@ function logTripArgsRejected(stage, args) {
       articlesSample: JSON.stringify((args && args.articles) || []).slice(0, 600),
     }));
   } catch (e) { /* logging must never throw */ }
+  emitEvent(hooks, "rejection", "trip_tool_args_rejected", { stage: stage });
 }
 
 // Trip mode drops the JSON mime type, but the model sometimes still
@@ -1153,9 +1165,10 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
     let mappedCall = updCall ? mapUpdateTripPacking(updCall.args, items) : null;
     let retrySawUpd = false;
     if (updCall && !mappedCall) {
+      emitEvent(hooks, "self_heal", "trip_packing_retry", { stage: "first" });
       // The model tried to update the packing but its args didn't
       // survive mapping — log it (OBS-1) and re-ask once with a hint.
-      logTripArgsRejected("first", updCall.args);
+      logTripArgsRejected("first", updCall.args, hooks);
       const retryContents = contents.concat([{
         role: "user",
         parts: [{ text: "Your packing update didn't go through — the articles didn't match the wardrobe. Call updateTripPacking again using the EXACT [iN] handles from the wardrobe list above (e.g. [i3]), every piece with a reason, and include a short sentence of prose saying what changed." }],
@@ -1166,7 +1179,7 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
         if (!mappedCall && c.name === "updateTripPacking") {
           retrySawUpd = true;
           mappedCall = mapUpdateTripPacking(c.args, items);
-          if (!mappedCall) logTripArgsRejected("retry", c.args);
+          if (!mappedCall) logTripArgsRejected("retry", c.args, hooks);
         }
         if (!pinCall && c.name === "pinContext") {
           toolCalls.push(c);
@@ -1184,6 +1197,7 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
     // words must describe what actually happened. A plan that
     // arrived but couldn't be applied is not an "empty" reply.
     const planFailed = !mappedCall && (updCall || retrySawUpd);
+    if (planFailed) emitEvent(hooks, "rejection", "trip_plan_not_applied", {});
     if (!text) {
       text = mappedCall
         ? ("Packing updated — " + (mappedCall.whatChanged || "got it."))
@@ -1203,6 +1217,7 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
   let mapped = parsed.outfit ? mapHandlesToIds(parsed.outfit, items) : null;
   let problem = parsed.outfit ? validateSlots(mapped || [], items) : null;
   if (parsed.outfit && (problem || !mapped)) {
+    emitEvent(hooks, "self_heal", "slot_repair_attempt", { problem: problem || "handles_unmapped" });
     const repairContents = contents.concat([
       { role: "model", parts: [{ text: JSON.stringify(parsed.outfit) }] },
       { role: "user", parts: [{ text: "That outfit doesn't work: " + (problem || "the handles didn't match the wardrobe") + ". Choose again using only wardrobe handles, following all rules." }] },
@@ -1213,11 +1228,13 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
       problem = parsed.outfit ? validateSlots(mapped || [], items) : null;
     } catch (e) {
       // Repair failed — fall through to text-only below.
+      emitEvent(hooks, "degraded", "slot_repair_failed", { key: (e && e.key) || null });
       problem = problem || "repair failed";
     }
   }
 
   if (!parsed.outfit || !mapped || problem) {
+    if (parsed.outfit) emitEvent(hooks, "rejection", "outfit_discarded", { problem: problem || "unmapped" });
     return { reply: parsed.reply, outfit: null, pinProposal: parsed.pinProposal || null };
   }
   return {

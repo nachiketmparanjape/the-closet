@@ -129,5 +129,10 @@ service cloud.firestore {
     match /ai_usage/{eventId} {
       allow read, create, update, delete: if false;
     }
+    // OBS-2: server-side error/event ledger (quality report reads
+    // it admin-side). Same posture as ai_usage.
+    match /error_events/{eventId} {
+      allow read, create, update, delete: if false;
+    }
   }
 }

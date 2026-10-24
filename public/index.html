@@ -1548,6 +1548,7 @@
         fab.hidden = !(typeof currentUser !== "undefined" && currentUser) || !!blocked;
       }
       function openOverlay(el) {
+        if (typeof noteTrail === "function") noteTrail("open " + (el.id || "overlay"));
         if (el._ux15Timer) { window.clearTimeout(el._ux15Timer); el._ux15Timer = null; }
         el.classList.remove("is-closing");
         el.hidden = false;
@@ -1635,6 +1636,28 @@
       var clientErrorSeq = 0;
       var clientErrorPersisted = 0;
       var clientErrorPersisting = false;
+      // OBS-2: session correlation — a per-load id plus a short
+      // trail of what the user was doing (views opened, windows
+      // opened), stamped onto every client_errors doc so a
+      // report like "it broke at 9:28" can be matched to the
+      // exact moment, and the server events around it.
+      function closetSessionId() {
+        try {
+          var sid = window.sessionStorage.getItem("closet.sessionId");
+          if (!sid) {
+            sid = "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+            window.sessionStorage.setItem("closet.sessionId", sid);
+          }
+          return sid;
+        } catch (e) { return "s-nostorage"; }
+      }
+      function noteTrail(what) {
+        try {
+          var t = window.__clientTrail || (window.__clientTrail = []);
+          t.push({ t: new Date().toISOString(), what: String(what || "").slice(0, 60) });
+          if (t.length > 12) t.splice(0, t.length - 12);
+        } catch (e) { /* the trail must never throw */ }
+      }
       function reportError(where, err) {
         clientErrorSeq++;
         var id = "c" + Date.now().toString(36) + "-" + clientErrorSeq;
@@ -1658,6 +1681,8 @@
               message: String((err && err.message) || err || "").slice(0, 500),
               page: location.pathname,
               userAgent: String(navigator.userAgent || "").slice(0, 200),
+              sessionId: closetSessionId(),
+              trail: (window.__clientTrail || []).slice(-12),
               createdAt: firebase.firestore.FieldValue.serverTimestamp()
             }).catch(function () { /* logging must never throw */ })
               .then(function () { clientErrorPersisting = false; });
@@ -6183,6 +6208,7 @@
       document.getElementById("tabChat").addEventListener("click", function () { renderChatTodayStrip(); });
 
       function switchView(view) {
+        if (typeof noteTrail === "function") noteTrail("view " + view);
         feedbackView = view; // FB-1: record where feedback comes from
         document.querySelectorAll(".tab").forEach(function (t) {
           var on = t.getAttribute("data-view") === (view === "trip" ? "trips" : view);

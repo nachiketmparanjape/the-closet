@@ -30,7 +30,8 @@ const { makeUsageRecorder, createAiTracker, flushAiUsage } = require("./usage");
 const { planPacking, sanitizeTripInput } = require("./packing");
 // PC-11: every expected failure goes through the catalog; every failure
 // path logs with a correlation ID.
-const { fail, newCorrelationId, logError, logSuccess } = require("./errors");
+const { fail, newCorrelationId, logError, logSuccess, keyOf, logEvent, CATALOG } = require("./errors");
+const { makeErrorEventRecorder } = require("./events");
 
 // The default bucket is closet-404e9.firebasestorage.app (the appspot.com
 // bucket exists but the client writes to firebasestorage.app). Without an
@@ -41,11 +42,29 @@ initializeApp({ storageBucket: "closet-404e9.firebasestorage.app" });
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB — phone photos, pre-resize
 
+// OBS-2: the durable event sink (error_events). Created lazily —
+// getFirestore() is valid at module scope after initializeApp,
+// but the recorder factory tolerates a null db by design.
+let _errorEventRecorder = null;
+function recordErrorEvent(fields) {
+  try {
+    if (!_errorEventRecorder) _errorEventRecorder = makeErrorEventRecorder(getFirestore());
+    _errorEventRecorder(fields);
+  } catch (e) { /* the sink must never break the request path */ }
+}
+
 // Callable boundary: HttpsErrors (from fail()) pass through untouched;
 // coded downstream errors map via their key; anything else is INTERNAL.
 // The client never sees raw internals — only catalog messages.
 function boundary(where, correlationId, uid, err) {
   logError(where, err, { uid: uid, correlationId: correlationId });
+  const key = keyOf(err) || (err && err.key) || "INTERNAL";
+  recordErrorEvent({
+    kind: "failure", fn: where, key: key,
+    category: (CATALOG[key] || {}).category || null,
+    correlationId: correlationId, uid: uid,
+    detail: err && err.message ? String(err.message).slice(0, 300) : null,
+  });
   if (err instanceof HttpsError) throw err;
   fail(err && err.key ? err.key : "INTERNAL");
 }
@@ -54,7 +73,9 @@ function boundary(where, correlationId, uid, err) {
 // successful request, so Cloud Logging can answer "what's the success
 // rate of planPacking this week?" without any extra infrastructure.
 function finish(where, correlationId, uid, start, result) {
-  logSuccess(where, { correlationId: correlationId, uid: uid, durationMs: Date.now() - start });
+  const durationMs = Date.now() - start;
+  logSuccess(where, { correlationId: correlationId, uid: uid, durationMs: durationMs });
+  recordErrorEvent({ kind: "success", fn: where, correlationId: correlationId, uid: uid, durationMs: durationMs });
   return result;
 }
 
@@ -210,6 +231,8 @@ exports.askStylist = onCall(
         }
       } catch (e) {
         logError("askStylist.vibeProfile", e, { uid: uid, correlationId: correlationId });
+        logEvent("subcall_degraded", { fn: "askStylist.vibeProfile", key: keyOf(e) });
+        recordErrorEvent({ kind: "degraded", fn: "askStylist.vibeProfile", key: keyOf(e), correlationId: correlationId, uid: uid });
       }
       // Sprint 17 (CONTEXT PINS): confirmed current facts, read
       // server-side best-effort like the vibe profile. Expiry filtering
@@ -221,6 +244,8 @@ exports.askStylist = onCall(
         pins = sanitizePins(pinsSnap.docs.map((d) => d.data()));
       } catch (e) {
         logError("askStylist.contextPins", e, { uid: uid, correlationId: correlationId });
+        logEvent("subcall_degraded", { fn: "askStylist.contextPins", key: keyOf(e) });
+        recordErrorEvent({ kind: "degraded", fn: "askStylist.contextPins", key: keyOf(e), correlationId: correlationId, uid: uid });
       }
       if (!items.length) {
         fail("EMPTY_WARDROBE");
@@ -242,12 +267,25 @@ exports.askStylist = onCall(
         }
       } catch (e) {
         logError("askStylist.styleProfile", e, { uid: uid, correlationId: correlationId });
+        logEvent("subcall_degraded", { fn: "askStylist.styleProfile", key: keyOf(e) });
+        recordErrorEvent({ kind: "degraded", fn: "askStylist.styleProfile", key: keyOf(e), correlationId: correlationId, uid: uid });
       }
       // Sprint 17 fix buffer: the client's local date (YYYY-MM-DD) —
       // the model resolves relative dates against it, and pins expire
       // by it. Malformed → null (server falls back to its own clock).
       const today = /^\d{4}-\d{2}-\d{2}$/.test(data.today || "") ? data.today : null;
-      const result = await askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, aiTracker.hooks, todayPick);
+      // OBS-2: the stylist's non-failure events (rejections,
+      // self-heals) ride the same hooks object into the sink.
+      const stylistHooks = Object.assign({}, aiTracker.hooks, {
+        onEvent: function (kind, name, fields) {
+          recordErrorEvent({
+            kind: kind, fn: "askStylist:" + name, key: fields && fields.key || null,
+            correlationId: correlationId, uid: uid,
+            detail: fields ? JSON.stringify(fields).slice(0, 300) : null,
+          });
+        },
+      });
+      const result = await askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, stylistHooks, todayPick);
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: true });
       return finish("askStylist", correlationId, uid, start, result);
     } catch (err) {
@@ -450,6 +488,8 @@ exports.planPacking = onCall(
         }
       } catch (e) {
         logError("planPacking.vibeProfile", e, { uid: uid, correlationId: correlationId });
+        logEvent("subcall_degraded", { fn: "planPacking.vibeProfile", key: keyOf(e) });
+        recordErrorEvent({ kind: "degraded", fn: "planPacking.vibeProfile", key: keyOf(e), correlationId: correlationId, uid: uid });
       }
       const result = await planPacking(items, trip.leg, trip.weatherSummary, trip.notes, vibeProfile, aiTracker.hooks);
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: true });

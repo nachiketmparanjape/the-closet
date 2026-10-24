@@ -65,3 +65,39 @@ describe("newCorrelationId()", () => {
     assert.notEqual(a, b);
   });
 });
+
+describe("OBS-2: keyOf()", () => {
+  const { keyOf, logEvent } = require("../functions/errors.js");
+  it("resolves from err.key (codedError)", () => {
+    assert.equal(keyOf(codedError("AI_BAD_RESPONSE", "junk")), "AI_BAD_RESPONSE");
+  });
+  it("resolves an HttpsError from fail() — the uncoded fix", () => {
+    try { fail("EMPTY_WARDROBE"); } catch (e) {
+      assert.equal(e.key, "EMPTY_WARDROBE");
+      assert.equal(keyOf(e), "EMPTY_WARDROBE");
+    }
+  });
+  it("reverse-looks-up a bare HttpsError by its catalog message", () => {
+    const e = new HttpsError("invalid-argument", CATALOG.BAD_IMAGE.message);
+    assert.equal(keyOf(e), "BAD_IMAGE");
+  });
+  it("returns null for unknown errors", () => {
+    assert.equal(keyOf(new Error("some random bug")), null);
+    assert.equal(keyOf(null), null);
+  });
+  it("logEvent never throws", () => {
+    assert.doesNotThrow(() => logEvent("test_event", { a: 1 }));
+  });
+});
+
+describe("OBS-2: friendlyError covers every catalog grpc code", () => {
+  require("../public/js/friendly-error.js");
+  const friendlyError = globalThis.friendlyError;
+  it("each distinct catalog grpc maps to a human line", () => {
+    const grpcs = [...new Set(Object.values(CATALOG).map((e) => e.grpc))];
+    for (const g of grpcs) {
+      const line = friendlyError({ code: g });
+      assert.ok(typeof line === "string" && line.length > 0, g);
+    }
+  });
+});

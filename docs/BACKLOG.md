@@ -244,8 +244,9 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   - **Client side:** reportError already persists to `client_errors`;
     add session correlation so a user report ("it broke at 9:28")
     can be matched to the exact server call.
-- **Status:** IN SPRINT 20 (pulled at the 2026-10-24 walk,
-  ranked #1). Scope refined in the sprint plan.
+- **Status:** SHIPPED 2026-10-24 (Sprint 20). Live-smoke
+  verified: failure events land in error_events with their
+  catalog keys; the quality report reads them back.
 
 ### OBS-3: AI consumption analytics — cost attribution (M)
 - **Idea (founder 2026-10-23):** know exactly where AI spend
