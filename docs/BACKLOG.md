@@ -212,7 +212,7 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   be tagged to a trip ("will this earn a place *for this trip*?"); they
   show in the generic Shop list AND in a unified trip view (packing +
   tagged shop items in one place).
-- **Status:** Not started. The `tripId` field already exists on
+- **Status:** In Sprint 19 (card 2). The `tripId` field already exists on
   shopChecks (Sprint 15); tagging UI + unified trip view remain.
 
 ### OBS-2: Error logging & handling overhaul (M)
@@ -427,9 +427,9 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   nothing teleports; DESIGN.md §5 is updated to describe
   the system as built (the spec already promises motion —
   this cut makes the promise true).
-- **Status:** Not started. Filed 2026-10-21. Natural pull:
-  with or right after DESIGN-CHAT-1 — the chat sheet is
-  the worst offender.
+- **Status:** In Sprint 19 (card 1). Filed 2026-10-21. (Backdrop-tap
+  parity shipped in the 2026-10-23 fix buffer; the motion
+  system is this cut.)
 
 ### PC-34: Garment extraction & clean rendering (research spike)
 - **Size:** Spike S, then size from findings
@@ -643,9 +643,8 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
 - **Acceptance:** a new user with an empty wardrobe reaches
   the guide in one tap, reads it in under a minute, and can
   follow the Google Photos path without guessing a step.
-- **Status:** Not started. Filed 2026-10-21 from the founder's
-  screenshots; sprint candidate — pairs with UX-14 (attack
-  line 1) and PC-34.
+- **Status:** In Sprint 19 (card 3). Filed 2026-10-21 from the founder's
+  screenshots; pairs with UX-14 (attack line 1) and PC-34.
 
 ### NAMING-1: Short-name standard at the data level
 - **Problem (founder, 2026-10-23):** outfit titles and shop-item
@@ -667,5 +666,35 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
 - **Acceptance:** no card in Wardrobe, Outfits, Shop list, or
   Today renders a title longer than ~6 words or ending mid-word;
   detail views keep the full descriptions.
-- **Status:** Not started. Filed 2026-10-23 from the founder's
+- **Status:** In Sprint 19 (card 4). Filed 2026-10-23 from the founder's
   phone review + the Essembl pilot.
+
+### PC-38: Stylist chat — attach reference photos (M)
+- **Origin:** Essembl teardown P3, adopted by the founder
+  2026-10-24. Evidence: `research_notes/essembl-apk-pilot.md`
+  (their stylist chat takes up to 4 attachable references).
+- **Problem:** the stylist can only reason over pieces already
+  in the wardrobe. There is no way to show it what you're
+  aiming for — an inspo photo, a screenshot of a look, a
+  friend's outfit — and ask "more like this, with what I own."
+- **In scope:** attach up to 4 reference images to a message
+  in the general stylist chat (photo picker + camera, same
+  single-door pattern as Add); thumbnails in the composer,
+  removable before send; references ride to `askStylist` as
+  vision context for that turn; the reply may name elements
+  it sees in the references.
+- **Out of scope:** references never create wardrobe items
+  (that is PC-36's worn-photo path); no reference persistence
+  beyond the conversation; trip-chat parity (general chat
+  first; trip rooms get it only if the pattern proves out);
+  no outfit generation bypass — suggestions are outfit cards
+  built only from owned pieces, as today.
+- **Acceptance:** in general chat, attach 2 inspo photos and
+  ask "more like this with what I own" → the reply visibly
+  reasons over the references (names elements from them) and
+  suggests outfits built only from owned pieces; removing a
+  thumbnail before send excludes it; no items are created.
+- **Lane:** Stylist. **Effort:** M.
+- **Status:** Filed sprint-ready 2026-10-24 (teardown P3
+  adoption). Competes at the next planning walk — adoption
+  is not scheduling.
