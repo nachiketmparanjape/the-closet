@@ -541,6 +541,7 @@
     .item-image img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .item-details { padding: 13px 1px 4px; }
     .item-name { margin: 0 0 4px; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .item-name.is-naming { color: var(--muted); font-style: italic; font-weight: 500; }
     .item-meta { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; }
     .color-dot { width: 9px; height: 9px; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--ink) 15%, transparent); flex: 0 0 auto; }
 
@@ -2249,7 +2250,14 @@
         details.className = "item-details";
         var name = document.createElement("p");
         name.className = "item-name";
-        name.textContent = item.shortName || item.name || "Untitled piece";
+        if (item.needsAi === true) {
+          // PC-43: a piece still waiting for its AI naming shows
+          // the wait, not the placeholder.
+          name.classList.add("is-naming");
+          name.textContent = "Naming…";
+        } else {
+          name.textContent = item.shortName || item.name || "Untitled piece";
+        }
         var meta = document.createElement("div");
         meta.className = "item-meta";
         var dot = document.createElement("span");
@@ -2868,12 +2876,70 @@
             renderGallery();
             todayDataSeen = true;
             maybeRenderToday();
+            maybeHealUnnamedItems();
           }, function (error) {
             loadingGrid.hidden = true;
             gallery.hidden = false;
             showToast(friendlyError(error));
             renderGallery();
           });
+      }
+
+      // PC-43: unnamed items heal themselves. A piece whose
+      // describe failed at save time carries needsAi; on load
+      // (capped, sequential, once per item per session) the app
+      // re-runs describeItem on its stored photo and writes the
+      // full v2 field set — the placeholder never becomes
+      // permanent again. Legacy zombies (the literal name with
+      // no ai block) count as flagged too.
+      var healAttempted = {};
+      function healOneItem(it) {
+        var url = it.imageUrl || (it.photos && it.photos[0] && it.photos[0].url);
+        if (!url || !functions) return Promise.resolve();
+        return fetch(url).then(function (r) { return r.blob(); })
+          .then(function (blob) { return loadImageFile(blob); })
+          .then(function (img) { return downscaleImage(img); })
+          .then(function (d) {
+            return functions.httpsCallable("describeItem")({
+              imageBase64: d.base64, mimeType: d.mimeType, photoIds: ["heal"]
+            });
+          })
+          .then(function (res) {
+            var ai = res.data || null;
+            if (!ai || !ai.name) return;
+            var v2 = buildV2Fields(ai, (it.colors && it.colors[0] && it.colors[0].hex) || "#5c6673");
+            return db.collection("users").doc(currentUser.uid).collection("items").doc(it.id).update({
+              name: ai.name,
+              shortName: ai.shortName || capShortName(ai.name),
+              category: ai.category || it.category || "Other",
+              colors: (v2.colors && v2.colors.length) ? v2.colors : (it.colors || []),
+              description: v2.description,
+              pattern: v2.pattern,
+              fit: v2.fit,
+              fabricGuess: v2.fabricGuess,
+              formality: v2.formality,
+              warmth: v2.warmth,
+              brand: v2.brand,
+              brandKey: v2.brandKey,
+              subtype: v2.subtype,
+              styleTags: v2.styleTags,
+              ai: ai,
+              needsAi: false
+            });
+          })
+          .catch(function (err) { reportError("healUnnamedItems", err); });
+      }
+      function maybeHealUnnamedItems() {
+        if (!currentUser || !db || !functions) return;
+        var targets = allItems.filter(function (it) {
+          if (healAttempted[it.id]) return false;
+          return it.needsAi === true || (it.name === "Untitled item" && !it.ai);
+        }).slice(0, 3);
+        if (!targets.length) return;
+        targets.forEach(function (it) { healAttempted[it.id] = true; });
+        targets.reduce(function (chain, it) {
+          return chain.then(function () { return healOneItem(it); });
+        }, Promise.resolve());
       }
 
       document.getElementById("authButton").addEventListener("click", function () {
@@ -3314,6 +3380,9 @@
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
           };
           if (aiSuggestion) doc.ai = aiSuggestion; // PC-7: cached AI description (raw cache)
+          // PC-43: no AI and no name of the user's own → the
+          // piece heals on a later load instead of staying blank.
+          if (!aiSuggestion && !doc.name) doc.needsAi = true;
           docRef.set(doc).then(function () {
             uploadForm.reset();
             document.getElementById("colorInput").value = "#5c6673";
@@ -3505,6 +3574,10 @@
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
           };
           if (r.ai) doc.ai = r.ai;
+          // PC-43: a failed describe must not become a permanent
+          // placeholder — flag it and the app re-describes on a
+          // later load until it lands.
+          if (!r.ai) doc.needsAi = true;
           return docRef.set(doc).then(function () { requestPhotoRender(docRef.id, storagePath); });
         }).catch(function (err) {
           if (uploaded) { storage.ref().child(storagePath).delete().catch(function () {}); }

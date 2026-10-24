@@ -873,9 +873,9 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   "Unidentified item" per the describe prompt's own rule,
   with the flag cleared.
 - **Lane:** Catalogue. **Effort:** S–M.
-- **Status:** IN SPRINT 20 (pulled at the 2026-10-24 walk,
-  ranked #2). Filed 2026-10-24; data incident repaired the
-  same night; this is the prevention half.
+- **Status:** SHIPPED 2026-10-24 (Sprint 20). Prevention
+  live: needsAi flags at both save paths, capped on-load
+  healer, "Naming…" grid state.
 
 ### UX-17 — Manual theme choice in Account (System / Light / Dark)
 
