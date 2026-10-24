@@ -48,8 +48,11 @@ a path the code fixed in advance.
 | A pointer | A piece or outfit you attach to a message yourself by typing @. | "@navy blazer but warmer" builds the answer around that blazer. |
 | A tool | A named action the model may ask the code to run, with checked inputs. OpenAI sorts tools into *data tools* (look something up) and *action tools* (change something). All three of ours are action tools. | `updateTripPacking` replaces a trip's packing plan. |
 | A pinned fact | A short fact you approved for the stylist to always remember ("I run cold", "the trip is in Tahoe"). The stylist may propose one; it is saved only when you tap Save. | Up to 20 are read into every brief. |
-| A fact label | The small pill at the top of the chat showing one piece of context in play. | A label reading "Today's pick" with an × to remove it. |
-| Today's pick | The outfit the app composed for you this morning. | Attaches itself to a fresh general conversation (see the entry-point table). |
+| The assembler | The one server function that builds every brief, for every caller, and returns the manifest beside each answer. Nothing else may gather context. | A new kind of fact is added in exactly one place, and every caller gets it. |
+| The manifest | The list the assembler returns with each answer: what it actually loaded into that brief, in plain names. | "Loaded: wardrobe (69), style notes (3), pinned facts (2)." |
+| The context line | The one slim display under the chat header. It renders the manifest, so what it shows is what the assembler loaded — the two cannot disagree. It opens the context sheet: every fact in play, each removable. | `Knows: Tahoe · runs cold · +2 more` |
+| A thread | A saved conversation: one for general chat, one per trip, kept on your account. | You reopen the app on Tuesday; Tuesday's thread is where Monday's ended. |
+| Today's pick | The outfit the app composed for you this morning. | Joins a conversation only when you tap a button that is about the pick (see the entry-point table). |
 | The previous pick | The last outfit the stylist proposed in this conversation — the thing "warmer" or "more formal" changes. | You write "warmer"; the previous pick is the base that changes. |
 | Style notes | Your confirmed written preferences, read into every brief. | "Never suggest skinny fits." |
 | Learned taste | Scores the app quietly keeps per style word, learned from what you wear and rate. | "Streetwear" at 0.7 after repeated wears. Rules in PERSONALIZATION.md. |
@@ -104,10 +107,10 @@ flowchart TD
 flowchart LR
     subgraph Session["SESSION — one conversation"]
         S1["The messages, in order"]
-        S2["Lifetime: until the page reloads"]
+        S2["Lifetime: saved on your account,<br/>until you start fresh"]
     end
     subgraph State["STATE — true right now"]
-        T1["Entry point · fact labels · the trip"]
+        T1["Entry point · the attachment · the trip"]
         T2["Your pointers on the current message"]
         T3["Lifetime: until it changes"]
     end
@@ -125,20 +128,24 @@ flowchart LR
 | Part | Industry name | Its one job |
 |---|---|---|
 | The screens and cards | The host application | Everything the model is not: display, buttons, approvals. |
-| `buildStylistRequest` (server) | The context assembler | Build the brief: choose the facts, order them, state which fact wins. |
+| `assembleContext` (server) | The context assembler | The single place every brief is built: choose the facts, order them, state which fact wins — and return the manifest of what was loaded. |
 | Gemini (`gemini-3.5-flash`) | The model | Read one brief, compose one answer. |
 | The trip tools | Tools (action) | Let the model revise a packing plan, suggest outfits from it, and propose pinned facts. |
 | The sanitizers and validators | Checks / guardrails | Keep invented or malformed answers from reaching the screen or the database. |
-| `chatThreads` (page memory) | The session store | Hold each conversation's messages. |
+| The thread store (database `chat_threads` + page cache) | The session store | Keep each conversation's whole transcript, one document per thread. |
 | The database collections | The memory store | Hold facts across conversations and feed them into briefs. |
 | The `ai_usage` and `error_events` ledgers | Tracing / observability | Record each call's cost and failures (OBSERVABILITY.md). |
 
 ### A turn, in words
 
 1. You open the chat from an **entry point**. The app picks the
-   conversation for it: the general conversation, or that trip's.
-2. If the conversation is empty, the app writes the first message
-   itself: a greeting — or, for a trip, a line that names the trip.
+   conversation for it: the general conversation, or that trip's —
+   and loads that thread from your account. Reopening after a gap
+   (a new day, or some hours) marks the return with a divider line:
+   "Continuing from Tuesday."
+2. If the saved conversation is empty, the app writes the first
+   message itself: a greeting — or, for a trip, a line that names
+   the trip.
 3. You type a message and tap send. You can attach a **pointer** by
    typing @.
 4. The phone gathers the context it holds (the conversation, the
@@ -158,7 +165,10 @@ flowchart LR
 7. **Output checks** run before anything is drawn: handles that do not
    exist are dropped, a broken answer shape is repaired once, and some
    failures earn one silent retry with a stricter instruction.
-8. The screen draws the reply text and the outfit card.
+8. The screen draws the reply text and the outfit card. The reply
+   carries the **manifest**; the context line under the header
+   renders it, so what the line shows is exactly what the assembler
+   loaded. Every message is saved to the thread as it lands.
 9. Anything the answer proposes saving — a pinned fact, a style-note
    change — stops at a **proposal card**. It is written only when you
    tap Save. Tool writes in a trip (a revised packing plan) are applied
@@ -166,23 +176,31 @@ flowchart LR
 
 Two other callers use the same stylist without a conversation: the
 **morning pick** (Today) and the **outfit composer** (the "build a look"
-actions). They assemble a smaller, fixed brief and take one answer —
-no conversation, no tools.
+actions). The same assembler builds their briefs, under the same
+rulebook; the bundles are smaller only because there is no conversation
+and there are no pointers — not because different rules apply. One
+answer, no tools.
 
 ### What each entry point attaches
 
-| Entry point | Conversation | Attached without asking | What you see of it |
+Attaching is an act, not a default: context joins a conversation when
+a button that is about that context is tapped — never merely because
+a screen opened. Memory (pinned facts, style notes, learned taste)
+is not an attachment: it applies to every brief, always.
+
+| Entry point | Conversation | What attaches | What you see of it |
 |---|---|---|---|
-| Stylist tab / chat button | General | Today's pick; pinned facts; measured weather | Today's pick shows as a fact label and a top outfit card. Of the pinned facts, only a pinned place shows a label. Today's pick can be removed by the × on its label — and it returns the next time the chat opens. |
-| Today screen: Ask | General | The same as above | The same as above |
-| Build a look around this | General | The same, plus a pointer to that piece, plus text typed for you that you still must send | The pointer shows as a label above the typing box; removable before sending |
-| Surprise me | General | The same, plus a message the app writes **and sends** for you | The sent message, after it is sent |
-| A trip page | That trip's | The trip, its packing list, its stored weather. Today's pick and place pins are left out on purpose | A trip label at the top of the screen |
+| Stylist tab / chat button | General | Nothing. The conversation starts clean. | The context line: memory only (wardrobe, style notes, pinned facts, weather). |
+| Today screen: Ask the stylist — and "Ask about this" on the pick card inside the chat | General | Today's pick. It also becomes the base that changes build on, until this conversation has a pick of its own. | The context line names it; the context sheet can remove it. |
+| Build a look around this | General | A pointer to that piece, plus text typed for you that waits unsent. | The pointer shows as a label above the typing box; removable before sending. |
+| Surprise me | General | A message the app writes and sends — from that button only. Today's pick does not attach; the result is something new. | The sent message, after it is sent. |
+| A trip page | That trip's | The trip, its packing list, its stored weather. Today's pick and place pins are left out on purpose. | The context line names the trip; "Leave trip" lives in the context sheet. |
 
 ### Who wins when two facts disagree
 
-The brief states these rules to the model in its instructions. They are
-today's working rules:
+These rules are stated to the model as one block in every brief (the
+PRECEDENCE block, generated from this table), above the per-feature
+details:
 
 | The disagreement | The winner | Example |
 |---|---|---|
@@ -211,7 +229,7 @@ system currently runs both, one per conversation kind.
 
 | Shelf | Holds | Stored where | Lifetime | Who writes |
 |---|---|---|---|---|
-| Session | The messages of one conversation | Page memory only | Until the page reloads — conversations are not saved | You and the stylist, by talking |
+| Session (a thread) | The messages of one conversation — the whole transcript | Database (`chat_threads`, one document per thread) + a page cache | Until you start fresh; a trip's thread is deleted with its trip | You and the stylist, by talking |
 | State | Entry point, fact labels, the current trip, pointers | Page memory | Until it changes | The app, from your taps |
 | Memory | Pinned facts (at most 20) | Database | Until you delete one | The stylist proposes; you approve |
 | Memory | Style notes (confirmed preferences) | Database | Until changed | You confirm each change |
@@ -223,11 +241,11 @@ system currently runs both, one per conversation kind.
 
 | Limit | Value | Set by |
 |---|---|---|
-| Messages from the conversation that the model reads | The last 20 | The server |
+| Messages from the conversation that the model reads | The last 50, per conversation | The server; the thread itself says so, once, when it first passes 50 |
 | Length of one message the model reads | 2,000 characters | The server |
 | Pinned facts read into a brief | Up to 20 | The server |
 | Wardrobe sent in a brief | Every piece, every time, one line each | The phone + server |
-| Conversations kept after the app closes or reloads | None | The current design of the session store |
+| Conversations kept after the app closes or reloads | Every thread, in full | The thread store |
 
 ## Where this sits in the industry's map
 
@@ -242,16 +260,19 @@ with theirs in their words.
 | One agent first (OpenAI, *A Practical Guide to Building Agents*, 2025) | Grow a single agent's ability before splitting into several; splitting adds cost and confusion. | One stylist. There are no multi-agent plans. |
 | Instructions + tools + model (OpenAI, same) | An agent is those three parts; most of the craft sits in the instructions and the tool shelf. | The craft sits in the assembler and the instructions. |
 | Guardrails in layers (OpenAI, same) | Checks belong at entry, around tools, and on output — not in one place. | Output checks are the strongest layer; tool-argument checks exist in trip conversations; entry checks are size limits. Public-safety layers are a deliberate non-goal for a private, single-user wardrobe app. |
-| Context engineering (Anthropic, *Effective Context Engineering for AI Agents*, 2025) | The brief is a budget: assemble deliberately, keep it small, order it well. | The brief is rebuilt per message in a fixed order. Two of this frame's three long-conversation techniques are in use in part: structured notes (pinned facts, style notes), and light pointers (handles + one-line summaries — the model cannot fetch more detail, so the user's @-pointers are the manual version of fetching). Deliberate summarization of long conversations is not in use: older messages are cut at the 20-message limit. |
-| Session, state, memory as separate things (Google, Agent Development Kit) | A conversation, its scratchpad, and long-term memory are three different stores with three different lifetimes. | All three shelves exist, as drawn above. The session shelf uses the in-memory option ADK's guides describe as a development choice, because a restart wipes it. |
+| Context engineering (Anthropic, *Effective Context Engineering for AI Agents*, 2025) | The brief is a budget: assemble deliberately, keep it small, order it well. | The brief is rebuilt per message in a fixed order. Two of this frame's three long-conversation techniques are in use in part: structured notes (pinned facts, style notes), and light pointers (handles + one-line summaries — the model cannot fetch more detail, so the user's @-pointers are the manual version of fetching). Deliberate summarization of long conversations is not in use: older messages fall outside the 50-message reading window, and the thread says so honestly when that first happens. |
+| Session, state, memory as separate things (Google, Agent Development Kit) | A conversation, its scratchpad, and long-term memory are three different stores with three different lifetimes. | All three shelves exist, as drawn above. The session shelf is a database-backed store — ADK's production-grade session option, not the in-memory development one it replaced. |
 | Model / tools / orchestration (Google, *Agents* whitepaper, 2024) | An agent system splits into the model, its tools, and the layer that runs the loop. | The component table above follows the same split: the model, the tool shelf, and the assembler + host as the orchestration layer. |
 
 ## Code pointers
 
-As of 2026-10-24. Server: `functions/index.js` holds the callable
-handlers; `functions/stylist.js` holds the assembler and instructions
-(`buildStylistRequest`), the tool declarations (`updateTripPacking`,
-`suggestTripOutfits`, `pinContext` — declared at lines ~479–585 and
-attached at ~961), and the checks. Client: `public/index.html` holds
-the session and state shelves. The audit trail behind every statement
-here is `docs/sprints/sprint-23/AUDIT.md`.
+As of 2026-10-24, after the UX-18 build (Sprint 23, waves W1–W5).
+Server: `functions/index.js` holds the callable handlers;
+`functions/stylist.js` holds the assembler (`assembleContext`, over
+`buildStylistRequest`), the manifest builder (`buildManifest`), the
+PRECEDENCE block, the tool declarations (`updateTripPacking`,
+`suggestTripOutfits`, `pinContext`), and the checks. Client:
+`public/index.html` holds the thread store (`chat_threads`), the
+context line and sheet, and the state shelf. The design this build
+implements is `docs/CONTEXT-MODEL.md`; the audit trail behind it is
+`docs/sprints/sprint-23/AUDIT.md`.

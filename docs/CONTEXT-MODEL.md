@@ -11,6 +11,18 @@ in `docs/sprints/sprint-23/AUDIT.md`; the principles are in
 state) is updated in the same commit, and the wave is marked done
 here.
 
+**Build status (2026-10-24): all five waves are built, deployed, and
+headlessly verified** (tests 339/339; the callable returns the
+manifest live; thread read/write/delete confirmed against the live
+rules). The founder's phone test is the ship gate. Two recorded
+deviations from the text below: (1) guests — this app's guests are
+anonymous-auth users with real account ids, so their threads are
+stored server-side under that id exactly like a signed-in user's;
+there is no device-only tier and no merge step (an upgrade that
+keeps the account id keeps the threads). (2) Start fresh lives in
+the context sheet, not a separate chat menu — one surface for
+everything about the conversation's context.
+
 The whole design is one sentence: **there is one way context is
 loaded, one display of what was loaded, one rulebook for every
 caller, and conversations are kept.** Everything below is that
@@ -107,7 +119,7 @@ flowchart TD
 | No thread furniture. | No thread list, no titles, no new-thread button, no search. The two conversation kinds the app already has are the whole model. |
 | Trip threads retire with their trip. | Deleting a trip deletes its thread. |
 | Start fresh. | Clears the current thread's messages (after the standard confirm), keeps the key. Available in every conversation. |
-| Guests. | A guest's threads live on the device only until sign-in; on sign-in they merge by key into the account: messages append and are de-duplicated by timestamp. This merge is the wave's one delicate piece and gets its own test. |
+| Guests. | Guests here are anonymous-auth users with real account ids, so their threads are stored on the account like anyone's (see the build-status note above). |
 
 ### Intuitive clarity — how the user always knows what is going on
 
@@ -160,6 +172,8 @@ claims to be, phone-validated before it is called done, and
 `docs/AGENT-ARCHITECTURE.md` updated in the same commit.
 
 | Wave | Scope | Acceptance, in plain terms |
+|---|---|---|---|
+| **Status** | **W1–W5 all built 2026-10-24** (commits `3fa5fd8`, `b22eb63`, `2c1b83f`, `67554ce`, `bd93f27` on main). | Phone validation by the founder is the remaining gate. |
 |---|---|---|
 | **W1 — One assembler + the manifest** | Server: all four callers route through `buildStylistRequest`'s successor; the client stops assembling its own context; every response carries a manifest. No visible change intended. | For the same conversation, every caller's brief follows the same order and who-wins table; tests assert the manifest matches the brief's contents; the audit's four call-site shapes are gone. |
 | **W2 — Attach and start rules** | Decision 1 + 8: the pick attaches only from its button; auto-attach and the re-seeding on open are removed; Surprise me fires only from its button; seeded text never auto-sends. | Opening the stylist cold, the context line shows no pick. Asking from Today attaches it. Surprise me does nothing until tapped, then sends its own prompt. |
