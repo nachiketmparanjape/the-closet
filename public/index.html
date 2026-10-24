@@ -154,6 +154,12 @@
     /* Founder note 2026-10-23: the Shop list header copy sat too
        tight against the first card. */
     #shopListView .gallery { margin-top: 22px; }
+    /* Capture note: a serif lead carries the one rule; the rest is
+       quiet explanation, the fine print last (founder: "beautify"). */
+    .capture-note { display: grid; gap: 8px; color: var(--muted); font-size: 14.5px; line-height: 1.55; }
+    .capture-note p { margin: 0; }
+    .capture-lead { color: var(--ink); font-family: "Closet Serif", serif; font-size: 20px; line-height: 1.25; }
+    .capture-fine { font-size: 13px; }
     .sheet-option { display: flex; align-items: center; width: 100%; padding: 15px 14px; background: none; border: none; border-radius: 10px; font: inherit; text-align: left; cursor: pointer; color: var(--ink); }
     .sheet-option:hover { background: var(--paper-soft); }
     .sheet-option .opt-title { display: block; font-weight: 600; font-size: 15px; }
@@ -755,7 +761,11 @@
         </div>
         <input id="captureFilesInput" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden />
         <input id="captureCameraInput" type="file" accept="image/*" capture="environment" hidden />
-        <p class="hint">One photo per piece. Add one photo and you'll fine-tune its details next; add several and each becomes its own piece, tagged automatically in the background. Need more angles of a single piece? Add them later from the piece itself.</p>
+        <div class="capture-note">
+          <p class="capture-lead">One photo per piece.</p>
+          <p>Add one photo and you'll fine-tune its details next. Add several, and each becomes its own piece — tagged automatically in the background.</p>
+          <p class="capture-fine">Need more angles of a single piece? Add them later from the piece itself.</p>
+        </div>
         <button class="secondary" id="captureCancel" type="button">Cancel</button>
       </div>
     </section>
@@ -2629,20 +2639,36 @@
       // (validation, pHash dupe check, upload / bulk job queue).
       function openCapture() { openOverlay(document.getElementById("captureOverlay")); }
       function closeCapture() { closeOverlay(document.getElementById("captureOverlay")); }
+      // Returns false when the browser refuses the programmatic
+      // hand-off (older Safari) so the caller can drive the ingest
+      // functions directly with the File objects instead.
       function handFiles(input, files) {
         try {
           var dt = new DataTransfer();
           files.forEach(function (f) { dt.items.add(f); });
           input.files = dt.files;
+          if (input.files.length !== files.length) return false;
           input.dispatchEvent(new Event("change", { bubbles: true }));
-        } catch (e) { input.click(); }
+          return true;
+        } catch (e) { return false; }
       }
-      function routeFilesToAdd(files) {
-        var list = Array.prototype.slice.call(files || []);
+      var pendingSingleFiles = null;
+      function routeFilesToAdd(list) {
         if (!list.length) return;
         closeCapture();
-        if (list.length === 1) { beginAdd(); handFiles(document.getElementById("photoInput"), list); }
-        else { beginBulk(); handFiles(bulkInput, list); }
+        if (list.length === 1) {
+          beginAdd();
+          pendingSingleFiles = null;
+          if (!handFiles(document.getElementById("photoInput"), list)) {
+            // Fallback: run the form's ingest directly and let the
+            // submit handler pick the files up from here.
+            pendingSingleFiles = list.slice();
+            handlePhotoInputFiles(document.getElementById("photoInput"), list);
+          }
+        } else {
+          beginBulk();
+          if (!handFiles(bulkInput, list)) setBulkJobs(list, false);
+        }
       }
       document.getElementById("addButton").addEventListener("click", openCapture);
       document.getElementById("emptyAddButton").addEventListener("click", openCapture);
@@ -2650,8 +2676,11 @@
       document.getElementById("captureCancel").addEventListener("click", closeCapture);
       document.getElementById("captureFilesBtn").addEventListener("click", function () { document.getElementById("captureFilesInput").click(); });
       document.getElementById("captureCameraBtn").addEventListener("click", function () { document.getElementById("captureCameraInput").click(); });
-      document.getElementById("captureFilesInput").addEventListener("change", function () { var f = this.files; this.value = ""; routeFilesToAdd(f); });
-      document.getElementById("captureCameraInput").addEventListener("change", function () { var f = this.files; this.value = ""; routeFilesToAdd(f); });
+      // Snapshot to a real Array BEFORE clearing the input: a live
+      // FileList empties when value resets (Safari) — passing the
+      // list itself silently routed zero photos (founder, 2026-10-23).
+      document.getElementById("captureFilesInput").addEventListener("change", function () { var list = Array.prototype.slice.call(this.files || []); this.value = ""; routeFilesToAdd(list); });
+      document.getElementById("captureCameraInput").addEventListener("change", function () { var list = Array.prototype.slice.call(this.files || []); this.value = ""; routeFilesToAdd(list); });
 
       // Dismissal parity (UX-15): EVERY overlay dismisses on a
       // backdrop tap, not just some — the founder hit the Pick-an-
@@ -2909,8 +2938,8 @@
         lib.dispatchEvent(new Event("change"));
       });
 
-      function handlePhotoInputFiles(input) {
-        var files = Array.prototype.slice.call(input.files, 0, MAX_PHOTOS);
+      function handlePhotoInputFiles(input, filesOverride) {
+        var files = filesOverride ? filesOverride.slice(0, MAX_PHOTOS) : Array.prototype.slice.call(input.files, 0, MAX_PHOTOS);
         suggestHint.hidden = true;
         aiRequestId++;
         aiSuggestion = null;
@@ -2922,7 +2951,7 @@
         photoPreview.textContent = "";
         photoPreview.hidden = true;
         if (!files.length) return;
-        if (input.files.length > MAX_PHOTOS) {
+        if ((filesOverride ? filesOverride.length : input.files.length) > MAX_PHOTOS) {
           showToast("Keeping the first " + MAX_PHOTOS + " photos.");
         }
         stashPHashes(files); // PC-19: hash in the background for the submit-time dupe check.
@@ -2965,6 +2994,8 @@
         event.preventDefault();
         if (!currentUser) { closeOverlay(uploadOverlay); beginAdd(); return; }
         var files = Array.prototype.slice.call(document.getElementById("photoInput").files, 0, MAX_PHOTOS);
+        if (!files.length && pendingSingleFiles) files = pendingSingleFiles.slice(0, MAX_PHOTOS);
+        pendingSingleFiles = null;
         if (!files.length) { showToast("Choose a photo first."); return; }
         for (var v = 0; v < files.length; v++) {
           if (files[v].size > 10 * 1024 * 1024) { showToast("Each image must be under 10 MB."); return; }
@@ -5472,7 +5503,9 @@
         var acts = document.createElement("div");
         acts.className = "today-actions";
         acts.appendChild(mkBtn("primary", "＋ Add your first pieces", function () { document.getElementById("addButton").click(); }));
-        acts.appendChild(mkBtn("secondary", "Bulk add", function () { beginBulk(); }));
+        // No separate Bulk button here (founder, 2026-10-23): the
+        // capture screen IS the single door on every surface — its
+        // photo-count routing reaches bulk. Consistency, always.
         card.appendChild(acts);
         frag.appendChild(card);
         // Labeled sample — what a morning could look like (never real data).
