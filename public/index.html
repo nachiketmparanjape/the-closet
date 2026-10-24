@@ -175,6 +175,11 @@
     .overlay.sheet-overlay { place-items: end center; padding: 0; }
     .sheet { width: min(560px, 100%); background: var(--paper); border-radius: var(--r-lg) var(--r-lg) 0 0; padding: 10px 10px calc(10px + env(safe-area-inset-bottom)); box-shadow: var(--shadow); }
     .sheet-title { margin: 0; padding: 10px 14px 6px; font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+    /* Founder (2026-10-24): no Cancel text buttons anywhere — every
+       window closes from an X in its top-right corner. Sheets put
+       the title and the X on one head row. */
+    .sheet-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .sheet-head .icon-button { margin: 4px 6px 0 0; flex-shrink: 0; }
     .sheet-intro { margin: 0; padding: 0 14px 12px; color: var(--muted); font-size: 14px; line-height: 1.5; }
     /* Founder note 2026-10-23: the Shop list header copy sat too
        tight against the first card. */
@@ -201,7 +206,6 @@
     .sheet-option:hover { background: var(--paper-soft); }
     .sheet-option .opt-title { display: block; font-weight: 600; font-size: 15px; }
     .sheet-option .opt-sub { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
-    .sheet-option.sheet-cancel .opt-title { color: var(--muted); font-weight: 600; }
     /* PC-14: shop-check result. */
     .shop-head { display: flex; gap: 18px; align-items: center; margin-bottom: 6px; }
     .shop-photo { width: 96px; height: 116px; object-fit: cover; border-radius: 8px; background: var(--paper-soft); flex-shrink: 0; }
@@ -894,7 +898,10 @@
        three labeled jobs (taste / memory / anti-taste). -->
   <div class="overlay sheet-overlay" id="wearSheet" hidden role="dialog" aria-modal="true" aria-labelledby="wearSheetTitle">
     <section class="sheet">
-      <h2 class="sheet-title" id="wearSheetTitle">What should I wear?</h2>
+      <div class="sheet-head">
+        <h2 class="sheet-title" id="wearSheetTitle">What should I wear?</h2>
+        <button class="icon-button" id="wearClose" type="button" aria-label="Close">×</button>
+      </div>
       <button class="sheet-option" id="wearDressMe" type="button">
         <span><span class="opt-title">✨ Pick today's outfit</span><span class="opt-sub">A fresh pick for today's weather and your plans</span></span>
       </button>
@@ -903,9 +910,6 @@
       </button>
       <button class="sheet-option" id="wearSurprise" type="button">
         <span><span class="opt-title">🌀 Surprise me</span><span class="opt-sub">An unexpected pick, outside your usual vibe</span></span>
-      </button>
-      <button class="sheet-option sheet-cancel" id="wearCancel" type="button">
-        <span><span class="opt-title">Cancel</span></span>
       </button>
     </section>
   </div>
@@ -1021,7 +1025,10 @@
   <!-- UX-11: one "Add outfit" entry — the sheet names the three ways. -->
   <div class="overlay sheet-overlay" id="addOutfitSheet" hidden role="dialog" aria-modal="true" aria-labelledby="addOutfitSheetTitle">
     <section class="sheet">
-      <h2 class="sheet-title" id="addOutfitSheetTitle">Add an outfit</h2>
+      <div class="sheet-head">
+        <h2 class="sheet-title" id="addOutfitSheetTitle">Add an outfit</h2>
+        <button class="icon-button" id="addOutfitClose" type="button" aria-label="Close">×</button>
+      </div>
       <button class="sheet-option" id="sheetBuild" type="button">
         <span><span class="opt-title">Build manually</span><span class="opt-sub">Pick pieces from your wardrobe</span></span>
       </button>
@@ -1031,16 +1038,16 @@
       <button class="sheet-option" id="sheetCamera" type="button">
         <span><span class="opt-title">Match with camera</span><span class="opt-sub">Photograph an outfit now</span></span>
       </button>
-      <button class="sheet-option sheet-cancel" id="sheetCancel" type="button">
-        <span><span class="opt-title">Cancel</span></span>
-      </button>
     </section>
   </div>
 
   <!-- PC-14: shop compatibility check — photo source sheet. -->
   <div class="overlay sheet-overlay" id="shopCheckSheet" hidden role="dialog" aria-modal="true" aria-labelledby="shopCheckSheetTitle">
     <section class="sheet">
-      <h2 class="sheet-title" id="shopCheckSheetTitle">Check a shop item</h2>
+      <div class="sheet-head">
+        <h2 class="sheet-title" id="shopCheckSheetTitle">Check a shop item</h2>
+        <button class="icon-button" id="shopSheetClose" type="button" aria-label="Close">×</button>
+      </div>
       <p class="sheet-intro">Before you buy it, check it against your wardrobe — snap it and I'll give you a straight verdict.</p>
       <div class="field shop-q-field">
         <label for="shopQuestionInput">Anything specific? <span class="hint">(optional)</span></label>
@@ -1053,9 +1060,6 @@
         <span><span class="opt-title">Upload photo</span><span class="opt-sub">Screenshot or saved photo</span></span>
       </button>
       <p class="sheet-fine">Shopping online? Take a screenshot — or copy the product photo and paste it here (Ctrl+V / Cmd+V).</p>
-      <button class="sheet-option sheet-cancel" id="shopSheetCancel" type="button">
-        <span><span class="opt-title">Cancel</span></span>
-      </button>
     </section>
   </div>
   <input type="file" id="shopCheckInput" accept="image/*" hidden>
@@ -1065,16 +1069,16 @@
        is in hand, the intent isn't; ask, don't guess. -->
   <div class="overlay sheet-overlay" id="pasteChoiceSheet" hidden role="dialog" aria-modal="true" aria-labelledby="pasteChoiceTitle">
     <section class="sheet">
-      <h2 class="sheet-title" id="pasteChoiceTitle">You pasted a photo</h2>
+      <div class="sheet-head">
+        <h2 class="sheet-title" id="pasteChoiceTitle">You pasted a photo</h2>
+        <button class="icon-button" id="pasteChoiceClose" type="button" aria-label="Close">×</button>
+      </div>
       <p class="sheet-intro">What should happen to it?</p>
       <button class="sheet-option" id="pasteChoiceAdd" type="button">
         <span><span class="opt-title">Add to wardrobe</span><span class="opt-sub">It's a piece — catalogue it</span></span>
       </button>
       <button class="sheet-option" id="pasteChoiceCheck" type="button">
         <span><span class="opt-title">Check against wardrobe</span><span class="opt-sub">Thinking of buying it? Get a verdict first</span></span>
-      </button>
-      <button class="sheet-option sheet-cancel" id="pasteChoiceCancel" type="button">
-        <span><span class="opt-title">Cancel</span></span>
       </button>
     </section>
   </div>
@@ -1204,7 +1208,7 @@
           <div class="bulk-dupe-actions">
             <button class="primary" id="bulkDupeSkip" type="button">Skip it &amp; add the rest</button>
             <button class="secondary" id="bulkDupeAnyway" type="button">Add it anyway</button>
-            <button class="secondary" id="bulkDupeCancel" type="button">Cancel</button>
+
           </div>
         </div>
         <div class="bulk-list" id="bulkList" hidden></div>
@@ -1244,11 +1248,11 @@
   <!-- UX-18 W3: the context sheet — every fact in play, each removable. -->
   <div class="overlay sheet-overlay" id="contextSheet" hidden role="dialog" aria-modal="true" aria-labelledby="contextSheetTitle">
     <section class="sheet">
-      <h2 class="sheet-title" id="contextSheetTitle">What the stylist knows</h2>
+      <div class="sheet-head">
+        <h2 class="sheet-title" id="contextSheetTitle">What the stylist knows</h2>
+        <button class="icon-button" id="contextSheetClose" type="button" aria-label="Close">×</button>
+      </div>
       <div id="contextSheetList"></div>
-      <button class="sheet-option sheet-cancel" id="contextSheetClose" type="button">
-        <span><span class="opt-title">Done</span></span>
-      </button>
     </section>
   </div>
 
@@ -4052,7 +4056,7 @@
         startBulkRun();
       });
       document.getElementById("bulkDupeAnyway").addEventListener("click", function () { startBulkRun(); });
-      document.getElementById("bulkDupeCancel").addEventListener("click", function () { hideBulkDupeBar(); });
+
       document.getElementById("bulkMini").addEventListener("click", function () { openOverlay(bulkOverlay); syncBulkMini(); });
       // (The hero's old Bulk add button is gone — bulk is reached by
       // photo count from the capture screen; see routeFilesToAdd.)
@@ -5407,7 +5411,7 @@
         openOverlay(document.getElementById("wearSheet"));
       });
       function closeWearSheet() { closeOverlay(document.getElementById("wearSheet")); }
-      document.getElementById("wearCancel").addEventListener("click", closeWearSheet);
+      document.getElementById("wearClose").addEventListener("click", closeWearSheet);
       document.getElementById("wearDressMe").addEventListener("click", function () {
         closeWearSheet();
         openComposer();
@@ -7352,7 +7356,7 @@
         if (!kept.length) {
           var p = document.createElement("p");
           p.className = "hint";
-          p.textContent = "Nothing matched your wardrobe — cancel and try another photo, or build it manually.";
+          p.textContent = "Nothing matched your wardrobe — close this and try another photo, or build it manually.";
           wrap.appendChild(p);
         }
         kept.forEach(function (m) {
@@ -7849,7 +7853,7 @@
         closeAddOutfitSheet();
         document.getElementById("photoParseInputCamera").click();
       });
-      document.getElementById("sheetCancel").addEventListener("click", closeAddOutfitSheet);
+      document.getElementById("addOutfitClose").addEventListener("click", closeAddOutfitSheet);
       addOutfitSheet.addEventListener("click", function (event) { if (event.target === addOutfitSheet) closeAddOutfitSheet(); });
 
       // UX-17: manual theme choice. The head resolver stamps
@@ -7906,7 +7910,7 @@
         closeOverlay(shopCheckSheet);
         document.getElementById("shopCheckInput").click();
       });
-      document.getElementById("shopSheetCancel").addEventListener("click", closeShopCheckSheet);
+      document.getElementById("shopSheetClose").addEventListener("click", closeShopCheckSheet);
       shopCheckSheet.addEventListener("click", function (event) { if (event.target === shopCheckSheet) closeShopCheckSheet(); });
       document.getElementById("shopListAddBtn").addEventListener("click", function () {
         openShopCheckSheet(null);
@@ -7949,7 +7953,7 @@
         pendingShopTripId = null;
         if (imgs && imgs.length) openShopCropper(imgs[0]);
       });
-      document.getElementById("pasteChoiceCancel").addEventListener("click", closePasteChoice);
+      document.getElementById("pasteChoiceClose").addEventListener("click", closePasteChoice);
       pasteChoiceSheet.addEventListener("click", function (event) {
         if (event.target === pasteChoiceSheet) closePasteChoice();
       });
