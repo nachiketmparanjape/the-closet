@@ -35,3 +35,19 @@ describe("parseModelJson — Sprint 5 fields", () => {
     assert.ok(STYLE_TAGS.indexOf("preppy") !== -1);
   });
 });
+
+describe("parseModelJson — NAMING-1 shortName", () => {
+  it("prefers the model's short_name, capped by the shared rule", () => {
+    const r = parseModelJson(JSON.stringify({
+      name: "Off-white running hat with a dark green brim",
+      short_name: "Off-white running hat with dark green brim",
+    }));
+    assert.equal(r.shortName, "Off-white running hat");
+  });
+  it("derives from the name when short_name is missing or prose", () => {
+    const r = parseModelJson(JSON.stringify({
+      name: "White bear graphic crew-neck tee, featuring a large chest print and dropped shoulders",
+    }));
+    assert.equal(r.shortName, "White bear graphic crew-neck tee");
+  });
+});

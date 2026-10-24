@@ -346,6 +346,12 @@
     #tripDetailWeather { display: inline-block; background: var(--paper-soft); color: var(--muted-strong); border-radius: 999px; padding: 5px 12px; font-size: 13px; margin: 8px 0 2px; }
     #tripDeleteBtn { color: var(--danger); }
     .trip-section-h { font-size: 17px; font-weight: 650; letter-spacing: -.01em; margin: 24px 0 8px; }
+    /* PC-35: the beginner guide's three paths. */
+    .guide-body { display: grid; gap: 22px; }
+    .guide-intro { color: var(--muted); margin: 0; line-height: 1.55; }
+    .guide-path h3 { margin: 0 0 6px; font-size: 17px; font-weight: 650; }
+    .guide-path p { margin: 0 0 10px; color: var(--muted); line-height: 1.55; font-size: 14.5px; }
+    .empty-copy .link-button { display: block; margin: 12px auto 0; }
     /* PC-31: trip tag on shop cards + rows in the unified trip view. */
     .shop-card-trip { font-size: 12.5px; color: var(--accent-dark); margin-top: 5px; }
     .trip-shop-row { cursor: pointer; }
@@ -647,6 +653,7 @@
             <h3>A clear view starts with one piece.</h3>
             <p>Add a photo, name the item, and choose a category. Your wardrobe will build itself from there.</p>
             <button class="secondary" id="emptyAddButton" type="button">Add your first piece</button>
+            <button class="link-button" id="emptyGuideLink" type="button">Ways to add your clothes →</button>
           </div>
         </div>
       </div>
@@ -785,6 +792,38 @@
           <p class="capture-fine">Need more angles of a single piece? Add them later from the piece itself.</p>
         </div>
         <button class="secondary" id="captureCancel" type="button">Cancel</button>
+        <button class="link-button" id="captureGuideLink" type="button">First time? See the ways to add your clothes →</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- PC-35: the beginner guide. Three ways in, honest about the
+       Google Photos path (save-then-add; no direct connection).
+       Reachable in one tap from the empty states, the Today zero
+       card, and the capture screen itself. -->
+  <div class="overlay" id="guideOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="guideTitle">
+    <section class="modal">
+      <div class="modal-head">
+        <h2 id="guideTitle">Ways to add your clothes</h2>
+        <button class="icon-button" id="guideClose" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body guide-body">
+        <p class="guide-intro">Three ways in — pick whichever matches the pile in front of you.</p>
+        <div class="guide-path">
+          <h3>📸 One piece at a time</h3>
+          <p>Photograph a piece, add it, done. Best for new buys and one-offs — you confirm its name and details as you go.</p>
+          <button class="secondary" type="button" data-guide-add>Add a piece</button>
+        </div>
+        <div class="guide-path">
+          <h3>🧺 A whole pile at once</h3>
+          <p>Choose many photos at once and each becomes its own piece, named and tagged by AI in the background. Review them in your wardrobe afterwards. One photo per piece — extra angles can be added later from the piece itself.</p>
+          <button class="secondary" type="button" data-guide-add>Add a pile</button>
+        </div>
+        <div class="guide-path">
+          <h3>✨ From Google Photos</h3>
+          <p>On Android, Google Photos quietly builds a wardrobe collection from photos of you — clean cutouts of your pieces, ready-made. Open Google Photos, find the collection, save the pieces you want to your camera roll, then add them here like any photo. Closet doesn't connect to Google Photos directly — it's a save-then-add path, and the pieces arrive looking clean.</p>
+          <button class="secondary" type="button" data-guide-add>Add from your photos</button>
+        </div>
       </div>
     </section>
   </div>
@@ -2078,7 +2117,7 @@
         details.className = "item-details";
         var name = document.createElement("p");
         name.className = "item-name";
-        name.textContent = item.name || "Untitled piece";
+        name.textContent = item.shortName || item.name || "Untitled piece";
         var meta = document.createElement("div");
         meta.className = "item-meta";
         var dot = document.createElement("span");
@@ -2495,7 +2534,7 @@
 
       function openItem(item) {
         activeItem = item;
-        itemTitle.textContent = item.name || "Untitled piece";
+        itemTitle.textContent = item.shortName || item.name || "Untitled piece";
         var photos = itemPhotos(item);
         itemPhoto.src = photos.length ? photos[0].url : "";
         itemPhoto.alt = item.name || "Wardrobe item";
@@ -2548,6 +2587,7 @@
         var subtypeVal = itemSubtypeInput.value.trim() || null;
         itemDocRef().update({
           name: itemNameInput.value.trim(),
+          shortName: capShortName(itemNameInput.value.trim()),
           category: itemCategoryInput.value,
           colors: detailPalette,
           description: itemDescInput.value.trim(),
@@ -2755,6 +2795,22 @@
       }
       document.getElementById("addButton").addEventListener("click", openCapture);
       document.getElementById("emptyAddButton").addEventListener("click", openCapture);
+      // PC-35: the beginner guide — one tap from the empty states,
+      // the Today zero card, and the capture screen. Every path's
+      // action lands on the single capture door (photo count
+      // routes single vs bulk, as everywhere else).
+      function openGuide() { openOverlay(document.getElementById("guideOverlay")); }
+      document.getElementById("guideClose").addEventListener("click", function () { closeOverlay(document.getElementById("guideOverlay")); });
+      document.querySelectorAll("[data-guide-add]").forEach(function (b) {
+        b.addEventListener("click", function () {
+          closeOverlay(document.getElementById("guideOverlay"));
+          openCapture();
+        });
+      });
+      ["emptyGuideLink", "captureGuideLink"].forEach(function (id) {
+        var n = document.getElementById(id);
+        if (n) n.addEventListener("click", openGuide);
+      });
       document.getElementById("captureClose").addEventListener("click", closeCapture);
       document.getElementById("captureCancel").addEventListener("click", closeCapture);
       document.getElementById("captureFilesBtn").addEventListener("click", function () { document.getElementById("captureFilesInput").click(); });
@@ -3113,6 +3169,7 @@
           var v2 = buildV2Fields(aiSuggestion, document.getElementById("colorInput").value);
           var doc = {
             name: document.getElementById("nameInput").value.trim(),
+            shortName: (aiSuggestion && aiSuggestion.shortName) || capShortName(document.getElementById("nameInput").value.trim()),
             category: document.getElementById("categoryInput").value,
             imageUrl: photos[0].url,
             storagePath: photos[0].storagePath,
@@ -3303,6 +3360,7 @@
           var v2 = buildV2Fields(r.ai, r.color || "#5c6673");
           var doc = {
             name: (r.ai && r.ai.name) || "Untitled item",
+            shortName: (r.ai && r.ai.shortName) || capShortName((r.ai && r.ai.name) || ""),
             category: (r.ai && r.ai.category) || "Other",
             imageUrl: r.imageUrl,
             storagePath: storagePath,
@@ -4825,7 +4883,7 @@
           var txt = document.createElement("div");
           var nm = document.createElement("div");
           nm.className = "pack-name";
-          nm.textContent = shopDisplayTitle((c.item && (c.item.note || c.item.category)) || "Shop item");
+          nm.textContent = shopDisplayTitle((c.item && (c.item.shortName || c.item.name || c.item.note || c.item.category)) || "Shop item");
           txt.appendChild(nm);
           var sub = document.createElement("div");
           sub.className = "pack-reason";
@@ -5726,6 +5784,7 @@
         var acts = document.createElement("div");
         acts.className = "today-actions";
         acts.appendChild(mkBtn("primary", "＋ Add your first pieces", function () { document.getElementById("addButton").click(); }));
+        acts.appendChild(mkBtn("link-button", "Ways to add your clothes →", function () { openGuide(); }));
         // No separate Bulk button here (founder, 2026-10-23): the
         // capture screen IS the single door on every surface — its
         // photo-count routing reaches bulk. Consistency, always.
@@ -5950,12 +6009,29 @@
       // prose lives in the detail view). Cards get SHORT names:
       // a stylist look name when there is one, else the hero piece
       // + "+ N more". The data-level standard is NAMING-1.
+      // NAMING-1: the client mirror of functions/shortname.js —
+      // one rule for card labels (≤5 words, no clauses/articles).
+      function capShortName(text, maxWords) {
+        var max = maxWords || 5;
+        var s = String(text == null ? "" : text).trim();
+        if (!s) return "";
+        s = s.split(/,| with | featuring | - | – | — |: /)[0].trim();
+        s = s.replace(/^(a|an|the)\s+/i, "");
+        var words = s.split(/\s+/).filter(Boolean);
+        if (words.length > max) s = words.slice(0, max).join(" ");
+        if (s) s = s.charAt(0).toUpperCase() + s.slice(1);
+        return s.slice(0, 48);
+      }
       function shortItemName(name) {
-        var s = String(name || "").replace(/^(a|an|the)\s+/i, "").split(",")[0].trim();
-        var w = s.split(/\s+/).slice(0, 5).join(" ");
-        return w ? w.charAt(0).toUpperCase() + w.slice(1) : "Piece";
+        return capShortName(name) || "Piece";
       }
       function outfitDisplayName(o) {
+        // NAMING-1: the stored shortName is the card label now.
+        var oids = Array.isArray(o.itemIds) ? o.itemIds : [];
+        if (o.shortName) {
+          if (o.lookName || o.source === "stylist" || o.source === "trip") return o.shortName;
+          return oids.length > 1 ? o.shortName + " + " + (oids.length - 1) + " more" : o.shortName;
+        }
         var n = String(o.name || "");
         if (n && n.length <= 44 && n.indexOf(" + ") === -1) return n;
         var ids = Array.isArray(o.itemIds) ? o.itemIds : [];
@@ -6186,6 +6262,7 @@
             itemNames: names,
             source: "photo",
             name: defaultOutfitName(sel),
+            shortName: capShortName(names[0]),
             occasion: null,
             weather: null,
             appConfidence: null,
@@ -6765,6 +6842,7 @@
           }
           var doc = {
             name: shopCheckShortTitle(item),
+            shortName: item.shortName || capShortName(item.name || item.note || ""),
             category: item.category || "Other",
             imageUrl: url,
             storagePath: newPath,
@@ -6954,6 +7032,7 @@
 
       // Short title: prefer the AI's short name; fall back to trimming the note.
       function shopCheckShortTitle(item) {
+        if (item.shortName && item.shortName.trim()) return item.shortName.trim();
         if (item.name && item.name.trim()) {
           var n = item.name.trim();
           return n.length > 60 ? n.slice(0, 57).trim() + "…" : n;
@@ -7066,7 +7145,7 @@
             imgWrap.appendChild(el("span", "shop-score-badge", String(c.score) + "/10"));
           }
           card.appendChild(imgWrap);
-          var name = (c.item && (c.item.note || c.item.category)) || "Shop item";
+          var name = (c.item && (c.item.shortName || c.item.name || c.item.note || c.item.category)) || "Shop item";
           card.appendChild(el("p", "shop-card-name", shopDisplayTitle(name)));
           if (c.verdict) card.appendChild(el("p", "shop-card-verdict", c.verdict));
           card.appendChild(el("span", "shop-status " + (c.status || "considering"), STATUS_LABELS[c.status] || "Considering"));
@@ -7315,6 +7394,7 @@
             itemNames: names,
             source: "manual",
             name: document.getElementById("builderName").value.trim() || defaultOutfitName(sel),
+            shortName: capShortName(document.getElementById("builderName").value.trim() || names[0]),
             occasion: document.getElementById("builderOccasion").value.trim() || null,
             weather: null,
             appConfidence: null,
@@ -7777,6 +7857,7 @@
             source: src,
             tripId: tripId,
             name: o.lookName || defaultOutfitName(o.itemIds),
+            shortName: o.lookName ? capShortName(o.lookName) : capShortName(names[0]),
             tagline: o.tagline || null,
             occasion: null,
             weather: null,

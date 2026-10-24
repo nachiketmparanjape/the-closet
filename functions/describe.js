@@ -20,6 +20,7 @@ const { GoogleGenAI } = require("@google/genai");
 const { codedError } = require("./errors");
 // Canonical color vocabulary + brand grouping key (PC-8 follow-up).
 const { PALETTE_NAMES, canonicalName, brandKey } = require("./palette");
+const { capShortName } = require("./shortname");
 
 const CATEGORIES = ["Tops", "Bottoms", "Outerwear", "Shoes", "Accessories", "Other"];
 const PATTERNS = ["solid", "striped", "plaid", "check", "floral", "graphic", "other"];
@@ -49,6 +50,7 @@ Look at the photo and answer with ONLY a JSON object (no markdown, no prose) wit
 
 {
   "name": "short, specific name a person would use, e.g. 'Navy striped crew-neck tee' (max 6 words)",
+  "short_name": "the card label: a noun phrase of AT MOST 5 words — no commas, no clauses, no 'with/featuring' tails — e.g. 'Navy linen overshirt', 'White bear graphic tee'",
   "description": "one plain sentence describing the garment for outfit planning (style, cut, notable details)",
   "category": one of ${JSON.stringify(CATEGORIES)},
   "colors": ["1 to 3 dominant colors of the GARMENT itself (ignore background) — pick ONLY from this list: ${PALETTE_NAMES.join(", ")}"],
@@ -123,8 +125,13 @@ function parseModelJson(text) {
     }
   }
 
+  const displayName = cleanString(obj.name, 60) || "Untitled item";
   return {
-    name: cleanString(obj.name, 60) || "Untitled item",
+    name: displayName,
+    // NAMING-1: the data-level card label. The model's short_name
+    // wins; a missing or prose-y one is derived from the name by
+    // the shared cap so a card can never render a clause again.
+    shortName: capShortName(obj.short_name) || capShortName(displayName),
     description: cleanString(obj.description, 240),
     category: oneOf(obj.category, CATEGORIES, "Other"),
     colors,

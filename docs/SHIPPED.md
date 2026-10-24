@@ -35,6 +35,23 @@ What went live. Momentum you can see.
   itself needs the founder's account data (his test trip +
   saved checks), so founder phone validation is the gate.
 
+- **NAMING-1: Short-name standard at the data level** —
+  built 2026-10-24. One rule everywhere (shared
+  `functions/shortname.js` + a client mirror): a shortName
+  is a noun phrase of at most 5 words — no commas, clauses,
+  articles, or "with/featuring" tails. describeItem now
+  mints `shortName` (model-proposed, server-capped, derived
+  from the name when missing); shopCheck enforces the cap
+  on its item name; every creation path stores it (single
+  upload, bulk, shop→wardrobe, and outfit saves — stylist
+  look names, composer, photo-parse); name edits recompute
+  it. Cards and detail headers read shortName first; full
+  prose stays in detail bodies. One-time backfill applied
+  to the founder's library: 72 docs (69 items, 3 outfits,
+  1 shop check), verified 0 remaining. Suite 259/259
+  (new parse cases), both callables redeployed, client
+  live. Founder phone spot-check is the final gate.
+
 ## Sprint 18 (2026-10-21 → )
 
 - **DESIGN-HOME-1 — Today, the stylist-first home (experimental).**

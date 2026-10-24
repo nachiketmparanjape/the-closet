@@ -668,8 +668,9 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
 - **Acceptance:** no card in Wardrobe, Outfits, Shop list, or
   Today renders a title longer than ~6 words or ending mid-word;
   detail views keep the full descriptions.
-- **Status:** In Sprint 19 (card 4). Filed 2026-10-23 from the founder's
-  phone review + the Essembl pilot.
+- **Status:** In Sprint 19 (card 4). BUILT 2026-10-24 — shared cap rule
+  server + client, minted at every creation path, backfill
+  applied (72 docs). Founder phone spot-check pending.
 
 ### PC-38: Stylist chat — attach reference photos (M)
 - **Origin:** Essembl teardown P3, adopted by the founder

@@ -15,6 +15,7 @@ const { getStorage } = require("firebase-admin/storage");
 const { getClient, reportUsage, MODEL_VERSION, CATEGORIES } = require("./describe");
 const { codedError } = require("./errors");
 const { cleanText } = require("./stylist");
+const { capShortName } = require("./shortname");
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
@@ -130,6 +131,10 @@ function parseShopCheckJson(text, validIds) {
     notClothing: false,
     item: {
       name: cleanText(item.name, 60),
+      // NAMING-1: the prompt already asks for a 2–4 word name, but
+      // the cap is enforced here so a prose-y reply can never
+      // reach a card again (the client prefers shortName).
+      shortName: capShortName(item.name),
       category: oneOf(item.category, CATEGORIES, "Other"),
       colors: Array.isArray(item.colors)
         ? item.colors.filter((c) => typeof c === "string").map((c) => cleanText(c, 30)).filter(Boolean).slice(0, 5)
