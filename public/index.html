@@ -99,23 +99,21 @@
 
     .hero { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(260px, .75fr); gap: clamp(32px, 6vw, 90px); align-items: end; padding: clamp(48px, 8vw, 96px) 0 52px; }
     h1 { margin: 0; max-width: 760px; font-family: "Closet Serif", serif; font-weight: 500; font-size: clamp(44px, 7.8vw, 104px); line-height: .94; letter-spacing: -.045em; }
-    .hero-copy { padding-bottom: 7px; }
-    .hero-copy p { margin: 0 0 24px; max-width: 420px; color: var(--muted); font-size: 16px; line-height: 1.65; }
-    /* Sprint 14: hero actions are an even row — equal widths, stretched
-       heights — so labels of different lengths (e.g. "Pick an outfit"
-       wrapping to 3 lines) can't make the row ragged. */
-    .hero-copy { display: flex; flex-wrap: wrap; gap: 10px; }
-    .hero-copy p { flex: 1 1 100%; }
-    .hero-copy .primary, .hero-copy .secondary { flex: 1 1 0; min-width: 0; }
-    /* Sprint 18 fix buffer: in the compact hero the four actions keep their
-       natural width and never wrap mid-label — one primary, three identical
-       secondaries (D7: no random colors, no lone emoji). */
-    .hero.hero-compact .hero-copy .primary, .hero.hero-compact .hero-copy .secondary { flex: 0 0 auto; white-space: nowrap; }
+    /* Fix buffer (founder phone review, 2026-10-23): ONE hero CTA
+       system in both hero states — a 2-column grid: the consolidated
+       "Add pieces" primary spans full width, the two secondaries
+       share a row. Same gaps and margins logged in or out; the
+       compact hero only shrinks the headline and hides the copy.
+       (Replaces the Sprint 14 even-row + Sprint 18 natural-width
+       patches, which diverged between states and wrapped ragged.) */
+    .hero-copy { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-content: end; padding-bottom: 7px; }
+    .hero-copy p { grid-column: 1 / -1; margin: 0 0 14px; max-width: 420px; color: var(--muted); font-size: 16px; line-height: 1.65; }
+    .hero-copy .primary { grid-column: 1 / -1; }
     /* Sprint 10 UX: once the wardrobe is non-empty the hero compacts to a
        slim header — the full statement is for the empty state only. */
     .hero.hero-compact { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 24px; padding: 30px 0 10px; }
     .hero.hero-compact h1 { font-size: clamp(26px, 4vw, 38px); max-width: none; }
-    .hero.hero-compact .hero-copy { padding-bottom: 0; display: flex; gap: 10px; margin-left: auto; }
+    .hero.hero-compact .hero-copy { padding-bottom: 0; flex: 0 1 430px; margin-left: auto; }
     .hero.hero-compact .hero-copy p { display: none; }
     .primary { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 48px; border: 1px solid var(--black); background: var(--black); color: var(--on-black); border-radius: var(--r-sm); padding: 0 19px; font-weight: 600; cursor: pointer; transition: background .18s ease, color .18s ease, border-color .18s ease; }
     .primary:hover { background: var(--accent-dark); border-color: var(--accent-dark); color: #fff; }
@@ -571,9 +569,8 @@
         <p>Photograph each piece once. Then search, sort, and see what you already own before deciding what comes next.</p>
         <button class="primary" id="addButton" type="button">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-          Add a piece
+          Add pieces
         </button>
-        <button class="secondary" id="bulkButton" type="button">Bulk add</button>
         <button class="secondary" id="shopCheckButton" type="button">Shop check</button>
         <button class="secondary" id="composerButton" type="button">Pick an outfit</button>
       </div>
@@ -731,6 +728,27 @@
         <span><span class="opt-title">🌀 Surprise me</span><span class="opt-sub">An unexpected pick, outside your usual vibe</span></span>
       </button>
       <button class="sheet-option sheet-cancel" id="wearCancel" type="button">
+        <span><span class="opt-title">Cancel</span></span>
+      </button>
+    </section>
+  </div>
+
+  <!-- Fix buffer 2026-10-23: ONE Add door (founder review). Single vs
+       bulk is a quantity choice made inside the sheet, where the
+       context is — not two rival top-level CTAs. Small wardrobes get
+       the bulk path first: it's the fastest start. -->
+  <div class="overlay sheet-overlay" id="addSheet" hidden role="dialog" aria-modal="true" aria-labelledby="addSheetTitle">
+    <section class="sheet">
+      <h2 class="sheet-title" id="addSheetTitle">Add to your wardrobe</h2>
+      <div id="addSheetOptions">
+        <button class="sheet-option" id="addOneBtn" type="button">
+          <span><span class="opt-title">📷 Add one piece</span><span class="opt-sub">Snap or pick a photo — the AI tags it for you</span></span>
+        </button>
+        <button class="sheet-option" id="addBulkBtn" type="button">
+          <span><span class="opt-title">🗂️ Add many at once</span><span class="opt-sub">Pick up to 100 photos — they tag themselves in the background</span></span>
+        </button>
+      </div>
+      <button class="sheet-option sheet-cancel" id="addCancel" type="button">
         <span><span class="opt-title">Cancel</span></span>
       </button>
     </section>
@@ -2596,10 +2614,28 @@
       });
       document.getElementById("uploadClose").addEventListener("click", function () { closeOverlay(uploadOverlay); });
       document.getElementById("uploadCancel").addEventListener("click", function () { closeOverlay(uploadOverlay); });
-      document.getElementById("addButton").addEventListener("click", beginAdd);
-      document.getElementById("emptyAddButton").addEventListener("click", beginAdd);
+      // Fix buffer 2026-10-23: the consolidated Add door. One primary
+      // opens the sheet; the sheet forks to the single-piece flow or
+      // the bulk flow. Small wardrobes see bulk first (fastest start).
+      function openAddSheet() {
+        var opts = document.getElementById("addSheetOptions");
+        var bulk = document.getElementById("addBulkBtn");
+        if (opts && bulk && allItems.length < 10 && opts.firstElementChild !== bulk) {
+          opts.insertBefore(bulk, opts.firstElementChild);
+        }
+        openOverlay(document.getElementById("addSheet"));
+      }
+      function closeAddSheet() { closeOverlay(document.getElementById("addSheet")); }
+      document.getElementById("addButton").addEventListener("click", openAddSheet);
+      document.getElementById("emptyAddButton").addEventListener("click", openAddSheet);
+      document.getElementById("addCancel").addEventListener("click", closeAddSheet);
+      document.getElementById("addOneBtn").addEventListener("click", function () { closeAddSheet(); beginAdd(); });
+      document.getElementById("addBulkBtn").addEventListener("click", function () { closeAddSheet(); beginBulk(); });
 
-      [uploadOverlay, itemOverlay, bulkOverlay, chatOverlay].forEach(function (overlay) {
+      // Dismissal parity (UX-15): EVERY overlay dismisses on a
+      // backdrop tap, not just some — the founder hit the Pick-an-
+      // outfit sheet ignoring empty-space taps (2026-10-23).
+      document.querySelectorAll(".overlay").forEach(function (overlay) {
         overlay.addEventListener("click", function (event) { if (event.target === overlay) closeOverlay(overlay); });
       });
       document.addEventListener("keydown", function (event) {
@@ -3352,7 +3388,8 @@
       document.getElementById("bulkDupeAnyway").addEventListener("click", function () { startBulkRun(); });
       document.getElementById("bulkDupeCancel").addEventListener("click", function () { hideBulkDupeBar(); });
       document.getElementById("bulkMini").addEventListener("click", function () { openOverlay(bulkOverlay); syncBulkMini(); });
-      document.getElementById("bulkButton").addEventListener("click", beginBulk);
+      // (The hero's old Bulk add button is gone — bulk lives in the
+      // Add sheet now; see openAddSheet. beginBulk is called there.)
 
       // PC-10: chat stylist — text-only outfit picks over the cached
       // descriptions. The model never sees photos here.
@@ -5413,7 +5450,7 @@
         var acts = document.createElement("div");
         acts.className = "today-actions";
         acts.appendChild(mkBtn("primary", "＋ Add your first pieces", function () { document.getElementById("addButton").click(); }));
-        acts.appendChild(mkBtn("secondary", "Bulk add", function () { document.getElementById("bulkButton").click(); }));
+        acts.appendChild(mkBtn("secondary", "Bulk add", function () { beginBulk(); }));
         card.appendChild(acts);
         frag.appendChild(card);
         // Labeled sample — what a morning could look like (never real data).
