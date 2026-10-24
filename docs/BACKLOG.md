@@ -795,8 +795,12 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   the real wardrobe; reopening the check shows the thread;
   a trip-tagged check's answers use the trip context.
 - **Lane:** Stylist. **Effort:** M. **Depends on:** PC-40.
-- **Status:** Filed sprint-ready 2026-10-24 (founder
-  direction). Competes at the next planning walk.
+- **Status:** HELD for UX-18 (founder's call, 2026-10-24).
+  The stylist chat gets one bottom-up redesign, designed
+  completely rather than in stages — a chat feature built on
+  the current architecture is rework by definition. PC-41
+  lands as a designed entry point of the new chat. Its
+  dependency (PC-40, contextual checks) stands shipped.
 
 ### PC-42: Crop the shop-check photo to the garment (M)
 - **Origin:** Founder, 2026-10-24: in a store photo there
@@ -819,8 +823,8 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   full photo" reproduces today's behavior exactly; the
   saved check's photo is the cropped one.
 - **Lane:** Stylist. **Effort:** M.
-- **Status:** Filed sprint-ready 2026-10-24 (founder
-  direction). Competes at the next planning walk.
+- **Status:** IN SPRINT 21 (pulled at the 2026-10-24 walk,
+  ranked #1).
 
 ### UX-16: Context-handoff audit — a chat opened from a surface carries that surface's subject (S)
 - **Origin:** Founder bug, 2026-10-24: asking the stylist
@@ -894,7 +898,8 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
 - **Revisit trigger:** first user request for it, or the
   next time Account is opened up for other work.
 - **Lane:** Loop (settings/shell). **Effort:** S.
-- **Status:** Parked 2026-10-24 by founder's own call.
+- **Status:** IN SPRINT 21 (pulled at the 2026-10-24 walk,
+  ranked #3 — small, closes the founder's own question).
 
 ### UX-18 — Stylist audit: one experience + architecture pass, founder session
 
@@ -930,3 +935,25 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
 - **Lane:** Stylist. **Effort:** session + follow-on cuts TBD.
 - **Status:** Parked 2026-10-24, awaiting the founder's
   word to sit down. UX-16's audit folds into this card.
+
+### OBS-4 — Data-model drift spot-check (S)
+
+- **Origin:** the important-invisibles register (2026-10-24):
+  the catalog data model (`docs/DATA_MODEL.md`, v2) has a
+  design doc but no proof surface — nothing checks the live
+  documents against it, so drift is discovered by accident
+  (the Untitled-item incident was drift of exactly this kind).
+- **In scope:** a drift section in `scripts/quality-report.js`
+  — sample the founder's items, trips, and shop checks;
+  verify the required v2 fields per DATA_MODEL.md and the
+  NAMING-1 standard (shortName present, within budget, not the
+  placeholder); report drift counts by kind with example ids.
+  Read-only; no auto-repair.
+- **Out of scope:** repair/migration (drift findings become
+  their own cuts), other users' data.
+- **Acceptance:** the report prints a drift section with sane
+  numbers on live data; a deliberately corrupted test doc is
+  flagged.
+- **Lane:** platform/observability. **Effort:** S.
+- **Status:** IN SPRINT 21 (filed and pulled at the 2026-10-24
+  walk, ranked #2).
