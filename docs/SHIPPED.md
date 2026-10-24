@@ -22,6 +22,19 @@ What went live. Momentum you can see.
   no scroll-lock after close. Motion *feel* itself awaits
   founder phone validation (the card's acceptance gate).
 
+- **PC-31: Trips Phase 3 — trip-tagged shop items + unified
+  trip view** — built 2026-10-24. A saved shop check gains a
+  Trip field in its detail view (tag/untag, saves on change);
+  checks saved from inside a trip conversation are tagged at
+  birth; Shop list cards name their trip; the trip page gains
+  a "Shopping for this trip" section (tagged checks with fit
+  score + status, tap through to the full check) rendered
+  alongside packing and outfits — the unified view. The
+  generic Shop list is unchanged. Verification: suite
+  257/257, live markers confirmed; the tagged round-trip
+  itself needs the founder's account data (his test trip +
+  saved checks), so founder phone validation is the gate.
+
 ## Sprint 18 (2026-10-21 → )
 
 - **DESIGN-HOME-1 — Today, the stylist-first home (experimental).**

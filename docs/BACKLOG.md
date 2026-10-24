@@ -212,8 +212,10 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   be tagged to a trip ("will this earn a place *for this trip*?"); they
   show in the generic Shop list AND in a unified trip view (packing +
   tagged shop items in one place).
-- **Status:** In Sprint 19 (card 2). The `tripId` field already exists on
-  shopChecks (Sprint 15); tagging UI + unified trip view remain.
+- **Status:** In Sprint 19 (card 2). BUILT 2026-10-24 — tagging UI in
+  the check detail, tag-at-birth from trip chat, trip name on
+  Shop cards, "Shopping for this trip" section on the trip
+  page. Founder phone validation pending.
 
 ### OBS-2: Error logging & handling overhaul (M)
 - **Idea (founder 2026-10-19):** treat error data as *system quality

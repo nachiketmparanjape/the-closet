@@ -346,6 +346,9 @@
     #tripDetailWeather { display: inline-block; background: var(--paper-soft); color: var(--muted-strong); border-radius: 999px; padding: 5px 12px; font-size: 13px; margin: 8px 0 2px; }
     #tripDeleteBtn { color: var(--danger); }
     .trip-section-h { font-size: 17px; font-weight: 650; letter-spacing: -.01em; margin: 24px 0 8px; }
+    /* PC-31: trip tag on shop cards + rows in the unified trip view. */
+    .shop-card-trip { font-size: 12.5px; color: var(--accent-dark); margin-top: 5px; }
+    .trip-shop-row { cursor: pointer; }
     .trip-reply { font-size: 15px; line-height: 1.55; color: var(--muted-strong); margin: 14px 0 0; }
     .pack-list { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-md); padding: 2px 14px; }
     .pack-row { display: flex; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
@@ -4623,6 +4626,7 @@
           (trip.packing && trip.packing.articleIds && trip.packing.articleIds.length)
             ? "Talk to me for changes" : "Plan packing";
         renderTripPacking(trip);
+        renderTripShopSection(trip);
       }
 
       // Pack check-off (founder-approved, 2026-10-21): packed state lives
@@ -4783,6 +4787,62 @@
             }, renderTripDetail));
           });
         }
+      }
+
+      // PC-31: the unified trip view — shop checks tagged to this
+      // trip live here alongside packing and outfits, so "should
+      // I buy this for the trip?" is answered where the trip is.
+      function renderTripShopSection(trip) {
+        var box = document.getElementById("tripPacking");
+        if (!box) return;
+        var tagged = (allShopChecks || []).filter(function (c) { return c.tripId === trip.id; });
+        if (!tagged.length) return;
+        var order = { considering: 0, bought: 1, dismissed: 2 };
+        tagged.sort(function (a, b) {
+          return (order[a.status] == null ? 0 : order[a.status]) - (order[b.status] == null ? 0 : order[b.status]);
+        });
+        var h = document.createElement("h3");
+        h.className = "trip-section-h";
+        h.textContent = "Shopping for this trip (" + tagged.length + ")";
+        box.appendChild(h);
+        var intro = document.createElement("p");
+        intro.className = "hint";
+        intro.textContent = "Pieces you're eyeing for this trip — each checked against your wardrobe before you buy.";
+        box.appendChild(intro);
+        tagged.forEach(function (c) {
+          var row = document.createElement("div");
+          row.className = "pack-row trip-shop-row";
+          row.setAttribute("role", "button");
+          row.tabIndex = 0;
+          if (c.photoUrl) {
+            var img = document.createElement("img");
+            img.src = c.photoUrl;
+            img.alt = (c.item && c.item.note) || "Shop item";
+            img.loading = "lazy";
+            img.className = "pack-thumb";
+            row.appendChild(img);
+          }
+          var txt = document.createElement("div");
+          var nm = document.createElement("div");
+          nm.className = "pack-name";
+          nm.textContent = shopDisplayTitle((c.item && (c.item.note || c.item.category)) || "Shop item");
+          txt.appendChild(nm);
+          var sub = document.createElement("div");
+          sub.className = "pack-reason";
+          var bits = [];
+          if (c.score != null) bits.push(c.score + "/10 fit");
+          bits.push(STATUS_LABELS[c.status] || "Considering");
+          if (c.verdict) bits.push(c.verdict);
+          sub.textContent = bits.join(" · ");
+          txt.appendChild(sub);
+          row.appendChild(txt);
+          function open() { openShopCheckDetail(c.id); }
+          row.addEventListener("click", open);
+          row.addEventListener("keydown", function (ev) {
+            if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); open(); }
+          });
+          box.appendChild(row);
+        });
       }
 
       // Open-Meteo daily forecast for the leg. Null when out of range
@@ -6925,6 +6985,11 @@
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         if (d.addedItemId) doc.addedItemId = d.addedItemId;
+        // PC-31: a check saved from inside a trip conversation is
+        // tagged to that trip at birth; any check can also be
+        // tagged later from its detail view.
+        var tagTrip = d.tripId || (typeof tripChat !== "undefined" && tripChat ? tripChat.tripId : null);
+        if (tagTrip) doc.tripId = tagTrip;
         return ref.set(doc).then(function () { return ref.id; });
       }
 
@@ -6959,6 +7024,7 @@
             allShopChecks = snap.docs.filter(function (d) { return d.exists; })
               .map(function (d) { return Object.assign({ id: d.id }, d.data()); });
             renderShopList();
+            if (activeTripId) renderTripDetail(); // PC-31: keep the unified trip view current
             maybeRenderToday();
           }, function (err) {
             showToast(friendlyError(err));
@@ -7004,6 +7070,9 @@
           card.appendChild(el("p", "shop-card-name", shopDisplayTitle(name)));
           if (c.verdict) card.appendChild(el("p", "shop-card-verdict", c.verdict));
           card.appendChild(el("span", "shop-status " + (c.status || "considering"), STATUS_LABELS[c.status] || "Considering"));
+          // PC-31: a tagged check names its trip right on the card.
+          var cardTrip = c.tripId ? tripById(c.tripId) : null;
+          if (cardTrip) card.appendChild(el("p", "shop-card-trip", "✈ For the " + (cardTrip.name || "Trip") + " trip"));
           function open() { openShopCheckDetail(c.id); }
           card.addEventListener("click", open);
           card.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } });
@@ -7089,6 +7158,36 @@
             .catch(function (err) { showToast(friendlyError(err)); });
         });
         field("SKU", sku);
+
+        // PC-31: tag this check to a trip — it then also lives in
+        // that trip's unified view ("will this earn a place for
+        // this trip?"). No trips yet → no field, nothing to tag to.
+        if (allTrips && allTrips.length) {
+          var tripSel = document.createElement("select");
+          var noneOpt = document.createElement("option");
+          noneOpt.value = "";
+          noneOpt.textContent = "Not for a trip";
+          tripSel.appendChild(noneOpt);
+          allTrips.forEach(function (t) {
+            var o = document.createElement("option");
+            o.value = t.id;
+            o.textContent = t.name || "Trip";
+            tripSel.appendChild(o);
+          });
+          tripSel.value = c.tripId || "";
+          tripSel.addEventListener("change", function () {
+            var v = tripSel.value || null;
+            shopCheckDocRef(id).update({ tripId: v, updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
+              .then(function () {
+                c.tripId = v;
+                renderShopList();
+                if (activeTripId) renderTripDetail();
+                showToast(v ? "Tagged to the trip." : "Trip tag removed.");
+              })
+              .catch(function (err) { showToast(friendlyError(err)); });
+          });
+          field("Trip", tripSel);
+        }
 
         body.appendChild(el("h3", "shop-section-title", "Status"));
         var statusRow = el("div", "status-row");
