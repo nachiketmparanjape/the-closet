@@ -247,3 +247,15 @@ Decided topics stay as compact records; full reports live in `research_notes/`.
   the Sprint 18 plan. Full study:
   `~/workspace/studio/research_notes/closet-combina-aesthetic.md`
   (frames archived alongside it).
+
+- **Reference app registry (2026-10-23, founder's rule:**
+  keep the ones with a decent user base saved for detailed
+  teardowns): `~/workspace/studio/research_notes/closet-reference-apps.md`
+  — admission = ≥1,000 US App Store ratings. Tracked: Alta
+  (4.9★, ~17K), Whering (4.7★, ~11.9K), Stylebook, Pureple,
+  Fits, Acloset, Smart Closet, Indyx, Outfit Formulas (the
+  founder's find, 4.4★, ~1.2K — qualifies at the threshold;
+  formulas + community styling are the steal), Cladwell.
+  Combina + PutTogether sit below the bar as design-only.
+  Teardown queue: Alta → Whering → Acloset → Indyx → Fits →
+  Stylebook → Outfit Formulas.
