@@ -1102,3 +1102,34 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
 - **Status:** Parked with a trigger (founder-saved
   2026-10-24): revisit after PC-34 is live AND the PC-36
   prototype has a verdict.
+
+### PC-50: Link intake for shop check (S)
+
+- **Origin:** Founder, 2026-10-24, minutes after PC-44
+  shipped: link intake "should work for the shop check
+  feature as well — that's perhaps more relevant, with a
+  fallback to good old screenshot (what we already have)."
+- **Problem:** checking something you're eyeing online
+  starts from its product page, but the check demands a
+  photo — so the user screenshots or saves the image first,
+  pure friction at the exact decision moment. PC-44 proved
+  the fetch machinery; the check is its most natural home.
+- **In scope:** the shop-check sheet gains a link field +
+  Fetch (same pattern as the capture screen): fetchLinkItem
+  pulls the retail photo to Storage, and the check runs on
+  it directly — no upload step, no crop step (a clean
+  product shot needs neither). PC-40's context (trip tag +
+  question) composes unchanged. Photo/screenshot stays as
+  the fallback route, untouched, for in-store and for
+  stores that block fetching (the catalog's friendly error
+  already covers it). Retry on a link check re-runs the
+  analysis on the same stored photo.
+- **Out of scope:** bulk link checks, price extraction,
+  retailer-specific parsers.
+- **Acceptance:** paste a Uniqlo product link in the check
+  sheet → verdict renders with the retail photo, saves to
+  the shop list like any check; a blocked store shows the
+  friendly message and the photo route still works.
+- **Lane:** Stylist (shop). **Effort:** S.
+- **Status:** Filed sprint-ready 2026-10-24 (founder
+  direction). Awaiting the founder's pull decision.
