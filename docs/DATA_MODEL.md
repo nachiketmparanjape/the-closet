@@ -1,305 +1,306 @@
-# Closet — data model design (v2)
+# The Data Model — What the App Stores, and the Rules It Follows
 
-Founder directive 2026-10-14: design the objects for the product's future so
-we never need a drastic migration. AI proposes, the founder disposes —
-user-confirmed data always outranks AI guesses. This doc is the design;
-implementation is a separate backlog cut.
+This document is the design for every record the Closet app keeps: your
+pieces, your outfits, what you wore, how you rated it, and what the app
+has learned about your taste. It was designed ahead of need — pieces
+first (v2, 2026-10-14), then outfits, wear, and learning (v3,
+2026-10-15) — so the app would never need a drastic migration later.
+It is a living document: when a collection or a rule changes, this
+document changes in the same commit.
 
-## Principles
+One idea runs through the whole model, set by the founder on
+2026-10-14: **the AI proposes, you dispose.** Anything you confirmed
+outranks anything the AI guessed, and the data is shaped so that rule
+can be enforced in code, not just promised.
 
-1. **AI suggests, user decides.** Every AI-filled field is user-editable.
-   A later AI re-run may add suggestions but never modifies or deletes
-   anything the user set.
-2. **Provenance is data.** Anything with two possible authors (user vs AI)
-   records its `source`. This is what makes rule 1 enforceable in code.
-3. **Additive evolution.** Schema changes add fields; code reads the new
-   field and falls back to the old one. No big-bang migrations, no backfill
-   scripts for a personal-scale app — old docs upgrade lazily on next edit.
-4. **Stable join keys.** The Firestore doc ID of an item is the permanent
-   reference. Future collections (outfits, wear log) point at it; the item
-   never embeds things that belong elsewhere.
+## Words we use
 
-## v1 schema (what exists 2026-10-14)
-
-`users/{uid}/items/{itemId}`:
-
-| field | type | notes |
+| Word | What it means | Example |
 |---|---|---|
-| name | string | user-confirmed (AI-suggested at upload since PC-7) |
-| category | string enum | user-confirmed (on-device/AI-suggested) |
-| color | string (hex) | single color picker value — **the field v2 replaces** |
-| imageUrl / storagePath | string | cover photo shortcuts |
-| photos | [{url, storagePath}] | up to 4, first = cover |
-| createdAt | timestamp | |
-| ai | object | PC-7 raw cache: name, description, category, **colors: string[1..3]** (plain words, garment-only), pattern, fit, fabric_guess, formality, warmth |
+| An item | One piece of clothing in your wardrobe. (The app calls it a "piece" on screen; the stored record is the item.) | The navy crewneck sweater. |
+| Provenance (the `source` field) | A note on a value saying who wrote it: you, or the AI. Any field both could write carries one. | The sweater's color "rust" has `source: "user"` — the AI may never overwrite it. |
+| The palette | An item's list of up to 3 colors, each a plain word plus, when known, a display hex. One entry is marked primary: the item's main color. | Navy (primary), cream, rust. |
+| A color family | The fixed list of about 30 standard color names the app reasons with, so near-identical words count as one color. Defined in the palette code. | "Navy" and "midnight blue" are the same family. |
+| A brand key | The grouping form of a brand name: lowercased, spaces tidied, sub-lines removed. Used for grouping and filtering; the name you see is never rewritten. | "Uniqlo UT" is stored as brand "Uniqlo", key `uniqlo`. "H&M" never becomes "H&m". |
+| The raw cache (the `ai` object) | The last AI analysis of an item, kept exactly as the model returned it, separate from the fields you can edit. | If you fix the AI's fabric guess, the original guess still sits in the cache for comparison. |
+| An outfit | A set of items assembled for an occasion, saved as its own record that points at the items by id. | "Rainy-day office look": 4 item ids, a name, an occasion. |
+| A version | One saved state of an outfit. Editing an outfit creates a new version instead of changing the old one. Versions of the same outfit share a `versionGroup` id. | The look as first recommended (v1), and your edited variant (v2) — both kept. |
+| A name snapshot | Item names copied into the outfit and wear records at save time, so the record still reads correctly if an item is later deleted. | A deleted sweater's outfit still shows "navy crewneck" in its list. |
+| A wear event | The record that clothes were actually worn: when, which items, for what. A fact — it happened. | "Wore the rainy-day look, Tue Oct 20, felt overdressed." |
+| A rating | A 0–10 score on an item or an outfit, written by you or by the app. The two sides are two separate records. | Your 8 on the look; the app's own reflection rating beside it. |
+| The style profile | One record holding your confirmed preferences as short written statements. This is where "the stylist learns you" physically lives. | "Prefers high-contrast outfits." |
+| A pending suggestion | A preference the app proposed that has no force until you confirm it. Unconfirmed suggestions never reach the stylist. | The app suggests "likes looser fits" after a rating; you tap confirm, or it stays inert. |
+| Lazy migration | Old records are upgraded when they are next saved, not by a mass rewrite script. Code reads the new field when present and falls back to the old one when not. | A v1 item with only the old single `color` still displays fine until its next edit. |
+| A fact vs a thing | Wear events and ratings are *facts* (things that happened; never edited by code). Items and outfits are *things* (they can gain new versions). Statistics are always computed from facts at read time — never stored as counters that can go stale. | "Worn 47 times" is counted from wear events every time it is shown. |
 
-## v2 changes
+## The pictures
 
-### 1. `colors`: first-class palette array (replaces `color`)
+### The collections, and how they point at each other
 
-```js
-colors: [
-  { name: "navy", hex: "#1f2a44", source: "ai",   primary: true  },
-  { name: "cream", hex: null,     source: "ai",   primary: false },
-  { name: "rust",  hex: "#a44a2a", source: "user", primary: false },
-]
+```mermaid
+flowchart TD
+    User["users/{you}"] --> Items["items — your pieces<br/>one record per piece"]
+    User --> Outfits["outfits — saved looks<br/>versioned: edits make a new record"]
+    User --> Wear["wear_events — what was worn<br/>append-only facts"]
+    User --> Ratings["ratings — scores by you<br/>and by the app"]
+    User --> Profile["style_profile — one record<br/>your confirmed preferences"]
+    Outfits -->|"itemIds point at"| Items
+    Wear -->|"outfitId points at one exact version"| Outfits
+    Wear -->|"articleIds — always filled,<br/>even with no outfit"| Items
+    Ratings -->|"targetId points at"| Items
+    Ratings -->|"or at"| Outfits
+    Profile -->|"confirmed preferences<br/>are read into"| Stylist["the stylist's brief<br/>(AGENT-ARCHITECTURE.md)"]
+    Elsewhere["Also stored, designed in their own documents:<br/>trips · pinned facts · today's picks (AGENT-ARCHITECTURE.md)<br/>shop checks (PRODUCT.md) · the ledgers (OBSERVABILITY.md)"]
 ```
 
-- Up to 3 entries (founder's "two to three colors").
-- `name` is the plain word (what the AI returns, what recommendations
-  reason over — "yellow socks match the yellow dots"). `hex` is set when a
-  human picks from the color picker; AI entries may leave it null.
-- `primary` marks the display/search color (v1's `color` role).
-- `source` enforces the authority rule: AI re-runs may only add/replace
-  `source:"ai"` entries; `source:"user"` entries are untouchable.
-- **New optional field (2026-10-15, founder feedback): `family`** — the
-  canonical palette name (`functions/palette.js`, ~30 names with hex
-  anchors, mirrored in `public/js/palette.js`). AI entries: constrained by
-  the prompt, so `family == name`. User entries: resolved by nearest hex.
-  Old free-text AI names map through an alias list for analysis. The
-  stylist and any future color-theory diagnosis reason over `family` —
-  stable vocabulary ("navy" and "midnight blue" are one family).
+### The learning loop the model exists to close
 
-**Representation decision (2026-10-14, founder: "whatever works best for
-the recommender"):** both are stored, but each consumer reads what suits
-it — the recommender reasons over `name` (words), the UI renders `hex`.
-Rationale: language models think in language. "Navy" carries matching
-semantics (goes with white, cream, tan); `#1f2a44` is opaque to them, and
-color-harmony concepts ("earth tones", "complementary") are linguistic.
-Hex stays because it's the only precise way to *display* a color. So:
-words for thinking, hex for showing.
-**Research 2026-10-14 confirmed this:** ColorGPT (arXiv 2025) found the
-name+hex combination outperforms either alone for LLM color tasks, and
-NumColor shows models can't natively parse hex (tokenization fragments
-it). Our hybrid matches what fashion-AI apps do in practice (compute in
-pixel/hex space, reason over named palettes). Full record: `PRODUCT.md`
-research, 2026-10-14.
-
-UI contract (for the implementation cut): the upload and edit views show
-the palette as chips — AI suggestions appear automatically, the founder can
-add (picker), remove, or re-mark primary. Exactly the interaction the
-founder described 2026-10-14.
-
-### 2. Promote AI attributes to top-level, user-editable fields
-
-`pattern`, `fit`, `fabricGuess`, `formality`, `warmth` move out of the `ai`
-blob to top-level fields, pre-filled from the AI at upload and editable any
-time (same authority rule as colors). **New optional field: `brand`
-(string, null when unknown)** — the most standard apparel attribute we lack
-(every retail data model carries it: schema.org, Google Merchant Center).
-AI attempts it best-effort at upload from labels/logos; user edits or leaves
-blank. Honest scope note (2026-10-14): brand helps filtering and
-brand-preference matching, not outfit harmony — it won't move recommendation
-quality. Added for organization and future-proofing at ~zero cost: optional,
-no migration (absent = unknown), prompt change batches with the next
-function deploy.
-
-**Standardization (2026-10-15, founder: "uniqlo and uniqlo UT shouldn't be
-different brands"):** the model returns the *parent* brand — prompt
-instructs it to strip sub-lines/collections ("Uniqlo UT" → "Uniqlo",
-"Nike SB" → "Nike"). **New field `brandKey`** (string|null): lowercase,
-whitespace-collapsed grouping key ("UNIQLO" → "uniqlo") for dedupe and
-filtering. Display casing is never normalized (H&M must not become H&m).
-Computed server-side at upload and client-side on brand edits.
-
-The `ai` object stays as the **raw cache** of the last AI analysis, extended with:
-
-```js
-ai: {
-  ...suggestion,          // the raw describeItem reply, as today
-  modelVersion: "gemini-2.5-flash",
-  analyzedAt: timestamp,
-  photoIds: ["0-...jpg"] // which photos were analyzed — hook for the
-                         // future multi-photo "garment model" (inbox 2026-10-14)
-}
+```mermaid
+flowchart TD
+    A["The stylist recommends an outfit"] --> B["Saved as outfit v1,<br/>with the app's confidence (0–10)<br/>and its reasoning stored"]
+    B --> C["You wear it — one tap<br/>writes a wear event"]
+    C --> D["You rate it (0–10, your words)"]
+    D --> E["The app reflects: its own rating record,<br/>engaging with your words and with<br/>the gap vs its stored confidence"]
+    E --> F{"The reflection suggests<br/>a preference?"}
+    F -->|"yes"| G["It sits pending"]
+    G -->|"you confirm"| H["It enters the style profile"]
+    F -->|"no"| I["Loop ends"]
+    H --> J["The next recommendation<br/>reads the profile"]
+    J --> A
 ```
 
-### 3. Migration: lazy, no backfill script
+### Outfit versions
 
-- Code writes `colors` (and top-level attributes) on every save.
-- Code reads `colors` if present, else falls back to `[{ hex: color,
-  source: "user", primary: true }]` — v1 docs keep working untouched.
-- `color` (v1) stops being written once the cut ships; removed from reads
-  after all docs have been re-saved at least once (observable, not
-  scheduled).
+```mermaid
+flowchart LR
+    V1["Outfit v1<br/>as recommended<br/>confidence + reasoning set"] -->|"you edit it"| V2["Outfit v2<br/>supersedes v1<br/>confidence + reasoning cleared —<br/>the prediction described v1, not this"]
+    V2 -->|"edited again"| V3["Outfit v3"]
+    W["A wear event or rating<br/>points at the exact version worn"] -.-> V2
+```
 
-## Deliberately not in v2
+## How it works
 
-- **Embeddings / vector fields** — deferred per 2026-10-06 research.
-- **Multi-photo AI analysis** — inbox idea ("Garment model", 2026-10-14);
-  the `ai.photoIds` hook is the only concession it gets today.
-- **Outfits / wear log collections** — not designed until the
-  conversational loop is scoped. The item doc ID is the join key when they
-  arrive.
+1. **A piece arrives.** The AI analyzes the photo and fills the item's
+   fields as suggestions: name, category, palette, pattern, fit, fabric
+   guess, formality, warmth, brand. Its raw answer is also kept, whole,
+   in the raw cache. Every suggested field is yours to edit.
+2. **Your edits outrank the AI, permanently.** Fields carry provenance.
+   A later AI re-run may add or replace only AI-written values; a value
+   you set is untouchable.
+3. **The stylist recommends.** Its answer names pieces by their exact
+   names; the server maps names back to item ids, drops any that do not
+   match, and returns no outfit at all if fewer than 2 ids check out —
+   you then see a text reply with no Save button. Matching is enforced
+   by the server, never trusted from the model.
+4. **Saving makes outfit v1**, with the app's confidence and reasoning
+   stored beside the pieces. The prediction is stored because the
+   prized number later — predicted vs actual — cannot be computed if
+   only the outcome is kept.
+5. **Wearing is one tap** ("I wore this", on the chat card and in
+   history, no form). It writes a wear event: the items (always, even
+   without a saved outfit), the outfit version if there is one, and the
+   *actual* occasion — which may differ from the outfit's *intended*
+   occasion. That disagreement is itself signal, so the two are
+   separate fields on purpose.
+6. **Rating writes two records at most.** Yours first (written directly
+   by the app; it stands even if everything else fails). Then the app
+   reflects: it reads the outfit, the items, and your style profile,
+   and writes its own rating — a reflection in words, plus at most one
+   suggested preference.
+7. **Learning lands only on your confirmation.** A suggested preference
+   sits pending. Confirmed, it enters the style profile and is read
+   into every later stylist brief. Unconfirmed, it has no effect, ever.
+8. **Statistics are derived, never stored.** Wear counts, most-worn and
+   never-worn lists, and rating summaries are computed from the wear
+   events and ratings each time they are shown. There are no cached
+   counters to drift out of truth.
+9. **Old records upgrade lazily.** Code writes the newest shape on
+   every save and reads with a fallback to the older shape. In
+   practice the last v1 color records were normalized on 2026-10-24;
+   the fallback read stays, so nothing old can break.
 
-## Minute decisions (2026-10-14 session)
+## Rules in tables
 
-- **No AI re-run on photo add/delete/cover-change.** The description is
-  garment-level, not photo-level; all photos depict the same article, so
-  the cached analysis stays valid. Verified in code: the edit save uses a
-  targeted `update()`, and photo management only rewrites the `photos`
-  array — neither path touches `ai`. Stale only if all photos were
-  replaced with a different garment (user error; fixed by editing).
-- **Color-theory reasoning is hybrid.** The LLM reasons over color *names*
-  ("navy", "rust") — color harmony is linguistic knowledge it already has.
-  Precise shade matching, if ever needed, happens in code (hex → HSL math:
-  complementary = hue + 180°, etc.) with results handed to the model as
-  words. The model never parses hex directly.
-- **Cost envelope verified:** ~$0.001 per piece described (2,515 tokens on
-  the live test); ~$0.005 per whole-wardrobe outfit chat (text only). AI
-  cost is not a design constraint at this scale.
+### The five standing principles
 
-## Implementation cut (backlog)
-
-"PC-8: color palette + item data model v2" — palette editor UI in upload
-and edit views, provenance rules in save paths, lazy migration per above.
-Size after this design: S/M. Not pulled into Sprint 2 (founder: end-to-end
-first).
-
----
-
-# Data model v3: outfits, wear log, ratings, style profile (2026-10-15)
-
-Founder directive 2026-10-15: make the outfit a first-class object and
-close the recommendation loop end-to-end (recommend → save → wear → rate
-→ reflect → learn). The conversational loop shipping (PC-10) satisfied
-v2's deferral condition, so this is now designed.
-
-## Principles (v2's four stand, plus one)
-
-5. **Facts are append-only.** Wear events and ratings are never edited by
-   code — the user may delete their own history, but nothing is silently
-   rewritten. Stats are derived from facts at read time, never stored
-   (no cached counters to go stale).
-
-The v2 authority rule extends naturally: user-written ratings, outfits,
-and preferences outrank anything the app infers. App-suggested
-preferences sit *pending* until the user confirms them.
-
-## New collections (all under `users/{uid}/`)
-
-### `outfits/{outfitId}` — dimension (the thing), versioned
-
-| field | type | notes |
+| # | Rule | What it means in practice |
 |---|---|---|
-| versionGroup | string | stable id across versions of "the same outfit" (v1: equals the doc ID) |
-| version | number | 1, 2, 3… |
-| supersedes | string? | previous version's doc ID; null on v1 |
-| itemIds | string[] | item doc IDs — the stable join key |
-| itemNames | string[] | parallel snapshot; display survives item deletion |
-| source | `"stylist"` \| `"manual"` | provenance of origin (v1); preserved across versions |
-| name | string | user-editable |
-| occasion | string? | *intent* — what it was assembled for |
-| weather | string? | as given at recommendation time |
-| appConfidence | number? 0–10 | the prediction side; set on v1 stylist outfits, nulled on user edits (the app didn't predict the variant) |
-| appReasoning | string? | why the app picked it; same nulling rule |
-| favorite | boolean | copied forward to new versions (behaves group-level) |
-| createdAt | timestamp | of this version |
+| 1 | The AI suggests; you decide. | Every AI-filled field is editable. A re-run never modifies or deletes anything you set. |
+| 2 | Provenance is data. | Anything with two possible authors records its `source`. This is what makes rule 1 enforceable in code. |
+| 3 | Changes are additive. | New fields are added; old reads fall back. No mass migrations, no backfill scripts at personal scale. |
+| 4 | Ids are the join keys. | An item's record id is permanent. Outfits and wear point at ids; nothing embeds what belongs elsewhere. |
+| 5 | Facts are append-only. | Wear events and ratings are never edited by code. You may delete your own history; nothing is silently rewritten. |
 
-Edits create a new version (new doc), never mutate — there is value in
-keeping what was recommended. History lists the latest version per group
-(client-side grouping; personal scale). Wear events and ratings reference
-the exact version doc ID, so "what did I wear / rate" is forever precise
-even as the outfit evolves.
+### The item record (`users/{you}/items/{itemId}`)
 
-### `wear_events/{eventId}` — fact (the event)
-
-| field | type | notes |
+| Field | Type | Notes |
 |---|---|---|
-| wornAt | timestamp | when it was worn; defaults to now, user-adjustable |
-| articleIds | string[] | ground truth — always populated, even without an outfit |
-| articleNames | string[] | snapshot for display |
-| outfitId | string? | null when logged without a saved outfit |
-| occasion | string? | *actual* — may differ from the outfit's intent, deliberately |
-| note | string? | "felt overdressed" |
-| createdAt | timestamp | when logged (differs from wornAt on backfill) |
+| `name` | text | AI-suggested at upload; yours once confirmed |
+| `category` | fixed list | Same authority rule |
+| `colors` | up to 3 entries | The palette — see its own table below. Replaces the v1 single `color`. |
+| `pattern`, `fit`, `fabricGuess`, `formality`, `warmth` | text / scale | AI-filled at upload, top-level and editable (moved out of the raw cache in v2) |
+| `brand` | text, or nothing | Optional; empty means unknown. The AI tries best-effort from labels and logos. For organizing and filtering — it does not affect outfit harmony. |
+| `brandKey` | text, or nothing | The grouping key, computed when the brand is set: server-side at upload, in the app on your edits |
+| `imageUrl` / `storagePath` | text | Cover photo shortcuts |
+| `photos` | up to 4 {url, storagePath} | The first photo is the cover |
+| `createdAt` | timestamp | |
+| `ai` | object | The raw cache — see below |
 
-Firestore can't join, so per-article stats ("worn 47 times") read
-`articleIds` directly — never resolve through outfits.
+One palette entry:
 
-### `ratings/{ratingId}` — fact (the event)
+```js
+{ name: "navy",  family: "navy", hex: "#1f2a44", source: "ai",   primary: true  }
+{ name: "cream", family: "cream", hex: null,     source: "ai",   primary: false }
+{ name: "rust",  family: "rust",  hex: "#a44a2a", source: "user", primary: false }
+```
 
-| field | type | notes |
+- `name` is the plain word — what recommendations reason over ("the
+  yellow socks match the yellow dots"). `hex` is set when a human picks
+  from the color picker; AI entries may leave it empty.
+- `family` is the standard name from the fixed palette list. For AI
+  entries the prompt constrains it, so family equals name; for your
+  entries it is resolved by nearest hex. Old free-text AI names map
+  through an alias list for analysis. Reasoning uses `family` — a
+  stable vocabulary.
+- `primary` marks the display and search color (the old v1 `color`
+  field's job).
+
+The raw cache (`ai` object) keeps the last analysis whole: the raw
+suggestion, plus `modelVersion` (which model), `analyzedAt` (when), and
+`photoIds` (which photos were analyzed — the hook for a future
+multi-photo "garment model"; the only concession that idea gets today).
+
+### Decisions about color and brand, with the reasons
+
+| Decision | Why | The alternative rejected |
 |---|---|---|
-| targetKind | `"article"` \| `"outfit"` | one mechanism, two targets |
-| targetId | string | |
-| wearEventId | string? | which wear is being rated, when an outfit is worn repeatedly |
-| rater | `"user"` \| `"app"` | the two sides are literally two docs |
-| score | number 0–10 | |
-| note | string? | user's words / app's reflection text |
-| suggestedPreference | string? | app rater only; pending until the user confirms it |
-| createdAt | timestamp | |
+| Store both the word and the hex; each reader uses what suits it. The recommender reasons over words; the screen renders hex. | Models think in language: "navy" carries matching meaning (goes with white, cream, tan); a hex code is opaque to them. Research checked 2026-10-14 agrees: ColorGPT (arXiv, 2025) found name + hex beats either alone for model color tasks; NumColor showed models cannot parse hex natively. Fashion apps do the same: compute in pixel space, reason over named palettes. | Hex-only (unreadable to the model) or word-only (too imprecise to display). |
+| Shade-precise matching, if ever needed, happens in code and reaches the model as words. | Hue arithmetic (a complement is hue + 180°) is exact in code and guesswork in a model. The model never parses hex directly. | Asking the model to compare hex codes. |
+| The AI returns the parent brand; sub-lines are stripped by instruction. | "Uniqlo" and "Uniqlo UT" are one brand for grouping. Display casing is never normalized. | Treating every sub-line as its own brand; or lowercasing display names ("H&m"). |
+| No AI re-run when photos are added, removed, or re-covered. | The analysis describes the garment, not the photo; all photos show the same article. Verified in code: photo changes rewrite only the `photos` list and never touch the cache. Stale only if every photo were swapped for a different garment — fixed by editing. | Re-analyzing on every photo change (cost, churn, and it would fight rule 1). |
 
-### `style_profile/{uid}` — single doc (slow-changing dimension)
+### The outfit record (`users/{you}/outfits/{outfitId}`)
 
-| field | type | notes |
+| Field | Type | Notes |
 |---|---|---|
-| preferences | [{ text, source, createdAt }] | user-editable; cap 50, oldest app-sourced pruned first |
-| updatedAt | timestamp | |
+| `versionGroup` | id | Stable across versions of "the same outfit" (in v1 of this design it equals the first record's id) |
+| `version` | number | 1, 2, 3… |
+| `supersedes` | id, or nothing | The previous version's record id; empty on v1 |
+| `itemIds` | id list | The pieces — the stable join key |
+| `itemNames` | text list | The name snapshot, parallel to `itemIds` |
+| `source` | `stylist` or `manual` | Where the outfit came from; kept across versions |
+| `name` | text | Yours to edit |
+| `occasion` | text, optional | The *intent* — what it was assembled for |
+| `weather` | text, optional | As given at recommendation time |
+| `appConfidence` | number 0–10, optional | The app's prediction. Set on stylist-made v1; cleared when you edit (the app did not predict your variant) |
+| `appReasoning` | text, optional | Why the app picked it; same clearing rule |
+| `favorite` | yes/no | Copied forward to new versions — behaves as a group-level mark |
+| `createdAt` | timestamp | Of this version |
 
-This is where "the stylist learns you" physically lives — and it grounds
-future stylist prompts, so learning compounds instead of evaporating.
+History shows the latest version per group (grouped in the app; fine at
+personal scale).
 
-## Backend changes
+### The wear event record (`users/{you}/wear_events/{eventId}`)
 
-### `askStylist`: structured outfit output (contract extension)
+| Field | Type | Notes |
+|---|---|---|
+| `wornAt` | timestamp | When it was worn; defaults to now, adjustable by you |
+| `articleIds` | id list | The ground truth — always filled, even when no outfit was saved |
+| `articleNames` | text list | The name snapshot |
+| `outfitId` | id, or nothing | Empty when wear was logged without a saved outfit |
+| `occasion` | text, optional | The *actual* occasion — deliberately separate from the outfit's intent |
+| `note` | text, optional | Your words: "felt overdressed" |
+| `createdAt` | timestamp | When logged (differs from `wornAt` on backfill) |
 
-Returns `{ reply, outfit: { itemIds, confidence, reasoning } | null }`.
-The prompt additionally requests JSON: exact item names as listed,
-confidence 0–10, one-line reasoning. The server maps names → IDs
-case-insensitively against the list it sent, drops misses, and returns
-`outfit: null` when fewer than 2 IDs validate — the client then shows a
-text-only reply with no Save button. Grounding is enforced server-side,
-not trusted from the model.
+Per-item counts read `articleIds` directly — the database cannot join,
+so stats never resolve through outfits.
 
-### New callable: `reflectOutfit`
+### The rating record (`users/{you}/ratings/{ratingId}`)
 
-Input `{ outfitId, score, note, wearEventId? }`. The client writes the
-user's rating doc first (Firestore direct, owner rules), then calls.
-The function reads outfit + items + style profile and asks the model
-for: reflection text (engaging with the user's words, acknowledging the
-delta vs `appConfidence`) and an optional suggested preference. Returns
-`{ reflection, suggestedPreference }`; the client writes the app's
-rating doc (`rater: "app"`). Model failure never blocks the rating —
-same principle as PC-7: the rating stands, reflection shows
-"unavailable", retry offered.
+| Field | Type | Notes |
+|---|---|---|
+| `targetKind` | `article` or `outfit` | One mechanism, two targets |
+| `targetId` | id | |
+| `wearEventId` | id, optional | Which wear is being rated, when an outfit is worn repeatedly |
+| `rater` | `user` or `app` | The two sides are literally two records |
+| `score` | number 0–10 | |
+| `note` | text, optional | Your words, or the app's reflection text |
+| `suggestedPreference` | text, optional | App ratings only; pending until you confirm it |
+| `createdAt` | timestamp | |
 
-## Migration
+Scores are never compared raw across the two raters: your 6 and the
+app's 6 mean different things. The screen labels them ("your rating"
+vs "app confidence") and treats the gap as information, not error.
 
-v3 is purely additive (four new collections). Zero migration — no
-backfill, no lazy-read fallbacks needed. v2's lazy migration for
-`colors`/top-level attributes proceeds independently under PC-8.
+### The style profile record (`users/{you}/style_profile/{you}`)
 
-## Deliberately not in v3
+| Field | Type | Notes |
+|---|---|---|
+| `preferences` | list of {text, source, createdAt} | Your confirmed preferences. Cap 50; when pruning is needed, the oldest app-sourced entries go first |
+| `updatedAt` | timestamp | |
 
-- **Article-direct wear logging** (wearing clothes with no saved outfit):
-  v1 is outfit-centric; article stats derive from outfit wears. Fast
-  follow if the founder wants it.
-- **Offline support** — no offline persistence currently; failures show
-  the friendly error (PC-11).
-- **Push nudges** ("what should I wear today") — needs the loop first;
-  inbox.
-- **Embeddings / vector fields** — still deferred per 2026-10-06.
+This record is the stylist's long-term memory of your taste — distinct
+from the learned taste scores, which are a separate mechanism with
+their own document (PERSONALIZATION.md).
 
-## Minute decisions (2026-10-15 design session)
+### Checked numbers (2026-10-14)
 
-- **Prediction must be stored.** The prized prediction-vs-outcome delta
-  can't be computed if only the outcome is saved — hence
-  `appConfidence`/`appReasoning` at creation.
-- **Intent vs actual occasion are different fields on purpose.**
-  Outfit.occasion is what it was *for*; wear_events.occasion is what
-  *happened*. Their disagreement is itself signal.
-- **No raw-score comparison.** The user's 6 and the app's 6 mean
-  different things; the UI labels them ("your rating" vs "app
-  confidence") and treats the delta as informational.
-- **Outfits are versioned, not mutated** (founder 2026-10-15: "there is
-  value in keeping what was recommended"). A new doc per version sharing
-  `versionGroup`; wears/ratings pin exact version IDs. User edits null
-  out `appConfidence`/`appReasoning` — the prediction described v1, not
-  the variant. Re-scoring edited outfits is a reserved future cut.
-- **One-tap wear logging is load-bearing.** The entire stats/reflection
-  edifice depends on wear events existing — the "I wore this" button
-  lives on the chat card and in history, one tap, no form.
-- **Implicit negatives are free.** "Recommended but never worn within 14
-  days" is a silent downvote the system already generates; the design
-  reserves it (consumed in a later cut, not this one).
+AI cost is not a design constraint at this scale: describing one piece
+cost about $0.001 (2,515 tokens on the live test); a whole-wardrobe
+outfit chat about $0.005, text only. Current per-call costs are tracked
+in OBSERVABILITY.md.
+
+## What is deliberately not in this model
+
+| Not here | Status |
+|---|---|
+| Embeddings / vector fields on items | Deferred on research (2026-10-06). Search and matching work on words and fields today. |
+| Multi-photo AI analysis (a "garment model" built from all photos) | An inbox idea (2026-10-14). The raw cache's `photoIds` is its only hook. |
+| Offline support | The app has none; failures show the plain error. A product decision, not an oversight. |
+| Push nudges ("what should I wear today?") | Needed the loop first; the loop now exists, so this is a product call, not a model gap. |
+
+## Known limits and reserved designs
+
+- **Silent downvotes are recorded as an idea, not yet consumed.**
+  "Recommended but never worn within 14 days" is a signal the data
+  already generates. The design reserves it; no code reads it yet.
+- **Edited outfits are not re-scored.** When you edit a version, its
+  stored prediction clears (correctly — it described the original). The
+  app does not yet produce a fresh prediction for your variant; that is
+  a reserved future cut.
+- **Wear logging started outfit-centered.** The wear record always
+  carries the item list, so per-item statistics work either way;
+  logging wear with no outfit at all was recorded in the v3 session as
+  a fast follow *if wanted* — check `docs/SHIPPED.md` before treating
+  its state as settled.
+- **This document covers the wardrobe core.** Trips, pinned facts,
+  today's picks, shop checks, and the observability ledgers are
+  designed in their own documents (see the map in the pictures); they
+  follow the same five principles.
+
+## Decisions still open
+
+None outstanding in the model itself. The reserved items above (silent
+downvotes, re-scoring edited outfits) become decisions when a sprint
+pulls them; each would be designed here first, in the open, before
+code.
+
+## Code pointers
+
+As of the v2/v3 designs (2026-10-14 / 2026-10-15), with the model since
+built and amended in place.
+
+- The palette list and family resolution: `functions/palette.js`,
+  mirrored for the app in `public/js/palette.js`.
+- Item analysis and the raw cache: the `describeItem` function;
+  brand-key computation at upload (server) and on brand edit (app).
+- The stylist contract (names in, ids validated, outfit or nothing):
+  `functions/stylist.js` and the `askStylist` handler in
+  `functions/index.js`.
+- Reflection: the `reflectOutfit` function — your rating is written by
+  the app first; the function's failure never blocks it.
+- The collections: `items`, `outfits`, `wear_events`, `ratings`,
+  `style_profile`, all under `users/{you}/` in Firestore.
+- Implementation cuts: PC-8 (palette + item model v2), PC-10 (the
+  conversational loop that satisfied v3's condition). Records in
+  `docs/SHIPPED.md`.
