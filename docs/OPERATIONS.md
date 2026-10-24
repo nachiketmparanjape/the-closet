@@ -77,7 +77,19 @@ on its Replicate secret version).
    use the `{ release: { name, rulesetName } }` wrapper; the
    storage release id is `firebase.storage/<bucket>` with the
    slash **not** URL-encoded.
-8. **Firebase CLI on this VM needs a config workaround:**
+8. **A throwing catch freezes the UI.** (2026-10-24) Both link
+   handlers called a nonexistent `logError(err, …)` as the
+   first line of their `.catch` — the client's error helper is
+   `reportError(where, err)`. The ReferenceError ate the toast
+   and skipped the chained button reset, so the button sat on
+   "Fetching…" forever while the server had answered in ~3s
+   (proven from `error_events` + a probe-account repro).
+   Rules: in a catch, show the user-visible message FIRST and
+   log second; never call a helper you haven't grepped for;
+   a UI that "hangs" may be a settled promise whose handler
+   threw — check `client_errors` before blaming the network
+   or the function.
+9. **Firebase CLI on this VM needs a config workaround:**
    `XDG_CONFIG_HOME=/tmp/fb-config npx firebase-tools …`
    (`~/.config/configstore` is root-owned). The CLI's own auth
    is unreliable here regardless — the REST scripts above are

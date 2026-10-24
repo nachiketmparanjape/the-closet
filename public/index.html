@@ -3263,15 +3263,19 @@
             });
           });
         }).catch(function (err) {
-          logError(err, "link-import");
           // Our callable's message IS the catalog copy (client-
           // safe by design) — show it; SDK errors go through
-          // the generic choke point instead.
+          // the generic choke point instead. Toast FIRST, log
+          // second: a logging hiccup must never eat the message
+          // (the 2026-10-24 logError typo froze both link
+          // buttons on "Fetching…" — the call had already
+          // answered; the catch itself threw).
           if (err && typeof err.code === "string" && err.code.indexOf("functions/") === 0 && err.message) {
             showToast(err.message);
           } else {
             showToast(friendlyError(err));
           }
+          reportError("link-import", err);
         }).then(function () {
           btn.disabled = false;
           btn.textContent = "Fetch";
@@ -7668,9 +7672,9 @@
             startShopCheckFromPath(d.storagePath, dl, d.sourceUrl || url);
           });
         }).catch(function (err) {
-          logError(err, "shop-link-import");
           if (err && typeof err.code === "string" && err.code.indexOf("functions/") === 0 && err.message) showToast(err.message);
           else showToast(friendlyError(err));
+          reportError("shop-link-import", err);
         }).then(function () {
           btn.disabled = false;
           btn.textContent = "Check link";

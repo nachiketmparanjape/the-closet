@@ -22,6 +22,13 @@ What went live. Momentum you can see.
   trickling the body, which had left a founder test
   spinning ~1 min; worst case is now the 12s page + 15s
   photo budget, hard-capped by the function's 60s.
+  Founder's retry still froze — the ledger told the real
+  story: the server answered LINK_NO_IMAGE in ~3s every
+  time, but both link handlers opened their catch with a
+  call to a nonexistent `logError()` (the helper is
+  `reportError(where, err)`); the throw ate the toast and
+  the button reset. Fixed (toast first, log second),
+  guarded by test, scar recorded in OPERATIONS.md rule 8.
 - **PC-44 — Non-photo catalogue intake** (Sprint 22,
   2026-10-24): paste a product link on the Add pieces screen
   → new callable `fetchLinkItem` fetches the page server-

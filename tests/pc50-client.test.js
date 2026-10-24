@@ -29,3 +29,13 @@ test("the context snapshot is one shared helper used by both entries", () => {
 test("retry re-runs a link check without re-snapshotting", () => {
   assert.ok(html.includes("else if (st.linkPath)"), "link retry branch missing");
 });
+
+test("link error paths use the real reportError helper (no logError ghosts)", () => {
+  // 2026-10-24 founder catch: both link handlers called a
+  // nonexistent logError() inside their catch — the throw ate
+  // the toast AND the button reset, freezing the UI on
+  // "Fetching…" even though the server had already answered.
+  assert.ok(!html.includes("logError("), "a logError( call survives — that function does not exist");
+  assert.ok(html.includes('reportError("shop-link-import", err)'), "shop handler does not log via reportError");
+  assert.ok(html.includes('reportError("link-import", err)'), "capture handler does not log via reportError");
+});
