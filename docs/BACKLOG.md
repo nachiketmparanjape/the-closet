@@ -934,7 +934,7 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
 - **Status:** Parked 2026-10-24, awaiting the founder's
   word to sit down. UX-16's audit folds into this card.
 
-### OBS-4 — Data-model drift spot-check (S)
+### OBS-4: Data-model drift spot-check (S)
 
 - **Origin:** the important-invisibles register (2026-10-24):
   the catalog data model (`docs/DATA_MODEL.md`, v2) has a
