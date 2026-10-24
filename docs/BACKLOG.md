@@ -841,3 +841,33 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
 - **Lane:** Stylist. **Effort:** S.
 - **Status:** Filed 2026-10-24. Competes at the next
   planning walk; the Today instance is already fixed.
+
+### PC-43 — Unnamed items heal themselves (no permanent "Untitled item")
+
+- **Problem (founder-found, 2026-10-24):** when the AI
+  describe step fails during an add (bulk especially), the
+  item saves with the literal placeholder name "Untitled
+  item", no ai block, category Other — and nothing ever
+  retries. 8 of the founder's 69 items were zombies of this
+  kind, surfacing in pickers, picks and lists. The 8 were
+  repaired by hand (re-describe from photo); this card makes
+  it structural so it never needs a hand.
+- **In scope:** at save time, an item whose describe failed
+  is flagged (e.g. `needsAi: true`); on app load, flagged
+  items are quietly re-described (existing describeItem
+  callable, capped per session, only on the owner's own
+  items) and the flag clears on success; the wardrobe grid
+  shows flagged items with a subtle "naming…" state rather
+  than the placeholder. Manual rename already exists as the
+  escape hatch.
+- **Out of scope:** re-describing healthy items; bulk
+  re-cataloguing.
+- **Acceptance:** kill the network mid-bulk-add → items
+  land flagged, none displays "Untitled item" as its name
+  after the next successful load; ai_usage shows the retry
+  calls; a permanently unidentifiable photo ends as
+  "Unidentified item" per the describe prompt's own rule,
+  with the flag cleared.
+- **Lane:** Catalogue. **Effort:** S–M.
+- **Status:** Filed 2026-10-24. Data incident repaired the
+  same night; this is the prevention half.
