@@ -215,86 +215,77 @@ evidence is one click away in AUDIT.md.
 
 ## Decisions
 
-The sit-down is happening in chat, decision by decision
-(started 2026-10-24). Made decisions are recorded with the
-founder's answer; open ones keep their question.
+The sit-down happened in chat (2026-10-24, two rounds).
+**All nine are decided.** This section is the record; the
+build spec that comes from them is `docs/CONTEXT-MODEL.md`.
 
-**Made (founder, 2026-10-24):**
-
-1. **Today's pick attaches only on an explicit tap of a
-   button that is about the pick** (for example, asking
-   the stylist from the Today screen). In a general
-   stylist session or a trip session it does not appear
-   by default, and there is nothing to remove. This
-   replaces the current behavior (auto-attach on open,
-   remove by tapping the x on its label). Exhibit #1 is
-   decided: no silent attachment, ever; attachment is an
-   act, not a default.
-8. **The starting rule holds** (founder: "I guess" --
-   recorded as yes): no entry point sends a message for
-   you; some may type text you can edit and send; context
-   attaches only as decision 1 says. Surprise-me's
-   auto-send goes away when this is built.
-7. **The reading limit rises from 20 to 50 messages, and
-   the experience is honest about it:** when a
-   conversation passes the limit, the app says plainly
+1. **Attach is an act, not a default.** Today's pick joins
+   a conversation only when you tap a button that is about
+   the pick (for example, asking the stylist from the
+   Today screen). A general stylist session and a trip
+   session never receive it by default. (Founder
+   confirmed Bramble's reading, round 2.)
+2. **One display, backed by one loader.** There is exactly
+   one display of what the stylist knows -- the context
+   line (decision 4) -- and exactly one way context is
+   loaded: the single assembler (decision 3). The display
+   renders what the assembler actually loaded, so the two
+   can never disagree. The top outfit card stops being a
+   context display; it is a plain pick card with actions.
+3. **One assembler, on the server.** The rule for "which
+   outfit are we changing" -- and every other context
+   rule -- lives in one place: the server's single
+   assembler (principle F1), not split between phone and
+   server.
+4. **Every pinned fact is surfaced, in the context line.**
+   One slim line under the chat header shows the first
+   few facts in play plus a count; tapping it opens a
+   sheet listing every fact, each removable. (Founder:
+   "makes sense.")
+5. **The who-wins table becomes the rule.** The table in
+   this document is the precedence rule; the stylist's
+   instructions are written to match it (principle F5:
+   precedence as a table, not prose). Direction confirmed
+   by the founder's agreement with AGENT-FUNDAMENTALS.md;
+   the table itself stands as written here.
+6. **Conversations are saved -- one stored thread per key
+   we already have** (the general conversation; one per
+   trip), transcripts kept on the account, loaded on
+   open. No thread list, no titles, no new-thread button:
+   the app stops forgetting; it does not become a chat
+   product. The design for making this intuitively clear
+   (a "continuing from" divider on return, a visible
+   Start fresh action, a one-time notice the first time a
+   conversation is saved, the window notice from decision
+   7) is specified in CONTEXT-MODEL.md. The founder will
+   refine it from organic use.
+7. **The reading window is the last 50 messages of the
+   conversation you are in** -- per conversation, not per
+   day and not per app-open. When a conversation grows
+   past 50, the app says plainly, in the conversation,
    that the stylist now reads only the most recent 50.
-   No summarizing for now. The founder expects more
-   opinions here once he uses long conversations more;
-   revisit then.
-
-**Direction confirmed by the founder's agreement with
-AGENT-FUNDAMENTALS.md; the concrete form is Bramble's to
-draft and the founder's to confirm:**
-
-3. The rule for "which outfit are we changing" lives in
-   **one place: the server's single assembler** (principle
-   F1), not split between phone and server.
-5. The who-wins table in this document **becomes the
-   rule**, and the stylist's instructions are written to
-   match it (principle F5: precedence as a table, not
-   prose).
-
-**Open:**
-
-2. Should the row of fact labels be the only display
-   of what the stylist knows? That means the top outfit
-   card goes away, or stays only as a picture that is
-   clearly not the context itself. *(Founder did not
-   understand the question as written; re-asked in
-   plainer words in the sit-down chat, 2026-10-24.)*
-4. Should every pinned fact show a label at the top of
-   the chat, so the full context is visible -- and
-   removable -- in one row? **Founder: yes in principle**
-   ("I think so") -- what is open is the design: an elegant
-   way to surface up to 20 facts without eating the
-   screen. Bramble's proposals are in the sit-down chat
-   (a single "what the stylist knows" line that expands
-   to the full list is the recommended one, and it would
-   also settle decision 2's "one display" question).
-6. Should conversations be saved, so a conversation is
-   still there after the app closes -- on the phone and
-   across your devices? **Founder: ideally yes, with
-   deliberation.** He wants a proper threads design --
-   all threads tracked, transcripts stored, like the
-   major agent apps -- at low effort, without the app
-   becoming a general chat product. Bramble's ladder is
-   in the sit-down chat; the recommended rung is one
-   stored conversation per key we already have (general,
-   one per trip), no thread list, no titles, no
-   new-thread button. Deliberation points: how much
-   transcript to keep, and trip threads living and dying
-   with their trip.
-9. The morning pick and the outfit composer call the
-   same stylist. Should they follow the same context
-   rules as the chat, or a smaller written set? Either
-   way, the set gets written down. *(Explained in plainer
-   words in the sit-down chat, 2026-10-24; Bramble's
-   recommendation: one rulebook -- the same who-wins table
-   and the same memory applied everywhere; the one-shot
-   callers simply have fewer inputs, because there is no
-   conversation and no pointers. Awaiting the founder's
-   call.)*
+   Summarizing the early part is deliberately not built
+   now: it costs little (one small call, rarely), but at
+   a 50-message window its benefit is narrow, and the
+   honest notice covers the expectation. Revisit when the
+   founder hits the limit in real use.
+8. **Nothing sends on your behalf -- except a button
+   whose own label is the instruction.** Refined by the
+   founder (round 2): actions with a built-in prompt are
+   fine (Surprise me is the case), provided they fire
+   only from their own clearly-named button. Opening a
+   surface never sends anything. Surprise me survives as:
+   tap its button -> it sends its built-in prompt. Per
+   decision 1 it does not attach today's pick -- it is
+   not a pick button; it composes something new.
+9. **One rulebook everywhere.** The morning pick and the
+   outfit composer follow the same context rules as the
+   chat -- the same who-wins table, the same memory --
+   with smaller bundles only because there is no
+   conversation and there are no pointers. One assembler
+   serves them too (decision 3). (Founder: "everything
+   should be one rulebook and similar experience. less
+   things for the user to worry about.")
 
 ## Code pointers (as of commit 2c37032, 2026-10-24)
 
