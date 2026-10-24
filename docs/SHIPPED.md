@@ -4,6 +4,44 @@ What went live. Momentum you can see.
 
 ## Sprint 19 (2026-10-24 → )
 
+- **PC-44 — Non-photo catalogue intake** (Sprint 22,
+  2026-10-24): paste a product link on the Add pieces screen
+  → new callable `fetchLinkItem` fetches the page server-
+  side, extracts the retail photo + title (Open Graph /
+  JSON-LD), stores the photo, and hands it to the ordinary
+  add flow as a file (describe + form unchanged). The saved
+  cover carries `source: "retail"` on the photo entry —
+  grid shows "· Retail photo", the piece page explains it
+  and how to replace it; swapping in your own photo at save
+  time means no label (binding is by file identity). Live
+  smoke on the probe account: Uniqlo full success;
+  Patagonia serves bots a routing page (LINK_NO_IMAGE) and
+  REI 503s (LINK_UNREACHABLE) — both fail with the catalog's
+  friendly copy, per the card's no-scraping-past-blocks
+  scope. Guide updated to four ways in.
+- **PC-47 — Forgotten-pieces utilization view** (Sprint 22,
+  2026-10-24): the wardrobe gains a Sort control — Browse
+  (the category wall, untouched) / Most worn / Least worn /
+  Never worn, from one aggregate wear_events query (cached
+  60s). Cards in wear modes carry a wear badge ("Worn 12× ·
+  last Oct 3" / "Never worn"), and never-worn pieces get
+  "Build a look around this" — opens the stylist with the
+  piece attached as a structured reference and the request
+  seeded in the composer.
+- **PC-46 — Candidate-piece outfit previews** (Sprint 22,
+  2026-10-24): honest scope note — the check already
+  generated outfit suggestions (owned pieces only) and
+  rendered them as anonymous thumbnails under "It would
+  work with". The actual gap was the candidate's absence.
+  The section is now "See it in an outfit": the candidate's
+  own photo leads each preview (brass ring, captioned with
+  its name), owned pieces follow as captioned figures with
+  their real names. Applies retroactively to saved checks
+  (one shared renderer). Deviation from the card's letter:
+  previews reuse the check's outfit cards, not Today's
+  composer card — the acceptance's substance (concrete
+  previews, candidate visible, real pieces named) is met
+  without rebuilding the composer for a second surface.
 - **PC-42 — Crop the shop-check photo** (Sprint 21, 2026-10-24):
   picking a check photo now pauses at a crop step (fixed square
   frame, drag to pan, zoom slider + wheel, canvas render capped

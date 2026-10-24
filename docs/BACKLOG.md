@@ -987,8 +987,7 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   source-labeled; saving works; swapping in your own photo
   later keeps everything else.
 - **Lane:** Catalogue. **Effort:** L.
-- **Status:** IN SPRINT 22 (pulled at the 2026-10-24 walk,
-  ranked #1, the sprint anchor).
+- **Status:** DONE 2026-10-24 (Sprint 22).
 
 ### PC-45: Explain-the-no → a proposed, confirmable style rule (M)
 
@@ -1031,8 +1030,7 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   outfit previews naming real owned pieces; previews use
   the same composer as Today picks.
 - **Lane:** Stylist. **Effort:** M.
-- **Status:** IN SPRINT 22 (pulled at the 2026-10-24 walk,
-  ranked #3; result-surface version only).
+- **Status:** DONE 2026-10-24 (Sprint 22).
 
 ### PC-47: Forgotten-pieces utilization surface (S/M)
 
@@ -1053,8 +1051,7 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   wear counts; a never-worn piece can start a look in one
   tap.
 - **Lane:** Loop + Personalization. **Effort:** S/M.
-- **Status:** IN SPRINT 22 (pulled at the 2026-10-24 walk,
-  ranked #2).
+- **Status:** DONE 2026-10-24 (Sprint 22).
 
 ### PC-48: Activity + luggage-aware trip planning (M/L)
 

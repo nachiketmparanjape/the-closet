@@ -58,3 +58,14 @@ it was waiting for.
 - PC-36 — gated on PC-34's token. PC-49 — trigger unmet.
 - PC-23, PC-24/25/26, UX-12 — keeps (2026-10-24 walk).
 - OPERATIONS OP-1 (CI restore) — manual path still fine.
+
+## Closeout (2026-10-24)
+
+All three cards shipped and deployed the same day; 317/317
+tests. PC-44's server half was proven live against three
+real retailers (one success, two by-design friendly
+failures). PC-46's premise needed narrowing mid-build — the
+check already generated and rendered outfit suggestions;
+the real gap was the candidate's absence from them. The
+narrowed work is recorded on the SHIPPED entry. PC-48 stays
+first alternate on its real-trip trigger.

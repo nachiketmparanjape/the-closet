@@ -221,7 +221,12 @@
     .shop-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
     .shop-thumb { width: 52px; height: 62px; object-fit: cover; border-radius: 6px; background: var(--paper-soft); flex-shrink: 0; }
     .shop-row-title { font-weight: 600; font-size: 14px; }
-    .shop-thumbs { display: flex; gap: 8px; margin-bottom: 6px; }
+    .shop-thumbs { display: flex; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+    .shop-fig { margin: 0; width: 64px; text-align: center; }
+    .shop-fig img { width: 64px; height: 64px; object-fit: cover; border-radius: 10px; display: block; }
+    .shop-fig figcaption { font-size: 10.5px; color: var(--muted); margin-top: 3px; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .shop-fig.candidate img { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .shop-fig.candidate figcaption { color: var(--accent-dark); font-weight: 600; }
     /* PC-14 follow-up: the result window opens immediately with a loading
        state — a lone toast gives no sense that work is happening. */
     .shop-loading { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 24px 0 8px; gap: 14px; }
@@ -7861,18 +7866,38 @@
             });
           }
           if (r.outfits && r.outfits.length) {
-            body.appendChild(el("h3", "shop-section-title", "It would work with"));
+            // PC-46: the candidate IN the outfit — its own photo
+            // leads each preview (ringed, captioned), the owned
+            // pieces follow with their names, so the verdict is
+            // something you can see, not just read.
+            body.appendChild(el("h3", "shop-section-title", "See it in an outfit"));
             r.outfits.forEach(function (o) {
               var card = el("div", "outfit-card");
               var thumbs = el("div", "shop-thumbs");
               var rendered = 0;
               o.pieces.forEach(function (pid) {
                 var t = thumbFor(pid);
-                if (t) { thumbs.appendChild(t); rendered++; }
+                if (t) {
+                  var it2 = itemById(pid);
+                  var fig = el("figure", "shop-fig");
+                  fig.appendChild(t);
+                  fig.appendChild(el("figcaption", null, (it2 && (it2.shortName || it2.name)) || "Piece"));
+                  thumbs.appendChild(fig);
+                  rendered++;
+                }
               });
               // A piece can go missing between check and view (deleted
               // item) — never render a fragment as an "outfit".
               if (rendered < 2) return;
+              if (photoUrl) {
+                var cfig = el("figure", "shop-fig candidate");
+                var cimg = document.createElement("img");
+                cimg.src = photoUrl;
+                cimg.alt = (r.item && r.item.name) || "The piece you are checking";
+                cfig.appendChild(cimg);
+                cfig.appendChild(el("figcaption", null, (r.item && (r.item.shortName || r.item.name)) || "This piece"));
+                thumbs.insertBefore(cfig, thumbs.firstChild);
+              }
               card.appendChild(thumbs);
               if (o.note) card.appendChild(el("p", "hint", o.note));
               body.appendChild(card);
