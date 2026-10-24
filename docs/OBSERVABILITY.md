@@ -3,7 +3,7 @@
 How the app watches itself: what broke, what it cost, and what the
 user was doing when it happened. This is the presentable design
 surface for a structure that is invisible by nature — if it can't
-be read and challenged here, it doesn't get to be load-bearing.
+be read and challenged here, it doesn't get to carry weight.
 
 **History.** OBS-1 (2026-10-19): structured logs + client error
 capture. OBS-3 (2026-10-23, founder chose full instrumentation in
@@ -17,7 +17,7 @@ and the sprint folders.
 are numbered (OP-n). Improvements are proposed against a section
 or an OP, decided with the founder, and this doc is edited in the
 same commit as the code — the doc lagging the code is itself a
-defect under the studio's load-bearing-invisibles doctrine.
+defect under the studio's important-invisibles doctrine.
 
 ---
 
