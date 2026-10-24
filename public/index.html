@@ -270,6 +270,8 @@
     /* DESIGN-HOME-1: Today — the experimental stylist-first home (§4.10). */
     .wordmark { border: none; background: none; font-family: "Closet Serif", serif; font-size: 21px; font-weight: 600; letter-spacing: -.02em; color: var(--ink); cursor: pointer; padding: 6px 2px; min-height: 44px; }
     .today-greet { font-family: "Closet Serif", serif; font-size: 34px; font-weight: 500; letter-spacing: -.025em; line-height: 1.08; margin: 6px 0 4px; }
+    .today-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0 6px; }
+    .today-actions .primary, .today-actions .secondary { width: 100%; }
     .today-date { color: var(--muted); font-size: 13.5px; margin: 0 0 6px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
     .today-weather { border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font-size: 12.5px; color: var(--muted-strong); background: var(--paper); }
     .today-card { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-md); padding: 18px; margin-top: 16px; }
@@ -678,6 +680,7 @@
       <div class="catalog-head">
         <h2>Shop list</h2>
         <span class="count" id="shopCheckCount">0 saved</span>
+        <button class="primary" id="shopListAddBtn" type="button" style="margin-left:auto">＋ Shop check</button>
       </div>
       <p class="hint">Things you're eyeing — each one checked against your wardrobe before you buy.</p>
       <div class="gallery" id="shopListGallery"></div>
@@ -4853,19 +4856,22 @@
       function renderTripShopSection(trip) {
         var box = document.getElementById("tripPacking");
         if (!box) return;
+        // Always rendered (founder, 2026-10-24): a trip with no
+        // tagged checks still needs the door to start one.
         var tagged = (allShopChecks || []).filter(function (c) { return c.tripId === trip.id; });
-        if (!tagged.length) return;
         var order = { considering: 0, bought: 1, dismissed: 2 };
         tagged.sort(function (a, b) {
           return (order[a.status] == null ? 0 : order[a.status]) - (order[b.status] == null ? 0 : order[b.status]);
         });
         var h = document.createElement("h3");
         h.className = "trip-section-h";
-        h.textContent = "Shopping for this trip (" + tagged.length + ")";
+        h.textContent = "Shopping for this trip" + (tagged.length ? " (" + tagged.length + ")" : "");
         box.appendChild(h);
         var intro = document.createElement("p");
         intro.className = "hint";
-        intro.textContent = "Pieces you're eyeing for this trip — each checked against your wardrobe before you buy.";
+        intro.textContent = tagged.length
+          ? "Pieces you're eyeing for this trip — each checked against your wardrobe before you buy."
+          : "Nothing tagged yet. Check something you're eyeing for this trip and it will live here, next to the packing list.";
         box.appendChild(intro);
         tagged.forEach(function (c) {
           var row = document.createElement("div");
@@ -4901,6 +4907,15 @@
           });
           box.appendChild(row);
         });
+        var tripShopBtn = document.createElement("button");
+        tripShopBtn.className = "secondary";
+        tripShopBtn.type = "button";
+        tripShopBtn.textContent = "＋ Shop check for this trip";
+        tripShopBtn.addEventListener("click", function () {
+          pendingShopTripId = trip.id;
+          document.getElementById("shopCheckButton").click();
+        });
+        box.appendChild(tripShopBtn);
       }
 
       // Open-Meteo daily forecast for the leg. Null when out of range
@@ -5663,6 +5678,23 @@
         wchip.hidden = true;
         dline.appendChild(wchip);
         root.appendChild(dline);
+
+        // Founder (2026-10-24): the two primary actions live on the
+        // main page itself, in every Today state — not only in the
+        // hero further up the page. Pick an outfit is deliberately
+        // NOT a third button here: the pick card below IS that
+        // action, with its refinement options (another, less warm…).
+        var todayActions = document.createElement("div");
+        todayActions.className = "today-actions";
+        var tAdd = shopCheckEl("button", "primary", "＋ Add pieces");
+        tAdd.type = "button";
+        tAdd.addEventListener("click", function () { document.getElementById("addButton").click(); });
+        todayActions.appendChild(tAdd);
+        var tShop = shopCheckEl("button", "secondary", "Shop check");
+        tShop.type = "button";
+        tShop.addEventListener("click", function () { document.getElementById("shopCheckButton").click(); });
+        todayActions.appendChild(tShop);
+        root.appendChild(todayActions);
         getWeatherSummary().then(function (s) {
           if (s && token === todayState.renderToken) { wchip.textContent = s; wchip.hidden = false; }
         });
@@ -6677,8 +6709,11 @@
 
       // PC-14: shop compatibility check.
       var shopCheckState = null;
+      // Set when a check is started from a trip page (founder,
+      // 2026-10-24): the saved check lands tagged to that trip.
+      var pendingShopTripId = null;
       var shopCheckSheet = document.getElementById("shopCheckSheet");
-      function closeShopCheckSheet() { closeOverlay(shopCheckSheet); }
+      function closeShopCheckSheet() { pendingShopTripId = null; closeOverlay(shopCheckSheet); }
       document.getElementById("shopCheckButton").addEventListener("click", function () {
         if (!currentUser) { signIn(); return; }
         openOverlay(shopCheckSheet);
@@ -6693,6 +6728,9 @@
       });
       document.getElementById("shopSheetCancel").addEventListener("click", closeShopCheckSheet);
       shopCheckSheet.addEventListener("click", function (event) { if (event.target === shopCheckSheet) closeShopCheckSheet(); });
+      document.getElementById("shopListAddBtn").addEventListener("click", function () {
+        document.getElementById("shopCheckButton").click();
+      });
       document.getElementById("shopCheckInputCamera").addEventListener("change", function () {
         var file = this.files && this.files[0];
         this.value = "";
@@ -7081,8 +7119,10 @@
           photoPath: st.storagePath,
           photoUrl: st.photoUrl,
           item: r.item, score: r.score, verdict: r.verdict,
-          reasons: r.reasons, similarOwned: r.similarOwned, outfits: r.outfits
+          reasons: r.reasons, similarOwned: r.similarOwned, outfits: r.outfits,
+          tripId: pendingShopTripId || undefined
         }, "considering").then(function (id) {
+          pendingShopTripId = null;
           st.savedId = id;
           saveBtn.textContent = "Saved ✓";
           showToast("Saved to your shop list.");
