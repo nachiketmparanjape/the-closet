@@ -155,6 +155,15 @@
        box) and to the feedback form itself. */
     .feedback-fab { position: fixed; left: 14px; bottom: calc(84px + env(safe-area-inset-bottom)); z-index: 30; padding: 10px 14px; border-radius: 999px; background: var(--paper); color: var(--ink); border: 1px solid var(--line-strong); box-shadow: var(--shadow); font-size: 13.5px; font-weight: 600; cursor: pointer; }
     .feedback-fab[hidden] { display: none; }
+    /* Phones (founder, 2026-10-24): the labeled pill was big
+       enough to sit on real content — it covered a sheet
+       option outright. Icon-only 40px circle here, and it
+       steps aside entirely while any window is open (on a
+       phone every window owns the bottom of the screen). */
+    @media (max-width: 899px) {
+      .feedback-fab { width: 40px; height: 40px; padding: 0; border-radius: 50%; font-size: 15px; display: flex; align-items: center; justify-content: center; opacity: .94; }
+      .feedback-fab .fb-label { display: none; }
+    }
     .feedback-fab:hover { border-color: var(--ink); }
     /* UX-11: bottom-sheet chooser for the three ways to add an outfit. */
     .overlay.sheet-overlay { place-items: end center; padding: 0; }
@@ -1232,7 +1241,7 @@
   </div>
 
   <button class="chat-fab" id="chatFab" type="button"><span aria-hidden="true">✨</span><span>Ask the stylist</span></button>
-  <button class="feedback-fab" id="feedbackFab" type="button" hidden>✎ Feedback</button>
+  <button class="feedback-fab" id="feedbackFab" type="button" hidden aria-label="Send feedback">✎ <span class="fb-label">Feedback</span></button>
 
   <div class="overlay" id="feedbackOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="feedbackTitle">
     <section class="modal">
@@ -1532,6 +1541,10 @@
         if (!fab) return;
         var top = overlayStack[overlayStack.length - 1];
         var blocked = top && (top.id === "feedbackOverlay" || top.id === "chatOverlay");
+        // On phones every open window is a bottom sheet that
+        // owns the screen's lower half — the pill steps aside
+        // until it closes (founder: it covered sheet options).
+        if (!blocked && top && window.matchMedia("(max-width: 899px)").matches) blocked = true;
         fab.hidden = !(typeof currentUser !== "undefined" && currentUser) || !!blocked;
       }
       function openOverlay(el) {
