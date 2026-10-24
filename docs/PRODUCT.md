@@ -253,9 +253,12 @@ Decided topics stay as compact records; full reports live in `research_notes/`.
   teardowns): `~/workspace/studio/research_notes/closet-reference-apps.md`
   — admission = ≥1,000 US App Store ratings. Tracked: Alta
   (4.9★, ~17K), Whering (4.7★, ~11.9K), Stylebook, Pureple,
-  Fits, Acloset, Smart Closet, Indyx, Outfit Formulas (the
-  founder's find, 4.4★, ~1.2K — qualifies at the threshold;
-  formulas + community styling are the steal), Cladwell.
-  Combina + PutTogether sit below the bar as design-only.
-  Teardown queue: Alta → Whering → Acloset → Indyx → Fits →
-  Stylebook → Outfit Formulas.
+  Fits, Acloset, Essembl (founder's find #2, 2026-10-23:
+  4.5★, ~4.8K iOS + ~12K Android ratings, ~1.2M Android
+  installs — the closest product-shape comp: Today / Studio /
+  Rate my look / Shop tabs), Smart Closet, Indyx, Outfit
+  Formulas (the founder's find, 4.4★, ~1.2K — qualifies at
+  the threshold; formulas + community styling are the
+  steal), Cladwell. Combina + PutTogether sit below the bar
+  as design-only. Teardown queue: Alta → Essembl → Whering →
+  Acloset → Indyx → Fits → Stylebook → Outfit Formulas.
