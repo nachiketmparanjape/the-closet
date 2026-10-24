@@ -646,3 +646,26 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
 - **Status:** Not started. Filed 2026-10-21 from the founder's
   screenshots; sprint candidate — pairs with UX-14 (attack
   line 1) and PC-34.
+
+### NAMING-1: Short-name standard at the data level
+- **Problem (founder, 2026-10-23):** outfit titles and shop-item
+  titles render as full AI prose sentences ("White bear graphic
+  crew-neck tee + The North…", "An off-white running hat with a
+  dark green brim…") — wordy, truncated, ugly on cards. Teardown
+  evidence (Essembl APK pilot, 2026-10-23): reference apps never
+  title cards with prose; descriptions live in detail views.
+- **Interim fix shipped 2026-10-23 (fix buffer):** display-layer
+  formatters — outfit cards use the stylist look name, else hero
+  piece + "+ N more"; shop cards cut the note to a short noun
+  phrase. Stored data is still prose.
+- **Scope:** give items, outfits, and shop checks a real
+  `shortName` at creation time: describeItem and shopCheck return
+  a ≤5-word label alongside the description; stylist outfits keep
+  lookName as the short name; composer/photo outfits generate one
+  at save. One-time backfill for existing docs. Cards/detail
+  headers read shortName; full prose stays in detail bodies.
+- **Acceptance:** no card in Wardrobe, Outfits, Shop list, or
+  Today renders a title longer than ~6 words or ending mid-word;
+  detail views keep the full descriptions.
+- **Status:** Not started. Filed 2026-10-23 from the founder's
+  phone review + the Essembl pilot.
