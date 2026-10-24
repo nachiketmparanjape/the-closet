@@ -21,7 +21,11 @@ const { getClient, logAiFailure, reportUsage, MODEL_VERSION } = require("./descr
 const { codedError, logEvent } = require("./errors");
 
 const MAX_ITEMS = 500;
-const MAX_MESSAGES = 20;
+// UX-18 W5 (decision 7): the reading window is the last 50 messages
+// of the conversation — per conversation, stated honestly in-app when
+// a thread first passes it (the client adds the note; the doc's
+// windowNoted flag keeps it to once).
+const MAX_MESSAGES = 50;
 const MAX_TEXT = 2000;
 const MAX_PREFERENCES = 50;
 
@@ -89,6 +93,18 @@ function describeColors(colors) {
 // it is not a set of rigid rules. An intentional clash can be the right
 // call, but the model must explain why. Bump the version when edited;
 // the benchmark re-runs against every version.
+// UX-18 W5 (decision 5): the who-wins table as ONE stated block in
+// the brief — the same table CURRENT-STATE.md carries and
+// CONTEXT-MODEL.md specifies. Per-feature prose elsewhere in the
+// brief explains mechanics; when anything conflicts, this block is
+// the rule. One rulebook for every caller (decision 9).
+const PRECEDENCE = `WHO WINS — when instructions conflict, the higher line wins:
+1. The user's confirmed style notes (the STYLE PROFILE) beat everything else.
+2. A style word the user named for this conversation beats the learned taste profile.
+3. Pieces or outfits the user pointed at (@-references) beat the previous pick as the outfit being changed.
+4. Weather the user states in this conversation beats a pinned location/weather fact; a pinned fact beats the measured weather.
+5. An attached today's pick is the iteration base only when this conversation has no pick of its own yet.`;
+
 const RUBRIC_VERSION = "2026-10-15-v1";
 const RUBRIC = `STYLING RUBRIC ${RUBRIC_VERSION} — judge every outfit by these dimensions.
 The rubric guides; it does not dictate. An intentional clash, an unexpected
@@ -766,7 +782,7 @@ function assembleContext(input) {
 function buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, todayPick) {
   const model = process.env.GEMINI_MODEL || MODEL_VERSION;
   const wardrobe = items.map((it, i) => itemLine(it, i)).join("\n");
-  let system = SYSTEM;
+  let system = SYSTEM + "\n\n" + PRECEDENCE;
   const prefs = Array.isArray(styleProfile) ? styleProfile.filter(Boolean) : [];
   if (prefs.length) {
     system += "\n\nSTYLE PROFILE — the user's confirmed preferences. Honor them when recommending:\n" +
@@ -1336,4 +1352,4 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
   };
 }
 
-module.exports = { askStylist, buildStylistRequest, assembleContext, buildManifest, resolveIterBase, computeActivePins, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeTodayPick, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins, sanitizePinProposal, extractToolCall, extractToolCalls, mapUpdateTripPacking, mapSuggestTripOutfits, handleIndex, unwrapJsonReply, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM, VIBE_TAGS };
+module.exports = { askStylist, buildStylistRequest, assembleContext, buildManifest, resolveIterBase, computeActivePins, PRECEDENCE, MAX_MESSAGES, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeTodayPick, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins, sanitizePinProposal, extractToolCall, extractToolCalls, mapUpdateTripPacking, mapSuggestTripOutfits, handleIndex, unwrapJsonReply, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM, VIBE_TAGS };

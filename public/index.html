@@ -4242,6 +4242,24 @@
           });
         }
       }
+      // UX-18 W5 (decision 7): the honest window note — the first time
+      // a conversation passes the reading window, the thread itself
+      // says so, once (the flag is stored with the thread).
+      function maybeNoteWindow(key) {
+        if (threadWindowNoted[key]) return;
+        var list = key === activeThreadKey ? stylistMessages : (chatThreads[key] || []);
+        var count = 0;
+        list.forEach(function (m) { if (m.role === "user" || m.role === "model") count++; });
+        if (count <= STYLIST_WINDOW) return;
+        threadWindowNoted[key] = true;
+        list.push({
+          role: "note",
+          text: "This conversation is past " + STYLIST_WINDOW + " messages — from here, the stylist reads the most recent " + STYLIST_WINDOW + ". The full conversation stays saved.",
+          at: Date.now()
+        });
+        if (key === activeThreadKey) renderChat();
+        saveThread(key);
+      }
       // Start fresh (clarity mechanism 2's action): clears the current
       // thread's messages; the thread key — and the account — remain.
       function startFreshThread() {
@@ -4530,6 +4548,7 @@
           saveThread("general");
         }
         applyReturnDivider(activeThreadKey);
+        maybeNoteWindow(activeThreadKey);
         renderChat();
         renderTripChip();
         renderPinChip();
@@ -5030,6 +5049,7 @@
           chatSend.disabled = false;
           renderChat();
           saveThread(sentThreadKey);
+          maybeNoteWindow(sentThreadKey);
         });
       }
 

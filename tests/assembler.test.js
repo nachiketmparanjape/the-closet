@@ -112,12 +112,17 @@ describe("assembleContext + manifest", () => {
     const shy = buildManifest(baseInput({ vibeProfile: { confidence: 0.1, tags: { streetwear: 0.9 } } }), []);
     assert.equal(shy.learnedTaste.applied, false);
   });
-  it("messagesRead respects the reading window", () => {
+  it("messagesRead respects the reading window (W5: 50 per conversation)", () => {
     // buildManifest counts what it is handed; the sanitizer normally
     // pre-slices, so hand it a raw long list to pin the window math.
-    const many = Array.from({ length: 30 }, (_, i) => ({ role: "user", text: "m" + i }));
+    const many = Array.from({ length: 80 }, (_, i) => ({ role: "user", text: "m" + i }));
     const m = buildManifest(baseInput({ messages: many }), []);
-    assert.equal(m.messagesTotal, 30);
-    assert.equal(m.messagesRead, 20); // MAX_MESSAGES until W5 raises it to 50
+    assert.equal(m.messagesTotal, 80);
+    assert.equal(m.messagesRead, 50);
+  });
+  it("the brief carries the WHO WINS precedence block (W5, decision 5)", () => {
+    const out = assembleContext(baseInput({}));
+    assert.match(out.config.systemInstruction, /WHO WINS/);
+    assert.match(out.config.systemInstruction, /style notes .* beat everything/);
   });
 });
