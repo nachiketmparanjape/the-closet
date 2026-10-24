@@ -1136,3 +1136,41 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   pieces (photos first, link last) on a founder catch;
   `fetchLinkItem` body-read timeout fix shipped with it.
   Awaiting founder phone validation.
+
+### PC-51: Paste a photo from the clipboard (S)
+
+- **Origin:** Founder, 2026-10-24: copied a product image
+  from a website on his laptop and instinctively hit paste
+  in the app — "there is no way to paste. that's a huge
+  miss lol." Every intake route today demands a saved file
+  or the camera; the clipboard — the natural desktop
+  gesture when browsing products — is unsupported. It is
+  also the escape hatch for stores whose pages expose no
+  fetchable photo (Amazon serves fetchers a script shell
+  with no image tags at all; verified 2026-10-24 on the
+  founder's own a.co link → LINK_NO_IMAGE).
+- **In scope:** a document-level paste handler that
+  snapshots image files off the clipboard event (the
+  FileList lesson: copy them out immediately) and routes
+  by what's open — shop-check sheet open → shop check via
+  the PC-42 cropper (first image); Add pieces open → the
+  ordinary capture ingest (all images); nothing relevant
+  open → a small chooser (Add to wardrobe / Shop check).
+  Text pastes are never hijacked: if the clipboard carries
+  text, text fields keep it (pasting a link into the link
+  field must work exactly as today); the handler only
+  claims an image-only paste, or an image paste whose
+  target isn't a text field.
+- **Out of scope:** an explicit "Paste" button via the
+  async Clipboard API (permission prompts; revisit if the
+  keyboard route proves undiscoverable), drag-and-drop
+  (file if wanted separately), paste on the piece page.
+- **Acceptance:** on desktop — copy a product image in the
+  browser → open a shop check → Cmd/Ctrl+V → the cropper
+  opens with that image; open Add pieces → paste → the
+  capture flow takes it; paste with nothing open → the
+  chooser appears; pasting a link into either link field
+  still pastes text, untouched.
+- **Lane:** Catalogue + Stylist (intake). **Effort:** S.
+- **Status:** Filed sprint-ready 2026-10-24 (founder
+  report). Awaiting the founder's pull decision.
