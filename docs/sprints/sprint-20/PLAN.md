@@ -112,3 +112,11 @@ via the manual path, live-marker verification, SHIPPED.md +
 friction.md updated, founder phone validation is the final
 gate per the standing rule — no "verified" before his phone
 has done the thing.
+
+## Closeout (2026-10-24)
+
+All four cards shipped the same day: OBS-2 (`b2e5927`, live-smoke
+verified), PC-43 (`75ca1e2`), PC-39 (`dd66017`), PC-40 (`6cb0209`).
+Tests 290/290. Remaining founder gates: phone verdict on the design
+waves, a Hong Kong trip-page shop check (PC-40's real-world proof),
+the Replicate token (PC-34), and the UX-18 sit-down when called.
