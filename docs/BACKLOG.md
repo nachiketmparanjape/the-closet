@@ -26,11 +26,12 @@ One vision call on the cover photo → name, description,
 {pattern, fit, fabric_guess, formality, warmth}, cached in Firestore.
 Decided 2026-10-06 (research in `PRODUCT.md`).
 
-### BUG-1: Diagnose the upload bounce (S — diagnosis only) — PARKED
+### BUG-1: Diagnose the upload bounce (S — diagnosis only) — KILLED 2026-10-24
 2 of 8 uploads bounced to the home screen on 2026-10-05; cause unknown.
-Parked 2026-10-11 at the founder's call — it hasn't recurred. If it does,
-he'll report the details (saved or lost? app closed or back to gallery?)
-and diagnosis resumes; the fix becomes its own cut.
+Parked 2026-10-11 at the founder's call — it hasn't recurred. KILLED at
+the Sprint 20 planning walk (founder-approved disposition): three weeks
+of heavy uploading since, zero recurrence. If it ever recurs it re-files
+as a new card with real data.
 
 ## Sprint 3 (2026-10-29 → 2026-11-11) — APPROVED 2026-10-14
 
@@ -243,8 +244,8 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   - **Client side:** reportError already persists to `client_errors`;
     add session correlation so a user report ("it broke at 9:28")
     can be matched to the exact server call.
-- **Status:** Not started. Builds on OBS-1 (Sprint 15 fix buffer).
-  Sprint candidate — pull at a planning walk.
+- **Status:** IN SPRINT 20 (pulled at the 2026-10-24 walk,
+  ranked #1). Scope refined in the sprint plan.
 
 ### OBS-3: AI consumption analytics — cost attribution (M)
 - **Idea (founder 2026-10-23):** know exactly where AI spend
@@ -732,8 +733,9 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   the shown forecast updates; with no forecast available the
   pill says so and stays tappable.
 - **Lane:** Loop. **Effort:** S.
-- **Status:** Filed sprint-ready 2026-10-24 with the design
-  already chosen. First in line at the next planning walk.
+- **Status:** IN SPRINT 20 (pulled at the 2026-10-24 walk,
+  ranked #3). Filed sprint-ready 2026-10-24 with the design
+  already chosen.
 
 ### PC-40: Contextual shop checks — trip-aware by default, plus your own question (M)
 - **Origin:** Founder, 2026-10-24: "The shop check should not
@@ -766,8 +768,9 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   its detail; a generic check with a question also answers
   it; a check with neither behaves exactly as today.
 - **Lane:** Stylist. **Effort:** M.
-- **Status:** Filed sprint-ready 2026-10-24 (founder
-  direction). Competes at the next planning walk.
+- **Status:** IN SPRINT 20 (pulled at the 2026-10-24 walk,
+  ranked #4). Filed sprint-ready 2026-10-24 (founder
+  direction).
 
 ### PC-41: Follow-up chat on a shop check (M)
 - **Origin:** Founder, 2026-10-24: "people should be able to
@@ -869,7 +872,8 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   "Unidentified item" per the describe prompt's own rule,
   with the flag cleared.
 - **Lane:** Catalogue. **Effort:** S–M.
-- **Status:** Filed 2026-10-24. Data incident repaired the
+- **Status:** IN SPRINT 20 (pulled at the 2026-10-24 walk,
+  ranked #2). Filed 2026-10-24; data incident repaired the
   same night; this is the prevention half.
 
 ### UX-17 — Manual theme choice in Account (System / Light / Dark)
