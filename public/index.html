@@ -1207,7 +1207,7 @@
         <button class="icon-button" id="feedbackClose" type="button" aria-label="Close feedback">×</button>
       </div>
       <div class="modal-body">
-        <p class="hint" style="margin-top:0">Spotted a bug, confused by something, or wishing for a feature? Write it here — or just dictate it, the keyboard mic works.</p>
+        <p class="hint" style="margin-top:0">One person builds Closet — feedback is how it learns. Spotted a bug, confused by something, or wishing for a feature? Write it here; every note gets read. Dictating works too, the keyboard mic is fine.</p>
         <textarea class="feedback-text" id="feedbackText" rows="5" enterkeyhint="send"
           placeholder="What happened? What confused you? What do you wish it did?"></textarea>
         <div class="form-actions" style="margin-top:16px">
@@ -1985,9 +1985,13 @@
         }
         // Sprint 18: feedback lives here now — the floating button was
         // retired when the tab bar took the bottom edge (DESIGN.md §3).
+        // Founder (2026-10-24): give it the one-person pitch — a bare
+        // button reads as a utility; the invitation is the point.
+        body.appendChild(h("Feedback"));
+        body.appendChild(el("p", "hint", "One person builds Closet. Feedback is how it learns — if something could be better, say it here. Every note gets read; plenty get built."));
         var fb = el("button", "secondary", "Send feedback");
         fb.type = "button";
-        fb.style.marginTop = "16px";
+        fb.style.marginTop = "10px";
         fb.addEventListener("click", function () { closeOverlay(document.getElementById("accountOverlay")); openFeedback(); });
         body.appendChild(fb);
         // DESIGN-HOME-1: the Today home toggle (an opt-out since
