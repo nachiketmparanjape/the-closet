@@ -2092,6 +2092,13 @@
           b.type = "button";
           b.addEventListener("click", function () {
             if (!currentUser) return;
+            // Two-tap, same as the context sheet: deleting a
+            // permanent fact must never be a single stray tap.
+            if (!b.dataset.confirm) {
+              b.dataset.confirm = "1";
+              b.textContent = "Tap again to remove";
+              return;
+            }
             db.collection("users").doc(currentUser.uid).collection("context_pins")
               .doc(p.id).delete().catch(function (err) {
                 if (typeof reportError === "function") reportError("deletePin", err);
@@ -4478,9 +4485,16 @@
         return [];
       }
 
-      // Sprint 17: saves a confirmed pin. One active pin per kind — a new
-      // global pin replaces same-kind global pins (trip-scoped ones stay).
-      // A "remove" proposal deletes the matching pins instead.
+      // Sprint 17: saves a confirmed pin. A "remove" proposal
+      // deletes the matching pins instead. Replacement on save
+      // (revised 2026-10-24, founder's lost pin): location and
+      // weather facts are single-valued — you are in one place,
+      // in one set of conditions — so a new one replaces the old.
+      // Preferences are a LIST (the context model holds up to 20
+      // facts): the original replace-all rule silently deleted
+      // his permanent "trips are usually to national parks"
+      // preference the moment a later preference was saved.
+      // Preferences now dedupe only on an exact same-label match.
       function savePinProposal(m) {
         var p = m.pinProposal;
         if (!p || !currentUser) return;
@@ -4493,7 +4507,15 @@
           }));
           failMsg = "Removed — I won't use that anymore.";
         } else {
-          var olds = matchingPins(allPins, { kind: p.kind });
+          var olds;
+          if (p.kind === "location" || p.kind === "weather") {
+            olds = matchingPins(allPins, { kind: p.kind });
+          } else {
+            olds = (allPins || []).filter(function (x) {
+              return x && !x.tripId && x.kind === p.kind &&
+                String(x.label || "").toLowerCase() === String(p.label || "").toLowerCase();
+            });
+          }
           done = Promise.all(olds.map(function (x) {
             return col.doc(x.id).delete().catch(function () {});
           })).then(function () {
