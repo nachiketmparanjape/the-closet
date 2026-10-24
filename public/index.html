@@ -147,7 +147,14 @@
     /* FB-1: always-visible feedback entry point. Bottom-left so it never
        collides with the chat FAB; a word, not an icon, so its purpose is
        obvious without a tutorial. */
-    .feedback-fab { position: fixed; left: 18px; bottom: max(18px, env(safe-area-inset-bottom)); z-index: 15; padding: 12px 18px; border-radius: 999px; background: var(--paper); color: var(--ink); border: 1px solid var(--line); box-shadow: var(--shadow); font-size: 14px; font-weight: 600; cursor: pointer; }
+    /* FB-1 revived (founder, 2026-10-24): an always-available
+       feedback pill, lifted above the tab dock (same line as
+       the bulk pill, opposite corner) and above overlays, so a
+       note can start from whatever screen shows the problem.
+       It yields only to the chat (it would sit on the typing
+       box) and to the feedback form itself. */
+    .feedback-fab { position: fixed; left: 14px; bottom: calc(84px + env(safe-area-inset-bottom)); z-index: 30; padding: 10px 14px; border-radius: 999px; background: var(--paper); color: var(--ink); border: 1px solid var(--line-strong); box-shadow: var(--shadow); font-size: 13.5px; font-weight: 600; cursor: pointer; }
+    .feedback-fab[hidden] { display: none; }
     .feedback-fab:hover { border-color: var(--ink); }
     /* UX-11: bottom-sheet chooser for the three ways to add an outfit. */
     .overlay.sheet-overlay { place-items: end center; padding: 0; }
@@ -312,6 +319,14 @@
        right-edge panel on desktop. Never a floating card mid-screen. */
     #chatOverlay { place-items: end center; padding: 0; }
     #chatOverlay .modal { width: 100%; max-height: 92dvh; border-radius: var(--r-lg) var(--r-lg) 0 0; }
+    /* Founder (2026-10-24): the Add pieces window floated inside
+       18px margins, a touch too wide and showing a stray scroll
+       bar on his iPhone. It is a full task screen — on phones
+       it IS the screen: edge to edge, full height, no frame. */
+    @media (max-width: 899px) {
+      #captureOverlay { padding: 0; place-items: stretch; }
+      #captureOverlay .modal { width: 100%; height: 100dvh; max-height: none; border-radius: 0; }
+    }
     @media (min-width: 900px) {
       #chatOverlay { place-items: stretch end; }
       #chatOverlay .modal { width: 420px; height: 100%; max-height: none; border-radius: 0; }
@@ -391,7 +406,7 @@
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
     }
-    .chat-fab, .feedback-fab { display: none !important; }
+    .chat-fab { display: none !important; }
     .outfit-card { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-md); padding: 16px; margin-top: 8px; }
 
 /* Trips are few and text-heavy (destination + dates), so they render as
@@ -523,7 +538,7 @@
     .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
     .overlay { position: fixed; inset: 0; z-index: 20; background: rgba(12, 14, 12, 0); transition: background-color 260ms ease; display: grid; place-items: center; padding: 18px; }
-    .modal { width: min(700px, 100%); max-height: min(860px, calc(100vh - 36px)); overflow: auto; background: var(--paper); box-shadow: var(--shadow); border-radius: 8px; }
+    .modal { width: min(700px, 100%); max-height: min(860px, calc(100dvh - 36px)); overflow: auto; background: var(--paper); box-shadow: var(--shadow); border-radius: 8px; }
     .modal-head { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 23px 26px; border-bottom: 1px solid var(--line); background: var(--paper); }
     .modal-head h2 { margin: 0; font-family: "Closet Serif", serif; font-size: 26px; font-weight: 500; }
     .icon-button { width: 44px; height: 44px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: transparent; cursor: pointer; }
@@ -595,13 +610,24 @@
          14.5px so "Pick an outfit" fits a 360px screen. One
          media-query flip reverts to the stack if it feels
          cramped on his phone. */
-      .hero-copy { grid-template-columns: 1fr 1fr 1fr; }
+      .hero-copy { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .hero-copy .primary { grid-column: auto; font-size: 14.5px; padding-left: 6px; padding-right: 6px; }
       .hero-copy .secondary { font-size: 14.5px; padding-left: 6px; padding-right: 6px; }
       #addButton svg { display: none; }
       .today-actions .primary, .today-actions .secondary { min-height: 48px; }
       .utility { grid-template-columns: 1fr; }
       .filters { justify-content: flex-start; overflow: visible; }
+      /* One rhythm for the whole top stack (founder, 2026-10-24:
+         "spacing in this part of the app looks uneven"). Each
+         band had its own era's padding, and the compact hero's
+         rules outranked the mobile ones — so a signed-in phone
+         got 30px where a guest got 18px. Now: 12px inside the
+         hero, 16px around the utility band, 14px between
+         search and chips, in BOTH hero states. */
+      .hero.hero-compact { display: grid; grid-template-columns: 1fr; align-items: start; gap: 12px; padding: 18px 0 16px; }
+      .hero.hero-compact h1 { font-size: clamp(27px, 8vw, 34px); line-height: 1.05; }
+      .hero.hero-compact .hero-copy { flex: none; margin-left: 0; }
+      .utility { padding: 16px 0; gap: 14px; }
       .chip { padding-left: 10px; padding-right: 10px; }
       .gallery, .skeleton-grid { gap: 16px 10px; }
       .empty { grid-template-columns: 1fr; min-height: 0; }
@@ -756,7 +782,6 @@
         <div id="photoParseUnknown" class="hint" style="margin-top:8px"></div>
       </div>
       <div class="form-actions">
-        <button class="secondary" id="photoParseCancel" type="button">Cancel</button>
         <button class="primary" id="photoParseSave" type="button">Save outfit</button>
         <button class="primary" id="photoParseSaveWear" type="button" style="margin-left:8px" title="Save the outfit and log it as worn today">Save + log worn today</button>
       </div>
@@ -825,7 +850,6 @@
           <p>Add one photo and you'll fine-tune its details next. Add several, and each becomes its own piece — tagged automatically in the background.</p>
           <p class="capture-fine">Need more angles of a single piece? Add them later from the piece itself.</p>
         </div>
-        <button class="secondary" id="captureCancel" type="button">Cancel</button>
         <button class="link-button" id="captureGuideLink" type="button">First time? See the ways to add your clothes →</button>
       </div>
     </section>
@@ -895,7 +919,6 @@
           <textarea id="tripNotes" rows="2" placeholder="client dinners, lots of walking" maxlength="500"></textarea>
         </div>
         <div style="display:flex;gap:8px;margin-top:12px;">
-          <button class="secondary" id="tripCancel" type="button">Cancel</button>
           <button class="primary" id="tripSave" type="button" style="flex:1">Save trip</button>
         </div>
       </div>
@@ -1016,7 +1039,6 @@
           <p class="ai-tags" id="aiTags"></p>
         </div>
         <div class="form-actions">
-          <button class="secondary" id="uploadCancel" type="button">Cancel</button>
           <button class="primary" id="uploadSubmit" type="submit">Upload piece</button>
         </div>
       </form>
@@ -1051,7 +1073,6 @@
         <div class="progress" id="bulkProgress" hidden aria-label="Bulk upload progress"><span></span></div>
         <div class="form-actions">
           <button class="secondary" id="bulkStop" type="button" hidden>Stop</button>
-          <button class="secondary" id="bulkCancel" type="button">Close</button>
           <button class="primary" id="bulkStart" type="button" disabled>Add pieces</button>
         </div>
       </div>
@@ -1190,7 +1211,6 @@
         </div>
         <div class="form-actions detail-actions">
           <button class="danger" id="itemDelete" type="button">Delete</button>
-          <button class="secondary" id="itemCancel" type="button">Cancel</button>
           <button class="primary" id="itemSave" type="button">Save changes</button>
         </div>
       </div>
@@ -1198,7 +1218,7 @@
   </div>
 
   <button class="chat-fab" id="chatFab" type="button"><span aria-hidden="true">✨</span><span>Ask the stylist</span></button>
-  <button class="feedback-fab" id="feedbackFab" type="button" hidden>Feedback</button>
+  <button class="feedback-fab" id="feedbackFab" type="button" hidden>✎ Feedback</button>
 
   <div class="overlay" id="feedbackOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="feedbackTitle">
     <section class="modal">
@@ -1208,10 +1228,10 @@
       </div>
       <div class="modal-body">
         <p class="hint" style="margin-top:0">One person builds Closet — feedback is how it learns. Spotted a bug, confused by something, or wishing for a feature? Write it here; every note gets read. Dictating works too, the keyboard mic is fine.</p>
+        <p class="hint" id="feedbackContextLine" hidden></p>
         <textarea class="feedback-text" id="feedbackText" rows="5" enterkeyhint="send"
           placeholder="What happened? What confused you? What do you wish it did?"></textarea>
         <div class="form-actions" style="margin-top:16px">
-          <button class="secondary" id="feedbackCancel" type="button">Cancel</button>
           <button class="primary" id="feedbackSend" type="submit">Send</button>
         </div>
       </div>
@@ -1271,7 +1291,6 @@
           <input id="builderOccasion" maxlength="60" placeholder="e.g. dinner, work" />
         </div>
         <div class="form-actions">
-          <button class="secondary" id="builderCancel" type="button">Cancel</button>
           <button class="primary" id="builderSave" type="button" disabled>Save outfit</button>
         </div>
       </div>
@@ -1491,11 +1510,22 @@
       // an instant focus that jumps the layout (the card's
       // no-focus-theft rule).
       var overlayStack = [];
+      // FB-1 revived: the feedback pill's visibility follows the
+      // overlay stack — present everywhere except over the chat
+      // (it would sit on the typing box) and its own form.
+      function syncFeedbackFab() {
+        var fab = document.getElementById("feedbackFab");
+        if (!fab) return;
+        var top = overlayStack[overlayStack.length - 1];
+        var blocked = top && (top.id === "feedbackOverlay" || top.id === "chatOverlay");
+        fab.hidden = !(typeof currentUser !== "undefined" && currentUser) || !!blocked;
+      }
       function openOverlay(el) {
         if (el._ux15Timer) { window.clearTimeout(el._ux15Timer); el._ux15Timer = null; }
         el.classList.remove("is-closing");
         el.hidden = false;
         if (overlayStack.indexOf(el) === -1) overlayStack.push(el);
+        syncFeedbackFab();
         document.body.style.overflow = "hidden";
         requestAnimationFrame(function () {
           requestAnimationFrame(function () { el.classList.add("is-open"); });
@@ -1505,6 +1535,7 @@
         if (el.hidden || el.classList.contains("is-closing")) return;
         var i = overlayStack.indexOf(el);
         if (i !== -1) overlayStack.splice(i, 1);
+        syncFeedbackFab();
         el.classList.remove("is-open");
         el.classList.add("is-closing");
         var panel = el.querySelector(".modal, .sheet");
@@ -2147,6 +2178,7 @@
           authButton.removeAttribute("aria-label");
           authButton.textContent = "Account";
         }
+        syncFeedbackFab();
       }
 
       function createItemCard(item) {
@@ -2622,7 +2654,6 @@
       }
 
       document.getElementById("itemClose").addEventListener("click", closeItem);
-      document.getElementById("itemCancel").addEventListener("click", closeItem);
 
       itemSave.addEventListener("click", function () {
         if (!activeItem || !currentUser) return;
@@ -2802,7 +2833,6 @@
         closeOverlay(document.getElementById("accountOverlay"));
       });
       document.getElementById("uploadClose").addEventListener("click", function () { closeOverlay(uploadOverlay); });
-      document.getElementById("uploadCancel").addEventListener("click", function () { closeOverlay(uploadOverlay); });
       // Fix buffer 2026-10-23 (founder design): ONE capture screen.
       // The user never chooses single vs bulk — the photo count
       // routes: 1 photo → the piece form; several → bulk. Handing
@@ -2860,7 +2890,6 @@
         if (n) n.addEventListener("click", openGuide);
       });
       document.getElementById("captureClose").addEventListener("click", closeCapture);
-      document.getElementById("captureCancel").addEventListener("click", closeCapture);
       document.getElementById("captureFilesBtn").addEventListener("click", function () { document.getElementById("captureFilesInput").click(); });
       document.getElementById("captureCameraBtn").addEventListener("click", function () { document.getElementById("captureCameraInput").click(); });
       // Snapshot to a real Array BEFORE clearing the input: a live
@@ -3611,7 +3640,6 @@
         }
       }
       document.getElementById("bulkClose").addEventListener("click", minimizeBulk);
-      document.getElementById("bulkCancel").addEventListener("click", minimizeBulk);
       document.getElementById("bulkStop").addEventListener("click", requestBulkStop);
       document.getElementById("bulkDupeSkip").addEventListener("click", function () {
         var dupes = pendingDupes;
@@ -5089,7 +5117,6 @@
 
       document.getElementById("addTripBtn").addEventListener("click", function () { openTripEditor(null); });
       document.getElementById("tripClose").addEventListener("click", function () { closeOverlay(document.getElementById("tripOverlay")); });
-      document.getElementById("tripCancel").addEventListener("click", function () { closeOverlay(document.getElementById("tripOverlay")); });
       document.getElementById("tripSave").addEventListener("click", saveTrip);
       document.getElementById("tripDest").addEventListener("change", function () {
         var q = document.getElementById("tripDest").value.trim();
@@ -5142,14 +5169,59 @@
           text: text.slice(0, 5000),
           view: opts.view || "unknown",
           userAgent: (opts.userAgent || "").slice(0, 500),
+          context: opts.context || null,
         };
       }
       var feedbackOverlay = document.getElementById("feedbackOverlay");
       var feedbackFab = document.getElementById("feedbackFab");
       var feedbackText = document.getElementById("feedbackText");
       var feedbackSend = document.getElementById("feedbackSend");
+      var feedbackContext = null;
+      var FEEDBACK_SURFACES = {
+        captureOverlay: "the Add pieces screen",
+        bulkOverlay: "the bulk add screen",
+        shopCheckOverlay: "a shop check",
+        shopCheckDetailOverlay: "a saved shop check",
+        itemOverlay: "a piece's details",
+        uploadOverlay: "the piece form",
+        outfitOverlay: "an outfit",
+        builderOverlay: "the outfit builder",
+        composerOverlay: "the outfit picker",
+        tripOverlay: "the trip form",
+        guideOverlay: "the beginner guide",
+        accountOverlay: "the account page",
+        photoParseOverlay: "the outfit photo screen"
+      };
       function openFeedback() {
         if (!currentUser) { showToast("Please sign in to send feedback."); return; }
+        // Absorb the context of the screen the user is on
+        // (founder, 2026-10-24): the surface in front of them,
+        // the trip in play, today's look — attached to the
+        // note automatically so they only write what happened.
+        var topEl = overlayStack[overlayStack.length - 1];
+        var fbTrip = null;
+        if (typeof tripById === "function") {
+          if (activeTripId) fbTrip = tripById(activeTripId);
+          if (!fbTrip && typeof tripChat !== "undefined" && tripChat) fbTrip = tripById(tripChat.tripId);
+        }
+        var fbLook = null;
+        try {
+          var tw2 = todayState.picks[todayState.idx];
+          if (tw2 && tw2.outfit && tw2.outfit.lookName) fbLook = tw2.outfit.lookName;
+        } catch (e) {}
+        feedbackContext = {
+          surface: topEl ? (FEEDBACK_SURFACES[topEl.id] || null) : null,
+          tripName: fbTrip ? (fbTrip.name || null) : null,
+          todayLook: fbLook
+        };
+        var line = document.getElementById("feedbackContextLine");
+        var bits = [];
+        if (feedbackContext.surface) bits.push(feedbackContext.surface);
+        if (feedbackContext.tripName) bits.push("the " + feedbackContext.tripName + " trip");
+        if (bits.length) {
+          line.textContent = "This note will mention you were on " + bits.join(", ") + ".";
+          line.hidden = false;
+        } else line.hidden = true;
         feedbackText.value = "";
         openOverlay(feedbackOverlay);
         // User gesture → iOS allows programmatic focus; keyboard (and its
@@ -5159,7 +5231,6 @@
       function closeFeedback() { closeOverlay(feedbackOverlay); }
       feedbackFab.addEventListener("click", openFeedback);
       document.getElementById("feedbackClose").addEventListener("click", closeFeedback);
-      document.getElementById("feedbackCancel").addEventListener("click", closeFeedback);
       feedbackSend.addEventListener("click", function () {
         if (!currentUser || !db) { showToast("Please sign in to send feedback."); return; }
         var doc;
@@ -5169,6 +5240,7 @@
             text: feedbackText.value,
             view: feedbackView,
             userAgent: navigator.userAgent,
+            context: feedbackContext,
           });
         } catch (e) {
           showToast("Write a little something first.");
@@ -6931,12 +7003,6 @@
           if (st && st.file) handleShopCheckFile(st.file);
         });
         actions.appendChild(retry);
-        var done = document.createElement("button");
-        done.type = "button";
-        done.className = "secondary";
-        done.textContent = "Done";
-        done.addEventListener("click", function () { closeOverlay(document.getElementById("shopCheckOverlay")); });
-        actions.appendChild(done);
         wrap.appendChild(actions);
         body.appendChild(wrap);
       }
@@ -7189,10 +7255,6 @@
           });
           actions.appendChild(add);
         }
-        var done = el("button", "secondary", "Done");
-        done.type = "button";
-        done.addEventListener("click", function () { closeOverlay(document.getElementById("shopCheckOverlay")); });
-        actions.appendChild(done);
         body.appendChild(actions);
       }
 
@@ -7512,10 +7574,6 @@
           }).catch(function (err) { showToast(friendlyError(err)); });
         });
         actions.appendChild(del);
-        var done = el("button", "secondary", "Done");
-        done.type = "button";
-        done.addEventListener("click", function () { closeOverlay(document.getElementById("shopCheckDetailOverlay")); });
-        actions.appendChild(done);
         body.appendChild(actions);
 
         openOverlay(document.getElementById("shopCheckDetailOverlay"));
@@ -7534,11 +7592,9 @@
         if (file) handlePhotoParseFile(file);
       });
       document.getElementById("photoParseClose").addEventListener("click", function () { closePhotoParse(true); });
-      document.getElementById("photoParseCancel").addEventListener("click", function () { closePhotoParse(true); });
       document.getElementById("photoParseSave").addEventListener("click", function () { savePhotoParseOutfit(false); });
       document.getElementById("photoParseSaveWear").addEventListener("click", function () { savePhotoParseOutfit(true); });
       document.getElementById("builderClose").addEventListener("click", closeBuilder);
-      document.getElementById("builderCancel").addEventListener("click", closeBuilder);
       document.getElementById("builderSave").addEventListener("click", function () {
         if (builderSelection.length < 2) { showToast("Pick at least 2 pieces."); return; }
         var sel = builderSelection.slice();
