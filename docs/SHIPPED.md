@@ -25,6 +25,11 @@ What went live. Momentum you can see.
   list falls back to its note). Acceptance verified against a
   deliberately corrupted throwaway doc (flagged on 6 kinds,
   then deleted).
+  Follow-up (founder-approved, same day): the 8 v1-remnant
+  items were normalized — `scripts/normalize-v1-colors.js`
+  built their `colors` arrays with the app's own
+  buildColorsFromAI + palette module; the census now reports
+  only the one benign historical check.
 - **UX-17 — Manual theme choice** (Sprint 21, 2026-10-24):
   Account → Appearance: System / Light / Dark, stored per
   device. A head resolver stamps data-theme before first paint
