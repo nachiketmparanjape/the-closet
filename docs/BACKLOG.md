@@ -571,6 +571,14 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   prototype on the PC-34 matting core, judged on the
   founder's real outfit photos before any build is sized.
 
+- **Alta benchmark (teardown P3, 2026-10-24):** Alta's
+  Prettify does this today (selfie → isolated pieces, per
+  their own post and an independent stylist's hands-on). It
+  is the acceptance bar for any PC-36 prototype: match its
+  one-photo-to-pieces-and-outfit shape before calling the
+  shape proven. Not a new card — the teardown point lives
+  here. Still gated on PC-34's token.
+
 ### PC-37: Trip chat is a full stylist room — outfit suggestions you can add
 - **Size:** M
 - **Value:** Founder, from an experimenting session
@@ -954,3 +962,143 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   flagged.
 - **Lane:** platform/observability. **Effort:** S.
 - **Status:** DONE 2026-10-24 (Sprint 21).
+
+### PC-44: Non-photo catalogue intake — link & lookup first (L)
+
+- **Origin:** Alta teardown P3, saved by the founder
+  2026-10-24. Alta offers receipt forwarding, a product
+  database, pasted links, and photo→original-image lookup;
+  reviewers confirm they work.
+- **Problem:** our intake is photo-only, and cataloguing
+  cost is the product's core hurdle (UX-14). A piece you
+  just bought online already has a perfect product photo —
+  making the user re-photograph it is pure friction.
+- **In scope (first slice):** paste a product link (or pick
+  from a small lookup) at add-time → the app fetches the
+  retail image + name/details as the draft; the source is
+  labeled on the item ("retail photo — not yours") and the
+  user can replace it with their own photo anytime.
+- **Out of scope:** receipt forwarding (a later slice),
+  scraping retailers that block it, price/affiliate data,
+  silently substituting a found image for the user's photo
+  (PC-34 doctrine: originals always retained, labeled).
+- **Acceptance:** paste a link for a real product → a draft
+  piece appears with the retail photo + suggested fields,
+  source-labeled; saving works; swapping in your own photo
+  later keeps everything else.
+- **Lane:** Catalogue. **Effort:** L.
+- **Status:** Filed from teardown 2026-10-24 (founder-saved).
+  Competes at the next planning walk.
+
+### PC-45: Explain-the-no → a proposed, confirmable style rule (M)
+
+- **Origin:** Alta teardown P3, saved by the founder
+  2026-10-24 (evidence second-hand: a hands-on review
+  describes thumbs-down + reason → style rules at Alta).
+- **Problem:** our learning hears only post-wear ratings
+  and reflection. The earlier signal — "not this, because…"
+  at suggestion time — evaporates.
+- **In scope:** when the user rejects a pick with a reason,
+  the app may PROPOSE a style rule ("skip wide-leg trousers")
+  as a visible, confirmable pin — never learned silently
+  (context-pin discipline); confirmed rules feed the
+  stylist prompt and show in the profile.
+- **Out of scope:** free-text rule editing v1, learning
+  from unconfirmed rejections.
+- **Acceptance:** reject a pick with a reason → a rule is
+  proposed, not applied; confirming it changes later picks;
+  dismissing it leaves no trace.
+- **Lane:** Personalization + Stylist. **Effort:** M.
+- **Status:** HELD for UX-18 (founder-saved 2026-10-24, but
+  it extends the chat's learning loop — queues behind the
+  bottom-up redesign like PC-38/PC-41).
+
+### PC-46: Candidate-piece outfit previews inside shop check (M)
+
+- **Origin:** Alta teardown P3, saved by the founder
+  2026-10-24. Alta generates outfits including a not-yet-
+  owned wishlist piece.
+- **Problem:** PC-40's check judges a candidate in prose
+  only — "would work with your navy trousers" is a claim
+  the user cannot see.
+- **In scope:** the check result shows 1–2 concrete outfit
+  previews built around the candidate + owned pieces
+  (existing pick machinery, candidate slotted in), so the
+  verdict is visible, not just asserted.
+- **Out of scope:** retail feeds, links, prices (VISION's
+  no-commerce rule); candidates the user didn't supply.
+- **Acceptance:** check a candidate → the result includes
+  outfit previews naming real owned pieces; previews use
+  the same composer as Today picks.
+- **Lane:** Stylist. **Effort:** M.
+- **Status:** Filed from teardown 2026-10-24 (founder-
+  saved). Any chat-shaped follow-up waits for UX-18;
+  the result-surface version competes at the next walk.
+
+### PC-47: Forgotten-pieces utilization surface (S/M)
+
+- **Origin:** Alta teardown P3, saved by the founder
+  2026-10-24. Alta sorts by most/least worn with a wear
+  calendar; its founding premise is people wear a small
+  fraction of their closet.
+- **Problem:** we store every wear event and expose no
+  aggregate view — the Loop lane has data with no surface.
+- **In scope:** a wardrobe view sorted by wear (most /
+  least / never), each neglected piece ending in an action
+  ("build a look around this") that routes to the stylist
+  with that piece pinned. Feeds the open exploration-vs-
+  exploitation question in PERSONALIZATION.md.
+- **Out of scope:** cost-per-wear (no price field exists),
+  guilt mechanics, streaks.
+- **Acceptance:** open the view → pieces order by real
+  wear counts; a never-worn piece can start a look in one
+  tap.
+- **Lane:** Loop + Personalization. **Effort:** S/M.
+- **Status:** Filed from teardown 2026-10-24 (founder-
+  saved). Competes at the next planning walk.
+
+### PC-48: Activity + luggage-aware trip planning (M/L)
+
+- **Origin:** Alta teardown P3, saved by the founder
+  2026-10-24 (Alta's own trip posts: per-activity planning
+  across cities/climates, luggage size as an input, every
+  packed item tied to a planned outfit).
+- **Problem:** our trips are single-destination-first;
+  activities live in free-text notes the planner cannot
+  use; nothing respects a luggage constraint.
+- **In scope:** activities as structured trip input (a
+  short list per leg: e.g. hiking, dinner, work) shaping
+  the packing plan; a luggage choice (carry-on / checked)
+  capping the plan's volume; packed items stay tied to
+  the outfits they serve.
+- **Out of scope:** shareable lookbook links (a separate
+  privacy decision), multi-city routing beyond legs as
+  they exist today.
+- **Acceptance:** a trip with activities + carry-on gets
+  a visibly smaller, activity-shaped plan vs the same
+  trip without them.
+- **Lane:** Outfits (trips). **Effort:** M/L.
+- **Status:** Filed from teardown 2026-10-24 (founder-
+  saved). Competes at the next planning walk.
+
+### PC-49: Personal avatar outfit preview (L)
+
+- **Origin:** Alta teardown P3, saved by the founder
+  2026-10-24. Alta's breakout surface (outfits rendered
+  on a personal avatar). Ranked last by the teardown on
+  purpose.
+- **Problem it would solve:** seeing a pick "on you"
+  before wearing it. Against it: reviewers in both
+  directions call Alta's an impression, not fit; body-
+  photo sensitivity; worst fit-to-effort ratio today.
+- **In scope (when the trigger fires):** a design spike
+  only — what an honest, labeled "impression, not fit"
+  preview would take with our extraction stack.
+- **Out of scope:** any build before the spike; marketing
+  it as fit evidence, ever.
+- **Acceptance:** the spike returns a go/no-go with the
+  honesty labeling designed in.
+- **Lane:** Stylist + Outfits. **Effort:** L.
+- **Status:** Parked with a trigger (founder-saved
+  2026-10-24): revisit after PC-34 is live AND the PC-36
+  prototype has a verdict.
