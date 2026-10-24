@@ -273,6 +273,8 @@
     .context-line { display: block; width: 100%; text-align: left; background: none; border: none; border-bottom: 1px solid var(--line); padding: 2px 2px 10px; margin-bottom: 10px; font: inherit; font-size: 13px; color: var(--muted); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .context-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
     .context-row-label { font-size: 14px; color: var(--ink); }
+    /* UX-18 W4/W5: in-thread system rows (return divider, saved/window notes). */
+    .chat-msg.divider, .chat-msg.note { align-self: center; background: none; border: none; color: var(--muted); font-size: 12.5px; text-align: center; padding: 4px 12px; max-width: 85%; }
     .chat-list { display: flex; flex-direction: column; gap: 8px; max-height: 52vh; overflow-y: auto; margin: 0 0 12px; }
     .chat-msg { max-width: 88%; padding: 9px 13px; border-radius: var(--r-md); font-size: 15px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: break-word; }
     /* DESIGN-CHAT-1 (§10): the chat's first-run moment — serif, one
@@ -4058,11 +4060,202 @@
       // suggested, sent with the trip payload so repeat asks produce
       // new outfits instead of the same ones again.
       var chatThreadSuggested = {};
+      // UX-18 W4 (threads, decision 6): conversations are SAVED — one
+      // Firestore doc per thread key under the user's account
+      // (chat_threads/{key}: the whole transcript + updatedAt). The
+      // app stops forgetting; it does not become a chat product: no
+      // thread list, no titles, keys are exactly the ones threads-lite
+      // already used. The full transcript is stored; the reading
+      // window (W5) applies only to what the assembler reads.
+      var threadLoaded = {};
+      var threadWindowNoted = {};
+      var threadUid = null;
+      function threadRef(key) {
+        return db.collection("users").doc(currentUser.uid).collection("chat_threads").doc(key);
+      }
+      function serializeMessages(list) {
+        return (list || []).filter(function (m) { return m && !m.thinking; }).map(function (m) {
+          var o = { role: m.role, text: m.text || "", at: m.at || 0 };
+          if (m.outfit) o.outfit = m.outfit;
+          if (m.pinProposal) o.pinProposal = m.pinProposal;
+          if (m.pinState) o.pinState = m.pinState;
+          if (m.refLabels) o.refLabels = m.refLabels;
+          if (m.tripOutfits) o.tripOutfits = m.tripOutfits;
+          if (m.tripSaveCtx) o.tripSaveCtx = m.tripSaveCtx;
+          return o;
+        });
+      }
+      function saveThread(key) {
+        if (!currentUser || typeof db === "undefined" || !db) return Promise.resolve();
+        var list = key === activeThreadKey ? stylistMessages : (chatThreads[key] || []);
+        return threadRef(key).set({
+          messages: serializeMessages(list),
+          windowNoted: !!threadWindowNoted[key],
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true }).catch(function (err) {
+          if (typeof reportError === "function") reportError("saveThread", err);
+        });
+      }
+      function rebuildSuggested(key, msgs) {
+        var acc = [];
+        (msgs || []).forEach(function (m) {
+          if (Array.isArray(m.tripOutfits)) {
+            m.tripOutfits.forEach(function (s) { if (s && s.itemIds) acc.push(s.itemIds); });
+          }
+        });
+        chatThreadSuggested[key] = acc;
+      }
+      function loadThread(key, done) {
+        if (!currentUser || typeof db === "undefined" || !db) { if (done) done([]); return; }
+        threadRef(key).get().then(function (snap) {
+          var msgs = [];
+          var noted = false;
+          if (snap.exists) {
+            var d = snap.data() || {};
+            msgs = Array.isArray(d.messages) ? d.messages : [];
+            noted = !!d.windowNoted;
+          }
+          // Race guard: if the user started talking before this load
+          // landed, local messages win their place by merge (by
+          // timestamp), never by overwrite — history is not lost to
+          // a slow first read.
+          var local = key === activeThreadKey ? stylistMessages : (chatThreads[key] || []);
+          if (local && local.length && local !== msgs) {
+            var seen = {};
+            var merged = [];
+            msgs.concat(local).forEach(function (m) {
+              var k = (m.at || 0) + "|" + m.role + "|" + (m.text || "").slice(0, 60);
+              if (seen[k]) return;
+              seen[k] = true;
+              merged.push(m);
+            });
+            merged.sort(function (a, b) { return (a.at || 0) - (b.at || 0); });
+            msgs = merged;
+            chatThreads[key] = msgs;
+            if (key === activeThreadKey) stylistMessages = msgs;
+            saveThread(key);
+          }
+          chatThreads[key] = msgs;
+          threadLoaded[key] = true;
+          threadWindowNoted[key] = noted;
+          rebuildSuggested(key, msgs);
+          if (key === activeThreadKey) stylistMessages = msgs;
+          if (done) done(msgs);
+        }).catch(function (err) {
+          if (typeof reportError === "function") reportError("loadThread", err);
+          chatThreads[key] = chatThreads[key] || [];
+          threadLoaded[key] = true;
+          if (done) done(chatThreads[key]);
+        });
+      }
+      // The return divider (clarity mechanism 1): reopening a thread
+      // after a gap shows where the conversation left off, so a saved
+      // conversation reads as a resumption, not a pre-filled screen.
+      function applyReturnDivider(key) {
+        if (key !== activeThreadKey) return;
+        var list = stylistMessages;
+        if (!list.length) return;
+        var last = null;
+        for (var i = list.length - 1; i >= 0; i--) {
+          if (list[i].role !== "divider") { last = list[i]; break; }
+        }
+        if (!last || !last.at) return;
+        var now = new Date();
+        var then = new Date(last.at);
+        var sameDay = then.toDateString() === now.toDateString();
+        if (sameDay && now.getTime() - then.getTime() < 6 * 3600 * 1000) return;
+        list.push({
+          role: "divider",
+          text: sameDay ? "Continuing from earlier today"
+            : "Continuing from " + then.toLocaleDateString(undefined, { weekday: "long" }),
+          at: Date.now()
+        });
+        saveThread(key);
+        renderChat();
+      }
+      // The one-time notice (clarity mechanism 3): the first saved
+      // conversation per account says, once, that saving is a thing.
+      function applySavedNotice() {
+        if (activeThreadKey !== "general" || !currentUser || typeof db === "undefined" || !db) return;
+        var sref = db.collection("users").doc(currentUser.uid).collection("settings").doc("app");
+        sref.get().then(function (snap) {
+          var d = snap.exists ? (snap.data() || {}) : {};
+          if (d.chatThreadsNoticeSeen || activeThreadKey !== "general") return;
+          stylistMessages.push({
+            role: "note",
+            text: "Conversations are saved now — this one will be here when you come back. Start fresh any time from the context sheet (tap the line above).",
+            at: Date.now()
+          });
+          saveThread("general");
+          renderChat();
+          sref.set({ chatThreadsNoticeSeen: true }, { merge: true }).catch(function () {});
+        }).catch(function () {});
+      }
+      function watchThreads(user) {
+        var uid = user ? user.uid : null;
+        if (uid === threadUid) return;
+        threadUid = uid;
+        chatThreads = {};
+        threadLoaded = {};
+        threadWindowNoted = {};
+        threadManifests = {};
+        chatThreadSuggested = {};
+        if (activeThreadKey !== "general") { activeThreadKey = "general"; stylistMessages = []; }
+        if (uid) {
+          loadThread("general", function () {
+            if (activeThreadKey === "general") {
+              applySavedNotice();
+              applyReturnDivider("general");
+            }
+          });
+        }
+      }
+      function seedTripAnchorIfEmpty() {
+        if (!tripChat || stylistMessages.length) return;
+        var trip = tripById(tripChat.tripId);
+        if (!trip) return;
+        var leg = (trip.legs && trip.legs[0]) || {};
+        stylistMessages.push({
+          role: "model",
+          text: "You're tweaking the *" + (trip.name || "trip") + "* packing (" +
+            fmtTripDates(leg) + ") — tell me what to change and I'll update it.",
+          at: Date.now()
+        });
+        saveThread(activeThreadKey);
+      }
       function switchThread(key) {
         if (key === activeThreadKey) return;
         chatThreads[activeThreadKey] = stylistMessages;
+        saveThread(activeThreadKey);
         activeThreadKey = key;
         stylistMessages = chatThreads[key] || [];
+        if (threadLoaded[key]) {
+          applyReturnDivider(key);
+        } else if (currentUser) {
+          loadThread(key, function () {
+            if (activeThreadKey !== key) return;
+            stylistMessages = chatThreads[key] || [];
+            applyReturnDivider(key);
+            if (key.indexOf("trip:") === 0) seedTripAnchorIfEmpty();
+            renderChat();
+            renderContextLine();
+          });
+        }
+      }
+      // Start fresh (clarity mechanism 2's action): clears the current
+      // thread's messages; the thread key — and the account — remain.
+      function startFreshThread() {
+        var key = activeThreadKey;
+        stylistMessages = [];
+        chatThreads[key] = [];
+        chatThreadSuggested[key] = [];
+        threadManifests[key] = null;
+        threadWindowNoted[key] = false;
+        saveThread(key);
+        renderChat();
+        renderContextLine();
+        closeOverlay(document.getElementById("contextSheet"));
+        showToast("Fresh conversation — the stylist starts clean here.");
       }
       var chatBusy = false;
       // Sprint 16 (TRIPCHAT-1): trip mode — null, or { tripId } while the
@@ -4124,6 +4317,15 @@
           chatList.appendChild(empty);
         }
         stylistMessages.forEach(function (m) {
+          // UX-18 W4/W5: system rows (return divider, saved/window
+          // notes) render as quiet centered lines, not bubbles.
+          if (m.role === "divider" || m.role === "note") {
+            var sys = document.createElement("div");
+            sys.className = "chat-msg " + m.role;
+            sys.textContent = m.text;
+            chatList.appendChild(sys);
+            return;
+          }
           var div = document.createElement("div");
           div.className = "chat-msg " + m.role + (m.thinking ? " thinking" : "");
           // PC-22: show @-referenced pieces/outfits inside the sent bubble.
@@ -4213,6 +4415,7 @@
         dismiss.addEventListener("click", function () {
           m.pinState = "dismissed";
           renderChat();
+          saveThread(activeThreadKey);
         });
         row.appendChild(save);
         row.appendChild(dismiss);
@@ -4275,7 +4478,7 @@
         }).catch(function (err) {
           if (typeof reportError === "function") reportError("savePinProposal", err);
           showToast(friendlyError(err));
-        }).then(function () { renderChat(); });
+        }).then(function () { renderChat(); saveThread(activeThreadKey); });
       }
 
       // PC-10: flatten items for the stylist prompt. PC-8: reads the v2
@@ -4315,12 +4518,18 @@
       function openChat() {
         if (!configured) { setupRequired(); return; }
         if (!currentUser) { signIn(); return; }
-        if (!stylistMessages.length) {
+        // UX-18 W4: the greeting seeds only a loaded, empty general
+        // thread — a saved conversation resumes as itself (with its
+        // return divider), never under a fresh greeting.
+        if (!stylistMessages.length && activeThreadKey === "general" && threadLoaded[activeThreadKey]) {
           stylistMessages.push({
             role: "model",
-            text: "Hi! Tell me the occasion, the weather, and anything you're feeling — I'll put together an outfit from your wardrobe."
+            text: "Hi! Tell me the occasion, the weather, and anything you're feeling — I'll put together an outfit from your wardrobe.",
+            at: Date.now()
           });
+          saveThread("general");
         }
+        applyReturnDivider(activeThreadKey);
         renderChat();
         renderTripChip();
         renderPinChip();
@@ -4342,15 +4551,9 @@
         tripChat = { tripId: tripId };
         switchThread("trip:" + tripId);
         // Anchor only a brand-new trip thread — a resumed one keeps
-        // its history (and its context) intact.
-        if (!stylistMessages.length) {
-          var leg = (trip.legs && trip.legs[0]) || {};
-          stylistMessages.push({
-            role: "model",
-            text: "You're tweaking the *" + (trip.name || "trip") + "* packing (" +
-              fmtTripDates(leg) + ") — tell me what to change and I'll update it."
-          });
-        }
+        // its history (and its context) intact. If the thread is
+        // still loading, switchThread's callback seeds it instead.
+        if (threadLoaded["trip:" + tripId]) seedTripAnchorIfEmpty();
         renderPinChip();
         renderChatTodayStrip();
         openChat();
@@ -4512,6 +4715,20 @@
         win.className = "hint";
         win.textContent = "The stylist reads the most recent " + STYLIST_WINDOW + " messages of this conversation.";
         list.appendChild(win);
+        // UX-18 W4: Start fresh lives here — visible from inside the
+        // conversation, two taps (the second is the confirm).
+        var freshRow = document.createElement("div");
+        freshRow.className = "context-row";
+        var fl = document.createElement("span");
+        fl.className = "context-row-label";
+        fl.textContent = "Start fresh — clear this conversation";
+        freshRow.appendChild(fl);
+        var fb = sheetActionBtn("Start fresh", function () {
+          if (fb.dataset.confirm) startFreshThread();
+          else { fb.dataset.confirm = "1"; fb.textContent = "Tap again to clear"; }
+        });
+        freshRow.appendChild(fb);
+        list.appendChild(freshRow);
         openOverlay(document.getElementById("contextSheet"));
       }
 
@@ -4673,11 +4890,12 @@
         var refLabels = chatRefs.articles.concat(chatRefs.outfits).map(function (r) {
           return { kind: r.kind, label: r.label };
         });
-        var userMsg = { role: "user", text: text };
+        var userMsg = { role: "user", text: text, at: Date.now() };
         if (refLabels.length) userMsg.refLabels = refLabels;
         stylistMessages.push(userMsg);
-        var thinking = { role: "model", text: "Thinking…", thinking: true };
+        var thinking = { role: "model", text: "Thinking…", thinking: true, at: Date.now() };
         stylistMessages.push(thinking);
+        saveThread(activeThreadKey);
         renderChat();
         chatBusy = true;
         chatSend.disabled = true;
@@ -4708,7 +4926,10 @@
         }
         var payload = {
           items: stylistItems(),
-          messages: stylistMessages.filter(function (m) { return !m.thinking; }),
+          // UX-18 W4/W5: the thread may hold the whole transcript;
+          // the wire carries the reading window plus margin — the
+          // server's sanitizer applies the exact window.
+          messages: stylistMessages.filter(function (m) { return !m.thinking; }).slice(-55),
           previousPick: previousPick,
           todayPick: todayPickCtx,
           // Sprint 13: explicit vibe handle ("dress me streetwear tonight").
@@ -4789,6 +5010,7 @@
                 ? "Packing updated — " + (d.toolCall.whatChanged || "got it.")
                 : "I couldn't apply those changes to your packing — mind rephrasing?";
               renderChat();
+              saveThread(sentThreadKey);
             });
           } else {
             thinking.text = d.reply || "Hmm, I couldn't put that together — try again?";
@@ -4807,6 +5029,7 @@
           chatBusy = false;
           chatSend.disabled = false;
           renderChat();
+          saveThread(sentThreadKey);
         });
       }
 
@@ -5750,6 +5973,10 @@
         if (!window.confirm('Delete "' + (trip.name || "this trip") + '"?')) return;
         db.collection("users").doc(currentUser.uid).collection("trips").doc(trip.id).delete()
           .then(function () {
+            // UX-18 W4: a trip's thread retires with its trip.
+            threadRef("trip:" + trip.id).delete().catch(function () {});
+            delete chatThreads["trip:" + trip.id];
+            delete threadLoaded["trip:" + trip.id];
             activeTripId = null;
             switchView("trips");
             showToast("Trip deleted.");
@@ -9126,6 +9353,7 @@
             watchShopChecks(user); // PC-28
             watchTrips(user); // Sprint 15 (PC-29 Phase 1)
             watchPins(user); // Sprint 17 (context pins)
+            watchThreads(user); // UX-18 W4 (saved conversations)
             syncTodayChrome(); // DESIGN-HOME-1
             watchTodaySettings(user); // fix buffer 5: server-side toggle
             watchTodayPicks(user); // fix buffer 5: cross-device picks

@@ -33,6 +33,13 @@ service cloud.firestore {
       allow read, create, update, delete:
         if request.auth != null && request.auth.uid == userId;
     }
+    // UX-18 W4 (threads): saved stylist conversations — one doc per
+    // thread key ("general", "trip:<id>"), the transcript as a messages
+    // array. Owner-only, same posture as trips.
+    match /users/{userId}/chat_threads/{threadId} {
+      allow read, create, update, delete:
+        if request.auth != null && request.auth.uid == userId;
+    }
     // Sprint 17 (CONTEXT PINS): confirmed current facts — location,
     // weather, preferences. Owner-only CRUD; kind is a fixed enum and
     // the label is short (detail lives in the prose fields).
