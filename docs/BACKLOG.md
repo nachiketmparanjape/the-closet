@@ -1257,5 +1257,5 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   intro UI anywhere.
 - **Lane:** Catalogue (onboarding surface). **Effort:** S.
 - **Status:** Filed 2026-10-24 with the design; founder
-  validation pending, then it enters via a planning walk
-  or his direct call.
+  reviewed it the same day and parked it — it enters work
+  only via the next planning walk.
