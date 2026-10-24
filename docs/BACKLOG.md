@@ -702,3 +702,118 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
 - **Status:** Filed sprint-ready 2026-10-24 (teardown P3
   adoption). Competes at the next planning walk — adoption
   is not scheduling.
+
+### PC-39: Trip weather re-check — the pill is the retry (S)
+- **Origin:** Founder, 2026-10-24. The trip page shows a frozen
+  `packing.weatherSnapshot` from plan time; if the forecast
+  wasn't available then (trip beyond Open-Meteo's 16-day
+  window) or has since changed, nothing ever refreshes it.
+- **Design (founder-approved 2026-10-24, "Option 1"):** no new
+  button. The weather pill under the trip dates becomes the
+  retry: tappable, shows "Checking weather…" during a fetch,
+  then the fresh forecast or "Forecast not available yet —
+  tap to check again". Plus a silent assist: opening a trip
+  whose forecast is missing or >3h old re-checks in the
+  background. A successful refresh updates the stored
+  snapshot (and therefore the packing summary's weather line).
+- **In scope:** tappable pill states (snapshot / checking /
+  unavailable), staleness guard so watcher re-renders never
+  spam the API (per-trip checked-at, 3h for hits, 30min for
+  misses), geocode fallback via `geocodeDestination` when the
+  leg has no coords, snapshot write-back (`packing.
+  weatherSnapshot` when a plan exists; a trip-level field
+  when it doesn't).
+- **Out of scope:** silently rebuilding the packing plan on a
+  weather change (re-planning stays the explicit Plan button /
+  trip chat); hourly forecasts; multi-leg weather.
+- **Acceptance:** open a trip planned >16 days out once its
+  dates enter the window → the pill fills in without any
+  re-plan; tap the pill on a planned trip → it re-fetches and
+  the shown forecast updates; with no forecast available the
+  pill says so and stays tappable.
+- **Lane:** Loop. **Effort:** S.
+- **Status:** Filed sprint-ready 2026-10-24 with the design
+  already chosen. First in line at the next planning walk.
+
+### PC-40: Contextual shop checks — trip-aware by default, plus your own question (M)
+- **Origin:** Founder, 2026-10-24: "The shop check should not
+  be generic. It should be specific to the context of that
+  trip by default, and people should be able to ask specific
+  questions."
+- **Problem:** `shopCheck` judges a photo against the
+  wardrobe only. A check started for a trip knows nothing
+  about the trip, and the user has no way to steer the
+  judgment ("warm enough for evenings there?", "too formal
+  for a beach wedding?").
+- **In scope:** (1) When a check is trip-tagged, the server
+  reads the trip doc itself (never client-supplied context)
+  and the prompt judges FOR the trip first: destination,
+  dates, stored forecast, trip notes, what's already packed.
+  (2) An optional one-line question field on the check sheet
+  ("Anything specific?"), available for generic checks too,
+  folded into the prompt with an instruction to answer it
+  directly; the sheet shows a "Checking for the {trip} trip"
+  line when a trip context is armed. (3) The question is
+  saved on the check doc and shown in its detail view.
+- **Out of scope:** follow-up conversation on a check (that
+  is PC-41); outfit suggestions re-ranked by trip (the
+  verdict and reasons carry the trip judgment); price talk
+  (existing ban stands).
+- **Acceptance:** start a check from a trip page, ask "warm
+  enough for evenings there?" → the verdict/reasons visibly
+  judge against the trip's weather and destination AND
+  answer the question; the saved check shows the question in
+  its detail; a generic check with a question also answers
+  it; a check with neither behaves exactly as today.
+- **Lane:** Stylist. **Effort:** M.
+- **Status:** Filed sprint-ready 2026-10-24 (founder
+  direction). Competes at the next planning walk.
+
+### PC-41: Follow-up chat on a shop check (M)
+- **Origin:** Founder, 2026-10-24: "people should be able to
+  ask specific questions as follow up — basically a chat
+  that helps them make the decision."
+- **Problem:** a check is one-shot. The follow-up questions
+  that actually decide a purchase ("what would I wear it
+  with in November?", "is the color too close to my navy
+  blazer?") have nowhere to go.
+- **In scope:** a compact chat thread inside the saved
+  check's detail view; a new callable answers with the full
+  context of THAT check (photo, analysis, wardrobe, and the
+  trip context when tagged — rides PC-40's plumbing);
+  thread persists on the check doc (capped history); answers
+  may reference owned pieces by name but never invent items.
+- **Out of scope:** chat on unsaved checks; the general
+  stylist chat absorbing checks (contexts stay separate,
+  per the context-mixing rule); voice input.
+- **Acceptance:** on a saved check, ask two follow-ups →
+  both answers reason over the check's photo/analysis and
+  the real wardrobe; reopening the check shows the thread;
+  a trip-tagged check's answers use the trip context.
+- **Lane:** Stylist. **Effort:** M. **Depends on:** PC-40.
+- **Status:** Filed sprint-ready 2026-10-24 (founder
+  direction). Competes at the next planning walk.
+
+### PC-42: Crop the shop-check photo to the garment (M)
+- **Origin:** Founder, 2026-10-24: in a store photo there
+  are other clothes around — "users just want to make sure
+  the right cloth is getting scanned."
+- **Problem:** the check analyzes the whole frame; a rack
+  photo can describe (and judge) the wrong garment.
+- **In scope:** after picking a photo, a crop step inside
+  the check flow before upload/analysis: fixed frame, drag
+  to pan, zoom slider (+ wheel on desktop); "Use this crop"
+  renders the region via canvas (long edge capped at
+  1600px, JPEG) and that image is what uploads; "Use full
+  photo" escape hatch; the cropped photo is also what gets
+  saved on the check (it is the subject of record).
+- **Out of scope:** wardrobe-add cropping (v2 if the pattern
+  proves out — the component should be reusable); free-form
+  corner dragging / rotation; multi-subject selection.
+- **Acceptance:** check a rack photo, crop to one jacket →
+  the analysis describes and judges the jacket only; "Use
+  full photo" reproduces today's behavior exactly; the
+  saved check's photo is the cropped one.
+- **Lane:** Stylist. **Effort:** M.
+- **Status:** Filed sprint-ready 2026-10-24 (founder
+  direction). Competes at the next planning walk.

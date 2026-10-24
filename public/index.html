@@ -6728,17 +6728,22 @@
       // 2026-10-24): the saved check lands tagged to that trip.
       var pendingShopTripId = null;
       var shopCheckSheet = document.getElementById("shopCheckSheet");
+      // The armed trip context dies ONLY on abandon: Cancel,
+      // backdrop tap, or closing the result window. Picking a
+      // photo source PROCEEDS with the check, so those handlers
+      // close the sheet directly — clearing here was the bug
+      // that ate the trip tag (founder report, 2026-10-24).
       function closeShopCheckSheet() { pendingShopTripId = null; closeOverlay(shopCheckSheet); }
       document.getElementById("shopCheckButton").addEventListener("click", function () {
         if (!currentUser) { signIn(); return; }
         openOverlay(shopCheckSheet);
       });
       document.getElementById("shopSheetCamera").addEventListener("click", function () {
-        closeShopCheckSheet();
+        closeOverlay(shopCheckSheet);
         document.getElementById("shopCheckInputCamera").click();
       });
       document.getElementById("shopSheetUpload").addEventListener("click", function () {
-        closeShopCheckSheet();
+        closeOverlay(shopCheckSheet);
         document.getElementById("shopCheckInput").click();
       });
       document.getElementById("shopSheetCancel").addEventListener("click", closeShopCheckSheet);
@@ -6778,8 +6783,13 @@
           fileType: file.type || "image/jpeg",
           result: null,
           savedId: null,
-          error: null
+          error: null,
+          // Snapshot the armed trip context into THIS check,
+          // then disarm — the state is the single source of
+          // truth from here, so no later close can eat the tag.
+          tripId: pendingShopTripId || null
         };
+        pendingShopTripId = null;
         renderShopCheckLoading();
         openOverlay(document.getElementById("shopCheckOverlay"));
         var fileRef = storage.ref().child(storagePath);
@@ -6932,7 +6942,8 @@
               photoUrl: source.photoUrl,
               item: r.item, score: r.score, verdict: r.verdict,
               reasons: r.reasons, similarOwned: r.similarOwned, outfits: r.outfits,
-              addedItemId: itemId
+              addedItemId: itemId,
+              tripId: source.tripId || undefined
             }, "bought").catch(function () {});
           }
           if (source.onAdded) {
@@ -7052,7 +7063,7 @@
           photoUrl: st.photoUrl,
           item: r.item, score: r.score, verdict: r.verdict,
           reasons: r.reasons, similarOwned: r.similarOwned, outfits: r.outfits,
-          tripId: pendingShopTripId || undefined
+          tripId: (st.tripId || pendingShopTripId) || undefined
         }, "considering").then(function (id) {
           st.savedId = id;
           st.autoSaving = false;
@@ -7096,7 +7107,8 @@
               item: st && st.result ? st.result.item : null,
               result: st ? st.result : null,
               fileName: st ? st.fileName : null,
-              fileType: st ? st.fileType : null
+              fileType: st ? st.fileType : null,
+              tripId: st ? st.tripId : null
             });
           });
           actions.appendChild(add);
@@ -7165,7 +7177,7 @@
           photoUrl: st.photoUrl,
           item: r.item, score: r.score, verdict: r.verdict,
           reasons: r.reasons, similarOwned: r.similarOwned, outfits: r.outfits,
-          tripId: pendingShopTripId || undefined
+          tripId: (st.tripId || pendingShopTripId) || undefined
         }, "considering").then(function (id) {
           pendingShopTripId = null;
           st.savedId = id;
