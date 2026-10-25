@@ -336,10 +336,10 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   rejected in the proposal, with a revisit trigger recorded.
   Principle: pins are the present-tense layer; trips own the
   future. The discipline half can split out as an (S) at planning.
-- **Status:** Split at the Sprint 24 walk (2026-10-24):
-  the pin-discipline half shipped inside UX-18; the
-  steering-card remainder is In Sprint 24. The card
-  closes when the remainder lands.
+- **Status:** In Sprint 24 (remainder). Split at the
+  walk (2026-10-24): the pin-discipline half landed
+  inside UX-18; the steering card is what remains, and
+  the card closes when it lands.
 
 ### UX-13: Visual redesign + design system (L)
 - **Idea (founder 2026-10-20):** the app looks extremely
@@ -810,11 +810,6 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   need (follow-up conversation about a check) may already
   be met there. On his word the remainder re-competes or
   the card closes.
-  The stylist chat gets one bottom-up redesign, designed
-  completely rather than in stages — a chat feature built on
-  the current architecture is rework by definition. PC-41
-  lands as a designed entry point of the new chat. Its
-  dependency (PC-40, contextual checks) stands shipped.
 
 ### PC-42: Crop the shop-check photo to the garment (M)
 - **Origin:** Founder, 2026-10-24: in a store photo there
@@ -1032,9 +1027,9 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   proposed, not applied; confirming it changes later picks;
   dismissing it leaves no trace.
 - **Lane:** Personalization + Stylist. **Effort:** M.
-- **Status:** In Sprint 24 — the UX-18 hold released when
-  UX-18 shipped, and the founder added the card to the
-  slate himself at the walk (2026-10-24).
+- **Status:** In Sprint 24 — the UX-18 hold released
+  when UX-18 landed, and the founder added the card to
+  the slate himself at the walk (2026-10-24).
 
 ### PC-46: Candidate-piece outfit previews inside shop check (M)
 

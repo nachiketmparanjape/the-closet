@@ -19,6 +19,7 @@ tabs stop lying by omission, and the chat gains eyes
 ## The slate (build order)
 
 ### PC-53: New-user empty states on every tab (S)
+- **Status:** In Sprint 24.
 Design at docs/proposals/NEW-USER-EMPTY-STATES.md (two
 tiers, count-derived graduation, no stored flags). Founder
 parked it for exactly this walk. In: Outfits/Shop/Trips
@@ -26,6 +27,7 @@ Tier-0 intro cards, Wardrobe+Outfits Tier-1 gap banner,
 Stylist one-liner. Out: any wizard, any stored state.
 
 ### PC-52: The stylist may propose an attachment (S)
+- **Status:** In Sprint 24.
 Completes the Context Standard: attach is an act, and the
 stylist may PROPOSE the act (a card mirroring pin
 proposals) but never attach silently. In: server-side
@@ -33,7 +35,8 @@ proposal signal when a reply reasons over the pick;
 client proposal card; accept attaches, dismiss leaves no
 trace. Out: auto-attach in any form.
 
-### PC-33 (remainder): Trip steering in general chat (S)
+### PC-33: Trip steering in general chat — remainder (S)
+- **Status:** In Sprint 24.
 The discipline half shipped inside UX-18 (pins are the
 present-tense layer; trips own the future — the context
 model enforces it). Remainder: the trip-intent confirm
@@ -44,6 +47,7 @@ gated; a steering card suppresses a pin proposal for the
 same fact. The card closes when this lands.
 
 ### PC-54: Paste intake on phones (S)
+- **Status:** In Sprint 24.
 PC-51 rides the desktop paste event; phones have none.
 In: a visible "Paste a photo" button where the platform
 supports clipboard read (Android Chrome, permission
@@ -53,6 +57,7 @@ Share Target is evaluated during the build and splits
 into its own card if it grows.
 
 ### PC-38: Attach reference photos in stylist chat (M)
+- **Status:** In Sprint 24.
 From the Essembl teardown P3 (founder-adopted). In:
 attach up to 4 reference images to a message in the
 general chat (picker + camera, single-door pattern);
@@ -65,6 +70,7 @@ card: the reply visibly reasons over the references and
 suggests outfits built only from owned pieces.
 
 ### PC-45: Explain-the-no → a proposed style rule (M)
+- **Status:** In Sprint 24.
 From the Alta teardown (founder-saved, HELD for UX-18 —
 the hold released when UX-18 shipped; founder added it
 to this slate). In: rejecting a pick with a reason may
