@@ -459,11 +459,17 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   alongside the original — the original is never destroyed).
   Design keeps the photo honest for now: tiles render best-
   effort, extraction is a rendering layer, not a data change.
-- **Status:** Not started. Filed 2026-10-21 from the founder's
-  note; research runs on pull. Update same day: question (2) is
-  founder-verified — the collection's images save to the camera
-  roll and upload into Closet cleanly (see PC-35); the spike
-  still owns the feature's name, limits, and platform reach.
+- **Status:** Built, not yet live (updated 2026-10-24 —
+  the old "not started" text survived three sprints of
+  work, a doc-honesty catch at the Sprint 24 walk).
+  Research done; the founder chose BiRefNet via Replicate
+  (2026-10-23) and the full package is built: server-side
+  orientation, the two-layer quality gate, first-photo
+  scope, hashes on the originals. Remaining chain: the
+  founder adds a REPLICATE_API_TOKEN secret version from
+  his laptop (parked with him, no nagging) → Bramble
+  deploys extractGarment + smoke-tests → the founder's
+  phone validation is the ship gate.
   Founder expansion (2026-10-21, later): seeing the exported
   cutouts, he set them as the quality benchmark and posed the
   spike's two charter questions verbatim — (Q1) is it actually
