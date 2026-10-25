@@ -163,6 +163,10 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
 - **Not yet sized** — parked; candidate for prioritization.
 
 ### UX-12: First-run tutorial / onboarding experience (not yet sized)
+- **Status:** Killed as a separate card at the Sprint 24
+  planning walk (2026-10-24) — the tutorial question folds
+  into UX-14, which subsumes it. This card remains as the
+  record of the idea and its trigger.
 - **Idea (founder 2026-10-17):** a quick tutorial for new users so they can
   figure out what to do on their own.
 - **Why parked:** the app is mid-UX-polish — flows are still changing, and a
@@ -174,10 +178,14 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
 - **Revisit trigger:** a stranger (not a hand-held tester) gets lost in the
   app, or the UX polish sprint settles and the flows stop moving.
 
-### AUTH-1: Privacy-friendlier sign-in — IN SPRINT 13
+### AUTH-1: Privacy-friendlier sign-in
 Anonymous-first auth with Google/email-link upgrade, one account per
-email, guest banner + privacy note. Built 2026-10-18, in founder phone
-validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
+email, guest banner + privacy note. Design:
+`docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
+- **Status:** DONE 2026-10-18 (Sprint 13) — built and founder
+  phone-validated the same day (his testing caught the guest
+  Google-link conflict, fixed in the same pass: linking signs
+  into the real account and offers guest-wardrobe migration).
 
 ### Personalization: exploration vs. exploitation (open modeling question)
 - **Problem:** the vibe profile only learns from what the user wears —
