@@ -19,6 +19,17 @@ What went live. Momentum you can see.
   who-wins precedence block; followed the same day by the
   Context Standard (one shelf, three durations, one
   display, layered remove).
+- **PC-37: Trip chat is a full stylist room** — shipped
+  2026-10-21 (trip rooms; entry restored at the Sprint
+  24 walk — the card had only a "built" note in the
+  backlog and no line here).
+- **UX-13: Visual redesign + design system** — shipped
+  2026-10-23 (Sprint 18, the Warm Editorial waves).
+- **OBS-3: AI consumption analytics** — shipped
+  2026-10-23 (the ai_usage ledger and cost report;
+  founder-validated the same day).
+- **PC-32: Chat threads** — shipped 2026-10-24, absorbed
+  into UX-18 wave 4 (one saved thread per context).
 
 - **PC-51 — Paste a photo from the clipboard** (2026-10-24):
   a document-level paste handler snapshots image files off

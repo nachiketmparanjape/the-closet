@@ -312,7 +312,9 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   chip). The full cut persists threads
   (`users/{uid}/chat_threads/{threadId}`), resumes them across
   reloads, and cleans up on trip delete.
-- **Status:** Not started (proposal stage). Sprint candidate.
+- **Status:** DONE 2026-10-24 — absorbed into UX-18
+  wave 4 (saved threads per context, shipped as part of
+  UX-18). This card's ask is the shipped behavior.
 
 ### PC-33: Trip steering in chat + pin discipline (M)
 - **Idea (founder 2026-10-20):** asking the general chat about a
@@ -358,7 +360,11 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   planning walk after the design doc is validated and two screens
   are re-skinned, decided by a timeboxed one-screen spike against
   pre-agreed GO criteria; if GO, strangler-style, never a freeze.
-- **Status:** In Sprint 18 — design foundation batch (plan:
+- **Status:** DONE 2026-10-23 (Sprint 18) — the design
+  foundation batch and all five Warm Editorial waves
+  are live. (Status updated at the Sprint 24 walk; it
+  still read "In Sprint 18".)
+- **Original status:** In Sprint 18 — design foundation batch (plan:
   `docs/sprints/sprint-18/PLAN.md`). DESIGN.md v1 is the first
   card; direction validation happens on the explained doc plus
   the wardrobe-grid reference implementation.
