@@ -60,3 +60,42 @@ describe("matchingPins", () => {
     assert.deepEqual(matchingPins(pins, { kind: "weather", label: "x" }), []);
   });
 });
+
+// The one fact-write path (2026-10-24): factConflicts decides which
+// stored facts a save replaces — for the form AND for proposals.
+function extractFactConflicts() {
+  const m = html.match(
+    /function factConflicts\(kind, label, scopeTripId, selfId\) \{[\s\S]*?\n      \}/
+  );
+  assert.ok(m, "factConflicts not found in client HTML");
+  const body = m[0]
+    .replace(/^function factConflicts\(kind, label, scopeTripId, selfId\) \{/, "")
+    .replace(/\n      \}$/, "");
+  return new Function("allPins", "kind", "label", "scopeTripId", "selfId", body);
+}
+const factConflicts = extractFactConflicts();
+
+const fcPins = [
+  { id: "1", kind: "location", label: "Mountain View" },
+  { id: "2", kind: "location", label: "Bay Area" },
+  { id: "3", kind: "preference", label: "Runs cold" },
+  { id: "4", kind: "preference", label: "Likes linen" },
+  { id: "5", kind: "weather", label: "Heatwave", tripId: "t1" },
+];
+
+describe("factConflicts — the one fact-write path", () => {
+  test("a new place conflicts with EVERY global place (one place at a time)", () => {
+    const v = factConflicts(fcPins, "location", "Denver", null, null);
+    assert.deepEqual(v.map((p) => p.id), ["1", "2"]);
+  });
+  test("a new preference conflicts only on an exact same label", () => {
+    assert.deepEqual(factConflicts(fcPins, "preference", "Denver", null, null), []);
+    const v = factConflicts(fcPins, "preference", "runs cold", null, null);
+    assert.deepEqual(v.map((p) => p.id), ["3"]);
+  });
+  test("editing never conflicts with itself; scopes stay separate", () => {
+    assert.deepEqual(factConflicts(fcPins, "location", "Mountain View", null, "1").map((p) => p.id), ["2"]);
+    assert.deepEqual(factConflicts(fcPins, "weather", "Storm", "t1", null).map((p) => p.id), ["5"]);
+    assert.deepEqual(factConflicts(fcPins, "weather", "Storm", null, null), []);
+  });
+});

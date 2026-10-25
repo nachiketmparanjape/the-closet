@@ -464,6 +464,9 @@ function sanitizePins(raw) {
     if (!label) continue;
     const validUntil = /^\d{4}-\d{2}-\d{2}$/.test(p.validUntil || "") ? p.validUntil : "";
     out.push({
+      // The doc id rides along so per-conversation mutes
+      // (layered remove, 2026-10-24) can name the fact.
+      id: typeof p.id === "string" ? cleanText(p.id, 128) : "",
       kind: kind,
       label: label,
       detail: cleanText(p.detail || "", 200),
@@ -728,10 +731,17 @@ function resolveIterBase(previousPick, todayPick) {
   return { base: base, isToday: !previousPick && !!base };
 }
 
-function computeActivePins(pins, tripContext, todayStr) {
+function computeActivePins(pins, tripContext, todayStr, mutedIds) {
   let active = (Array.isArray(pins) ? pins : []).filter(
     (p) => p && (!p.validUntil || p.validUntil >= todayStr)
   );
+  // Layered remove (founder, 2026-10-24): facts the user
+  // removed from THIS conversation are left out of the brief —
+  // what the context bar hides, the stylist truly does not
+  // use. The facts themselves are untouched in the account.
+  if (Array.isArray(mutedIds) && mutedIds.length) {
+    active = active.filter((p) => !p.id || mutedIds.indexOf(p.id) < 0);
+  }
   // Threads scoping (founder 2026-10-19): inside a trip conversation,
   // global location/weather pins do NOT apply — the trip's own
   // destination and packing weather are the context there. Preference
@@ -796,13 +806,14 @@ function assembleContext(input) {
   const req = buildStylistRequest(
     input.items, input.messages, input.styleProfile, input.previousPick,
     input.references, input.weatherContext, input.vibe, input.vibeProfile,
-    input.tripContext, input.pins, todayStr, input.todayPick, input.shopItem
+    input.tripContext, input.pins, todayStr, input.todayPick, input.shopItem,
+    input.mutedPinIds
   );
-  const manifest = buildManifest(input, computeActivePins(input.pins, input.tripContext, todayStr));
+  const manifest = buildManifest(input, computeActivePins(input.pins, input.tripContext, todayStr, input.mutedPinIds));
   return { model: req.model, contents: req.contents, config: req.config, manifest: manifest };
 }
 
-function buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, todayPick, shopItem) {
+function buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, todayPick, shopItem, mutedPinIds) {
   const model = process.env.GEMINI_MODEL || MODEL_VERSION;
   const wardrobe = items.map((it, i) => itemLine(it, i)).join("\n");
   let system = SYSTEM + "\n\n" + PRECEDENCE;
@@ -952,7 +963,7 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
   // global location/weather pins do NOT apply — the trip's own
   // destination and packing weather are the context there. Preference
   // pins and pins scoped to this trip still do.
-  const activePins = computeActivePins(pins, tripContext, todayStr);
+  const activePins = computeActivePins(pins, tripContext, todayStr, mutedPinIds);
   if (activePins.length) {
     const pinLines = activePins.map((p) => {
       let line = "- [" + p.kind + "] " + p.label;
@@ -1278,7 +1289,7 @@ function unwrapJsonReply(text) {
 }
 
 // here; the client re-validates on execute.
-async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, hooks, todayPick, shopItem) {
+async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, hooks, todayPick, shopItem, mutedPinIds) {
   const todayStr = /^\d{4}-\d{2}-\d{2}$/.test(today || "")
     ? today
     : new Date().toISOString().slice(0, 10);
@@ -1289,7 +1300,7 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
     previousPick: previousPick, references: references,
     weatherContext: weatherContext, vibe: vibe, vibeProfile: vibeProfile,
     tripContext: tripContext, pins: pins, today: todayStr, todayPick: todayPick,
-    shopItem: shopItem,
+    shopItem: shopItem, mutedPinIds: mutedPinIds,
   });
   const { model, contents, config } = assembled;
   const manifest = assembled.manifest;

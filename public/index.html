@@ -4287,6 +4287,7 @@
         chatThreadSuggested = {};
         chatAttachByThread = {};
         chatAttachShopByThread = {};
+        chatMutedPinsByThread = {};
         if (activeThreadKey !== "general") { activeThreadKey = "general"; stylistMessages = []; }
         if (uid) {
           loadThread("general", function () {
@@ -4358,6 +4359,7 @@
         threadWindowNoted[key] = false;
         delete chatAttachByThread[key]; // a new conversation starts unattached
         delete chatAttachShopByThread[key];
+        delete chatMutedPinsByThread[key]; // muted facts return on a fresh start
         saveThread(key);
         renderChat();
         renderContextLine();
@@ -4535,6 +4537,34 @@
       // matches case-insensitively (the model quotes CURRENT CONTEXT, so
       // it's usually exact); if the label matches nothing but exactly one
       // pin of that kind exists, that one is the target. Pure — tested.
+      // THE one fact-write path (founder screenshot, 2026-10-24):
+      // every door that writes a fact — the add/edit form, a
+      // saved proposal — applies the same kind rules, so the
+      // rules cannot hold in one door and leak in another:
+      // place and weather are single-valued within a scope (a
+      // new one replaces the old); preferences are a list and
+      // dedupe only on an exact same-label match (the rule
+      // whose absence in the form let two places pile up, and
+      // whose over-application in Sprint 17 deleted a permanent
+      // preference). selfId = the fact being edited; it never
+      // conflicts with itself.
+      function factConflicts(kind, label, scopeTripId, selfId) {
+        return (typeof allPins !== "undefined" ? allPins : []).filter(function (x) {
+          if (!x || x.id === selfId) return false;
+          if ((x.tripId || null) !== (scopeTripId || null)) return false;
+          if (kind === "location" || kind === "weather") return x.kind === kind;
+          return x.kind === kind &&
+            String(x.label || "").toLowerCase() === String(label || "").toLowerCase();
+        });
+      }
+      function deleteFacts(list) {
+        if (!currentUser || !list.length) return Promise.resolve();
+        var col = db.collection("users").doc(currentUser.uid).collection("context_pins");
+        return Promise.all(list.map(function (x) {
+          return col.doc(x.id).delete().catch(function () {});
+        }));
+      }
+
       function matchingPins(pins, proposal) {
         var sameKind = (pins || []).filter(function (p) {
           return p && p.kind === proposal.kind && !p.tripId;
@@ -4570,18 +4600,7 @@
           }));
           failMsg = "Removed — I won't use that anymore.";
         } else {
-          var olds;
-          if (p.kind === "location" || p.kind === "weather") {
-            olds = matchingPins(allPins, { kind: p.kind });
-          } else {
-            olds = (allPins || []).filter(function (x) {
-              return x && !x.tripId && x.kind === p.kind &&
-                String(x.label || "").toLowerCase() === String(p.label || "").toLowerCase();
-            });
-          }
-          done = Promise.all(olds.map(function (x) {
-            return col.doc(x.id).delete().catch(function () {});
-          })).then(function () {
+          done = deleteFacts(factConflicts(p.kind, p.label, null, null)).then(function () {
             return col.add({
               kind: p.kind,
               label: p.label,
@@ -4750,6 +4769,26 @@
       var chatAttachShopByThread = {};
       function currentShopAttach() { return chatAttachShopByThread[activeThreadKey] || null; }
       function detachShopItem() { delete chatAttachShopByThread[activeThreadKey]; }
+
+      // Layered remove (founder, 2026-10-24): removal follows
+      // the layer the thing belongs to. A fact is PERMANENT —
+      // removing it from a conversation mutes it for that
+      // conversation only: it stays in the Account (the fact's
+      // permanent home, whose Remove deletes for good) and it
+      // returns here on Start fresh, because a fresh
+      // conversation includes the permanent facts again. Mute
+      // state has the attachments' lifecycle: per thread, never
+      // saved with the transcript, cleared by Start fresh.
+      var chatMutedPinsByThread = {};
+      function currentMutedPinIds() { return chatMutedPinsByThread[activeThreadKey] || []; }
+      function mutePinForThread(id) {
+        var arr = chatMutedPinsByThread[activeThreadKey] || (chatMutedPinsByThread[activeThreadKey] = []);
+        if (arr.indexOf(id) < 0) arr.push(id);
+      }
+      function unmutePinForThread(id) {
+        var arr = chatMutedPinsByThread[activeThreadKey];
+        if (arr) chatMutedPinsByThread[activeThreadKey] = arr.filter(function (x) { return x !== id; });
+      }
       function shopItemFromCheck(r) {
         if (!r || r.notClothing || !r.item) return null;
         return {
@@ -4789,6 +4828,7 @@
         var today = new Date().toISOString().slice(0, 10);
         return (typeof allPins !== "undefined" ? allPins : []).filter(function (p) {
           if (p.validUntil && p.validUntil < today) return false;
+          if (currentMutedPinIds().indexOf(p.id) >= 0) return false; // muted in this chat
           if (tripChat) return p.kind === "preference" || p.tripId === tripChat.tripId;
           return true;
         });
@@ -4902,14 +4942,18 @@
             openContextSheet();
           }));
         } else if (e.action === "removePin") {
+          // Layered remove: this Remove mutes the fact for THIS
+          // conversation only. Deleting a fact for good happens
+          // in the Account, the fact's permanent home.
           var btn = sheetActionBtn("Remove", function () {
             if (btn.dataset.confirm) {
-              db.collection("users").doc(currentUser.uid).collection("context_pins").doc(e.id).delete()
-                .then(function () { showToast("Fact removed."); renderContextLine(); openContextSheet(); })
-                .catch(function (err) { showToast(friendlyError(err)); });
+              mutePinForThread(e.id);
+              showToast("Out of this conversation — the fact stays in your Account.");
+              renderContextLine();
+              openContextSheet();
             } else {
               btn.dataset.confirm = "1";
-              btn.textContent = "Tap again to remove";
+              btn.textContent = "This chat only";
             }
           });
           var pinActs = document.createElement("span");
@@ -5007,9 +5051,15 @@
             validUntil: untilIn.value || null,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
           };
-          var op = existing
-            ? col.doc(existing.id).update(fields)
-            : col.add(Object.assign({ createdAt: firebase.firestore.FieldValue.serverTimestamp() }, fields));
+          var op = deleteFacts(factConflicts(
+            kindState.kind, label,
+            existing ? (existing.tripId || null) : null,
+            existing ? existing.id : null
+          )).then(function () {
+            return existing
+              ? col.doc(existing.id).update(fields)
+              : col.add(Object.assign({ createdAt: firebase.firestore.FieldValue.serverTimestamp() }, fields));
+          });
           op.then(function () {
             showToast(existing ? "Saved — the stylist will use it from your next message." : "Added — the stylist will use it from your next message.");
             if (onSaved) onSaved();
@@ -5044,6 +5094,25 @@
         freshRow.appendChild(fb);
         list.appendChild(freshRow);
         contextEntries().forEach(function (e) { list.appendChild(contextSheetRow(e)); });
+        // Muted in this conversation: shown, dimmed, restorable.
+        currentMutedPinIds().forEach(function (id) {
+          var p = (typeof allPins !== "undefined" ? allPins : []).find(function (x) { return x.id === id; });
+          if (!p) return;
+          if (p.validUntil && p.validUntil < new Date().toISOString().slice(0, 10)) return;
+          var mrow = document.createElement("div");
+          mrow.className = "context-row";
+          mrow.style.opacity = "0.55";
+          var ml = document.createElement("span");
+          ml.className = "context-row-label";
+          ml.textContent = (p.kind === "location" ? "📍 " : "") + p.label + " · not in this chat";
+          mrow.appendChild(ml);
+          mrow.appendChild(sheetActionBtn("Add back", function () {
+            unmutePinForThread(id);
+            renderContextLine();
+            openContextSheet();
+          }));
+          list.appendChild(mrow);
+        });
         // Education, in place (founder ask, 2026-10-24): the sheet
         // that removes context also ADDS it — one surface, both
         // directions. Attaching today's pick is offered here when it
@@ -5291,6 +5360,10 @@
           // Shop attach: the item under consideration, when the
           // user attached one in this conversation.
           shopItem: tripChat ? null : currentShopAttach(),
+          // Layered remove: facts muted in this conversation.
+          // The server leaves them out of the brief — what the
+          // bar hides, the stylist truly does not use.
+          mutedPinIds: currentMutedPinIds(),
           // Sprint 13: explicit vibe handle ("dress me streetwear tonight").
           // Server accepts exact vocabulary hits only.
           vibe: detectVibeTag(text),

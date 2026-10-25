@@ -243,7 +243,9 @@ exports.askStylist = onCall(
       try {
         const pinsSnap = await getFirestore()
           .collection("users").doc(uid).collection("context_pins").limit(20).get();
-        pins = sanitizePins(pinsSnap.docs.map((d) => d.data()));
+        // The doc id rides along: per-conversation mutes
+        // (layered remove) name facts by id.
+        pins = sanitizePins(pinsSnap.docs.map((d) => Object.assign({ id: d.id }, d.data())));
       } catch (e) {
         logError("askStylist.contextPins", e, { uid: uid, correlationId: correlationId });
         logEvent("subcall_degraded", { fn: "askStylist.contextPins", key: keyOf(e) });
@@ -287,7 +289,11 @@ exports.askStylist = onCall(
           });
         },
       });
-      const result = await askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, stylistHooks, todayPick, shopItem);
+      // Layered remove: facts muted in this conversation.
+      const mutedPinIds = Array.isArray(data.mutedPinIds)
+        ? data.mutedPinIds.filter((x) => typeof x === "string" && x.length > 0 && x.length <= 128).slice(0, 20)
+        : [];
+      const result = await askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, stylistHooks, todayPick, shopItem, mutedPinIds);
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: true });
       return finish("askStylist", correlationId, uid, start, result);
     } catch (err) {

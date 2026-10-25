@@ -59,6 +59,32 @@ describe("computeActivePins", () => {
     const active = computeActivePins(PINS, trip, "2026-10-24");
     assert.deepEqual(active.map((p) => p.label), ["Runs cold"]);
   });
+  it("layered remove: a muted pin (by doc id) drops; unmuted stay", () => {
+    const withIds = sanitizePins([
+      { id: "p1", kind: "location", label: "Tahoe", validUntil: "2999-01-01" },
+      { id: "p2", kind: "preference", label: "Runs cold", validUntil: null },
+    ]);
+    assert.equal(withIds[0].id, "p1"); // sanitizePins keeps the doc id
+    const active = computeActivePins(withIds, null, "2026-10-24", ["p1"]);
+    assert.deepEqual(active.map((p) => p.label), ["Runs cold"]);
+    const none = computeActivePins(withIds, null, "2026-10-24", []);
+    assert.equal(none.length, 2);
+    const undef = computeActivePins(withIds, null, "2026-10-24");
+    assert.equal(undef.length, 2); // no mutes supplied: unchanged behavior
+  });
+  it("assembleContext: muted pins leave both the brief and the manifest", () => {
+    const out = assembleContext(baseInput({
+      pins: sanitizePins([
+        { id: "p1", kind: "preference", label: "Runs cold", validUntil: null },
+        { id: "p2", kind: "preference", label: "Secret fact", validUntil: null },
+      ]),
+      mutedPinIds: ["p2"],
+    }));
+    assert.deepEqual(out.manifest.pins.map((p) => p.label), ["Runs cold"]);
+    const brief = JSON.stringify(out.contents) + JSON.stringify(out.config);
+    assert.ok(brief.includes("Runs cold"));
+    assert.ok(!brief.includes("Secret fact"));
+  });
 });
 
 describe("assembleContext + manifest", () => {
