@@ -4500,9 +4500,9 @@
           var targets = matchingPins(allPins, p);
           head.textContent = "🗑 Forget “" +
             targets.map(function (t) { return t.label; }).join(", ") + "”?";
-          bits = ["This " + p.kind + " no longer applies."];
+          bits = ["This fact no longer applies."];
         } else {
-          head.textContent = (icons[p.kind] || "📌") + " Remember as current " + p.kind + "?";
+          head.textContent = (icons[p.kind] || "📌") + " Remember this fact?";
         }
         card.appendChild(head);
         var body = document.createElement("p");
@@ -4803,11 +4803,23 @@
           var att = currentAttach();
           entries.push({ type: "pick", label: "◈ Today's pick" + (att.lookName ? " · " + att.lookName : ""), action: "detachPick" });
         }
-        // Display priority (founder, 2026-10-24): what the user
-        // ADDED to the conversation first — trip, attached pick,
-        // attached shop item — then the weather, then permanent
-        // context (pinned facts, then the memory tail). The line
-        // shows the first three; the rest wait behind "+N more".
+        // THE CONTEXT STANDARD (founder-approved, 2026-10-24):
+        // one shelf, three durations — this message (@ pointers),
+        // this conversation (pick, shop item), always (facts) —
+        // and ONE display for all of it: this list, which feeds
+        // both the bar and the sheet. Before the standard, the @
+        // pointers lived only as composer chips and never appeared
+        // here, so "what the stylist knows" had a hole in it.
+        // Display priority within the shelf (founder's order):
+        // what the user ADDED first — trip, pick, @ articles,
+        // @ outfits, shop item — then weather, then facts, then
+        // the memory tail. The bar shows the first three.
+        (chatRefs.articles || []).forEach(function (r) {
+          entries.push({ type: "ref", refKind: "article", id: r.id, label: "▸ " + r.label + " · this message", action: "removeRef" });
+        });
+        (chatRefs.outfits || []).forEach(function (r) {
+          entries.push({ type: "ref", refKind: "outfit", id: r.id, label: "◈ " + r.label + " · this message", action: "removeRef" });
+        });
         var shopAtt = currentShopAttach();
         if (shopAtt && !tripChat) {
           entries.push({ type: "shop", label: "🛍 " + shopAtt.name, action: "detachShop" });
@@ -4872,6 +4884,14 @@
         if (e.action === "detachPick") {
           row.appendChild(sheetActionBtn("Remove", function () {
             detachTodayPick();
+            renderContextLine();
+            openContextSheet();
+          }));
+        } else if (e.action === "removeRef") {
+          row.appendChild(sheetActionBtn("Remove", function () {
+            chatRefs.articles = chatRefs.articles.filter(function (a) { return a.id !== e.id; });
+            chatRefs.outfits = chatRefs.outfits.filter(function (a) { return a.id !== e.id; });
+            renderRefChips();
             renderContextLine();
             openContextSheet();
           }));
