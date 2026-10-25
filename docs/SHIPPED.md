@@ -685,3 +685,23 @@ What went live. Momentum you can see.
   or change it." — itself a door to the sheet; the first open of
   the sheet (from any door) retires it permanently
   (`contextSheetSeen` on the settings doc). Tests 384/384.
+
+- **Phone-test buffer #5 (2026-10-25, founder): the chat chrome
+  ate the conversation.** Four changes. (1) "Working from" is
+  removed — the founder's call: the hint line below the bar
+  explains the bar better than a label word; the bar is now just
+  its entries + chevron, and the sheet title takes the hint's own
+  phrase, "What I'm taking into account." (2) The stylist chat is
+  full-screen on the phone (the universal overlay rule gains its
+  second named exception, after capture) and a flex column at
+  every size: compact header, context bar + hint, scrolling
+  message list, composer — the bar is pinned and always visible,
+  and the message list takes all remaining height (was capped at
+  52vh inside a 92dvh sheet). (3) The header shrank (10px padding,
+  19px title). (4) Today's pick moved into that header as a small
+  chip — the pick's first photo + "Today's pick" (or "Go to
+  Today" before a pick exists); tapping goes to the Today page.
+  The in-thread navigation row retired; the 2026-10-24 ruling
+  stands (no pick card in the thread; the way to Today is always
+  present), now served from the header. Tests 384/384 incl. the
+  layout invariants.
