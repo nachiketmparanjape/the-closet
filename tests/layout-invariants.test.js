@@ -53,3 +53,14 @@ test("every overlay contains a modal or sheet panel (no third presentation kind)
       m[1] + " has no modal/sheet panel");
   }
 });
+
+test("panels never scroll sideways — overflow-x clipped, row labels shrink", () => {
+  // Founder phone find (2026-10-25): the context sheet slid
+  // left-right by a few px. The class fix, not the instance:
+  // every panel clips horizontal overflow, and flex row labels
+  // may shrink and wrap instead of forcing the panel wider.
+  assert.ok(html.includes(".sheet, .modal { overflow-x: hidden; overflow-x: clip; }"),
+    "the panel overflow-x guard is gone");
+  assert.ok(/\.context-row-label \{[^}]*min-width: 0/.test(html),
+    ".context-row-label lost min-width: 0 — long labels will widen the sheet again");
+});
