@@ -302,6 +302,8 @@
     .context-form > button.primary { width: 100%; }
     /* UX-18 W4/W5: in-thread system rows (return divider, saved/window notes). */
     .chat-msg.divider, .chat-msg.note { align-self: center; background: none; border: none; color: var(--muted); font-size: 12.5px; text-align: center; padding: 4px 12px; max-width: 85%; }
+    .chat-divider-action { align-self: center; margin: 0 0 6px; }
+    .chat-divider-action button { font-size: 13px; font-weight: 600; }
     .chat-list { display: flex; flex-direction: column; gap: 8px; max-height: 52vh; overflow-y: auto; margin: 0 0 12px; }
     .chat-msg { max-width: 88%; padding: 9px 13px; border-radius: var(--r-md); font-size: 15px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: break-word; }
     /* DESIGN-CHAT-1 (§10): the chat's first-run moment — serif, one
@@ -4305,6 +4307,15 @@
             }
             return true;
           });
+          // Heal (2026-10-25): threads saved while the return
+          // divider could stack carry consecutive divider rows
+          // for one return point — collapse each run to its
+          // last row, so the saved thread reads clean on load.
+          msgs = msgs.filter(function (m, idx) {
+            if (!m || m.role !== "divider") return true;
+            var next = msgs[idx + 1];
+            return !(next && next.role === "divider");
+          });
           // Race guard: if the user started talking before this load
           // landed, local messages win their place by merge (by
           // timestamp), never by overwrite — history is not lost to
@@ -4350,6 +4361,15 @@
           if (list[i].role !== "divider") { last = list[i]; break; }
         }
         if (!last || !last.at) return;
+        // Already marked: a divider sitting after the last real
+        // message means THIS return point is already labelled.
+        // Without this check every later return re-measured the
+        // gap from the same old message and stacked another
+        // divider — the founder's thread printed "Continuing
+        // from Saturday" twice (2026-10-25).
+        for (var j = list.length - 1; j >= 0 && list[j] !== last; j--) {
+          if (list[j].role === "divider") return;
+        }
         var now = new Date();
         var then = new Date(last.at);
         var sameDay = then.toDateString() === now.toDateString();
@@ -4371,6 +4391,9 @@
       // shows the pair. The in-flight flag closes the race; the
       // already-present check makes a push impossible regardless.
       var savedNoticeInFlight = false;
+      // Two-tap confirm state for the in-thread Start fresh
+      // action under the resume divider (2026-10-25).
+      var dividerFreshArmed = false;
       function applySavedNotice() {
         if (savedNoticeInFlight) return;
         if (activeThreadKey !== "general" || !currentUser || typeof db === "undefined" || !db) return;
@@ -4583,7 +4606,21 @@
           addInfo.appendChild(addBtn);
           chatList.appendChild(addInfo);
         }
-        stylistMessages.forEach(function (m) {
+        // Refresh right there (founder, 2026-10-25): the
+        // trailing return divider — the resume point, with no
+        // conversation after it — carries its own Start fresh
+        // action, so clearing the context doesn't require a
+        // trip to the context sheet. Two-tap confirm, the
+        // sheet's own pattern. Once the user speaks, the
+        // divider is history and the action goes away.
+        var lastContentIdx = -1, lastDividerIdx = -1;
+        stylistMessages.forEach(function (m, i) {
+          if (m.role === "user" || m.role === "model") lastContentIdx = i;
+          if (m.role === "divider") lastDividerIdx = i;
+        });
+        var resumeDividerIdx = lastDividerIdx > lastContentIdx ? lastDividerIdx : -1;
+        if (resumeDividerIdx === -1) dividerFreshArmed = false;
+        stylistMessages.forEach(function (m, midx) {
           // UX-18 W4/W5: system rows (return divider, saved/window
           // notes) render as quiet centered lines, not bubbles.
           if (m.role === "divider" || m.role === "note") {
@@ -4591,6 +4628,27 @@
             sys.className = "chat-msg " + m.role;
             sys.textContent = m.text;
             chatList.appendChild(sys);
+            if (midx === resumeDividerIdx) {
+              var act = document.createElement("div");
+              act.className = "chat-divider-action";
+              var fb = document.createElement("button");
+              fb.type = "button";
+              fb.className = "link-button";
+              fb.textContent = dividerFreshArmed
+                ? "Tap again to clear it — your facts stay"
+                : "↻ Start fresh — clear this conversation";
+              fb.addEventListener("click", function () {
+                if (!dividerFreshArmed) {
+                  dividerFreshArmed = true;
+                  renderChat();
+                  return;
+                }
+                dividerFreshArmed = false;
+                startFreshThread();
+              });
+              act.appendChild(fb);
+              chatList.appendChild(act);
+            }
             return;
           }
           var div = document.createElement("div");

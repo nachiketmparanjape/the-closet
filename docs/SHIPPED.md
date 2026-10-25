@@ -4,6 +4,17 @@ What went live. Momentum you can see.
 
 ## Sprint 19 (2026-10-24 → )
 
+- **Return divider, de-duplicated + refresh in place** —
+  founder phone test 2026-10-25: "Continuing from
+  Saturday" printed twice (every return after a gap
+  re-measured from the same last message and stacked
+  another divider). applyReturnDivider now refuses when
+  a divider already trails the last real message, and
+  thread loads collapse saved divider runs to their last
+  row. The trailing divider also carries its own
+  Start fresh action now (two-tap confirm, the sheet's
+  pattern) — refresh context right there, no trip to
+  the context sheet. Founder phone validation pending.
 - **Ask doors start fresh** — founder decision 2026-10-24
   (phone-test buffer, refining UX-18 decision 6):
   contextual "Ask the stylist" entries (Today's Ask, a
