@@ -804,7 +804,12 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   the real wardrobe; reopening the check shows the thread;
   a trip-tagged check's answers use the trip context.
 - **Lane:** Stylist. **Effort:** M. **Depends on:** PC-40.
-- **Status:** HELD for UX-18 (founder's call, 2026-10-24).
+- **Status:** HELD — at the Sprint 24 walk (2026-10-24)
+  the founder's decision on this card waits for his phone
+  test of the shop attach built the same day: its core
+  need (follow-up conversation about a check) may already
+  be met there. On his word the remainder re-competes or
+  the card closes.
   The stylist chat gets one bottom-up redesign, designed
   completely rather than in stages — a chat feature built on
   the current architecture is rework by definition. PC-41
@@ -940,12 +945,13 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   (entry points × attached context × disagreements) so the
   session is decisions, not discovery.
 - **Lane:** Stylist. **Effort:** session + follow-on cuts TBD.
-- **Status:** SPRINT 23 FOCUS (founder, 2026-10-24: "the
-  key remaining big change that makes the app seamless").
-  Bramble brings the audit inventory to the sit-down;
-  the session's output is docs/CONTEXT-MODEL.md, then
-  build waves follow from it. Held behind it: PC-38,
-  PC-41, PC-45, PC-32, PC-33. UX-16 folds in.
+- **Status:** DONE 2026-10-24 (Sprint 23) — all five
+  build waves live the same day, followed by the
+  phone-test fix buffers and the Context Standard.
+  Everything it held is released: PC-38, PC-45 and the
+  PC-33 remainder are in Sprint 24; PC-41 awaits the
+  founder's shop-attach verdict; PC-32 was absorbed by
+  wave 4. UX-16 folded in, as planned.
 
 ### OBS-4: Data-model drift spot-check (S)
 

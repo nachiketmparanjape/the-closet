@@ -4,6 +4,22 @@ What went live. Momentum you can see.
 
 ## Sprint 19 (2026-10-24 → )
 
+- **OBS-2: Error logging & handling overhaul** — shipped
+  2026-10-24 (Sprint 20).
+- **PC-39: Trip weather re-check** — shipped 2026-10-24
+  (Sprint 20).
+- **PC-40: Contextual shop checks** — shipped 2026-10-24
+  (Sprint 20).
+- **PC-43: Unnamed items heal themselves** — shipped
+  2026-10-24 (Sprint 20).
+- **UX-18: Stylist audit — one experience + architecture
+  pass** — shipped 2026-10-24 (Sprint 23): one server
+  assembler + manifest, attach-as-act, the context bar
+  and sheet, saved threads, the 50-message window, the
+  who-wins precedence block; followed the same day by the
+  Context Standard (one shelf, three durations, one
+  display, layered remove).
+
 - **PC-51 — Paste a photo from the clipboard** (2026-10-24):
   a document-level paste handler snapshots image files off
   the clipboard and routes by what owns the screen — shop
