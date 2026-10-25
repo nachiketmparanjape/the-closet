@@ -729,3 +729,17 @@ What went live. Momentum you can see.
   every sheet — verified all 8) carries the spacing and sticks
   flush at `top: 0`. Every sheet gains it at once; a layout
   invariant guards the pair. Tests 386/386.
+
+- **Phone-test buffer #8 (2026-10-25, founder screenshot): the
+  sliver was the band above the sheet, not inside it.** Sheets
+  were capped below full height (100dvh − 24px in the base rule,
+  92dvh by the phone overlay rule), so a tall sheet left a strip
+  of the page showing above its header, the page's text
+  half-clipped by the sheet's top edge. Buffer #7's inside
+  sliver (scrolled content in the panel's top padding, above the
+  sticky head) was a real but different defect — both are fixed.
+  Now a sheet whose content needs the height takes 100dvh and
+  sits flush, like the chat and capture; short sheets still
+  anchor to the bottom with the backdrop above them. Modals keep
+  their 92dvh cap. A layout invariant guards the sheet's
+  full-height allowance. Tests 387/387.
