@@ -178,7 +178,7 @@
        tall sheet (the context sheet once the Add-a-fact form
        landed) overflowed past the bottom of the screen with no
        way to scroll to its end (founder phone report). */
-    .sheet { width: min(560px, 100%); max-height: calc(100dvh - 24px); overflow-y: auto; overscroll-behavior: contain; background: var(--paper); border-radius: var(--r-lg) var(--r-lg) 0 0; padding: 0 10px calc(10px + env(safe-area-inset-bottom)); box-shadow: var(--shadow); }
+    .sheet { width: min(560px, 100%); max-height: 100dvh; overflow-y: auto; overscroll-behavior: contain; background: var(--paper); border-radius: var(--r-lg) var(--r-lg) 0 0; padding: 0 10px calc(10px + env(safe-area-inset-bottom)); box-shadow: var(--shadow); }
     /* UNIVERSAL: panels never scroll sideways (founder phone find,
        2026-10-25 — the context sheet slid left-right by a few px).
        One wide child used to make the whole panel horizontally
@@ -523,7 +523,11 @@
     /* UNIVERSAL OVERLAY RULE (founder, 2026-10-24): on phones
        every overlay panel is a bottom sheet — full width,
        anchored to the bottom, top corners rounded, never
-       taller than 92dvh. No centered floating cards on
+       taller than 92dvh (sheets excepted: a sheet whose
+       content needs the full height takes it and sits flush
+       to the top — founder, 2026-10-25, after a capped sheet
+       left a band of page text peeking above its header).
+       No centered floating cards on
        mobile, ever: each window had grown its own placement
        over the sprints, which is why pages kept looking
        unformatted. Two exceptions, both full-screen: the
@@ -533,7 +537,8 @@
        tests/layout-invariants. */
     @media (max-width: 899px) {
       .overlay:not(#captureOverlay):not(#chatOverlay) { place-items: end center; padding: 0; }
-      .overlay:not(#captureOverlay):not(#chatOverlay) .modal, .overlay:not(#captureOverlay):not(#chatOverlay) .sheet { width: 100%; max-width: none; max-height: 92dvh; border-radius: 20px 20px 0 0; }
+      .overlay:not(#captureOverlay):not(#chatOverlay) .modal { width: 100%; max-width: none; max-height: 92dvh; border-radius: 20px 20px 0 0; }
+      .overlay:not(#captureOverlay):not(#chatOverlay) .sheet { width: 100%; max-width: none; max-height: 100dvh; border-radius: 20px 20px 0 0; }
     }
     .chat-fab { display: none !important; }
     .outfit-card { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-md); padding: 16px; margin-top: 8px; }

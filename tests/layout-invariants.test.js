@@ -76,3 +76,11 @@ test("sticky sheet heads sit flush — no content sliver above them", () => {
   assert.ok(/\.sheet-head \{[^}]*position: sticky; top: 0;/.test(html),
     ".sheet-head no longer sticks flush at top: 0");
 });
+
+test("tall sheets sit flush to the top (no peeking band above the header)", () => {
+  // Founder screenshot (2026-10-25): a height-capped sheet left a
+  // strip of the page visible above its header, text half-clipped
+  // by the sheet's edge. Sheets may now use the full height.
+  assert.ok(/\.sheet \{[^}]*max-height: 100dvh/.test(html),
+    ".sheet lost its full-height allowance — the peeking band is back");
+});
