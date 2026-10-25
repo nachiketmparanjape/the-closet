@@ -705,3 +705,15 @@ What went live. Momentum you can see.
   stands (no pick card in the thread; the way to Today is always
   present), now served from the header. Tests 384/384 incl. the
   layout invariants.
+
+- **Phone-test buffer #6 (2026-10-25, founder: "fix it everywhere
+  it exists"): sideways scroll in the "What I'm taking into
+  account" sheet.** A flex row label that cannot shrink (flex
+  items refuse by default) forced its row — and so the sheet —
+  a few px wider than the screen. Fixed as a class, on every
+  surface: (1) every panel (`.sheet`, `.modal`, and the chat
+  list) now clips horizontal overflow — panels scroll vertically
+  only, by design; (2) context row labels (and the sheet title)
+  may shrink and wrap, and row buttons no longer flex, so
+  content fits instead of being clipped in practice; (3) a new
+  layout-invariant test guards both rules. Tests 385/385.
