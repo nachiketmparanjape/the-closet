@@ -283,7 +283,15 @@
     .pin-chip { display: inline-block; font-size: 13px; font-weight: 500; color: var(--ink); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; margin-left: 8px; vertical-align: middle; white-space: nowrap; }
     /* UX-18 W3: the one context display — a slim line under the chat
        header; tapping opens the context sheet with every fact. */
-    .context-line { display: block; width: 100%; text-align: left; background: none; border: none; border-bottom: 1px solid var(--line); padding: 2px 2px 10px; margin-bottom: 10px; font: inherit; font-size: 13px; color: var(--muted); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* UX-18 W3's context line, redesigned 2026-10-24 (founder):
+       as small muted caption text it did not read as tappable.
+       It is a control, so it is built like one: a tinted bar with
+       a border, a chevron, conversation-size type, and a full
+       44px+ touch target. */
+    .context-line { display: flex; align-items: center; gap: 10px; width: 100%; box-sizing: border-box; text-align: left; background: var(--paper-soft); border: 1px solid var(--line-strong); border-radius: 12px; padding: 11px 14px; margin-bottom: 10px; font: inherit; font-size: 14.5px; color: var(--ink); cursor: pointer; min-height: 46px; }
+    .context-line .cl-label { color: var(--muted); font-weight: 600; flex-shrink: 0; }
+    .context-line .cl-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .context-line .cl-chev { color: var(--muted); font-size: 19px; flex-shrink: 0; }
     .context-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
     .context-row-label { font-size: 14px; color: var(--ink); }
     .context-form { padding: 14px 0 4px; }
@@ -377,13 +385,15 @@
     .today-explore .et { font-size: 15px; font-weight: 600; display: block; }
     .today-explore .es { font-size: 12.5px; color: var(--muted); display: block; margin-top: 2px; line-height: 1.4; }
     .today-sample-tag { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; background: var(--accent-soft); color: var(--accent-dark); border-radius: 999px; padding: 3px 9px; margin: 0 0 10px; }
-    /* Fix buffer 4: Today leads the stylist sheet (founder: the pill is
-       the always-visible door back). Compact mirror of the pick card. */
-    #chatTodayStrip { border-bottom: 1px solid var(--line); padding: 14px 2px 16px; margin-bottom: 12px; }
-    #chatTodayStrip .today-pick-photos figure { width: 56px; }
-    #chatTodayStrip .today-pick-photos img { width: 56px; height: 70px; border-radius: 10px; }
-    #chatTodayStrip .today-why { font-size: 14px; margin-top: 10px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-    #chatTodayStrip .today-actions { margin-top: 12px; }
+    /* The way back to Today, as ONE quiet line (2026-10-24
+       redesign): the pick's card was removed from chat at the
+       founder's word, and its replacement — a sentence plus a
+       full-width button — ate a slab of the chat. A single
+       tappable line carries the same information and the same
+       navigation at a quarter of the height. */
+    #chatTodayStrip { padding: 0 2px 6px; margin-bottom: 6px; }
+    .today-link-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; box-sizing: border-box; background: none; border: none; border-bottom: 1px solid var(--line); padding: 8px 2px 10px; font: inherit; font-size: 14px; color: var(--ink); cursor: pointer; text-align: left; }
+    .today-link-row .tl-arrow { color: var(--accent-dark); font-weight: 700; flex-shrink: 0; }
     /* Fix buffer 5 (founder): the stylist docks — bottom sheet on phone,
        right-edge panel on desktop. Never a floating card mid-screen. */
     #chatOverlay { place-items: end center; padding: 0; }
@@ -4163,6 +4173,17 @@
             msgs = Array.isArray(d.messages) ? d.messages : [];
             noted = !!d.windowNoted;
           }
+          // Heal: threads saved before the notice guard carry the
+          // saved-conversations notice twice — collapse to the
+          // first copy on every load (the next save persists it).
+          var noticeSeen = false;
+          msgs = msgs.filter(function (m) {
+            if (m && m.role === "note" && m.text && m.text.indexOf("Conversations are saved now") === 0) {
+              if (noticeSeen) return false;
+              noticeSeen = true;
+            }
+            return true;
+          });
           // Race guard: if the user started talking before this load
           // landed, local messages win their place by merge (by
           // timestamp), never by overwrite — history is not lost to
@@ -4223,12 +4244,28 @@
       }
       // The one-time notice (clarity mechanism 3): the first saved
       // conversation per account says, once, that saving is a thing.
+      // Guarded twice over (2026-10-24): two racing calls once read
+      // the flag before either write landed and pushed the notice
+      // twice into the saved thread — the founder's screenshot
+      // shows the pair. The in-flight flag closes the race; the
+      // already-present check makes a push impossible regardless.
+      var savedNoticeInFlight = false;
       function applySavedNotice() {
+        if (savedNoticeInFlight) return;
         if (activeThreadKey !== "general" || !currentUser || typeof db === "undefined" || !db) return;
+        savedNoticeInFlight = true;
         var sref = db.collection("users").doc(currentUser.uid).collection("settings").doc("app");
         sref.get().then(function (snap) {
+          savedNoticeInFlight = false;
           var d = snap.exists ? (snap.data() || {}) : {};
           if (d.chatThreadsNoticeSeen || activeThreadKey !== "general") return;
+          var already = stylistMessages.some(function (m) {
+            return m.role === "note" && m.text && m.text.indexOf("Conversations are saved now") === 0;
+          });
+          if (already) {
+            sref.set({ chatThreadsNoticeSeen: true }, { merge: true }).catch(function () {});
+            return;
+          }
           stylistMessages.push({
             role: "note",
             text: "Conversations are saved now — this one will be here when you come back. Start fresh any time from the context sheet (tap the line above).",
@@ -4237,7 +4274,7 @@
           saveThread("general");
           renderChat();
           sref.set({ chatThreadsNoticeSeen: true }, { merge: true }).catch(function () {});
-        }).catch(function () {});
+        }).catch(function () { savedNoticeInFlight = false; });
       }
       function watchThreads(user) {
         var uid = user ? user.uid : null;
@@ -4802,7 +4839,19 @@
         var labels = contextEntries().map(function (e) { return e.label; });
         var text = labels.slice(0, 3).join("  ·  ");
         if (labels.length > 3) text += "  ·  +" + (labels.length - 3) + " more";
-        el.textContent = "Knows: " + text;
+        el.textContent = "";
+        var lab = document.createElement("span");
+        lab.className = "cl-label";
+        lab.textContent = "Knows";
+        el.appendChild(lab);
+        var txt = document.createElement("span");
+        txt.className = "cl-text";
+        txt.textContent = text;
+        el.appendChild(txt);
+        var chev = document.createElement("span");
+        chev.className = "cl-chev";
+        chev.textContent = "›";
+        el.appendChild(chev);
         el.hidden = false;
       }
       function sheetActionBtn(text, fn) {
@@ -6868,14 +6917,20 @@
         // Ask button or the context sheet — never from a card in
         // the thread.)
         strip.hidden = false;
-        var row = document.createElement("div");
-        row.className = "today-actions";
-        row.style.marginTop = "0";
-        row.appendChild(shopCheckEl("p", "today-why", "Today's pick lives on the Today page."));
-        row.appendChild(mkBtn("secondary", "Go to Today", function () {
+        var row = document.createElement("button");
+        row.type = "button";
+        row.className = "today-link-row";
+        var lt = document.createElement("span");
+        lt.textContent = "Today's pick lives on the Today page";
+        row.appendChild(lt);
+        var ar = document.createElement("span");
+        ar.className = "tl-arrow";
+        ar.textContent = "→";
+        row.appendChild(ar);
+        row.addEventListener("click", function () {
           closeOverlay(chatOverlay);
           switchView("today");
-        }));
+        });
         strip.appendChild(row);
       }
 
