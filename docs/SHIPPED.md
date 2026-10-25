@@ -666,3 +666,22 @@ What went live. Momentum you can see.
 | 2026-10-24 | Sprint 20 card 3: PC-39 | Trip weather re-check (founder's Option 1). The trip page's weather line is now a tappable pill: it shows the live forecast with a ↻ when one is held, "Typical weather · tap to check forecast" when only the climate fallback is held, and "Check forecast" when nothing is known; tapping re-fetches and updates both the trip-level weather fields and (when a plan exists) the plan's snapshot, with an honest "forecast isn't out yet" toast when the dates are beyond Open-Meteo's 16-day window. A silent re-check runs once per trip per session when the snapshot is missing, older than 24h, or the first leg day has arrived and the snapshot is still the fallback. Planning now also stamps the trip-level weather fields so the pill never needs a second fetch after a plan. Weather truth resolves trip-level first, plan snapshot for older trips. 284/284 tests (+4 wiring guards). Live (hosting release 1792860053751000). Note: Hong Kong (Nov 23) is outside the forecast window until ~Nov 7 — the pill will start returning real forecasts then. |
 | 2026-10-24 | Sprint 20 card 4: PC-40 | Contextual shop checks. (a) Trip-aware: when a check starts from a trip (or is tagged to one), the client now sends the tripId and the SERVER reads the trip doc itself — name, leg, dates, the PC-39 weather, notes, and the names of what's already packed — and the model judges the item FOR that trip (weather fit, packing gap vs duplicating a packed piece, combining with packed pieces) alongside the general wardrobe fit, naming the trip in the verdict when it drives the call. A bad trip reference degrades to a plain check, never an error. (b) The wearer's own question: an optional "Anything specific?" field on the check sheet is snapshotted into the check (and cleared, same disarm discipline as the trip tag), sent with the call, and the prompt instructs the model to answer it directly. The server echoes the context it actually used; the result window shows "Judged for: <trip> · You asked: …", and both fields are saved on the check doc and shown on its detail view. 290/290 tests (+6). shopCheck redeployed; hosting live (release 1792860233310000). Founder phone test is the real-world gate: a check from the Hong Kong trip page should now reason about the trip. |
 | 2026-10-24 | Founder phone validation + nit fix | Sprint 20 phone round: PC-40 validated by the founder ("the added context in the shop list seems to work properly" — judged-for line + question present on the saved check and its detail view); PC-39's pill tap returned the expected "forecast isn't out yet" toast (Hong Kong is beyond the 16-day window until ~Nov 7). Nit: the feedback bubble's pencil sat off-center — the button's content was a raw text node ("✎ " plus the word span), so the phone circle centered the text run, not the glyph; the pencil is now its own element and flex centers the glyph itself. Hosting live with the fix. |
+
+- **Phone-test buffer #4 (2026-10-25, founder screenshot): the saved
+  notice directed the user to "the context sheet (tap the line
+  above)" — a place the user cannot identify.** The notice is now
+  one plain sentence ("This conversation is saved — it will be here
+  when you come back.") and carries its own Start fresh: the same
+  two-tap button as the resume divider, and the notice text itself
+  is tappable (founder: refresh by touching the message itself).
+  Threads saved with the old text heal and gain the action too —
+  the recognizer accepts both openings. **"Knows" renamed to
+  "Working from"** in all three places it lived (bar label, bar
+  aria-label, sheet title): weather and place are circumstances the
+  stylist works from, not knowledge about the user, and the label
+  now covers all three context durations honestly. **Education
+  without a manual:** a one-time hint sits under the context bar —
+  "Everything I'm taking into account for this chat — tap to view
+  or change it." — itself a door to the sheet; the first open of
+  the sheet (from any door) retires it permanently
+  (`contextSheetSeen` on the settings doc). Tests 384/384.
