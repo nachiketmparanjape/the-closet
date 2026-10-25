@@ -5006,6 +5006,23 @@
         var list = document.getElementById("contextSheetList");
         if (!list) return;
         list.textContent = "";
+        // Start fresh FIRST (founder, 2026-10-24): it is a
+        // conversation action, not a fact — buried under the facts,
+        // the tip and the form, nobody found it. At the top it
+        // reads as what it is: "this conversation" first, then
+        // "what the stylist knows". Two taps, second confirms.
+        var freshRow = document.createElement("div");
+        freshRow.className = "context-row";
+        var fl = document.createElement("span");
+        fl.className = "context-row-label";
+        fl.textContent = "Start fresh — clear this conversation (your facts stay)";
+        freshRow.appendChild(fl);
+        var fb = sheetActionBtn("Start fresh", function () {
+          if (fb.dataset.confirm) startFreshThread();
+          else { fb.dataset.confirm = "1"; fb.textContent = "Tap again to clear"; }
+        });
+        freshRow.appendChild(fb);
+        list.appendChild(freshRow);
         contextEntries().forEach(function (e) { list.appendChild(contextSheetRow(e)); });
         // Education, in place (founder ask, 2026-10-24): the sheet
         // that removes context also ADDS it — one surface, both
@@ -5047,20 +5064,6 @@
         }, editPin);
         list.appendChild(factForm);
         if (editPin) setTimeout(function () { factForm.scrollIntoView({ block: "nearest" }); }, 60);
-        // UX-18 W4: Start fresh lives here — visible from inside the
-        // conversation, two taps (the second is the confirm).
-        var freshRow = document.createElement("div");
-        freshRow.className = "context-row";
-        var fl = document.createElement("span");
-        fl.className = "context-row-label";
-        fl.textContent = "Start fresh — clear this conversation";
-        freshRow.appendChild(fl);
-        var fb = sheetActionBtn("Start fresh", function () {
-          if (fb.dataset.confirm) startFreshThread();
-          else { fb.dataset.confirm = "1"; fb.textContent = "Tap again to clear"; }
-        });
-        freshRow.appendChild(fb);
-        list.appendChild(freshRow);
         openOverlay(document.getElementById("contextSheet"));
       }
 
