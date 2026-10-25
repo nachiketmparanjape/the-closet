@@ -1428,3 +1428,42 @@ email, guest banner + privacy note. Design:
   upload is a recurring friction.
 - **Status:** Filed 2026-10-24 from the PC-54 split.
   Enters work only via a planning walk.
+
+### PC-56: Garment embeddings — same-garment duplicate candidates (not yet sized)
+
+- **Origin:** Founder, 2026-10-25, asking whether image
+  embeddings would catch the duplicates the pHash can't:
+  "would image embedding help identifying the garment
+  duplicate also?" — filed on his "sounds good" the same
+  day.
+- **Problem:** PC-19's perceptual hash recognizes the same
+  PICTURE (same photo re-saved/resized/recompressed —
+  distance ≤5 of 64 bits). It cannot recognize the same
+  GARMENT in a different photo (re-shot, different angle,
+  light, background) — that gap is by design, and it is
+  where real wardrobe duplicates would sneak in.
+- **Shape (from the filing discussion):** a vision-model
+  embedding per photo (a few hundred numbers describing
+  what's depicted — kind, shape, color, pattern), compared
+  by cosine similarity. Layered, never a replacement:
+  pHash stays the only auto-acting layer (certain, free,
+  instant); an embedding match only ever PROPOSES — a
+  side-by-side "looks like your X — same piece?" the user
+  confirms or dismisses, in the bulk-add warn pattern.
+  Similar-but-different garments (two plain white tees)
+  are indistinguishable to any visual system, so no
+  threshold earns auto-delete or auto-link. Best input is
+  the PC-34 clean render (background removed = the vector
+  describes the garment, not the scene), computed once
+  server-side when the render is made and stored beside
+  the phash. The same vectors later serve PC-36's
+  matching problem (recognizing owned pieces in a worn
+  photo).
+- **Costs to size at the walk:** one embedding call per
+  photo at intake (money + latency, OBS-3 tracked) and a
+  small vector stored per photo.
+- **Revisit trigger:** PC-34 extraction live (the clean
+  inputs exist), or garment duplicates become a felt
+  problem in real use — whichever comes first.
+- **Status:** Filed 2026-10-25. Enters work only via a
+  planning walk.
