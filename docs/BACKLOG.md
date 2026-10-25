@@ -1269,8 +1269,14 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   named on Today/Wardrobe/Outfits; threshold crossed → no
   intro UI anywhere.
 - **Lane:** Catalogue (onboarding surface). **Effort:** S.
-- **Status:** In Sprint 24 (the walk it was parked for,
-  2026-10-24).
+- **Status:** DONE 2026-10-24 (Sprint 24). Built to the
+  proposal doc as written: tier-0 intro cards on Outfits,
+  Shop and Trips; the tier-1 gap banner on Wardrobe and
+  Outfits sharing Today's component; the stylist's extra
+  line at zero pieces; the shop empty line's stale "tap
+  Save" copy corrected (checks auto-save). gapCopyFor is
+  pinned by tests/pc53-client.test.js. Awaiting the
+  founder's phone validation (his verdict is the gate).
 
 ### PC-54: Paste intake on phones (S)
 

@@ -4,6 +4,15 @@ What went live. Momentum you can see.
 
 ## Sprint 19 (2026-10-24 → )
 
+- **PC-53: New-user empty states on every tab** — shipped
+  2026-10-24 (Sprint 24): tier-0 intro cards on Outfits,
+  Shop and Trips; a slim gap-naming banner (one shared
+  gapCopyFor) on Wardrobe and Outfits below the pick
+  threshold; Today's progress card speaks the same
+  sentence; the stylist's empty chat gains its zero-
+  pieces line; graduation is count-derived, nothing
+  stored. Founder phone validation pending.
+
 - **OBS-2: Error logging & handling overhaul** — shipped
   2026-10-24 (Sprint 20).
 - **PC-39: Trip weather re-check** — shipped 2026-10-24

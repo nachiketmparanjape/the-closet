@@ -3134,6 +3134,13 @@
         }
 
         gallery.textContent = "";
+        // PC-53 tier 1: the gap banner leads an unfiltered,
+        // below-threshold wardrobe (graduates by count alone).
+        if (currentUser && allItems.length > 0 && !todayThresholdMet() && filter === "All" && !query && wardrobeSortMode === "browse") {
+          var wBanner = tier1BannerEl();
+          wBanner.style.gridColumn = "1 / -1";
+          gallery.appendChild(wBanner);
+        }
         if (!currentUser || allItems.length === 0) {
           gallery.appendChild(emptyState);
         } else if (filter === "All" && !query && wardrobeSortMode === "browse") {
@@ -4422,7 +4429,9 @@
           em.textContent = "beautifully.";
           title.appendChild(em);
           empty.appendChild(title);
-          empty.appendChild(shopCheckEl("p", "chat-empty-hint", "Built entirely from what's already in your closet. Try “casual dinner, 60°F” — tap @ to build around a specific piece, or tap the line above to attach today's pick and talk about it."));
+          empty.appendChild(shopCheckEl("p", "chat-empty-hint",
+            (allItems.length === 0 ? "I dress you from your wardrobe; add a few pieces and I can start. " : "") +
+            "Built entirely from what's already in your closet. Try “casual dinner, 60°F” — tap @ to build around a specific piece, or tap the line above to attach today's pick and talk about it."));
           chatList.appendChild(empty);
         }
         stylistMessages.forEach(function (m) {
@@ -5780,7 +5789,14 @@
         gallery.textContent = "";
         var n = allTrips.length;
         count.textContent = n + (n === 1 ? " trip" : " trips");
-        document.getElementById("tripsHint").hidden = n > 0;
+        document.getElementById("tripsHint").hidden = n > 0 || allItems.length === 0;
+        // PC-53 tier 0: the intro card (creating a trip at zero
+        // pieces is allowed; its packing list starts empty).
+        if (n === 0 && allItems.length === 0) {
+          gallery.appendChild(introCardEl("Trips",
+            "Trips build a packing list from your wardrobe, tuned to the weather where you're going. Going somewhere?",
+            "＋ New trip", function () { document.getElementById("addTripBtn").click(); }));
+        }
         allTrips.forEach(function (t) {
           var leg = (t.legs && t.legs[0]) || {};
           var card = document.createElement("article");
@@ -6798,6 +6814,55 @@
         });
         return allItems.length >= 4 && hasTop && hasBottom;
       }
+      // PC-53: one gap sentence for every below-threshold surface
+      // (Today's progress card, the Wardrobe and Outfits banners).
+      // It names the SPECIFIC gap — a missing category, or the
+      // count left when categories are covered — never a bare
+      // count. Pure, so the copy matrix is testable.
+      function gapCopyFor(n, hasTop, hasBottom) {
+        var pieces = n + (n === 1 ? " piece" : " pieces") + " in. ";
+        if (!hasTop && !hasBottom) return pieces + "Add a top and a bottom and morning picks unlock.";
+        if (!hasBottom) return pieces + "Add a bottom and morning picks unlock.";
+        if (!hasTop) return pieces + "Add a top and morning picks unlock.";
+        var left = 4 - n;
+        return "Tops and bottoms covered — " + (left === 1 ? "one more piece" : left + " more pieces") + " and picks begin.";
+      }
+      function topBottomFlags() {
+        var hasTop = false, hasBottom = false;
+        allItems.forEach(function (it) {
+          if (it.category === "Tops") hasTop = true;
+          if (it.category === "Bottoms") hasBottom = true;
+        });
+        return [hasTop, hasBottom];
+      }
+      // PC-53 tier 1: the slim banner (Today's progress card is
+      // the same component on the Today tab).
+      function tier1BannerEl() {
+        var flags = topBottomFlags();
+        var card = document.createElement("div");
+        card.className = "today-card";
+        card.appendChild(shopCheckEl("p", "today-eyebrow", "Getting there"));
+        card.appendChild(shopCheckEl("p", "today-why", gapCopyFor(allItems.length, flags[0], flags[1])));
+        var acts = document.createElement("div");
+        acts.className = "today-actions";
+        acts.appendChild(mkBtn("primary", "＋ Add pieces", function () { document.getElementById("addButton").click(); }));
+        card.appendChild(acts);
+        return card;
+      }
+      // PC-53 tier 0: the intro card every tab leads with at
+      // zero pieces — eyebrow, two plain sentences, one action.
+      function introCardEl(eyebrow, text, actionLabel, onAction) {
+        var card = document.createElement("div");
+        card.className = "today-card";
+        card.style.gridColumn = "1 / -1";
+        card.appendChild(shopCheckEl("p", "today-eyebrow", eyebrow));
+        card.appendChild(shopCheckEl("p", "today-why", text));
+        var acts = document.createElement("div");
+        acts.className = "today-actions";
+        acts.appendChild(mkBtn("primary", actionLabel, onAction));
+        card.appendChild(acts);
+        return card;
+      }
       function maybeRenderToday() {
         var v = document.getElementById("todayView");
         if (v && !v.hidden) renderToday();
@@ -7229,8 +7294,8 @@
         card.className = "today-card";
         card.appendChild(shopCheckEl("p", "today-eyebrow", "Getting there"));
         var n = allItems.length;
-        card.appendChild(shopCheckEl("p", "today-why",
-          n + (n === 1 ? " piece" : " pieces") + " in — add a few more (a top and a bottom at minimum) and I can dress you in the mornings."));
+        var flags = topBottomFlags();
+        card.appendChild(shopCheckEl("p", "today-why", gapCopyFor(n, flags[0], flags[1])));
         var acts = document.createElement("div");
         acts.className = "today-actions";
         acts.appendChild(mkBtn("primary", "＋ Add a piece", function () { document.getElementById("addButton").click(); }));
@@ -7473,7 +7538,18 @@
         var list = latestOutfits();
         document.getElementById("outfitCount").textContent =
           list.length + (list.length === 1 ? " outfit" : " outfits");
-        document.getElementById("outfitsHint").hidden = list.length > 0;
+        document.getElementById("outfitsHint").hidden = list.length > 0 || allItems.length === 0;
+        // PC-53: tier 0 leads with the intro card; tier 1 with
+        // the gap banner. Both graduate on counts alone.
+        if (allItems.length === 0 && list.length === 0) {
+          gallery.appendChild(introCardEl("Outfits",
+            "Outfits are combinations of your own pieces. Add a few pieces first — then the stylist can dress you, and the looks you save live here.",
+            "＋ Add your first pieces", function () { document.getElementById("addButton").click(); }));
+        } else if (allItems.length > 0 && !todayThresholdMet()) {
+          var oBanner = tier1BannerEl();
+          oBanner.style.gridColumn = "1 / -1";
+          gallery.appendChild(oBanner);
+        }
         list.forEach(function (o) {
           var card = document.createElement("article");
           card.className = "item";
@@ -8963,10 +9039,20 @@
         var n = allShopChecks.length;
         count.textContent = n + (n === 1 ? " saved" : " saved");
         if (!n) {
-          var empty = document.createElement("p");
-          empty.className = "hint";
-          empty.textContent = "Nothing saved yet — run a shop check and tap Save.";
-          gallery.appendChild(empty);
+          // PC-53 tier 0: at zero pieces the tab leads with the
+          // intro card (checks work right away — the sheet is a
+          // front door too). Otherwise the plain line, with the
+          // stale "tap Save" copy corrected: checks auto-save.
+          if (allItems.length === 0) {
+            gallery.appendChild(introCardEl("Shop check",
+              "Before you buy something, check it against your wardrobe and get a straight verdict. Checks work right away — and get sharper the more of your wardrobe is in.",
+              "Check an item", function () { openShopCheckSheet(null); }));
+          } else {
+            var empty = document.createElement("p");
+            empty.className = "hint";
+            empty.textContent = "Nothing saved yet — run a shop check and it saves itself here.";
+            gallery.appendChild(empty);
+          }
           return;
         }
         var el = shopCheckEl;

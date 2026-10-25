@@ -19,7 +19,8 @@ tabs stop lying by omission, and the chat gains eyes
 ## The slate (build order)
 
 ### PC-53: New-user empty states on every tab (S)
-- **Status:** In Sprint 24.
+- **Status:** Built + deployed 2026-10-24; founder phone
+  validation pending.
 Design at docs/proposals/NEW-USER-EMPTY-STATES.md (two
 tiers, count-derived graduation, no stored flags). Founder
 parked it for exactly this walk. In: Outfits/Shop/Trips
