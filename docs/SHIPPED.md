@@ -4,6 +4,13 @@ What went live. Momentum you can see.
 
 ## Sprint 19 (2026-10-24 → )
 
+- **PC-52: The stylist may propose an attachment** —
+  shipped 2026-10-24 (Sprint 24): when a general
+  conversation turns on the unattached pick, the model
+  may propose attaching it (a card, a tap — decision 1
+  intact); Dismiss silences proposals for the
+  conversation, Start fresh re-arms. Founder phone
+  validation pending.
 - **PC-53: New-user empty states on every tab** — shipped
   2026-10-24 (Sprint 24): tier-0 intro cards on Outfits,
   Shop and Trips; a slim gap-naming banner (one shared

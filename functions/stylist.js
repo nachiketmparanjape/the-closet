@@ -447,7 +447,11 @@ function parseStylistJson(text, todayStr) {
   // Sprint 17: optional pin proposal — the model may surface one durable
   // fact per message. Sanitized; the client confirms before saving.
   const proposal = sanitizePinProposal(obj.pinProposal, todayStr);
-  return { reply: reply, outfit: outfit, pinProposal: proposal };
+  // PC-52: an attach proposal is a single literal — the model may
+  // propose attaching today's pick, nothing else. Anything else
+  // the model invents in this field drops here.
+  const attachProposal = obj.attachProposal === "todayPick" ? "todayPick" : null;
+  return { reply: reply, outfit: outfit, pinProposal: proposal, attachProposal: attachProposal };
 }
 
 // Sprint 17 (CONTEXT PINS): stored current facts the user confirmed.
@@ -807,13 +811,13 @@ function assembleContext(input) {
     input.items, input.messages, input.styleProfile, input.previousPick,
     input.references, input.weatherContext, input.vibe, input.vibeProfile,
     input.tripContext, input.pins, todayStr, input.todayPick, input.shopItem,
-    input.mutedPinIds
+    input.mutedPinIds, input.attachCtx
   );
   const manifest = buildManifest(input, computeActivePins(input.pins, input.tripContext, todayStr, input.mutedPinIds));
   return { model: req.model, contents: req.contents, config: req.config, manifest: manifest };
 }
 
-function buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, todayPick, shopItem, mutedPinIds) {
+function buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, todayPick, shopItem, mutedPinIds, attachCtx) {
   const model = process.env.GEMINI_MODEL || MODEL_VERSION;
   const wardrobe = items.map((it, i) => itemLine(it, i)).join("\n");
   let system = SYSTEM + "\n\n" + PRECEDENCE;
@@ -993,6 +997,18 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
       "(runs cold, leans casual, loves earth tones, never suggest X, packing style, owns ski gear).\n" +
       "- Extract end dates from speech (\"until Sunday\" → that date). Skip trivia and one-off requests.\n" +
       "- Never propose on your own initiative — only when the user states the fact or its end. Propose, never append.";
+  }
+  // PC-52: attach proposals. Attach is an act (UX-18 decision 1) —
+  // the stylist may PROPOSE the act when the conversation has
+  // turned on the unattached pick, exactly as facts are proposed.
+  // The brief section exists only when a pick is available and
+  // unattached and no proposal was dismissed in this conversation;
+  // the server also drops the field otherwise (askStylist gates).
+  if (!tripContext && attachCtx && attachCtx.available && !attachCtx.dismissed && !todayPick) {
+    system += "\n\nATTACH PROPOSAL — today's pick exists but is NOT attached to this conversation, so you cannot see or change it. " +
+      "If the user's words clearly turn on that pick (\"make it warmer\", \"why did you pick this?\", \"swap the shoes on it\"), " +
+      "you may return \"attachProposal\": \"todayPick\" in the JSON alongside reply/outfit. The user gets an Attach card; " +
+      "nothing attaches unless they tap it. Do not claim to see the pick, and do not propose when the conversation is about anything else.";
   }
   for (const m of messages) {
     contents.push({ role: m.role, parts: [{ text: m.text }] });
@@ -1289,7 +1305,7 @@ function unwrapJsonReply(text) {
 }
 
 // here; the client re-validates on execute.
-async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, hooks, todayPick, shopItem, mutedPinIds) {
+async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, hooks, todayPick, shopItem, mutedPinIds, attachCtx) {
   const todayStr = /^\d{4}-\d{2}-\d{2}$/.test(today || "")
     ? today
     : new Date().toISOString().slice(0, 10);
@@ -1300,7 +1316,7 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
     previousPick: previousPick, references: references,
     weatherContext: weatherContext, vibe: vibe, vibeProfile: vibeProfile,
     tripContext: tripContext, pins: pins, today: todayStr, todayPick: todayPick,
-    shopItem: shopItem, mutedPinIds: mutedPinIds,
+    shopItem: shopItem, mutedPinIds: mutedPinIds, attachCtx: attachCtx,
   });
   const { model, contents, config } = assembled;
   const manifest = assembled.manifest;
@@ -1386,9 +1402,16 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
     }
   }
 
+  // PC-52: the attach proposal survives only under the exact
+  // conditions its brief section states — general conversation,
+  // a pick available, none attached, none dismissed here. The
+  // prompt asks; this gate decides (a model that proposes out
+  // of turn is dropped, not displayed).
+  const attachProposal = (!tripContext && attachCtx && attachCtx.available &&
+    !attachCtx.dismissed && !todayPick) ? (parsed.attachProposal || null) : null;
   if (!parsed.outfit || !mapped || problem) {
     if (parsed.outfit) emitEvent(hooks, "rejection", "outfit_discarded", { problem: problem || "unmapped" });
-    return { reply: parsed.reply, outfit: null, pinProposal: parsed.pinProposal || null, manifest: manifest };
+    return { reply: parsed.reply, outfit: null, pinProposal: parsed.pinProposal || null, attachProposal: attachProposal, manifest: manifest };
   }
   return {
     reply: parsed.reply,
@@ -1404,6 +1427,7 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
       scores: parsed.outfit.scores,
     },
     pinProposal: parsed.pinProposal || null,
+    attachProposal: attachProposal,
   };
 }
 

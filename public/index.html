@@ -4144,6 +4144,8 @@
           if (m.outfit) o.outfit = m.outfit;
           if (m.pinProposal) o.pinProposal = m.pinProposal;
           if (m.pinState) o.pinState = m.pinState;
+          if (m.attachProposal) o.attachProposal = m.attachProposal;
+          if (m.attachState) o.attachState = m.attachState;
           if (m.refLabels) o.refLabels = m.refLabels;
           if (m.tripOutfits) o.tripOutfits = m.tripOutfits;
           if (m.tripSaveCtx) o.tripSaveCtx = m.tripSaveCtx;
@@ -4295,6 +4297,7 @@
         chatAttachByThread = {};
         chatAttachShopByThread = {};
         chatMutedPinsByThread = {};
+        chatAttachDismissedByThread = {};
         if (activeThreadKey !== "general") { activeThreadKey = "general"; stylistMessages = []; }
         if (uid) {
           loadThread("general", function () {
@@ -4367,6 +4370,7 @@
         delete chatAttachByThread[key]; // a new conversation starts unattached
         delete chatAttachShopByThread[key];
         delete chatMutedPinsByThread[key]; // muted facts return on a fresh start
+        delete chatAttachDismissedByThread[key]; // a dismissed proposal may be offered again
         saveThread(key);
         renderChat();
         renderContextLine();
@@ -4488,6 +4492,12 @@
                matchingPins(allPins, m.pinProposal).length)) {
             chatList.appendChild(renderPinProposalCard(m));
           }
+          // PC-52: the attach proposal card, same pattern — it
+          // renders only while the pick is still unattached
+          // (attaching from anywhere resolves it silently).
+          if (m.attachProposal && m.attachState === "pending" && !currentAttach()) {
+            chatList.appendChild(renderAttachProposalCard(m));
+          }
         });
         chatList.scrollTop = chatList.scrollHeight;
       }
@@ -4536,6 +4546,56 @@
           saveThread(activeThreadKey);
         });
         row.appendChild(save);
+        row.appendChild(dismiss);
+        card.appendChild(row);
+        return card;
+      }
+
+      // PC-52: the attach proposal card. Mirrors the pin
+      // proposal's shape and discipline — the stylist proposes,
+      // the user taps, nothing attaches without the tap.
+      // Attach runs the same attachTodayPick() as every other
+      // door; Dismiss silences proposals for this conversation.
+      function renderAttachProposalCard(m) {
+        var card = document.createElement("div");
+        card.className = "pin-proposal";
+        var head = document.createElement("p");
+        head.className = "pin-proposal-head";
+        head.textContent = "📎 Attach today's pick to this conversation?";
+        card.appendChild(head);
+        var body = document.createElement("p");
+        body.className = "hint";
+        var ready = todayPickReady();
+        body.textContent = (ready && ready.lookName ? "“" + ready.lookName + "” — " : "") +
+          "the stylist can then work from it directly: swap a piece, warm it up, explain the choice.";
+        card.appendChild(body);
+        var row = document.createElement("div");
+        row.className = "pin-proposal-actions";
+        var attach = document.createElement("button");
+        attach.className = "primary";
+        attach.type = "button";
+        attach.textContent = "Attach";
+        attach.addEventListener("click", function () {
+          if (attachTodayPick()) {
+            m.attachState = "accepted";
+            renderContextLine();
+          } else {
+            m.attachState = "dismissed";
+          }
+          renderChat();
+          saveThread(activeThreadKey);
+        });
+        var dismiss = document.createElement("button");
+        dismiss.className = "secondary";
+        dismiss.type = "button";
+        dismiss.textContent = "Dismiss";
+        dismiss.addEventListener("click", function () {
+          m.attachState = "dismissed";
+          chatAttachDismissedByThread[activeThreadKey] = true;
+          renderChat();
+          saveThread(activeThreadKey);
+        });
+        row.appendChild(attach);
         row.appendChild(dismiss);
         card.appendChild(row);
         return card;
@@ -4746,6 +4806,12 @@
       // threads scopes it, and a resumed thread starts unattached
       // until the user attaches again.
       var chatAttachByThread = {};
+      // PC-52: a dismissed attach proposal stays dismissed for
+      // the life of the conversation (the model does not
+      // re-propose; the server is told, and drops the field).
+      // Attachments' lifecycle: per thread, never saved with
+      // the transcript, cleared by Start fresh.
+      var chatAttachDismissedByThread = {};
       function currentAttach() { return chatAttachByThread[activeThreadKey] || null; }
       function todayPickReady() {
         if (typeof todayHomeOn !== "function" || !todayHomeOn()) return null;
@@ -5373,6 +5439,11 @@
           // The server leaves them out of the brief — what the
           // bar hides, the stylist truly does not use.
           mutedPinIds: currentMutedPinIds(),
+          // PC-52: whether a pick exists today (it rides above
+          // only when attached) and whether an attach proposal
+          // was already dismissed in this conversation.
+          todayPickAvailable: !tripChat && !todayPickCtx && !!todayPickReady(),
+          attachProposalDismissed: !!chatAttachDismissedByThread[activeThreadKey],
           // Sprint 13: explicit vibe handle ("dress me streetwear tonight").
           // Server accepts exact vocabulary hits only.
           vibe: detectVibeTag(text),
@@ -5462,6 +5533,8 @@
             // confirm card — never auto-saved.
             thinking.pinProposal = d.pinProposal || null;
             thinking.pinState = d.pinProposal ? "pending" : null;
+            thinking.attachProposal = d.attachProposal || null;
+            thinking.attachState = d.attachProposal ? "pending" : null;
           }
         }).catch(function (err) {
           thinking.thinking = false;

@@ -293,7 +293,15 @@ exports.askStylist = onCall(
       const mutedPinIds = Array.isArray(data.mutedPinIds)
         ? data.mutedPinIds.filter((x) => typeof x === "string" && x.length > 0 && x.length <= 128).slice(0, 20)
         : [];
-      const result = await askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, stylistHooks, todayPick, shopItem, mutedPinIds);
+      // PC-52: attach-proposal context — two strict booleans.
+      // available: a pick exists today (the client knows; the
+      // pick itself rides only when attached). dismissed: a
+      // proposal was already dismissed in this conversation.
+      const attachCtx = {
+        available: data.todayPickAvailable === true,
+        dismissed: data.attachProposalDismissed === true,
+      };
+      const result = await askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, stylistHooks, todayPick, shopItem, mutedPinIds, attachCtx);
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: true });
       return finish("askStylist", correlationId, uid, start, result);
     } catch (err) {

@@ -1244,7 +1244,22 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   Dismiss leaves the conversation pick-free and the model
   does not re-propose on the next turn.
 - **Lane:** Stylist. **Effort:** S.
-- **Status:** In Sprint 24 (planning walk 2026-10-24).
+- **Status:** DONE 2026-10-24 (Sprint 24). Built as
+  specced: an attachProposal field alongside pinProposal
+  (strict literal "todayPick"), the brief section present
+  only under the exact conditions (general chat, pick
+  available and unattached, none dismissed), a server
+  gate that drops out-of-turn proposals, and a client
+  proposal card mirroring the pin card — Attach runs
+  attachTodayPick(); Dismiss silences proposals for the
+  conversation (Start fresh re-arms). Deviation from the
+  brief text, recorded: the "at most once unless the
+  subject changes" nuance is enforced as once per
+  conversation by the client + server together — the
+  pick is the only attachable subject in scope, so a
+  subject change cannot occur. tests/pc52.test.js pins
+  the brief gating and parse strictness. Awaiting the
+  founder's phone validation.
 
 ### PC-53: New-user empty states on every tab (S)
 
