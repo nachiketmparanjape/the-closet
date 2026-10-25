@@ -1332,4 +1332,50 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   never a silent nothing.
 - **Lane:** Catalogue. **Effort:** S (share target may split
   out as its own card at the walk).
-- **Status:** In Sprint 24 (planning walk 2026-10-24).
+- **Status:** DONE 2026-10-24 (Sprint 24). Built as specced:
+  a visible Paste a photo button on the capture screen and
+  in the shop sheet; the tap tries the async clipboard read
+  and routes any photo through PC-51's one routing (now a
+  shared routePastedImages) — shop sheet → the cropper,
+  capture → add. Every failure speaks: no read API (iOS)
+  → the save-and-upload line; permission denied → Upload
+  does the same job; clipboard holds no photo → copy one
+  first. The guide's clipboard path carries the phone
+  sentence too. pickClipboardImageType is pinned by
+  tests/pc54-client.test.js. The share target split out
+  as PC-55 during the build. Validation split: the
+  founder's iPhone can verify the honest fallback tap;
+  the Android read path needs an Android device — flagged,
+  not claimed.
+
+### PC-55: Web Share Target — photos from the share sheet (M)
+
+- **Origin:** Split out of PC-54 during its Sprint 24 build
+  (2026-10-24), on the evaluation recorded here.
+- **Problem:** the real phone gesture for "I found a photo"
+  is the system share sheet. PC-54's Paste button covers
+  Android Chrome's clipboard read; iOS offers no clipboard
+  read at all, so on iPhone the only frictionless door is
+  Share → Closet.
+- **Evaluation (2026-10-24):** the app has a manifest but NO
+  service worker. A share target needs the manifest field
+  (POST, multipart) PLUS a service worker to receive the
+  POST, stash the file, and redirect into the app — and a
+  service worker is new infrastructure for this app
+  (update lifecycle, cache versioning, offline behavior),
+  an important invisible that deserves its own design
+  pass, not a bolt-on inside an S card. Platform truth:
+  share targets surface only for installed PWAs, and iOS
+  support is recent and partial — the payoff is real but
+  narrower than the spec's promise.
+- **In scope (when pulled):** a service-worker design note
+  first (what it caches, how updates ship, how it can
+  never serve a stale app), then the share_target field
+  receiving an image into the same routing as paste
+  (chooser: add or check).
+- **Revisit trigger:** service-worker infrastructure gets
+  pulled for any other reason (offline, install polish),
+  or the founder's phone use shows screenshot → Photos →
+  upload is a recurring friction.
+- **Status:** Filed 2026-10-24 from the PC-54 split.
+  Enters work only via a planning walk.

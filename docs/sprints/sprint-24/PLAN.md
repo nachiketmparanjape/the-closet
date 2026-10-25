@@ -52,7 +52,15 @@ gated; a steering card suppresses a pin proposal for the
 same fact. The card closes when this lands.
 
 ### PC-54: Paste intake on phones (S)
-- **Status:** In Sprint 24.
+- **Status:** Built + deployed 2026-10-24; founder phone
+  validation pending (iPhone fallback tap; the Android
+  read path needs an Android device). The button is
+  visible everywhere and its tap degrades honestly where
+  the read is unavailable (the card's acceptance), and
+  PC-51's routing is now one shared routePastedImages.
+  The Web Share Target split out as PC-55 on the build's
+  evaluation: no service worker exists in the app, and
+  that infrastructure gets its own design pass.
 PC-51 rides the desktop paste event; phones have none.
 In: a visible "Paste a photo" button where the platform
 supports clipboard read (Android Chrome, permission

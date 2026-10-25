@@ -4,6 +4,17 @@ What went live. Momentum you can see.
 
 ## Sprint 19 (2026-10-24 → )
 
+- **PC-54: Paste intake on phones** — shipped 2026-10-24
+  (Sprint 24): a Paste a photo button on the capture
+  screen and in the shop sheet; the tap tries the async
+  clipboard read (Android Chrome, behind its permission
+  prompt) and routes through PC-51's one routing; every
+  failure speaks one honest line (iOS: save the photo
+  and upload it). The Web Share Target split out as
+  PC-55 — the app has no service worker, and that
+  infrastructure deserves its own design pass. Founder
+  phone validation pending (iPhone: the fallback tap;
+  the Android read path needs an Android device).
 - **PC-33: Trip steering in general chat** — shipped
   2026-10-24 (Sprint 24): the pin tense rule (location/
   weather proposals are present-tense only) plus the

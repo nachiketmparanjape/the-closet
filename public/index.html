@@ -944,6 +944,7 @@
         <div class="photo-actions">
           <button class="primary" id="captureFilesBtn" type="button">Upload photos</button>
           <button class="secondary" id="captureCameraBtn" type="button">Take a photo</button>
+          <button class="secondary" id="capturePasteBtn" type="button">Paste a photo</button>
         </div>
         <div class="capture-link">
           <p class="capture-fine">Shopping online? Copy the product photo (right-click → Copy image) or take a screenshot, then paste it right here — Ctrl+V, or Cmd+V on a Mac.</p>
@@ -989,7 +990,7 @@
         </div>
         <div class="guide-path">
           <h3>📋 From your clipboard</h3>
-          <p>Seeing it online? Copy the product photo — right-click it and choose Copy image — or take a screenshot, then paste it straight in: Ctrl+V on Windows, Cmd+V on a Mac. Works on the Add pieces screen, in a shop check, or anywhere in the app — we'll ask whether it's a new piece or a check. No saving files first.</p>
+          <p>Seeing it online? Copy the product photo — right-click it and choose Copy image — or take a screenshot, then paste it straight in: Ctrl+V on Windows, Cmd+V on a Mac. Works on the Add pieces screen, in a shop check, or anywhere in the app — we'll ask whether it's a new piece or a check. No saving files first. On a phone, the same screens carry a Paste a photo button — on Android it reads the clipboard directly; on iPhone the browser keeps the clipboard private, so save the photo and upload it instead.</p>
           <button class="secondary" type="button" data-guide-add>Add from clipboard</button>
         </div>
       </div>
@@ -1073,6 +1074,9 @@
       </button>
       <button class="sheet-option" id="shopSheetUpload" type="button">
         <span><span class="opt-title">Upload photo</span><span class="opt-sub">Screenshot or saved photo</span></span>
+      </button>
+      <button class="sheet-option" id="shopSheetPaste" type="button">
+        <span><span class="opt-title">Paste a photo</span><span class="opt-sub">From the clipboard</span></span>
       </button>
       <p class="sheet-fine">Shopping online? Take a screenshot — or copy the product photo and paste it here (Ctrl+V / Cmd+V).</p>
     </section>
@@ -8514,12 +8518,22 @@
         var text = "";
         try { text = (dt.getData("text/plain") || "").trim(); } catch (err) { text = ""; }
         if (inField && text) return;
+        if (routePastedImages(images)) e.preventDefault();
+      });
+
+      // The one routing for pasted photos, shared by the paste
+      // event (PC-51) and the Paste button (PC-54): the surface
+      // that owns the screen decides — shop sheet open → the
+      // check's photo step; capture open → add; another overlay
+      // open → not ours, leave it; nothing open → ask (add or
+      // check). Returns false when another flow owns the screen.
+      function routePastedImages(images) {
+        if (!images || !images.length) return false;
         var shopSheetOpen = !shopCheckSheet.hidden;
         var captureOpen = !document.getElementById("captureOverlay").hidden;
         if (!shopSheetOpen && !captureOpen && document.querySelector(".overlay:not([hidden])")) {
-          return; // another flow owns the screen — don't stack
+          return false;
         }
-        e.preventDefault();
         if (shopSheetOpen) {
           closeOverlay(shopCheckSheet);
           openShopCropper(images[0]);
@@ -8529,7 +8543,54 @@
           pastedImages = images;
           openOverlay(pasteChoiceSheet);
         }
-      });
+        return true;
+      }
+
+      // PC-54: paste on phones. There is no paste EVENT on a
+      // phone — the gesture is a button that asks the browser
+      // for the clipboard (async Clipboard API). Android Chrome
+      // allows it behind a permission prompt; iOS Safari offers
+      // no programmatic read at all. The button is visible
+      // everywhere and every outcome is spoken: a photo routes
+      // exactly like a desktop paste; anything else gets one
+      // honest line, never a silent nothing. (The fuller phone
+      // answer — the system share sheet — is PC-55.)
+      function pickClipboardImageType(types) {
+        if (!types) return null;
+        for (var i = 0; i < types.length; i++) {
+          if (String(types[i]).indexOf("image/") === 0) return types[i];
+        }
+        return null;
+      }
+      function pastePhotoFromClipboard() {
+        if (!currentUser) return;
+        if (!navigator.clipboard || typeof navigator.clipboard.read !== "function") {
+          showToast("This browser won't share the clipboard — on iPhone, save the photo and upload it instead. It lands in the same place.");
+          return;
+        }
+        navigator.clipboard.read().then(function (items) {
+          var found = null;
+          for (var i = 0; i < items.length && !found; i++) {
+            var t = pickClipboardImageType(items[i].types);
+            if (t) found = { item: items[i], type: t };
+          }
+          if (!found) {
+            showToast("No photo on the clipboard — copy an image first, then tap Paste.");
+            return null;
+          }
+          return found.item.getType(found.type).then(function (blob) {
+            var ext = found.type === "image/png" ? "png" : (found.type === "image/jpeg" ? "jpg" : "img");
+            var file = new File([blob], "pasted-photo." + ext, { type: blob.type || found.type });
+            if (!routePastedImages([file])) {
+              showToast("Another window is open — finish that first, then paste.");
+            }
+          });
+        }).catch(function () {
+          showToast("The browser didn't allow clipboard access — Upload does the same job.");
+        });
+      }
+      document.getElementById("capturePasteBtn").addEventListener("click", pastePhotoFromClipboard);
+      document.getElementById("shopSheetPaste").addEventListener("click", pastePhotoFromClipboard);
 
       // Shop-check photo step (rebuilt 2026-10-24 on the founder's
       // phone verdict): the FULL photo is the selection by default
