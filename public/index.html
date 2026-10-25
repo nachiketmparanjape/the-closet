@@ -292,6 +292,7 @@
     .context-line .cl-label { color: var(--muted); font-weight: 600; flex-shrink: 0; }
     .context-line .cl-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .context-line .cl-chev { color: var(--muted); font-size: 19px; flex-shrink: 0; }
+    .context-hint { display: block; width: 100%; box-sizing: border-box; background: none; border: none; font: inherit; font-size: 12.5px; color: var(--muted); text-align: center; padding: 0 10px 9px; margin-top: -5px; cursor: pointer; }
     .context-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
     .context-row-label { font-size: 14px; color: var(--ink); }
     .context-form { padding: 14px 0 4px; }
@@ -1337,7 +1338,8 @@
         <button class="icon-button" id="chatClose" type="button" aria-label="Close stylist chat">×</button>
       </div>
       <div class="modal-body">
-        <button class="context-line" id="chatContextLine" type="button" hidden aria-label="What the stylist knows — tap for details"></button>
+        <button class="context-line" id="chatContextLine" type="button" hidden aria-label="What the stylist is working from — tap for details"></button>
+        <button class="context-hint" id="chatContextHint" type="button" hidden>Everything I'm taking into account for this chat — tap to view or change it.</button>
         <div id="chatTodayStrip" hidden></div>
         <div class="chat-list" id="chatList" aria-live="polite"></div>
         <form class="chat-input-row" id="chatForm" style="position:relative;">
@@ -1358,7 +1360,7 @@
   <div class="overlay sheet-overlay" id="contextSheet" hidden role="dialog" aria-modal="true" aria-labelledby="contextSheetTitle">
     <section class="sheet">
       <div class="sheet-head">
-        <h2 class="sheet-title" id="contextSheetTitle">What the stylist knows</h2>
+        <h2 class="sheet-title" id="contextSheetTitle">What the stylist is working from</h2>
         <button class="icon-button" id="contextSheetClose" type="button" aria-label="Close">×</button>
       </div>
       <div id="contextSheetList"></div>
@@ -4301,7 +4303,7 @@
           // first copy on every load (the next save persists it).
           var noticeSeen = false;
           msgs = msgs.filter(function (m) {
-            if (m && m.role === "note" && m.text && m.text.indexOf("Conversations are saved now") === 0) {
+            if (isSavedNotice(m)) {
               if (noticeSeen) return false;
               noticeSeen = true;
             }
@@ -4394,6 +4396,19 @@
       // Two-tap confirm state for the in-thread Start fresh
       // action under the resume divider (2026-10-25).
       var dividerFreshArmed = false;
+      var noticeFreshArmed = false;
+      var contextSheetSeen = true;
+      var contextSheetSeenKnown = false;
+      function isSavedNotice(m) {
+        return !!(m && m.role === "note" && m.text &&
+          (m.text.indexOf("Conversations are saved now") === 0 ||
+           m.text.indexOf("This conversation is saved") === 0));
+      }
+      function tapSavedNotice() {
+        if (!noticeFreshArmed) { noticeFreshArmed = true; renderChat(); return; }
+        noticeFreshArmed = false;
+        startFreshThread();
+      }
       function applySavedNotice() {
         if (savedNoticeInFlight) return;
         if (activeThreadKey !== "general" || !currentUser || typeof db === "undefined" || !db) return;
@@ -4402,17 +4417,18 @@
         sref.get().then(function (snap) {
           savedNoticeInFlight = false;
           var d = snap.exists ? (snap.data() || {}) : {};
+          contextSheetSeen = !!d.contextSheetSeen;
+          contextSheetSeenKnown = true;
+          renderContextLine();
           if (d.chatThreadsNoticeSeen || activeThreadKey !== "general") return;
-          var already = stylistMessages.some(function (m) {
-            return m.role === "note" && m.text && m.text.indexOf("Conversations are saved now") === 0;
-          });
+          var already = stylistMessages.some(isSavedNotice);
           if (already) {
             sref.set({ chatThreadsNoticeSeen: true }, { merge: true }).catch(function () {});
             return;
           }
           stylistMessages.push({
             role: "note",
-            text: "Conversations are saved now — this one will be here when you come back. Start fresh any time from the context sheet (tap the line above).",
+            text: "This conversation is saved — it will be here when you come back.",
             at: Date.now()
           });
           saveThread("general");
@@ -4620,6 +4636,7 @@
         });
         var resumeDividerIdx = lastDividerIdx > lastContentIdx ? lastDividerIdx : -1;
         if (resumeDividerIdx === -1) dividerFreshArmed = false;
+        if (!stylistMessages.some(isSavedNotice)) noticeFreshArmed = false;
         stylistMessages.forEach(function (m, midx) {
           // UX-18 W4/W5: system rows (return divider, saved/window
           // notes) render as quiet centered lines, not bubbles.
@@ -4628,6 +4645,24 @@
             sys.className = "chat-msg " + m.role;
             sys.textContent = m.text;
             chatList.appendChild(sys);
+            if (isSavedNotice(m)) {
+              sys.style.cursor = "pointer";
+              sys.addEventListener("click", tapSavedNotice);
+              var nact = document.createElement("div");
+              nact.className = "chat-divider-action";
+              var nfb = document.createElement("button");
+              nfb.type = "button";
+              nfb.className = "link-button";
+              nfb.textContent = noticeFreshArmed
+                ? "Tap again to clear it — your facts stay"
+                : "↻ Start fresh — clear this conversation";
+              nfb.addEventListener("click", function (ev) {
+                if (ev) ev.stopPropagation();
+                tapSavedNotice();
+              });
+              nact.appendChild(nfb);
+              chatList.appendChild(nact);
+            }
             if (midx === resumeDividerIdx) {
               var act = document.createElement("div");
               act.className = "chat-divider-action";
@@ -5377,14 +5412,14 @@
         var el = document.getElementById("chatContextLine");
         if (!el) return;
         syncRefPhotoUi(); // PC-38: the attach door follows the active thread
-        if (!currentUser) { el.hidden = true; return; }
+        if (!currentUser) { el.hidden = true; var h0 = document.getElementById("chatContextHint"); if (h0) h0.hidden = true; return; }
         var labels = contextEntries().map(function (e) { return e.label; });
         var text = labels.slice(0, 3).join("  ·  ");
         if (labels.length > 3) text += "  ·  +" + (labels.length - 3) + " more";
         el.textContent = "";
         var lab = document.createElement("span");
         lab.className = "cl-label";
-        lab.textContent = "Knows";
+        lab.textContent = "Working from";
         el.appendChild(lab);
         var txt = document.createElement("span");
         txt.className = "cl-text";
@@ -5395,6 +5430,8 @@
         chev.textContent = "›";
         el.appendChild(chev);
         el.hidden = false;
+        var hintEl = document.getElementById("chatContextHint");
+        if (hintEl) hintEl.hidden = !(contextSheetSeenKnown && !contextSheetSeen);
       }
       function sheetActionBtn(text, fn) {
         var b = document.createElement("button");
@@ -5565,6 +5602,14 @@
       function openContextSheet() {
         var list = document.getElementById("contextSheetList");
         if (!list) return;
+        if (!contextSheetSeen) {
+          contextSheetSeen = true;
+          renderContextLine();
+          if (currentUser && typeof db !== "undefined" && db) {
+            db.collection("users").doc(currentUser.uid).collection("settings").doc("app")
+              .set({ contextSheetSeen: true }, { merge: true }).catch(function () {});
+          }
+        }
         list.textContent = "";
         // Start fresh FIRST (founder, 2026-10-24): it is a
         // conversation action, not a fact — buried under the facts,
@@ -6099,6 +6144,7 @@
       }
 
       document.getElementById("chatContextLine").addEventListener("click", openContextSheet);
+      document.getElementById("chatContextHint").addEventListener("click", openContextSheet);
       document.getElementById("contextSheetClose").addEventListener("click", function () {
         contextEditPinId = null;
         closeOverlay(document.getElementById("contextSheet"));
