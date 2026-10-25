@@ -310,6 +310,9 @@
     .chat-empty-title { font-family: "Closet Serif", serif; font-size: 22px; font-weight: 500; line-height: 1.28; margin: 0; }
     .chat-empty-title em { font-style: italic; color: var(--accent-dark); }
     .chat-empty-hint { font-size: 13px; color: var(--muted); margin: 8px 0 0; line-height: 1.5; }
+    .chat-addinfo { margin: 14px 4px 4px; padding: 14px; background: var(--paper-soft); border: 1px solid var(--line); border-radius: var(--r-md); }
+    .chat-addinfo p { margin: 0 0 10px; font-size: 13.5px; line-height: 1.5; color: var(--ink); }
+    .chat-addinfo .primary { min-height: 40px; padding: 8px 16px; font-size: 14px; }
     .chat-msg.user { align-self: flex-end; background: var(--ink); color: var(--bg); border-bottom-right-radius: 4px; }
     .chat-msg.model { align-self: flex-start; background: var(--paper-soft); color: var(--ink); border-bottom-left-radius: 4px; }
     .chat-msg.thinking { color: var(--muted); font-style: italic; }
@@ -1769,6 +1772,15 @@
         el.classList.remove("is-closing");
         el.hidden = false;
         if (overlayStack.indexOf(el) === -1) overlayStack.push(el);
+        // Stacking belongs to the stack, not the DOM: every
+        // overlay shares z-index 20 in CSS, so paint order
+        // otherwise falls to document order — and a sheet
+        // declared before the chat in the markup renders
+        // UNDER the chat drawer (the PC-38 photo chooser did
+        // exactly that on the founder's screen, 2026-10-24).
+        // The stack position IS the z order; the step stays
+        // small so fixed chrome (toast, fabs) keeps its place.
+        el.style.zIndex = String(21 + overlayStack.indexOf(el));
         syncFeedbackFab();
         document.body.style.overflow = "hidden";
         requestAnimationFrame(function () {
@@ -1788,6 +1800,7 @@
           el._ux15Timer = null;
           el.hidden = true;
           el.classList.remove("is-closing");
+          el.style.zIndex = "";
           if (!overlayStack.length) document.body.style.overflow = "";
         }, 230);
       }
@@ -4521,6 +4534,29 @@
             (allItems.length === 0 ? "I dress you from your wardrobe; add a few pieces and I can start. " : "") +
             "Built entirely from what's already in your closet. Try “casual dinner, 60°F” — tap @ to build around a specific piece, or tap the line above to attach today's pick and talk about it."));
           chatList.appendChild(empty);
+        }
+        // PC-53 follow-up (founder phone test, 2026-10-24): a
+        // new user lands in the stylist too — until the wardrobe
+        // reaches the pick threshold and the user has actually
+        // said something here, the chat itself explains how
+        // pieces get in and carries the one Add door. Render-
+        // time only; nothing is saved to the thread.
+        if (!todayThresholdMet() &&
+            !stylistMessages.some(function (m) { return m.role === "user"; })) {
+          var addInfo = document.createElement("div");
+          addInfo.className = "chat-addinfo";
+          addInfo.appendChild(shopCheckEl("p", "",
+            "New here? Pieces get in with a photo each — one photo per piece, or several at once. About a minute a piece, and then I can start dressing you."));
+          var addBtn = document.createElement("button");
+          addBtn.type = "button";
+          addBtn.className = "primary";
+          addBtn.textContent = "＋ Add pieces";
+          addBtn.addEventListener("click", function () {
+            closeOverlay(chatOverlay);
+            document.getElementById("addButton").click();
+          });
+          addInfo.appendChild(addBtn);
+          chatList.appendChild(addInfo);
         }
         stylistMessages.forEach(function (m) {
           // UX-18 W4/W5: system rows (return divider, saved/window
