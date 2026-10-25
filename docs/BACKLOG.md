@@ -336,8 +336,10 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   rejected in the proposal, with a revisit trigger recorded.
   Principle: pins are the present-tense layer; trips own the
   future. The discipline half can split out as an (S) at planning.
-- **Status:** Not started (proposal stage). Sprint candidate;
-  sits next to PC-32 (threads) and CONTEXT-1 (pins).
+- **Status:** Split at the Sprint 24 walk (2026-10-24):
+  the pin-discipline half shipped inside UX-18; the
+  steering-card remainder is In Sprint 24. The card
+  closes when the remainder lands.
 
 ### UX-13: Visual redesign + design system (L)
 - **Idea (founder 2026-10-20):** the app looks extremely
@@ -709,9 +711,8 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   suggests outfits built only from owned pieces; removing a
   thumbnail before send excludes it; no items are created.
 - **Lane:** Stylist. **Effort:** M.
-- **Status:** Filed sprint-ready 2026-10-24 (teardown P3
-  adoption). Competes at the next planning walk — adoption
-  is not scheduling.
+- **Status:** In Sprint 24 (planning walk 2026-10-24 —
+  adoption became scheduling there, not before).
 
 ### PC-39: Trip weather re-check — the pill is the retry (S)
 - **Origin:** Founder, 2026-10-24. The trip page shows a frozen
@@ -1025,9 +1026,9 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   proposed, not applied; confirming it changes later picks;
   dismissing it leaves no trace.
 - **Lane:** Personalization + Stylist. **Effort:** M.
-- **Status:** HELD for UX-18 (founder-saved 2026-10-24, but
-  it extends the chat's learning loop — queues behind the
-  bottom-up redesign like PC-38/PC-41).
+- **Status:** In Sprint 24 — the UX-18 hold released when
+  UX-18 shipped, and the founder added the card to the
+  slate himself at the walk (2026-10-24).
 
 ### PC-46: Candidate-piece outfit previews inside shop check (M)
 
@@ -1230,8 +1231,7 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   Dismiss leaves the conversation pick-free and the model
   does not re-propose on the next turn.
 - **Lane:** Stylist. **Effort:** S.
-- **Status:** Filed 2026-10-24. Enters work only via a
-  planning walk (no ad hoc build).
+- **Status:** In Sprint 24 (planning walk 2026-10-24).
 
 ### PC-53: New-user empty states on every tab (S)
 
@@ -1256,9 +1256,8 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   named on Today/Wardrobe/Outfits; threshold crossed → no
   intro UI anywhere.
 - **Lane:** Catalogue (onboarding surface). **Effort:** S.
-- **Status:** Filed 2026-10-24 with the design; founder
-  reviewed it the same day and parked it — it enters work
-  only via the next planning walk.
+- **Status:** In Sprint 24 (the walk it was parked for,
+  2026-10-24).
 
 ### PC-54: Paste intake on phones (S)
 
@@ -1285,4 +1284,4 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   never a silent nothing.
 - **Lane:** Catalogue. **Effort:** S (share target may split
   out as its own card at the walk).
-- **Status:** Filed 2026-10-24. Enters via a planning walk.
+- **Status:** In Sprint 24 (planning walk 2026-10-24).
