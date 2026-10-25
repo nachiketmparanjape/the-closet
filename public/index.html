@@ -404,13 +404,23 @@
        full-width button — ate a slab of the chat. A single
        tappable line carries the same information and the same
        navigation at a quarter of the height. */
-    #chatTodayStrip { padding: 0 2px 6px; margin-bottom: 6px; }
-    .today-link-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; box-sizing: border-box; background: none; border: none; border-bottom: 1px solid var(--line); padding: 8px 2px 10px; font: inherit; font-size: 14px; color: var(--ink); cursor: pointer; text-align: left; }
-    .today-link-row .tl-arrow { color: var(--accent-dark); font-weight: 700; flex-shrink: 0; }
+    .chat-head-pick { display: flex; align-items: center; gap: 7px; margin-left: auto; background: var(--paper-soft); border: 1px solid var(--line); border-radius: 999px; padding: 3px 11px 3px 4px; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--ink); cursor: pointer; }
+    .chat-head-pick[hidden] { display: none; }
+    .chat-head-pick img { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; display: block; }
     /* Fix buffer 5 (founder): the stylist docks — bottom sheet on phone,
        right-edge panel on desktop. Never a floating card mid-screen. */
     #chatOverlay { place-items: end center; padding: 0; }
-    #chatOverlay .modal { width: 100%; max-height: 92dvh; border-radius: var(--r-lg) var(--r-lg) 0 0; }
+    #chatOverlay .modal { width: 100%; height: 100dvh; max-height: none; border-radius: 0; }
+    /* Buffer #5 (founder, 2026-10-25): the chat is a full-screen
+       room, not a sheet — header and context bar are pinned chrome,
+       only the message list scrolls, the composer stays at the
+       bottom, and the header itself is compact with Today's pick
+       living in it (the pick's nav row left the thread). */
+    #chatOverlay .modal { display: flex; flex-direction: column; }
+    #chatOverlay .modal-head { padding: 10px 14px; gap: 10px; }
+    #chatOverlay .modal-head h2 { font-size: 19px; }
+    #chatOverlay .modal-body { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; padding: 12px 14px 14px; }
+    #chatOverlay .chat-list { flex: 1; min-height: 0; max-height: none; margin: 0 0 10px; }
     /* Founder (2026-10-24): the Add pieces window floated inside
        18px margins, a touch too wide and showing a stray scroll
        bar on his iPhone. It is a full task screen — on phones
@@ -506,11 +516,14 @@
        taller than 92dvh. No centered floating cards on
        mobile, ever: each window had grown its own placement
        over the sprints, which is why pages kept looking
-       unformatted. One exception: the capture window
-       (full-screen). Guarded by tests/layout-invariants. */
+       unformatted. Two exceptions, both full-screen: the
+       capture window, and the stylist chat (founder,
+       2026-10-25 — a conversation needs the whole screen,
+       with its context bar pinned). Guarded by
+       tests/layout-invariants. */
     @media (max-width: 899px) {
-      .overlay:not(#captureOverlay) { place-items: end center; padding: 0; }
-      .overlay:not(#captureOverlay) .modal, .overlay:not(#captureOverlay) .sheet { width: 100%; max-width: none; max-height: 92dvh; border-radius: 20px 20px 0 0; }
+      .overlay:not(#captureOverlay):not(#chatOverlay) { place-items: end center; padding: 0; }
+      .overlay:not(#captureOverlay):not(#chatOverlay) .modal, .overlay:not(#captureOverlay):not(#chatOverlay) .sheet { width: 100%; max-width: none; max-height: 92dvh; border-radius: 20px 20px 0 0; }
     }
     .chat-fab { display: none !important; }
     .outfit-card { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-md); padding: 16px; margin-top: 8px; }
@@ -1335,12 +1348,12 @@
     <section class="modal">
       <div class="modal-head">
         <h2 id="chatTitle">Stylist</h2>
+        <button class="chat-head-pick" id="chatHeadPick" type="button" hidden></button>
         <button class="icon-button" id="chatClose" type="button" aria-label="Close stylist chat">×</button>
       </div>
       <div class="modal-body">
-        <button class="context-line" id="chatContextLine" type="button" hidden aria-label="What the stylist is working from — tap for details"></button>
+        <button class="context-line" id="chatContextLine" type="button" hidden aria-label="What I'm taking into account — tap for details"></button>
         <button class="context-hint" id="chatContextHint" type="button" hidden>Everything I'm taking into account for this chat — tap to view or change it.</button>
-        <div id="chatTodayStrip" hidden></div>
         <div class="chat-list" id="chatList" aria-live="polite"></div>
         <form class="chat-input-row" id="chatForm" style="position:relative;">
           <div id="chatPhotoChips" class="chat-photo-chips" hidden></div>
@@ -1360,7 +1373,7 @@
   <div class="overlay sheet-overlay" id="contextSheet" hidden role="dialog" aria-modal="true" aria-labelledby="contextSheetTitle">
     <section class="sheet">
       <div class="sheet-head">
-        <h2 class="sheet-title" id="contextSheetTitle">What the stylist is working from</h2>
+        <h2 class="sheet-title" id="contextSheetTitle">What I'm taking into account</h2>
         <button class="icon-button" id="contextSheetClose" type="button" aria-label="Close">×</button>
       </div>
       <div id="contextSheetList"></div>
@@ -5417,10 +5430,6 @@
         var text = labels.slice(0, 3).join("  ·  ");
         if (labels.length > 3) text += "  ·  +" + (labels.length - 3) + " more";
         el.textContent = "";
-        var lab = document.createElement("span");
-        lab.className = "cl-label";
-        lab.textContent = "Working from";
-        el.appendChild(lab);
         var txt = document.createElement("span");
         txt.className = "cl-text";
         txt.textContent = text;
@@ -6145,6 +6154,10 @@
 
       document.getElementById("chatContextLine").addEventListener("click", openContextSheet);
       document.getElementById("chatContextHint").addEventListener("click", openContextSheet);
+      document.getElementById("chatHeadPick").addEventListener("click", function () {
+        closeOverlay(chatOverlay);
+        switchView("today");
+      });
       document.getElementById("contextSheetClose").addEventListener("click", function () {
         contextEditPinId = null;
         closeOverlay(document.getElementById("contextSheet"));
@@ -7894,36 +7907,36 @@
       // (the topline wordmark alone failed the founder's first real use:
       // it reads as a title and scrolls away).
       function renderChatTodayStrip() {
-        var strip = document.getElementById("chatTodayStrip");
-        if (!strip) return;
+        var chip = document.getElementById("chatHeadPick");
+        if (!chip) return;
         // Trip mode is a dedicated room (founder, 2026-10-21): the
         // daily pick never appears inside a trip conversation.
-        if (tripChat) { strip.hidden = true; strip.textContent = ""; return; }
-        strip.textContent = "";
-        if (!todayHomeOn() || !currentUser) { strip.hidden = true; return; }
-        // Founder verdict (2026-10-24, phone test of UX-18): the
-        // pick CARD does not belong in the chat thread — it lives
-        // on the Today page, and that's enough. What stays here is
-        // only the way back: one slim navigation row. (Attaching
-        // the pick to the conversation happens from Today's own
-        // Ask button or the context sheet — never from a card in
-        // the thread.)
-        strip.hidden = false;
-        var row = document.createElement("button");
-        row.type = "button";
-        row.className = "today-link-row";
-        var lt = document.createElement("span");
-        lt.textContent = "Today's pick lives on the Today page";
-        row.appendChild(lt);
-        var ar = document.createElement("span");
-        ar.className = "tl-arrow";
-        ar.textContent = "→";
-        row.appendChild(ar);
-        row.addEventListener("click", function () {
-          closeOverlay(chatOverlay);
-          switchView("today");
-        });
-        strip.appendChild(row);
+        // Founder verdict (2026-10-24): the pick CARD does not
+        // belong in the chat thread — it lives on the Today page.
+        // Buffer #5 (2026-10-25): its navigation moved into the
+        // compact header — a small chip with the pick's first
+        // photo; tapping it goes to the Today page. The thread
+        // keeps no strip row at all.
+        if (tripChat || !todayHomeOn() || !currentUser) { chip.hidden = true; chip.textContent = ""; return; }
+        chip.textContent = "";
+        var imgUrl = "";
+        var wrap = todayState.picks && todayState.picks[todayState.idx];
+        if (wrap && wrap.outfit && wrap.outfit.itemIds) {
+          for (var i = 0; i < wrap.outfit.itemIds.length && !imgUrl; i++) {
+            var it = itemById(wrap.outfit.itemIds[i]);
+            if (it && it.photos && it.photos.length) imgUrl = photoDisplayUrl(it.photos[0]);
+          }
+        }
+        if (imgUrl) {
+          var im = document.createElement("img");
+          im.src = imgUrl;
+          im.alt = "";
+          chip.appendChild(im);
+        }
+        var lb = document.createElement("span");
+        lb.textContent = imgUrl ? "Today's pick" : "Go to Today";
+        chip.appendChild(lb);
+        chip.hidden = false;
       }
 
       function renderToday() {
