@@ -2111,13 +2111,29 @@
                 showToast(friendlyError(err));
               });
           });
-          row.appendChild(b);
+          var aActs = document.createElement("span");
+          aActs.style.display = "flex";
+          aActs.style.gap = "8px";
+          var eb = el("button", "secondary", "Edit");
+          eb.type = "button";
+          eb.addEventListener("click", function () {
+            accountEditPinId = p.id;
+            renderAccountBody();
+          });
+          aActs.appendChild(eb);
+          aActs.appendChild(b);
+          row.appendChild(aActs);
           body.appendChild(row);
         });
-        // The add door, same form as the chat context sheet.
-        // (The pins watcher re-renders this section when the new
-        // fact lands, so onAdded has nothing to refresh itself.)
-        body.appendChild(buildAddFactForm(null));
+        // The add/edit door, same form as the chat context
+        // sheet. (The pins watcher re-renders this section when
+        // a save lands; onSaved just clears the edit state.)
+        var aEditPin = accountEditPinId
+          ? (allPins || []).filter(function (p) { return p.id === accountEditPinId; })[0] || null
+          : null;
+        var aForm = buildAddFactForm(function () { accountEditPinId = null; }, aEditPin);
+        body.appendChild(aForm);
+        if (aEditPin) setTimeout(function () { aForm.scrollIntoView({ block: "nearest" }); }, 60);
       }
 
       function renderAccountBody() {
@@ -4827,7 +4843,15 @@
               btn.textContent = "Tap again to remove";
             }
           });
-          row.appendChild(btn);
+          var pinActs = document.createElement("span");
+          pinActs.style.display = "flex";
+          pinActs.style.gap = "8px";
+          pinActs.appendChild(sheetActionBtn("Edit", function () {
+            contextEditPinId = e.id;
+            openContextSheet();
+          }));
+          pinActs.appendChild(btn);
+          row.appendChild(pinActs);
         } else if (e.action === "leaveTrip") {
           row.appendChild(sheetActionBtn("Leave trip", function () {
             closeOverlay(document.getElementById("contextSheet"));
@@ -4846,72 +4870,86 @@
       // 2026-10-24: the Account list could remove facts but not
       // add them — a list with only a delete is a dead end).
       // onAdded() lets each home refresh itself.
-      function buildAddFactForm(onAdded) {
-      var form = document.createElement("div");
-      form.className = "context-form";
-      var fh = document.createElement("p");
-      fh.className = "context-form-head";
-      fh.textContent = "Add a fact";
-      form.appendChild(fh);
-      var kindState = { kind: "preference" };
-      var kindRow = document.createElement("div");
-      kindRow.className = "context-kind-row";
-      [["preference", "Preference"], ["location", "Place"], ["weather", "Weather"]].forEach(function (pair) {
-        var kb = document.createElement("button");
-        kb.type = "button";
-        kb.className = pair[0] === kindState.kind ? "primary" : "secondary";
-        kb.textContent = pair[1];
-        kb.addEventListener("click", function () {
-          kindState.kind = pair[0];
-          kindRow.querySelectorAll("button").forEach(function (b) { b.className = "secondary"; });
-          kb.className = "primary";
+      var contextEditPinId = null;
+      var accountEditPinId = null;
+      // The fact form, shared by the chat context sheet and the
+      // Account page's Current context section. existing = a pin
+      // to EDIT (prefilled; Save writes it back in place) or null
+      // to ADD. Editing exists in both homes or neither — a
+      // capability that lives in only one home reads as missing
+      // from the other (the lesson of the add door, 2026-10-24).
+      // onSaved() lets each home refresh itself.
+      function buildAddFactForm(onSaved, existing) {
+        var form = document.createElement("div");
+        form.className = "context-form";
+        var fh = document.createElement("p");
+        fh.className = "context-form-head";
+        fh.textContent = existing ? "Edit fact" : "Add a fact";
+        form.appendChild(fh);
+        var kindState = { kind: existing ? (existing.kind || "preference") : "preference" };
+        var kindRow = document.createElement("div");
+        kindRow.className = "context-kind-row";
+        [["preference", "Preference"], ["location", "Place"], ["weather", "Weather"]].forEach(function (pair) {
+          var kb = document.createElement("button");
+          kb.type = "button";
+          kb.className = pair[0] === kindState.kind ? "primary" : "secondary";
+          kb.textContent = pair[1];
+          kb.addEventListener("click", function () {
+            kindState.kind = pair[0];
+            kindRow.querySelectorAll("button").forEach(function (b) { b.className = "secondary"; });
+            kb.className = "primary";
+          });
+          kindRow.appendChild(kb);
         });
-        kindRow.appendChild(kb);
-      });
-      form.appendChild(kindRow);
-      var labelIn = document.createElement("input");
-      labelIn.type = "text";
-      labelIn.maxLength = 80;
-      labelIn.placeholder = "The fact — e.g. Runs cold";
-      labelIn.setAttribute("aria-label", "Fact");
-      form.appendChild(labelIn);
-      var detailIn = document.createElement("input");
-      detailIn.type = "text";
-      detailIn.maxLength = 200;
-      detailIn.placeholder = "Details (optional)";
-      detailIn.setAttribute("aria-label", "Fact details");
-      form.appendChild(detailIn);
-      var untilIn = document.createElement("input");
-      untilIn.type = "date";
-      untilIn.setAttribute("aria-label", "Fact applies until (optional)");
-      form.appendChild(untilIn);
-      var addBtn = document.createElement("button");
-      addBtn.type = "button";
-      addBtn.className = "primary";
-      addBtn.textContent = "Add fact";
-      addBtn.addEventListener("click", function () {
-        var label = labelIn.value.trim();
-        if (!label) { showToast("Write the fact first."); labelIn.focus(); return; }
-        addBtn.disabled = true;
-        db.collection("users").doc(currentUser.uid).collection("context_pins").add({
-          kind: kindState.kind,
-          label: label,
-          detail: detailIn.value.trim(),
-          weatherSummary: "",
-          validUntil: untilIn.value || null,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        }).then(function () {
-          showToast("Added — the stylist will use it from your next message.");
-          renderContextLine();
-          openContextSheet();
-        }).catch(function (err) {
-          addBtn.disabled = false;
-          showToast(friendlyError(err));
+        form.appendChild(kindRow);
+        var labelIn = document.createElement("input");
+        labelIn.type = "text";
+        labelIn.maxLength = 80;
+        labelIn.placeholder = "The fact — e.g. Runs cold";
+        labelIn.setAttribute("aria-label", "Fact");
+        if (existing) labelIn.value = existing.label || "";
+        form.appendChild(labelIn);
+        var detailIn = document.createElement("input");
+        detailIn.type = "text";
+        detailIn.maxLength = 200;
+        detailIn.placeholder = "Details (optional)";
+        detailIn.setAttribute("aria-label", "Fact details");
+        if (existing) detailIn.value = existing.detail || "";
+        form.appendChild(detailIn);
+        var untilIn = document.createElement("input");
+        untilIn.type = "date";
+        untilIn.setAttribute("aria-label", "Fact applies until (optional)");
+        if (existing && existing.validUntil) untilIn.value = existing.validUntil;
+        form.appendChild(untilIn);
+        var addBtn = document.createElement("button");
+        addBtn.type = "button";
+        addBtn.className = "primary";
+        addBtn.textContent = existing ? "Save changes" : "Add fact";
+        addBtn.addEventListener("click", function () {
+          var label = labelIn.value.trim();
+          if (!label) { showToast("Write the fact first."); labelIn.focus(); return; }
+          addBtn.disabled = true;
+          var col = db.collection("users").doc(currentUser.uid).collection("context_pins");
+          var fields = {
+            kind: kindState.kind,
+            label: label,
+            detail: detailIn.value.trim(),
+            weatherSummary: existing ? (existing.weatherSummary || "") : "",
+            validUntil: untilIn.value || null,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          };
+          var op = existing
+            ? col.doc(existing.id).update(fields)
+            : col.add(Object.assign({ createdAt: firebase.firestore.FieldValue.serverTimestamp() }, fields));
+          op.then(function () {
+            showToast(existing ? "Saved — the stylist will use it from your next message." : "Added — the stylist will use it from your next message.");
+            if (onSaved) onSaved();
+          }).catch(function (err) {
+            addBtn.disabled = false;
+            showToast(friendlyError(err));
+          });
         });
-      });
-      form.appendChild(addBtn);
-      list.appendChild(form);
+        form.appendChild(addBtn);
         return form;
       }
 
@@ -4950,7 +4988,16 @@
         // return if the stylist happened to propose it again. The
         // sheet now adds facts directly, in the same document shape
         // a saved proposal writes.
-        list.appendChild(buildAddFactForm(function () { renderContextLine(); openContextSheet(); }));
+        var editPin = contextEditPinId
+          ? (allPins || []).filter(function (p) { return p.id === contextEditPinId; })[0] || null
+          : null;
+        var factForm = buildAddFactForm(function () {
+          contextEditPinId = null;
+          renderContextLine();
+          openContextSheet();
+        }, editPin);
+        list.appendChild(factForm);
+        if (editPin) setTimeout(function () { factForm.scrollIntoView({ block: "nearest" }); }, 60);
         // UX-18 W4: Start fresh lives here — visible from inside the
         // conversation, two taps (the second is the confirm).
         var freshRow = document.createElement("div");
@@ -5276,6 +5323,7 @@
 
       document.getElementById("chatContextLine").addEventListener("click", openContextSheet);
       document.getElementById("contextSheetClose").addEventListener("click", function () {
+        contextEditPinId = null;
         closeOverlay(document.getElementById("contextSheet"));
       });
       document.getElementById("chatFab").addEventListener("click", openChat);
