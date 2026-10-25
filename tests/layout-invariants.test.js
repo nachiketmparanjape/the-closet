@@ -81,6 +81,8 @@ test("tall sheets sit flush to the top (no peeking band above the header)", () =
   // Founder screenshot (2026-10-25): a height-capped sheet left a
   // strip of the page visible above its header, text half-clipped
   // by the sheet's edge. Sheets may now use the full height.
-  assert.ok(/\.sheet \{[^}]*max-height: 100dvh/.test(html),
+  assert.ok(/\.sheet \{[^}]*max-height: 100%/.test(html),
     ".sheet lost its full-height allowance — the peeking band is back");
+  assert.ok(html.includes("fitOpenOverlaysToViewport"),
+    "overlays no longer track the visual viewport — the iOS keyboard will push headers off-screen again");
 });

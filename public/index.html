@@ -178,7 +178,7 @@
        tall sheet (the context sheet once the Add-a-fact form
        landed) overflowed past the bottom of the screen with no
        way to scroll to its end (founder phone report). */
-    .sheet { width: min(560px, 100%); max-height: 100dvh; overflow-y: auto; overscroll-behavior: contain; background: var(--paper); border-radius: var(--r-lg) var(--r-lg) 0 0; padding: 0 10px calc(10px + env(safe-area-inset-bottom)); box-shadow: var(--shadow); }
+    .sheet { width: min(560px, 100%); max-height: 100%; overflow-y: auto; overscroll-behavior: contain; background: var(--paper); border-radius: var(--r-lg) var(--r-lg) 0 0; padding: 0 10px calc(10px + env(safe-area-inset-bottom)); box-shadow: var(--shadow); }
     /* UNIVERSAL: panels never scroll sideways (founder phone find,
        2026-10-25 — the context sheet slid left-right by a few px).
        One wide child used to make the whole panel horizontally
@@ -420,7 +420,7 @@
     /* Fix buffer 5 (founder): the stylist docks — bottom sheet on phone,
        right-edge panel on desktop. Never a floating card mid-screen. */
     #chatOverlay { place-items: end center; padding: 0; }
-    #chatOverlay .modal { width: 100%; height: 100dvh; max-height: none; border-radius: 0; }
+    #chatOverlay .modal { width: 100%; height: 100%; max-height: none; border-radius: 0; }
     /* Buffer #5 (founder, 2026-10-25): the chat is a full-screen
        room, not a sheet — header and context bar are pinned chrome,
        only the message list scrolls, the composer stays at the
@@ -437,7 +437,7 @@
        it IS the screen: edge to edge, full height, no frame. */
     @media (max-width: 899px) {
       #captureOverlay { padding: 0; place-items: stretch; }
-      #captureOverlay .modal { width: 100%; height: 100dvh; max-height: none; border-radius: 0; }
+      #captureOverlay .modal { width: 100%; height: 100%; max-height: none; border-radius: 0; }
     }
     @media (min-width: 900px) {
       #chatOverlay { place-items: stretch end; }
@@ -537,8 +537,8 @@
        tests/layout-invariants. */
     @media (max-width: 899px) {
       .overlay:not(#captureOverlay):not(#chatOverlay) { place-items: end center; padding: 0; }
-      .overlay:not(#captureOverlay):not(#chatOverlay) .modal { width: 100%; max-width: none; max-height: 92dvh; border-radius: 20px 20px 0 0; }
-      .overlay:not(#captureOverlay):not(#chatOverlay) .sheet { width: 100%; max-width: none; max-height: 100dvh; border-radius: 20px 20px 0 0; }
+      .overlay:not(#captureOverlay):not(#chatOverlay) .modal { width: 100%; max-width: none; max-height: min(92dvh, 100%); border-radius: 20px 20px 0 0; }
+      .overlay:not(#captureOverlay):not(#chatOverlay) .sheet { width: 100%; max-width: none; max-height: 100%; border-radius: 20px 20px 0 0; }
     }
     .chat-fab { display: none !important; }
     .outfit-card { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-md); padding: 16px; margin-top: 8px; }
@@ -673,7 +673,7 @@
     .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
     .overlay { position: fixed; inset: 0; z-index: 20; background: rgba(12, 14, 12, 0); transition: background-color 260ms ease; display: grid; place-items: center; padding: 18px; }
-    .modal { width: min(700px, 100%); max-height: min(860px, calc(100dvh - 36px)); overflow: auto; background: var(--paper); box-shadow: var(--shadow); border-radius: 8px; }
+    .modal { width: min(700px, 100%); max-height: min(860px, calc(100dvh - 36px), 100%); overflow: auto; background: var(--paper); box-shadow: var(--shadow); border-radius: 8px; }
     .modal-head { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 23px 26px; border-bottom: 1px solid var(--line); background: var(--paper); }
     .modal-head h2 { margin: 0; font-family: "Closet Serif", serif; font-size: 26px; font-weight: 500; }
     .icon-button { width: 44px; height: 44px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: transparent; cursor: pointer; }
@@ -1819,6 +1819,32 @@
         if (!blocked && top && window.matchMedia("(max-width: 899px)").matches) blocked = true;
         fab.hidden = !(typeof currentUser !== "undefined" && currentUser) || !!blocked;
       }
+      // iOS keyboard (founder phone find, 2026-10-25): Safari
+      // does not shrink the layout viewport when the keyboard
+      // opens — it shrinks the VISUAL viewport and scrolls the
+      // page. A fixed panel sized to the full layout height and
+      // anchored to the bottom then keeps its composer visible
+      // and pushes its header off the top (the chat lost its
+      // header and context bar exactly this way). While any
+      // overlay is open, open overlays are fitted to the visual
+      // viewport — height and top offset — and track it live,
+      // so every window (chat, sheets with forms, capture)
+      // keeps its whole self on the visible screen.
+      var vvFitBound = false;
+      function fitOpenOverlaysToViewport() {
+        if (!window.visualViewport) return;
+        var vv = window.visualViewport;
+        overlayStack.forEach(function (el) {
+          el.style.height = vv.height + "px";
+          el.style.top = vv.offsetTop + "px";
+        });
+      }
+      function bindViewportFit() {
+        if (vvFitBound || !window.visualViewport) return;
+        vvFitBound = true;
+        window.visualViewport.addEventListener("resize", fitOpenOverlaysToViewport);
+        window.visualViewport.addEventListener("scroll", fitOpenOverlaysToViewport);
+      }
       function openOverlay(el) {
         if (typeof noteTrail === "function") noteTrail("open " + (el.id || "overlay"));
         if (el._ux15Timer) { window.clearTimeout(el._ux15Timer); el._ux15Timer = null; }
@@ -1834,6 +1860,8 @@
         // The stack position IS the z order; the step stays
         // small so fixed chrome (toast, fabs) keeps its place.
         el.style.zIndex = String(21 + overlayStack.indexOf(el));
+        bindViewportFit();
+        fitOpenOverlaysToViewport();
         syncFeedbackFab();
         document.body.style.overflow = "hidden";
         requestAnimationFrame(function () {
@@ -1854,6 +1882,8 @@
           el.hidden = true;
           el.classList.remove("is-closing");
           el.style.zIndex = "";
+          el.style.height = "";
+          el.style.top = "";
           if (!overlayStack.length) document.body.style.overflow = "";
         }, 230);
       }
