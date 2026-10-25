@@ -465,115 +465,149 @@ email, guest banner + privacy note. Design:
   system live on all 17 overlays; browser-smoke verified;
   founder phone validation (the acceptance gate) pending.
 
-### PC-34: Garment extraction & clean rendering (research spike)
-- **Size:** Spike S, then size from findings
-- **Value:** Founder's long-term direction (2026-10-21): user photos
-  are shot on beds and carpets, and no layout survives an ugly
-  source photo — the Sprint 18 tiles read "clunky" partly for
-  this reason. The apps he admires extract the garment itself
-  and render it clean (cutout on a neutral ground). He also
-  reports Google Photos (Android) auto-builds a wardrobe
-  collection from photos of him wearing clothes — if users can
-  export those, importing pre-extracted garments could collapse
-  the cataloguing cost (an attack line for UX-14).
-- **Scope:** Research spike, fixed protocol (TL;DR, findings,
-  options + tradeoffs, recommendation, sources), answering:
-  (1) server-side background-removal / segmentation options —
-  quality on soft garments, per-photo cost at our scale, API
-  vs self-hosted; (2) what Google Photos' clothing collection
-  actually is and whether users can get those images out
-  (founder-reported — verify, don't assume); (3) where
-  extraction slots into the pipeline (upload-time clean render
-  alongside the original — the original is never destroyed).
-  Design keeps the photo honest for now: tiles render best-
-  effort, extraction is a rendering layer, not a data change.
-- **Status:** Built, not yet live (updated 2026-10-24 —
-  the old "not started" text survived three sprints of
-  work, a doc-honesty catch at the Sprint 24 walk).
-  Research done; the founder chose BiRefNet via Replicate
-  (2026-10-23) and the full package is built: server-side
-  orientation, the two-layer quality gate, first-photo
-  scope, hashes on the originals. Remaining chain: the
-  founder adds a REPLICATE_API_TOKEN secret version from
-  his laptop (parked with him, no nagging) → Bramble
-  deploys extractGarment + smoke-tests → the founder's
-  phone validation is the ship gate.
-  Founder expansion (2026-10-21, later): seeing the exported
-  cutouts, he set them as the quality benchmark and posed the
-  spike's two charter questions verbatim — (Q1) is it actually
-  possible for us: is there a readymade solution, and if not,
-  can we build it as good from scratch? (Q2) how expensive is
-  it — per photo at our scale, and in build/maintenance if we
-  roll our own? The spike's recommendation must answer both
-  head-on, with the Google output as the bar. PC-36 (worn-photo
-  decomposition) shares this spike — same segmentation core.
-  Research landed same day (studio inbox + PRODUCT.md record);
-  **founder approved Option A 2026-10-21**: Photoroom behind
-  one `extractGarment` callable, provider-swappable, original
-  never destroyed. First step is the evidence step — a
-  ~20-photo trial on the founder's real bed/carpet photos
-  (quality + latency) — then the build pulls through planning.
-  Trial ran 2026-10-22 (10 production calls; quality record in
-  the studio research note). **Build pulled 2026-10-22** —
-  founder's call: implement for sure if costs stay low (Basic
-  is $20/mo covering 1,000 images, inside the floor at our
-  scale). The sandbox rerun on the 13 raw laid-out photos is
-  extra evidence, not a gate. Hard requirements from the
-  founder: the original photo is retained untouched, and the
-  PC-19 pHash — computed on the original at selection time and
-  stored per photo — stays the dedup reference; extraction is
-  a render layer only, never a data change. Build shape:
-  `extractGarment` callable with the provider behind
-  `functions/photoroom.js`; render at
-  `users/{uid}/renders/<sha256(storagePath)>.png`; the photo
-  entry gains renderUrl / renderStoragePath /
-  renderUncertainty; tiles prefer the render and fall back to
-  the original on any failure. Build landed dark 2026-10-22
-  (commit ce5d130; client live, callable awaiting its secret).
-  Provider choice reopened the same day: the founder is
-  weighing Photoroom's $20/mo floor against BiRefNet via
-  Replicate (pay-per-use, ~$0.001/image, no floor, cold
-  starts, no uncertainty score, no trial evidence yet). His
-  call after deliberation; the provider seam makes it a
-  one-module swap, and nothing costs anything while dormant.
-  BiRefNet comparison evidence landed 2026-10-22: the open
-  model (run locally on CPU) over the same 14 raw photos plus
-  the 20 trial originals — quality parity with Photoroom on
-  the 10 head-to-head items (alpha stats within ~0.3pt,
-  visually near-identical), and on the translucent-lens
-  sunglasses (Photoroom's weakest, uncertainty 0.84–1.0) it
-  kept the source's dark lenses where Photoroom washed them
-  translucent. All 14 raw photos extracted cleanly off
-  bed/carpet; only blemishes were slivers of adjacent dark
-  objects on the two most cluttered shots. Full record in
-  the studio research note and `photoroom-trial/results.md`.
-  Bramble's recommendation now: the no-floor route (BiRefNet
-  via Replicate behind the same provider module), giving up
-  the uncertainty score. Founder's call still open; if
-  BiRefNet is chosen, the pending sandbox-key paste is moot
-  and a Replicate token via the same secure-paste pattern
-  takes its place.
-  **Founder chose BiRefNet via Replicate 2026-10-23**, and
-  approved the full package in the same pass: orientation
-  baked into the pixels server-side before the provider call
-  (with an aspect assertion in the gate, so a rotated render
-  can never pass silently); a two-layer quality gate — mask
-  heuristics, then a Gemini vision check on the cutout
-  composited over magenta — where the client only ever
-  points a photo at a passed render and a rejection leaves
-  the original showing; extraction scoped to each item's
-  first photo (the only photo any surface displays); both
-  AI calls emitting ai_usage events (OBS-3a). Built
-  2026-10-23: `functions/birefnet.js` replaces
-  `functions/photoroom.js` behind the seam, the
-  `REPLICATE_API_TOKEN` secret exists with its accessor
-  grant (no version yet — the token value is the founder's
-  laptop step), the client side is deployed, and the suite
-  is green at 256. Remaining before this can run live: the
-  founder adds the token version, Bramble deploys
-  `extractGarment`, one smoke call verifies the model id /
-  input name / hardware rate against the real API, and the
-  founder's phone validation is the final gate.
+### PC-34: Garment extraction & clean rendering
+- **Status:** Built, not yet live. Next step is the
+  founder's: add the access token for the outside service
+  (see "What remains"). Then deploy, one smoke test, and
+  the founder's phone check is the ship gate.
+- **In plain words:** When a user adds a photo of a
+  garment — usually the garment lying on a bed or a
+  carpet — the app cuts the garment out of the photo and
+  shows that cutout on a clean background on every screen.
+  The original photo is never changed and never deleted.
+  The feature is built. It cannot run yet, because the
+  outside service that does the cutting needs an access
+  key (a "token") that only the founder can add.
+- **Why it matters:** The background of a photo decides
+  how the whole wardrobe looks. Beds and carpets make
+  every screen look cluttered, however good the layout
+  is. Clean cutouts are also the base for two later
+  cards: PC-36 (a photo of a person wearing an outfit
+  becomes the separate pieces plus the outfit) and PC-56
+  (recognizing the same garment in a different photo).
+- **Key terms:**
+  - *Segmentation* — the step that decides which pixels
+    in a photo belong to the garment and which belong to
+    the background.
+  - *Render* — the cutout image. The app stores the
+    render next to the original photo and displays it
+    when it passes the quality gate.
+  - *Quality gate* — two automatic checks a render must
+    pass before the app displays it. A render that fails
+    is never displayed; the app keeps showing the
+    original photo.
+  - *Provider* — the outside service that runs the
+    segmentation model. The provider today is Replicate
+    (a service that runs models on its own computers and
+    charges per run), running an open-source model named
+    BiRefNet.
+- **What was decided:**
+  - The original photo is retained untouched, always.
+    Extraction is a display layer, not a data change.
+  - Duplicate detection keeps using the PC-19 perceptual
+    hash (a fingerprint of what a photo looks like),
+    computed on the original photo. Renders play no part
+    in it.
+  - Only each item's first photo gets a render in this
+    version. The first photo is the only photo any
+    screen displays.
+  - Provider history: the first choice (2026-10-21) was
+    Photoroom, a managed service with a $20-per-month
+    minimum covering 1,000 images. The founder chose
+    BiRefNet via Replicate on 2026-10-23: pay per use at
+    about $0.001 per image and no monthly minimum. At
+    our volume the minimum costs more than the usage,
+    and the trial (below) showed equal quality.
+- **What was built (2026-10-23):**
+  - A callable function, `extractGarment`, so the
+    provider can be swapped by changing one module
+    (`functions/birefnet.js`) and nothing else.
+  - The steps: read the original photo; fix its
+    orientation in the pixels on the server (a phone
+    photo can carry a rotation flag instead of rotated
+    pixels, and a rotated render must never pass
+    silently); call the provider; run the quality gate;
+    store the render at `users/{uid}/renders/` under a
+    name hashed from the original's path; record the
+    render's location on the photo.
+  - The quality gate, layer 1: measurements on the
+    cutout's mask (which pixels the model kept), plus a
+    shape check that catches a wrongly rotated result.
+    Layer 2: a vision model sees the original and the
+    cutout side by side (the cutout shown on a magenta
+    background) and answers pass or fail, with reasons.
+  - The client displays the render when one exists and
+    has passed, and the original photo otherwise.
+  - Both AI calls (the provider call and the gate's
+    vision check) write usage records, like every AI
+    call in the app.
+- **Evidence:** Trial, 2026-10-22, on the founder's real
+  photos. Photoroom ran on 10 photos. BiRefNet ran
+  locally on the same photos and more: 14 raw photos,
+  20 trial originals. On the items compared head to
+  head, quality was equal. On the hardest item —
+  sunglasses with translucent lenses — Photoroom washed
+  the lenses out and BiRefNet kept them dark, as in the
+  source. All 14 raw photos cut cleanly off beds and
+  carpets; the only flaws were thin slivers of nearby
+  dark objects on the two most cluttered photos. Full
+  record: the studio research note on this spike and
+  `photoroom-trial/results.md` in the studio files.
+- **Costs (measured or quoted, as labelled):** BiRefNet
+  through Replicate costs about $0.001 per image,
+  quoted, pay per use, no monthly minimum. Photoroom's
+  $20-per-month minimum is quoted from its pricing at
+  decision time. Running the model on our own servers
+  was not chosen; the earlier research record says to
+  revisit it only past about 5,000 images per month.
+- **Questions for a reader:**
+  1. The provider call has never run live. The model
+     name (`zhengpeng-7/birefnet`) and the name of its
+     image input are unverified against the real
+     Replicate service; the smoke test below checks
+     them. Do hosted versions of this model differ from
+     the local run in any way we should expect?
+  2. Layer 2 of the gate spends one vision-model call
+     per photo to judge the cutout. Is there a cheaper
+     or more reliable signal for "this cutout is wrong"
+     that we are missing?
+  3. A pay-per-use hosted model can be slow on its
+     first call after idle time (a "cold start"). At
+     one photo at a time, is that a real problem for a
+     consumer app, or a non-issue?
+- **What remains, in order:**
+  1. The founder adds a version to the secret named
+     REPLICATE_API_TOKEN. The secret exists in the
+     project; it holds no value yet. This step is
+     parked with the founder, by his instruction.
+  2. Deploy the `extractGarment` function.
+  3. One smoke test: a single call against the real
+     service, checking the model name, the input name,
+     and the price of the run.
+  4. The founder checks the result on his phone. That
+     check is the ship gate.
+- **History:**
+  - 2026-10-21 — The founder sets the direction after
+    seeing Google Photos' auto-built clothing collection
+    and its clean cutouts. The card opens as a research
+    spike with his two questions: is this possible for
+    us, and what does it cost? He approves the readymade
+    route the same day: one provider behind one
+    swappable function, the original never destroyed.
+  - 2026-10-22 — Research and the trial (see Evidence)
+    run. The founder's call: build it, if costs stay
+    low. The build lands the same day, dark: the client
+    side live, the function waiting for its key.
+  - 2026-10-23 — The founder chooses BiRefNet via
+    Replicate over Photoroom. The full package is
+    built: orientation handling, the two-layer quality
+    gate, first-photo scope.
+  - 2026-10-24 — A document check catches this card's
+    status still reading "Not started," three sprints
+    after the build. Status corrected.
+  - 2026-10-25 — This card rewritten in the studio's
+    shareable-card structure (standards/shareable-cards)
+    as the first worked example.
 
 ### PC-36: Photo of a person → individual articles + the outfit
 - **Size:** Spike shared with PC-34, then size from findings
