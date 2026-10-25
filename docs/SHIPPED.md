@@ -717,3 +717,15 @@ What went live. Momentum you can see.
   may shrink and wrap, and row buttons no longer flex, so
   content fits instead of being clipped in practice; (3) a new
   layout-invariant test guards both rules. Tests 385/385.
+
+- **Phone-test buffer #7 (2026-10-25, founder): a thin sliver of
+  content showed above the "What I'm taking into account"
+  header.** Cause, in the sheet construction itself: the panel
+  carried 10px of top padding, and scrolled content paints into
+  that strip; the sticky head can never cover it (a sticky
+  element cannot leave its content box — the old `top: -10px`
+  compensation was unreachable). Fixed the way modals already
+  work: the panel has no top padding, the head (first child of
+  every sheet — verified all 8) carries the spacing and sticks
+  flush at `top: 0`. Every sheet gains it at once; a layout
+  invariant guards the pair. Tests 386/386.
