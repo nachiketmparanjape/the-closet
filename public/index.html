@@ -1147,6 +1147,27 @@
     </section>
   </div>
 
+  <!-- Ask-door warning (founder decision 2026-10-24):
+       contextual "Ask the stylist" doors start a FRESH
+       general conversation; the Stylist tab still resumes.
+       When the current conversation has history, this sheet
+       is the one warning before the clear. -->
+  <div class="overlay sheet-overlay" id="askFreshSheet" hidden role="dialog" aria-modal="true" aria-labelledby="askFreshTitle">
+    <section class="sheet">
+      <div class="sheet-head">
+        <h2 class="sheet-title" id="askFreshTitle">Start a fresh conversation?</h2>
+        <button class="icon-button" id="askFreshClose" type="button" aria-label="Close">×</button>
+      </div>
+      <p class="sheet-intro">This Ask starts a new stylist conversation, so your question stands on its own. Your current conversation will be cleared — your saved facts stay.</p>
+      <button class="sheet-option" id="askFreshStart" type="button">
+        <span><span class="opt-title">Start fresh</span><span class="opt-sub">Clear it and ask in a clean conversation</span></span>
+      </button>
+      <button class="sheet-option" id="askFreshKeep" type="button">
+        <span><span class="opt-title">Keep chatting</span><span class="opt-sub">Ask inside the current conversation instead</span></span>
+      </button>
+    </section>
+  </div>
+
   <!-- PC-51: paste-with-nothing-open lands here — the photo
        is in hand, the intent isn't; ask, don't guess. -->
   <div class="overlay sheet-overlay" id="pasteChoiceSheet" hidden role="dialog" aria-modal="true" aria-labelledby="pasteChoiceTitle">
@@ -3175,12 +3196,14 @@
       }
       function buildLookAround(item) {
         if (!item || !currentUser) return;
-        var exists = chatRefs.articles.some(function (a) { return a.id === item.id; });
-        if (!exists) chatRefs.articles.push({ kind: "article", id: item.id, label: item.shortName || item.name || "Piece" });
-        renderRefChips();
-        openChat();
-        chatInput.value = "Build a look around this piece.";
-        chatInput.focus();
+        askDoor(function () {
+          var exists = chatRefs.articles.some(function (a) { return a.id === item.id; });
+          if (!exists) chatRefs.articles.push({ kind: "article", id: item.id, label: item.shortName || item.name || "Piece" });
+          renderRefChips();
+          openChat();
+          chatInput.value = "Build a look around this piece.";
+          chatInput.focus();
+        });
       }
 
       function renderGallery() {
@@ -4468,6 +4491,8 @@
         delete chatAttachDismissedByThread[key]; // a dismissed proposal may be offered again
         delete chatTripSteerDismissedByThread[key];
         clearRefPhotoDraft(); // PC-38: a fresh conversation starts unattached — photos too
+        chatRefs = { articles: [], outfits: [] }; // …and no @ draft rides in either
+        renderRefChips();
         saveThread(key);
         renderChat();
         renderContextLine();
@@ -5155,17 +5180,69 @@
           reasons: Array.isArray(r.reasons) ? r.reasons.slice(0, 6) : []
         };
       }
+      // Ask doors (founder decision 2026-10-24, refining UX-18
+      // decision 6): contextual "Ask the stylist" entries —
+      // Today's Ask, a shop check's Ask, Build a look,
+      // Surprise me — bring a NEW subject, so they start a
+      // FRESH general conversation; landing mid-conversation
+      // tangled the new subject with the old history. The
+      // Stylist tab stays the deliberate resume door, exactly
+      // as decision 6 built it. When the general conversation
+      // has history (the user has actually spoken in it), one
+      // warning sheet offers Start fresh / Keep chatting;
+      // no history, no warning.
+      var askProceed = null;
+      var askFreshSheetEl = document.getElementById("askFreshSheet");
+      function threadHasConversation(key) {
+        var list = key === activeThreadKey ? stylistMessages : (chatThreads[key] || []);
+        return (list || []).some(function (m) { return m && m.role === "user"; });
+      }
+      function askDoor(proceed) {
+        var go = function () {
+          if (activeThreadKey !== "general") switchThread("general");
+          if (currentUser && threadHasConversation("general")) {
+            askProceed = proceed;
+            openOverlay(askFreshSheetEl);
+          } else {
+            proceed();
+          }
+        };
+        if (threadLoaded["general"] || !currentUser) go();
+        else loadThread("general", go);
+      }
+      document.getElementById("askFreshStart").addEventListener("click", function () {
+        var proceed = askProceed; askProceed = null;
+        closeOverlay(askFreshSheetEl);
+        if (activeThreadKey !== "general") switchThread("general");
+        startFreshThread();
+        if (proceed) proceed();
+      });
+      document.getElementById("askFreshKeep").addEventListener("click", function () {
+        var proceed = askProceed; askProceed = null;
+        closeOverlay(askFreshSheetEl);
+        if (proceed) proceed();
+      });
+      document.getElementById("askFreshClose").addEventListener("click", function () {
+        askProceed = null;
+        closeOverlay(askFreshSheetEl);
+      });
+      askFreshSheetEl.addEventListener("click", function (event) {
+        if (event.target === askFreshSheetEl) { askProceed = null; closeOverlay(askFreshSheetEl); }
+      });
+
       function askStylistAboutShop(r) {
         var item = shopItemFromCheck(r);
         if (!item || !currentUser) return;
-        if (tripChat) exitTripChat();
-        chatAttachShopByThread[activeThreadKey] = item;
-        closeOverlay(document.getElementById("shopCheckOverlay"));
-        closeOverlay(document.getElementById("shopCheckDetailOverlay"));
-        openChat();
-        renderContextLine();
-        showToast("Attached: " + item.name + " — ask away.");
-        chatInput.focus();
+        askDoor(function () {
+          if (tripChat) exitTripChat();
+          chatAttachShopByThread[activeThreadKey] = item;
+          closeOverlay(document.getElementById("shopCheckOverlay"));
+          closeOverlay(document.getElementById("shopCheckDetailOverlay"));
+          openChat();
+          renderContextLine();
+          showToast("Attached: " + item.name + " — ask away.");
+          chatInput.focus();
+        });
       }
 
       // UX-18 W3 (CONTEXT-MODEL, decisions 2 + 4): ONE display of what
@@ -6154,10 +6231,12 @@
       });
       document.getElementById("wearSurprise").addEventListener("click", function () {
         closeWearSheet();
-        openChat();
-        document.getElementById("chatInput").value =
-          "Surprise me — pick an outfit in a vibe I rarely wear, something unexpected.";
-        document.getElementById("chatForm").requestSubmit();
+        askDoor(function () {
+          openChat();
+          document.getElementById("chatInput").value =
+            "Surprise me — pick an outfit in a vibe I rarely wear, something unexpected.";
+          document.getElementById("chatForm").requestSubmit();
+        });
       });
 
       // Sprint 15 (PC-29 Phase 1): trips. Trip objects + one-call packing.
@@ -7698,9 +7777,13 @@
       function todayAsk() {
         // UX-18 W2: this button is ABOUT the pick — tapping it is
         // the explicit act that attaches today's pick to the chat.
-        attachTodayPick();
-        openChat();
-        renderChatTodayStrip();
+        // 2026-10-24: as an Ask door it starts fresh (see
+        // askDoor) — the attach lands in the clean conversation.
+        askDoor(function () {
+          attachTodayPick();
+          openChat();
+          renderChatTodayStrip();
+        });
       }
       // Fix buffer 4: Today leads the stylist sheet when the experiment
       // is on — the ✦ Stylist pill is the persistent door back to Today

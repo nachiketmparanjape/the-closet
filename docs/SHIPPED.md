@@ -4,6 +4,15 @@ What went live. Momentum you can see.
 
 ## Sprint 19 (2026-10-24 → )
 
+- **Ask doors start fresh** — founder decision 2026-10-24
+  (phone-test buffer, refining UX-18 decision 6):
+  contextual "Ask the stylist" entries (Today's Ask, a
+  shop check's Ask, Build a look, Surprise me) bring a new
+  subject, so they start a fresh general conversation;
+  with history present, one warning sheet offers Start
+  fresh / Keep chatting first. The Stylist tab remains
+  the resume door, unchanged. Start fresh also clears
+  any @ draft now. Founder phone validation pending.
 - **PC-45: Explain-the-no → a proposed style rule** —
   shipped 2026-10-24 (Sprint 24): rejecting Today's pick
   via "Another" asks why first (chips, the pick's own
