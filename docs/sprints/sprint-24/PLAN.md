@@ -147,3 +147,18 @@ unconfirmed rejections.
   (outside this sprint).
 - Every card updates BACKLOG + SHIPPED in its own commit;
   the mirror runs at sprint close.
+
+## Close (2026-10-24, same day)
+
+All six cards built, tested (384/384 at close), committed,
+pushed and deployed the day the sprint opened: PC-53
+(fcc5540), PC-52 (9279b1f), PC-33 (e2cc178), PC-54
+(51bb4c1), PC-38 (568906a), PC-45 (79bc92d). The sprint's
+one spin-off, PC-55 (Web Share Target), is filed in the
+backlog with its evaluation and revisit trigger; it was
+not pulled. Every card awaits the founder's phone
+validation — that, not this close, is the ship gate, and
+his verdicts open the next planning walk (standing
+candidates: PC-41's decision after his shop-attach test,
+PC-48 ahead of the January Canada trip, UX-14 as anchor,
+PC-36, the garment-model trigger check).
