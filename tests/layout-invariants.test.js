@@ -64,3 +64,15 @@ test("panels never scroll sideways — overflow-x clipped, row labels shrink", (
   assert.ok(/\.context-row-label \{[^}]*min-width: 0/.test(html),
     ".context-row-label lost min-width: 0 — long labels will widen the sheet again");
 });
+
+test("sticky sheet heads sit flush — no content sliver above them", () => {
+  // Founder phone find (2026-10-25): a ~10px sliver of scrolled
+  // content showed above the context sheet's stuck header. Cause:
+  // the panel's top padding is a strip the sticky head can never
+  // cover (sticky cannot leave the content box). The head must be
+  // flush: no top padding on .sheet, head sticks at top: 0.
+  assert.ok(/\.sheet \{[^}]*padding: 0 10px/.test(html),
+    ".sheet regained top padding — the sliver above sticky heads is back");
+  assert.ok(/\.sheet-head \{[^}]*position: sticky; top: 0;/.test(html),
+    ".sheet-head no longer sticks flush at top: 0");
+});

@@ -178,7 +178,7 @@
        tall sheet (the context sheet once the Add-a-fact form
        landed) overflowed past the bottom of the screen with no
        way to scroll to its end (founder phone report). */
-    .sheet { width: min(560px, 100%); max-height: calc(100dvh - 24px); overflow-y: auto; overscroll-behavior: contain; background: var(--paper); border-radius: var(--r-lg) var(--r-lg) 0 0; padding: 10px 10px calc(10px + env(safe-area-inset-bottom)); box-shadow: var(--shadow); }
+    .sheet { width: min(560px, 100%); max-height: calc(100dvh - 24px); overflow-y: auto; overscroll-behavior: contain; background: var(--paper); border-radius: var(--r-lg) var(--r-lg) 0 0; padding: 0 10px calc(10px + env(safe-area-inset-bottom)); box-shadow: var(--shadow); }
     /* UNIVERSAL: panels never scroll sideways (founder phone find,
        2026-10-25 — the context sheet slid left-right by a few px).
        One wide child used to make the whole panel horizontally
@@ -191,7 +191,7 @@
     /* Founder (2026-10-24): no Cancel text buttons anywhere — every
        window closes from an X in its top-right corner. Sheets put
        the title and the X on one head row. */
-    .sheet-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; position: sticky; top: -10px; background: var(--paper); z-index: 2; }
+    .sheet-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; position: sticky; top: 0; background: var(--paper); z-index: 2; }
     .sheet-head .icon-button { margin: 4px 6px 0 0; flex-shrink: 0; }
     .sheet-intro { margin: 0; padding: 0 14px 12px; color: var(--muted); font-size: 14px; line-height: 1.5; }
     /* Founder note 2026-10-23: the Shop list header copy sat too
