@@ -1075,9 +1075,28 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   proposed, not applied; confirming it changes later picks;
   dismissing it leaves no trace.
 - **Lane:** Personalization + Stylist. **Effort:** M.
-- **Status:** In Sprint 24 — the UX-18 hold released
-  when UX-18 landed, and the founder added the card to
-  the slate himself at the walk (2026-10-24).
+- **Status:** DONE 2026-10-24 (Sprint 24). Built on the
+  Today pick's "Another" — the app's one rejection
+  surface. When "Another" would generate a new pick, a
+  reason sheet opens first (browsing today's existing
+  set stays instant — that isn't rejection). The reason
+  does two jobs, kept apart: it steers the regeneration
+  (one turn, phrased into the generation request) and it
+  may earn a PROPOSED rule. Situational reasons (too
+  warm/cold, colors clash, not my style) steer only —
+  never rules. Durable taste proposes: a named piece →
+  "Skip <piece>"; the user's own words → the words;
+  formality chips → a lean template. The proposal swaps
+  into the sheet while the new pick composes; Save writes
+  a preference fact through the one write path
+  (factConflicts + deleteFacts + the standard doc shape),
+  and a rule that is already a fact is never re-proposed.
+  No thanks writes nothing — dismissing leaves no trace.
+  Because the server reads facts from Firestore itself,
+  a confirmed rule feeds the very next stylist call and
+  shows in Account's facts like any other. Helpers pinned
+  by tests/pc45-client.test.js. Founder phone validation
+  pending.
 
 ### PC-46: Candidate-piece outfit previews inside shop check (M)
 

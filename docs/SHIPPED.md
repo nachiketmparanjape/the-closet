@@ -4,6 +4,16 @@ What went live. Momentum you can see.
 
 ## Sprint 19 (2026-10-24 → )
 
+- **PC-45: Explain-the-no → a proposed style rule** —
+  shipped 2026-10-24 (Sprint 24): rejecting Today's pick
+  via "Another" asks why first (chips, the pick's own
+  pieces, or the user's words); the reason steers the
+  regeneration for one turn, and durable-taste reasons
+  earn a proposed style rule in the same sheet — saved
+  as a preference fact only on the user's tap, through
+  the one fact write path; dismissing leaves no trace.
+  Situational reasons steer but never propose. Founder
+  phone validation pending.
 - **PC-38: Reference photos in stylist chat** — shipped
   2026-10-24 (Sprint 24): attach up to 4 inspiration
   photos to a message in the general chat (📷 door →

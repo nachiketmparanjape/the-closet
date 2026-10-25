@@ -1111,6 +1111,39 @@
     </section>
   </div>
 
+  <!-- PC-45: explain-the-no. Rejecting Today's pick asks
+       for the reason first; a reason with a durable taste
+       reading earns a PROPOSED style rule (a fact) — saved
+       only on the user's tap, never learned silently. -->
+  <div class="overlay sheet-overlay" id="rejectSheet" hidden role="dialog" aria-modal="true" aria-labelledby="rejectTitle">
+    <section class="sheet">
+      <div class="sheet-head">
+        <h2 class="sheet-title" id="rejectTitle">What's off about this pick?</h2>
+        <button class="icon-button" id="rejectClose" type="button" aria-label="Close">×</button>
+      </div>
+      <div id="rejectMain">
+        <div id="rejectChips" style="display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 10px;" role="group" aria-label="Reason"></div>
+        <p class="sheet-fine" id="rejectPieceLabel" hidden style="margin:0 0 6px;">Or it's one piece:</p>
+        <div id="rejectPieces" style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px;" role="group" aria-label="Piece"></div>
+        <div class="field">
+          <label for="rejectText">Or say it your way <span class="hint">(optional)</span></label>
+          <input type="text" id="rejectText" maxlength="120" placeholder="e.g. no more turtlenecks" autocomplete="off" />
+        </div>
+        <button class="primary" id="rejectGo" type="button" style="width:100%;">Another pick</button>
+        <button class="link-button" id="rejectSkip" type="button" style="margin-top:8px;">No reason — just another</button>
+      </div>
+      <div id="rejectProposal" hidden>
+        <p class="today-eyebrow" style="margin-top:0;">Rule idea</p>
+        <p id="rejectRuleLabel" style="font-size:17px;font-weight:650;margin:4px 0 8px;"></p>
+        <p class="sheet-fine">Save it as a fact? Future picks and chats will honor it, and it lives with your other facts in Account — removable there anytime.</p>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <button class="primary" id="rejectSaveRule" type="button" style="flex:1;">Save rule</button>
+          <button class="secondary" id="rejectNoRule" type="button" style="flex:1;">No thanks</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
   <!-- PC-51: paste-with-nothing-open lands here — the photo
        is in hand, the intent isn't; ask, don't guess. -->
   <div class="overlay sheet-overlay" id="pasteChoiceSheet" hidden role="dialog" aria-modal="true" aria-labelledby="pasteChoiceTitle">
@@ -7312,7 +7345,7 @@
         return b;
       }
 
-      function generateTodayPick(previousPick) {
+      function generateTodayPick(previousPick, reasonNote) {
         if (todayState.generating || !currentUser || !functions) return;
         todayState.generating = true;
         todayState.error = false;
@@ -7341,7 +7374,10 @@
           return getWeatherSummary().then(function (weather) {
             return callAskStylist({
               items: stylistItems(),
-              messages: [{ role: "user", text: "Dress me for today. Pick one complete outfit from my wardrobe. Be decisive — this is the morning rush." }],
+              // PC-45: a rejection reason steers THIS regeneration
+              // (one-turn context, not learning — learning is the
+              // confirmed rule, and only that).
+              messages: [{ role: "user", text: "Dress me for today. Pick one complete outfit from my wardrobe. Be decisive — this is the morning rush." + (reasonNote ? " I just rejected your last pick: " + reasonNote + " — do better on that." : "") }],
               previousPick: previousPick || null,
               vibe: detectVibeTag("dress me for today"),
               weatherContext: weather,
@@ -7379,9 +7415,162 @@
           showToast("That's today's set — ask the stylist for more.");
           return;
         }
-        var cur = todayState.picks[todayState.idx];
-        generateTodayPick(cur && cur.outfit ? { itemIds: cur.outfit.itemIds.slice() } : null);
+        // PC-45: a new generation means the current pick was
+        // rejected — ask why before regenerating. (Advancing
+        // through today's existing set stays instant: browsing
+        // isn't rejection.)
+        openRejectSheet();
       }
+
+      // PC-45: explain-the-no. The reason does two jobs, kept
+      // strictly apart: it steers the immediate regeneration
+      // (one turn, via rejectionWords), and it MAY earn a
+      // proposed style rule (ruleForRejection) that becomes a
+      // fact only when the user taps Save. Situational
+      // reasons (weather, colors, a vague feeling) steer but
+      // never propose — a rule is a durable taste claim, and
+      // the day's weather is not one.
+      var REJECT_CHIPS = [
+        { id: "formal", label: "Too formal" },
+        { id: "casual", label: "Too casual" },
+        { id: "warm", label: "Too warm" },
+        { id: "cold", label: "Too cold" },
+        { id: "colors", label: "Colors clash" },
+        { id: "style", label: "Not my style" }
+      ];
+      function ruleForRejection(reason) {
+        if (!reason) return null;
+        if (reason.pieceName) {
+          var pn = String(reason.pieceName).trim().slice(0, 60);
+          return pn ? "Skip " + pn : null;
+        }
+        var text = String(reason.text || "").trim().replace(/\s+/g, " ").slice(0, 80);
+        if (text.length >= 3) return text.charAt(0).toUpperCase() + text.slice(1);
+        if (reason.chip === "formal") return "Lean more casual than formal";
+        if (reason.chip === "casual") return "Lean sharper, less casual";
+        return null;
+      }
+      function rejectionWords(reason) {
+        if (!reason) return "";
+        if (reason.pieceName) return "it's the " + reason.pieceName;
+        var words = [];
+        if (reason.chip) {
+          var c = REJECT_CHIPS.filter(function (x) { return x.id === reason.chip; })[0];
+          if (c) words.push("it was " + c.label.toLowerCase());
+        }
+        var text = String(reason.text || "").trim();
+        if (text) words.push(text);
+        return words.join(" — ");
+      }
+      var rejectReason = { chip: null, pieceName: null };
+      var rejectRulePending = null;
+      var rejectSheet = document.getElementById("rejectSheet");
+      function openRejectSheet() {
+        rejectReason = { chip: null, pieceName: null };
+        rejectRulePending = null;
+        document.getElementById("rejectText").value = "";
+        document.getElementById("rejectMain").hidden = false;
+        document.getElementById("rejectProposal").hidden = true;
+        renderRejectChoices();
+        openOverlay(rejectSheet);
+      }
+      function renderRejectChoices() {
+        var chips = document.getElementById("rejectChips");
+        chips.textContent = "";
+        REJECT_CHIPS.forEach(function (c) {
+          var b = document.createElement("button");
+          b.type = "button";
+          b.className = "chip" + (rejectReason.chip === c.id ? " active" : "");
+          b.textContent = c.label;
+          b.addEventListener("click", function () {
+            rejectReason.chip = rejectReason.chip === c.id ? null : c.id;
+            if (rejectReason.chip) rejectReason.pieceName = null;
+            renderRejectChoices();
+          });
+          chips.appendChild(b);
+        });
+        var wrap = todayState.picks[todayState.idx];
+        var ids = (wrap && wrap.outfit && wrap.outfit.itemIds) || [];
+        var pieces = document.getElementById("rejectPieces");
+        pieces.textContent = "";
+        document.getElementById("rejectPieceLabel").hidden = !ids.length;
+        ids.forEach(function (id) {
+          var it = itemById(id);
+          if (!it) return;
+          var name = it.shortName || it.name || "Piece";
+          var b = document.createElement("button");
+          b.type = "button";
+          b.className = "chip" + (rejectReason.pieceName === name ? " active" : "");
+          b.textContent = name;
+          b.addEventListener("click", function () {
+            rejectReason.pieceName = rejectReason.pieceName === name ? null : name;
+            if (rejectReason.pieceName) rejectReason.chip = null;
+            renderRejectChoices();
+          });
+          pieces.appendChild(b);
+        });
+      }
+      function closeRejectSheet() { closeOverlay(rejectSheet); }
+      function submitRejection(withReason) {
+        var cur = todayState.picks[todayState.idx];
+        var prev = cur && cur.outfit ? { itemIds: cur.outfit.itemIds.slice() } : null;
+        var reason = null;
+        if (withReason) {
+          reason = {
+            chip: rejectReason.chip,
+            pieceName: rejectReason.pieceName,
+            text: document.getElementById("rejectText").value
+          };
+          if (!reason.chip && !reason.pieceName && !String(reason.text || "").trim()) reason = null;
+        }
+        generateTodayPick(prev, reason ? rejectionWords(reason) : null);
+        var rule = reason ? ruleForRejection(reason) : null;
+        // Already a fact? Proposing a duplicate teaches nothing.
+        if (rule && factConflicts("preference", rule, null, null).length) rule = null;
+        if (rule) {
+          rejectRulePending = rule;
+          document.getElementById("rejectRuleLabel").textContent = rule;
+          document.getElementById("rejectMain").hidden = true;
+          document.getElementById("rejectProposal").hidden = false;
+        } else {
+          closeRejectSheet();
+        }
+      }
+      document.getElementById("rejectGo").addEventListener("click", function () { submitRejection(true); });
+      document.getElementById("rejectSkip").addEventListener("click", function () { submitRejection(false); });
+      document.getElementById("rejectClose").addEventListener("click", closeRejectSheet);
+      rejectSheet.addEventListener("click", function (event) {
+        if (event.target === rejectSheet) closeRejectSheet();
+      });
+      document.getElementById("rejectNoRule").addEventListener("click", function () {
+        rejectRulePending = null; // dismissed — no trace, by design
+        closeRejectSheet();
+      });
+      document.getElementById("rejectSaveRule").addEventListener("click", function () {
+        var label = rejectRulePending;
+        rejectRulePending = null;
+        closeRejectSheet();
+        if (!label || !currentUser) return;
+        // The ONE fact write path (same primitives + doc shape
+        // as every other door): conflicts first, then the add.
+        var col = db.collection("users").doc(currentUser.uid).collection("context_pins");
+        deleteFacts(factConflicts("preference", label, null, null)).then(function () {
+          return col.add({
+            kind: "preference",
+            label: label,
+            detail: "",
+            weatherSummary: "",
+            validUntil: null,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        }).then(function () {
+          showToast("Saved as a fact — future picks will honor it.");
+        }).catch(function (err) {
+          if (typeof reportError === "function") reportError("saveStyleRule", err);
+          showToast(friendlyError(err));
+        });
+      });
       function todayWear() {
         var wrap = todayState.picks[todayState.idx];
         if (!wrap || !currentUser) return;

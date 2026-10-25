@@ -87,7 +87,10 @@ card: the reply visibly reasons over the references and
 suggests outfits built only from owned pieces.
 
 ### PC-45: Explain-the-no → a proposed style rule (M)
-- **Status:** In Sprint 24.
+- **Status:** Built + deployed 2026-10-24; founder phone
+  validation pending. The rejection surface is Today's
+  "Another" (the app's only one); situational reasons
+  steer the regeneration but never propose rules.
 From the Alta teardown (founder-saved, HELD for UX-18 —
 the hold released when UX-18 shipped; founder added it
 to this slate). In: rejecting a pick with a reason may
