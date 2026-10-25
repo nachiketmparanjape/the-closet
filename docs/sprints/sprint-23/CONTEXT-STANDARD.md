@@ -34,6 +34,20 @@ knows, rendered from one manifest).
 3. **One language.** User-facing words are *Attach* and
    *Fact*. "Pin" is a code word and does not appear in the
    app ("Remember this fact?", never "pin this").
+4. **Removal follows the layer** (founder, later the same
+   day). Removing a thing removes it from the layer it
+   belongs to, not from every layer: a pointer leaves the
+   message, an attachment leaves the conversation, and a
+   fact removed in a conversation is only *muted* there —
+   it stays in the Account (its permanent home, whose
+   Remove deletes for good) and returns on Start fresh.
+   The mute is real: the server leaves muted facts out of
+   the brief, so the display never hides what is still in
+   use. Corollary, learned the same hour: the kind rules
+   (one place, one weather, preferences dedupe by exact
+   label) are enforced by ONE write path shared by every
+   door that writes a fact — a rule that holds in one door
+   and leaks in another is not a rule.
 
 ## What a new feature must do to comply
 
@@ -49,5 +63,10 @@ knows, rendered from one manifest).
 Built and live 2026-10-24 (commit 6347913): @ pointers join
 contextEntries with a "· this message" suffix and a Remove
 row in the sheet; the proposal card says "Remember this
-fact?". Fold this standard into docs/CONTEXT-MODEL.md when
-the docs PR (#80) lands; until then this file is the record.
+fact?". Rule 4 + the one-write-path corollary built and
+live the same day (commit c7367b7): per-conversation fact
+mutes ride the askStylist call and are honored by the one
+assembler; factConflicts() is the shared write rule for the
+form and proposal saves. Fold this standard into
+docs/CONTEXT-MODEL.md when the docs PR (#80) lands; until
+then this file is the record.
