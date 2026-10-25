@@ -4,6 +4,14 @@ What went live. Momentum you can see.
 
 ## Sprint 19 (2026-10-24 → )
 
+- **PC-33: Trip steering in general chat** — shipped
+  2026-10-24 (Sprint 24): the pin tense rule (location/
+  weather proposals are present-tense only) plus the
+  steering card — a future trip in general chat earns a
+  Create-this-trip card; advice is never gated; a
+  same-reply pin proposal for the trip's fact is
+  suppressed server-side. Founder phone validation
+  pending (incl. the card's education line).
 - **PC-52: The stylist may propose an attachment** —
   shipped 2026-10-24 (Sprint 24): when a general
   conversation turns on the unattached pick, the model

@@ -28,7 +28,8 @@ Tier-0 intro cards, Wardrobe+Outfits Tier-1 gap banner,
 Stylist one-liner. Out: any wizard, any stored state.
 
 ### PC-52: The stylist may propose an attachment (S)
-- **Status:** In Sprint 24.
+- **Status:** Built + deployed 2026-10-24; founder phone
+  validation pending.
 Completes the Context Standard: attach is an act, and the
 stylist may PROPOSE the act (a card mirroring pin
 proposals) but never attach silently. In: server-side
@@ -37,10 +38,13 @@ client proposal card; accept attaches, dismiss leaves no
 trace. Out: auto-attach in any form.
 
 ### PC-33: Trip steering in general chat — remainder (S)
-- **Status:** In Sprint 24.
-The discipline half shipped inside UX-18 (pins are the
-present-tense layer; trips own the future — the context
-model enforces it). Remainder: the trip-intent confirm
+- **Status:** Built + deployed 2026-10-24; founder phone
+  validation pending.
+Correction found while building: the principle was
+adopted in the UX-18 context model, but the prompt rule
+itself never landed in the brief — so this card carried
+both halves after all: the TENSE RULE in the pin-proposal
+brief, and the trip-intent confirm
 card in general chat per docs/proposals/TRIP-STEER-
 PROPOSAL.md — prefilled destination/dates, create-or-
 dismiss, at most once per conversation, advice never

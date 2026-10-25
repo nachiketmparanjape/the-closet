@@ -4146,6 +4146,9 @@
           if (m.pinState) o.pinState = m.pinState;
           if (m.attachProposal) o.attachProposal = m.attachProposal;
           if (m.attachState) o.attachState = m.attachState;
+          if (m.tripProposal) o.tripProposal = m.tripProposal;
+          if (m.tripState) o.tripState = m.tripState;
+          if (m.createdTripId) o.createdTripId = m.createdTripId;
           if (m.refLabels) o.refLabels = m.refLabels;
           if (m.tripOutfits) o.tripOutfits = m.tripOutfits;
           if (m.tripSaveCtx) o.tripSaveCtx = m.tripSaveCtx;
@@ -4298,6 +4301,7 @@
         chatAttachShopByThread = {};
         chatMutedPinsByThread = {};
         chatAttachDismissedByThread = {};
+        chatTripSteerDismissedByThread = {};
         if (activeThreadKey !== "general") { activeThreadKey = "general"; stylistMessages = []; }
         if (uid) {
           loadThread("general", function () {
@@ -4371,6 +4375,7 @@
         delete chatAttachShopByThread[key];
         delete chatMutedPinsByThread[key]; // muted facts return on a fresh start
         delete chatAttachDismissedByThread[key]; // a dismissed proposal may be offered again
+        delete chatTripSteerDismissedByThread[key];
         saveThread(key);
         renderChat();
         renderContextLine();
@@ -4498,6 +4503,15 @@
           if (m.attachProposal && m.attachState === "pending" && !currentAttach()) {
             chatList.appendChild(renderAttachProposalCard(m));
           }
+          // PC-33: the trip steering card — pending offers the
+          // create; created shows the way into the trip. A trip
+          // that already matches the destination suppresses the
+          // offer (the user already made it, wherever they were).
+          if (m.tripProposal && m.tripState === "created" && m.createdTripId) {
+            chatList.appendChild(renderTripCreatedRow(m));
+          } else if (m.tripProposal && m.tripState === "pending" && !tripChat && !tripProposalAlreadyTripped(m.tripProposal)) {
+            chatList.appendChild(renderTripProposalCard(m));
+          }
         });
         chatList.scrollTop = chatList.scrollHeight;
       }
@@ -4597,6 +4611,133 @@
         });
         row.appendChild(attach);
         row.appendChild(dismiss);
+        card.appendChild(row);
+        return card;
+      }
+
+      // PC-33: does a trip already cover this proposal's
+      // destination? (Either string containing the other,
+      // case-insensitive — "Glacier" vs "Glacier National
+      // Park, United States".)
+      function tripProposalAlreadyTripped(p) {
+        var dest = String((p && p.destination) || "").toLowerCase();
+        if (!dest) return false;
+        return allTrips.some(function (t) {
+          var leg = (t.legs && t.legs[0]) || {};
+          var have = String(leg.resolvedName || leg.location || "").toLowerCase();
+          return have && (have.indexOf(dest) >= 0 || dest.indexOf(have) >= 0);
+        });
+      }
+
+      // PC-33: the trip steering card. Pins are the
+      // present-tense layer; trips own the future — when the
+      // conversation carries a future trip, the durable offer
+      // is a trip object. Advice is never gated: the reply
+      // above already answered; this card only offers the
+      // container. Create runs the trips flow's own steps
+      // (geocode, then the trip doc); the success state
+      // offers the jump into the trip — it never yanks.
+      function renderTripProposalCard(m) {
+        var p = m.tripProposal;
+        var card = document.createElement("div");
+        card.className = "pin-proposal";
+        var head = document.createElement("p");
+        head.className = "pin-proposal-head";
+        head.textContent = "✈️ Make this a trip?";
+        card.appendChild(head);
+        var body = document.createElement("p");
+        body.className = "hint";
+        var dates = fmtTripDates({ startDate: p.startDate, endDate: p.endDate || p.startDate });
+        body.textContent = (p.name || p.destination) + " · " + p.destination +
+          (dates ? " · " + dates : "") +
+          " — a trip gets its own chat, its own weather, and a packing list, kept out of your daily outfits until you go.";
+        card.appendChild(body);
+        var row = document.createElement("div");
+        row.className = "pin-proposal-actions";
+        var create = document.createElement("button");
+        create.className = "primary";
+        create.type = "button";
+        create.textContent = "Create this trip";
+        create.addEventListener("click", function () {
+          createTripFromProposal(m, create);
+        });
+        var dismiss = document.createElement("button");
+        dismiss.className = "secondary";
+        dismiss.type = "button";
+        dismiss.textContent = "Just advise me here";
+        dismiss.addEventListener("click", function () {
+          m.tripState = "dismissed";
+          chatTripSteerDismissedByThread[activeThreadKey] = true;
+          renderChat();
+          saveThread(activeThreadKey);
+        });
+        row.appendChild(create);
+        row.appendChild(dismiss);
+        card.appendChild(row);
+        return card;
+      }
+
+      function createTripFromProposal(m, btn) {
+        if (!currentUser) return;
+        var p = m.tripProposal;
+        btn.disabled = true;
+        geocodeDestination(p.destination).then(function (geo) {
+          if (!geo) {
+            btn.disabled = false;
+            showToast("Couldn't find that place — check the spelling?");
+            return;
+          }
+          var leg = {
+            location: p.destination,
+            resolvedName: geo.name,
+            lat: geo.lat,
+            lng: geo.lng,
+            startDate: p.startDate,
+            endDate: p.endDate || p.startDate
+          };
+          var name = p.name || p.destination;
+          db.collection("users").doc(currentUser.uid).collection("trips").add({
+            name: name,
+            legs: [leg],
+            notes: "",
+            packing: null,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          }).then(function (ref) {
+            m.tripState = "created";
+            m.createdTripId = ref.id;
+            if (!tripById(ref.id)) {
+              allTrips.unshift({ id: ref.id, name: name, legs: [leg], notes: "", packing: null });
+            }
+            renderTrips();
+            renderChat();
+            saveThread(activeThreadKey);
+            showToast("Trip saved.");
+          }).catch(function (err) {
+            btn.disabled = false;
+            showToast(friendlyError(err));
+          });
+        });
+      }
+
+      // PC-33: the steering card's success state — the trip
+      // exists; the jump into it is one tap, offered here and
+      // in the Trips tab, never forced.
+      function renderTripCreatedRow(m) {
+        var card = document.createElement("div");
+        card.className = "pin-proposal";
+        var head = document.createElement("p");
+        head.className = "pin-proposal-head";
+        head.textContent = "✈️ Trip created — " + (m.tripProposal.name || m.tripProposal.destination);
+        card.appendChild(head);
+        var row = document.createElement("div");
+        row.className = "pin-proposal-actions";
+        var open = document.createElement("button");
+        open.className = "primary";
+        open.type = "button";
+        open.textContent = "Open the trip";
+        open.addEventListener("click", function () { openTripDetail(m.createdTripId); });
+        row.appendChild(open);
         card.appendChild(row);
         return card;
       }
@@ -4812,6 +4953,10 @@
       // Attachments' lifecycle: per thread, never saved with
       // the transcript, cleared by Start fresh.
       var chatAttachDismissedByThread = {};
+      // PC-33: a dismissed trip-steering card stays dismissed
+      // for the conversation (at most one ask per thread;
+      // Start fresh re-arms). Same attachments lifecycle.
+      var chatTripSteerDismissedByThread = {};
       function currentAttach() { return chatAttachByThread[activeThreadKey] || null; }
       function todayPickReady() {
         if (typeof todayHomeOn !== "function" || !todayHomeOn()) return null;
@@ -5444,6 +5589,8 @@
           // was already dismissed in this conversation.
           todayPickAvailable: !tripChat && !todayPickCtx && !!todayPickReady(),
           attachProposalDismissed: !!chatAttachDismissedByThread[activeThreadKey],
+          // PC-33: trip steering already dismissed here?
+          tripProposalDismissed: !!chatTripSteerDismissedByThread[activeThreadKey],
           // Sprint 13: explicit vibe handle ("dress me streetwear tonight").
           // Server accepts exact vocabulary hits only.
           vibe: detectVibeTag(text),
@@ -5535,6 +5682,8 @@
             thinking.pinState = d.pinProposal ? "pending" : null;
             thinking.attachProposal = d.attachProposal || null;
             thinking.attachState = d.attachProposal ? "pending" : null;
+            thinking.tripProposal = d.tripProposal || null;
+            thinking.tripState = d.tripProposal ? "pending" : null;
           }
         }).catch(function (err) {
           thinking.thinking = false;

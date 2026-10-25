@@ -338,10 +338,24 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   rejected in the proposal, with a revisit trigger recorded.
   Principle: pins are the present-tense layer; trips own the
   future. The discipline half can split out as an (S) at planning.
-- **Status:** In Sprint 24 (remainder). Split at the
-  walk (2026-10-24): the pin-discipline half landed
-  inside UX-18; the steering card is what remains, and
-  the card closes when it lands.
+- **Status:** DONE 2026-10-24 (Sprint 24). Correction
+  to the walk's record, found while building: the
+  discipline half had NOT fully landed in UX-18 — the
+  present-tense principle was adopted in the context
+  model, but the prompt rule itself was never written
+  into the brief (the pin section still said "where
+  they'll be"). Both halves shipped here: the TENSE RULE
+  in the pin-proposal brief (present-tense only for
+  location/weather; preferences unaffected), the trip
+  proposal (sanitized: destination + real future dates
+  or nothing), parse-level suppression (a trip proposal
+  drops a same-reply location/weather pin proposal), and
+  the steering card — Create runs the trips flow's own
+  steps, success offers the jump without yanking, "Just
+  advise me here" dismisses for the conversation, and a
+  matching existing trip suppresses the card. The card's
+  education line is Bramble's wording, flagged for the
+  founder's copy verdict. tests/pc33.test.js.
 
 ### UX-13: Visual redesign + design system (L)
 - **Idea (founder 2026-10-20):** the app looks extremely

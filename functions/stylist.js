@@ -446,12 +446,39 @@ function parseStylistJson(text, todayStr) {
   }
   // Sprint 17: optional pin proposal — the model may surface one durable
   // fact per message. Sanitized; the client confirms before saving.
-  const proposal = sanitizePinProposal(obj.pinProposal, todayStr);
+  let proposal = sanitizePinProposal(obj.pinProposal, todayStr);
   // PC-52: an attach proposal is a single literal — the model may
   // propose attaching today's pick, nothing else. Anything else
   // the model invents in this field drops here.
   const attachProposal = obj.attachProposal === "todayPick" ? "todayPick" : null;
-  return { reply: reply, outfit: outfit, pinProposal: proposal, attachProposal: attachProposal };
+  // PC-33: a trip proposal — a destination plus real future
+  // timing, sanitized hard (a steering card with a wrong date is
+  // worse than none). Suppression lives here too: when a reply
+  // carries a trip proposal, a location/weather pin proposal
+  // for the same fact drops — the user never sees two competing
+  // cards for one fact (proposal §3). Preferences survive.
+  const tripProposal = sanitizeTripProposal(obj.tripProposal, todayStr);
+  if (tripProposal && proposal && (proposal.kind === "location" || proposal.kind === "weather")) {
+    proposal = null;
+  }
+  return { reply: reply, outfit: outfit, pinProposal: proposal, attachProposal: attachProposal, tripProposal: tripProposal };
+}
+
+// PC-33: the trip-proposal sanitizer. Destination and a valid
+// future start date are required (the intent threshold is
+// destination + timing); an end date survives only when it is
+// a valid date on/after the start. Name is optional color.
+function sanitizeTripProposal(raw, todayStr) {
+  if (!raw || typeof raw !== "object") return null;
+  const destination = cleanText(raw.destination, 80);
+  if (!destination) return null;
+  const dateOk = (s) => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse(s + "T12:00:00Z"));
+  if (!dateOk(raw.startDate) || raw.startDate < todayStr) return null;
+  const out = { destination: destination, startDate: raw.startDate };
+  if (dateOk(raw.endDate) && raw.endDate >= raw.startDate) out.endDate = raw.endDate;
+  const name = cleanText(raw.name, 60);
+  if (name) out.name = name;
+  return out;
 }
 
 // Sprint 17 (CONTEXT PINS): stored current facts the user confirmed.
@@ -811,13 +838,13 @@ function assembleContext(input) {
     input.items, input.messages, input.styleProfile, input.previousPick,
     input.references, input.weatherContext, input.vibe, input.vibeProfile,
     input.tripContext, input.pins, todayStr, input.todayPick, input.shopItem,
-    input.mutedPinIds, input.attachCtx
+    input.mutedPinIds, input.attachCtx, input.steerCtx
   );
   const manifest = buildManifest(input, computeActivePins(input.pins, input.tripContext, todayStr, input.mutedPinIds));
   return { model: req.model, contents: req.contents, config: req.config, manifest: manifest };
 }
 
-function buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, todayPick, shopItem, mutedPinIds, attachCtx) {
+function buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, todayPick, shopItem, mutedPinIds, attachCtx, steerCtx) {
   const model = process.env.GEMINI_MODEL || MODEL_VERSION;
   const wardrobe = items.map((it, i) => itemLine(it, i)).join("\n");
   let system = SYSTEM + "\n\n" + PRECEDENCE;
@@ -996,7 +1023,12 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
       "- Location/weather: where they'll be / what weather they'll be in. Preference: lasting facts " +
       "(runs cold, leans casual, loves earth tones, never suggest X, packing style, owns ski gear).\n" +
       "- Extract end dates from speech (\"until Sunday\" → that date). Skip trivia and one-off requests.\n" +
-      "- Never propose on your own initiative — only when the user states the fact or its end. Propose, never append.";
+      "- Never propose on your own initiative — only when the user states the fact or its end. Propose, never append.\n" +
+      "- TENSE RULE (PC-33): location and weather pins are PRESENT-TENSE ONLY — propose one only for where " +
+      "the user IS now or weather they are in now (\"I'm in Tahoe until Sunday\", \"it's snowing here\"). Never " +
+      "for a place they will travel to later, however clean its end date looks: a saved pin takes effect " +
+      "immediately and would outrank their real weather at home. Future trips belong in a trip proposal " +
+      "(below), not a pin. Preference proposals are unaffected — lasting facts stay proposable.";
   }
   // PC-52: attach proposals. Attach is an act (UX-18 decision 1) —
   // the stylist may PROPOSE the act when the conversation has
@@ -1009,6 +1041,18 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
       "If the user's words clearly turn on that pick (\"make it warmer\", \"why did you pick this?\", \"swap the shoes on it\"), " +
       "you may return \"attachProposal\": \"todayPick\" in the JSON alongside reply/outfit. The user gets an Attach card; " +
       "nothing attaches unless they tap it. Do not claim to see the pick, and do not propose when the conversation is about anything else.";
+  }
+  // PC-33: trip steering. Pins are the present-tense layer;
+  // trips own the future. When a message carries a future trip,
+  // the durable offer is a trip object, not a pin.
+  if (!tripContext && !(steerCtx && steerCtx.dismissed)) {
+    system += "\n\nTRIP PROPOSAL — if the user's words carry a FUTURE trip (a destination plus future timing: " +
+      "\"next week\", explicit dates, \"my trip to …\"), you may return \"tripProposal\" in the JSON alongside reply/outfit:\n" +
+      "{ \"destination\": \"<place>\", \"startDate\": \"<YYYY-MM-DD>\", \"endDate\": \"<YYYY-MM-DD, omit if same or unknown>\", " +
+      "\"name\": \"<short trip name, optional>\" }.\n" +
+      "Compute real dates from what the user said and today's date. The user gets a card offering to create the trip; " +
+      "answer their question fully either way — the card never replaces advice, and creating the trip is their tap, " +
+      "never your act. Vague travel talk with no timing earns no proposal.";
   }
   for (const m of messages) {
     contents.push({ role: m.role, parts: [{ text: m.text }] });
@@ -1305,7 +1349,7 @@ function unwrapJsonReply(text) {
 }
 
 // here; the client re-validates on execute.
-async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, hooks, todayPick, shopItem, mutedPinIds, attachCtx) {
+async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, hooks, todayPick, shopItem, mutedPinIds, attachCtx, steerCtx) {
   const todayStr = /^\d{4}-\d{2}-\d{2}$/.test(today || "")
     ? today
     : new Date().toISOString().slice(0, 10);
@@ -1317,6 +1361,7 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
     weatherContext: weatherContext, vibe: vibe, vibeProfile: vibeProfile,
     tripContext: tripContext, pins: pins, today: todayStr, todayPick: todayPick,
     shopItem: shopItem, mutedPinIds: mutedPinIds, attachCtx: attachCtx,
+    steerCtx: steerCtx,
   });
   const { model, contents, config } = assembled;
   const manifest = assembled.manifest;
@@ -1409,9 +1454,15 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
   // of turn is dropped, not displayed).
   const attachProposal = (!tripContext && attachCtx && attachCtx.available &&
     !attachCtx.dismissed && !todayPick) ? (parsed.attachProposal || null) : null;
+  // PC-33: the trip proposal survives only in general chat and
+  // only when steering has not been dismissed in this
+  // conversation. (Parse already suppressed any competing
+  // location/weather pin proposal.)
+  const tripProposal = (!tripContext && !(steerCtx && steerCtx.dismissed))
+    ? (parsed.tripProposal || null) : null;
   if (!parsed.outfit || !mapped || problem) {
     if (parsed.outfit) emitEvent(hooks, "rejection", "outfit_discarded", { problem: problem || "unmapped" });
-    return { reply: parsed.reply, outfit: null, pinProposal: parsed.pinProposal || null, attachProposal: attachProposal, manifest: manifest };
+    return { reply: parsed.reply, outfit: null, pinProposal: parsed.pinProposal || null, attachProposal: attachProposal, tripProposal: tripProposal, manifest: manifest };
   }
   return {
     reply: parsed.reply,
@@ -1428,7 +1479,8 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
     },
     pinProposal: parsed.pinProposal || null,
     attachProposal: attachProposal,
+    tripProposal: tripProposal,
   };
 }
 
-module.exports = { askStylist, buildStylistRequest, assembleContext, buildManifest, resolveIterBase, computeActivePins, PRECEDENCE, MAX_MESSAGES, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeTodayPick, sanitizeShopItem, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins, sanitizePinProposal, extractToolCall, extractToolCalls, mapUpdateTripPacking, mapSuggestTripOutfits, handleIndex, unwrapJsonReply, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM, VIBE_TAGS };
+module.exports = { askStylist, buildStylistRequest, assembleContext, buildManifest, resolveIterBase, computeActivePins, PRECEDENCE, MAX_MESSAGES, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeTodayPick, sanitizeShopItem, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins, sanitizePinProposal, sanitizeTripProposal, extractToolCall, extractToolCalls, mapUpdateTripPacking, mapSuggestTripOutfits, handleIndex, unwrapJsonReply, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM, VIBE_TAGS };

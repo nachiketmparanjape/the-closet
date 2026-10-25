@@ -301,7 +301,9 @@ exports.askStylist = onCall(
         available: data.todayPickAvailable === true,
         dismissed: data.attachProposalDismissed === true,
       };
-      const result = await askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, stylistHooks, todayPick, shopItem, mutedPinIds, attachCtx);
+      // PC-33: trip steering — dismissed in this conversation?
+      const steerCtx = { dismissed: data.tripProposalDismissed === true };
+      const result = await askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, stylistHooks, todayPick, shopItem, mutedPinIds, attachCtx, steerCtx);
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: true });
       return finish("askStylist", correlationId, uid, start, result);
     } catch (err) {
