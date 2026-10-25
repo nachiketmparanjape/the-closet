@@ -610,44 +610,119 @@ email, guest banner + privacy note. Design:
     as the first worked example.
 
 ### PC-36: Photo of a person → individual articles + the outfit
-- **Size:** Spike shared with PC-34, then size from findings
-- **Value:** Founder (2026-10-21): the endgame of the
-  Google-Photos-clean-view direction. Photograph yourself
-  wearing an outfit — or reuse photos you already have — and
-  the app identifies each worn garment, creates the
-  individual articles (clean renders, per PC-34), and
-  creates the outfit object matching what's being worn.
-  Cataloguing cost per piece drops to ~zero and the outfit
-  arrives free with the pieces: onboarding's front-loaded
-  cost (UX-14's core problem) collapses. It also compounds —
-  every outfit photo a user already owns becomes wardrobe +
-  outfits in one step. Today's parseOutfitPhoto only MATCHES
-  a photo against pieces already catalogued; this CREATES
+- **Status:** Not started. A prototype is approved
+  (founder, 2026-10-21) but waits for PC-34 to go live:
+  both use the same garment-extraction core, and PC-34
+  waits for the founder's token step (see its card).
+  Next action after that: the prototype below.
+- **In plain words:** Take one photo of a person wearing
+  an outfit — a new photo, or one already on the phone.
+  The app finds each garment in the photo, creates a
+  wardrobe entry for each one with a clean cutout image,
+  and saves the combination as an outfit. The user
+  checks the new entries before anything is kept.
+  Today the app can only recognize, in such a photo,
+  pieces it already knows. This card makes it create
   the pieces.
-- **Scope:** Research first, as one spike with PC-34 (same
-  segmentation core), answering the founder's two charter
-  questions for this capability too: (Q1) feasibility —
-  readymade fashion-parsing / human-parsing solutions vs
-  from scratch, judged honestly against the Google
-  benchmark; (Q2) cost — per photo at our scale, plus
-  build/maintenance if scratch. Any build follows the
-  spike's recommendation only. Shape of the eventual build:
-  one worn photo → draft articles (clean render + AI tags)
-  the user confirms or edits — nothing lands silently — plus
-  one outfit composed of exactly those articles.
-- **Status:** Not started. Filed 2026-10-21 from the
-  founder's message; research pairs with PC-34. Research
-  landed same day; **founder approved Option A 2026-10-21**:
-  prototype on the PC-34 matting core, judged on the
-  founder's real outfit photos before any build is sized.
-
-- **Alta benchmark (teardown P3, 2026-10-24):** Alta's
-  Prettify does this today (selfie → isolated pieces, per
-  their own post and an independent stylist's hands-on). It
-  is the acceptance bar for any PC-36 prototype: match its
-  one-photo-to-pieces-and-outfit shape before calling the
-  shape proven. Not a new card — the teardown point lives
-  here. Still gated on PC-34's token.
+- **Why it matters:** Adding clothes one by one is the
+  app's largest cost to a new user, and it all falls at
+  the start, before the app has given anything back.
+  One photo the user already owns could do the whole
+  job: the pieces enter the wardrobe and the outfit
+  arrives with them. Every old outfit photo a user has
+  becomes wardrobe plus outfits in one step. This is
+  the direct attack on the onboarding problem (UX-14 —
+  the card about getting a new user's wardrobe into the
+  app without a long setup chore).
+- **Key terms:**
+  - *Worn photo* — a photo of a person wearing clothes,
+    as opposed to a photo of one garment lying flat.
+  - *Segmentation* — the step that decides which pixels
+    in a photo belong to which garment. (Same term, same
+    meaning as in PC-34.)
+  - *Render* — a clean cutout image of one garment, as
+    PC-34 produces from a flat photo.
+  - *Draft article* — a wardrobe entry the app proposes
+    from a photo. The user confirms or edits it; a draft
+    is never kept silently.
+  - *Human parsing* — the branch of image software that
+    separates the parts of a person in a photo: each
+    garment, the body, the background. This card needs
+    it, and it is harder than flat-photo segmentation
+    for two reasons: garments overlap each other, and a
+    garment changes shape when a body wears it.
+- **What was decided:**
+  - Prototype before build (founder approved "Option
+    A," 2026-10-21): try the capability on PC-34's
+    extraction core, judge it on the founder's real
+    outfit photos, and size any build only after that
+    evidence exists.
+  - Nothing lands silently. The build's shape is one
+    worn photo → draft articles (clean render plus the
+    app's usual descriptive tags) → the user confirms
+    or edits → one outfit composed of exactly those
+    articles.
+  - The acceptance bar is named in advance: Alta (a
+    competing wardrobe app) ships this feature today
+    under the name Prettify — one selfie in, isolated
+    pieces out. A prototype must match that shape
+    before the shape counts as proven for us.
+- **What exists today:** A function named
+  `parseOutfitPhoto` reads a worn photo and matches it
+  against pieces already in the wardrobe. It creates
+  nothing. The gap between matching and creating is
+  exactly this card.
+- **Evidence:** The capability exists in production
+  elsewhere: Alta's Prettify does it (their own post,
+  plus an independent stylist's hands-on report, both
+  reviewed in the studio's Alta teardown, 2026-10-24).
+  Google Photos also builds a clothing collection on
+  its own from photos of the founder wearing clothes
+  (founder-reported, 2026-10-21 — the sighting that
+  opened this card). What is not yet known: whether a
+  readymade service, or a build of our own, reaches
+  that quality at our cost. The founder's two questions
+  for the shared PC-34/PC-36 research spike stand:
+  (Q1) is it possible for us — a readymade solution, or
+  one we build as good? (Q2) what does it cost, per
+  photo and to maintain?
+- **Questions for a reader:**
+  1. Which route separates garments on a person most
+     reliably today: a dedicated human-parsing model
+     that labels every pixel, or a vision model that
+     first locates each garment and a segmentation
+     model that then cuts each one out?
+  2. How much of a partly hidden garment (a shirt under
+     an open jacket) can any current method recover —
+     and is a partial piece better shown to the user as
+     a draft, or refused?
+  3. One worn photo becomes several model calls (one
+     per garment, plus checks). Is the per-photo cost
+     still sane at consumer scale, or does the shape
+     need batching?
+- **What remains, in order:**
+  1. PC-34 goes live (its own card carries that chain:
+     token → deploy → smoke test → phone check).
+  2. The prototype: run real outfit photos of the
+     founder through the extraction core, extended to
+     several garments on a person.
+  3. The founder judges the prototype against the Alta
+     bar. Only then is a build sized, and it enters
+     work through a planning walk.
+- **History:**
+  - 2026-10-21 — The founder files the direction after
+    seeing Google Photos' auto-built clothing
+    collection and its clean cutouts: parse a worn
+    photo into its garments, create the articles and
+    the outfit. Option A approved the same day
+    (prototype on PC-34's core, judged on his photos).
+  - 2026-10-24 — Alta's Prettify is set as the
+    acceptance bar (Alta teardown, disposition round).
+    At the Sprint 24 planning walk the card is kept;
+    the round's vision-input slot went to the smaller
+    PC-38 (reference photos in chat).
+  - 2026-10-25 — This card rewritten in the studio's
+    shareable-card structure (standards/shareable-cards).
 
 ### PC-37: Trip chat is a full stylist room — outfit suggestions you can add
 - **Size:** M
