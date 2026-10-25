@@ -315,6 +315,13 @@
     .chat-msg.thinking { color: var(--muted); font-style: italic; }
     .chat-input-row { display: flex; gap: 8px; flex-wrap: wrap; }
     .chat-ref-chips { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 6px; }
+    .chat-photo-chips { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 8px; }
+    .chat-photo-thumb { position: relative; width: 52px; height: 52px; border-radius: var(--r-sm); overflow: hidden; border: 1px solid var(--line-strong); }
+    .chat-photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .chat-photo-thumb button { position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; border-radius: 50%; border: none; background: rgba(20,16,10,.72); color: #fff; font-size: 13px; line-height: 1; cursor: pointer; padding: 0; }
+    .chat-msg-photos { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+    .chat-msg-photos img { width: 74px; height: 74px; object-fit: cover; border-radius: var(--r-sm); display: block; }
+    .chat-msg-photocount { font-size: 12.5px; opacity: .75; margin-bottom: 4px; }
     .chat-ref-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 4px 6px 4px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--ink); border: 1px solid var(--line); }
     .chat-ref-chip button { border: none; background: transparent; color: var(--muted); cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px; }
     .chat-ref-picker { position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); max-height: 220px; overflow-y: auto; background: var(--paper); border: 1px solid var(--line-strong); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.18); z-index: 30; }
@@ -1084,6 +1091,26 @@
   <input type="file" id="shopCheckInput" accept="image/*" hidden>
   <input type="file" id="shopCheckInputCamera" accept="image/*" capture="environment" hidden>
 
+  <!-- PC-38: reference-photo source chooser — the same
+       single-door pattern as Add (one door, then upload or
+       camera). References are inspiration for one message;
+       they never become wardrobe items. -->
+  <div class="overlay sheet-overlay" id="refPhotoSheet" hidden role="dialog" aria-modal="true" aria-labelledby="refPhotoTitle">
+    <section class="sheet">
+      <div class="sheet-head">
+        <h2 class="sheet-title" id="refPhotoTitle">Attach reference photos</h2>
+        <button class="icon-button" id="refPhotoClose" type="button" aria-label="Close">×</button>
+      </div>
+      <p class="sheet-intro">Show the stylist what you're aiming for — an inspiration photo, a screenshot of a look. Up to 4; they ride with your next message only.</p>
+      <button class="sheet-option" id="refPhotoUpload" type="button">
+        <span><span class="opt-title">Upload photos</span><span class="opt-sub">From your library</span></span>
+      </button>
+      <button class="sheet-option" id="refPhotoCamera" type="button">
+        <span><span class="opt-title">Take a photo</span><span class="opt-sub">Use the camera</span></span>
+      </button>
+    </section>
+  </div>
+
   <!-- PC-51: paste-with-nothing-open lands here — the photo
        is in hand, the intent isn't; ask, don't guess. -->
   <div class="overlay sheet-overlay" id="pasteChoiceSheet" hidden role="dialog" aria-modal="true" aria-labelledby="pasteChoiceTitle">
@@ -1255,11 +1282,15 @@
         <div id="chatTodayStrip" hidden></div>
         <div class="chat-list" id="chatList" aria-live="polite"></div>
         <form class="chat-input-row" id="chatForm" style="position:relative;">
+          <div id="chatPhotoChips" class="chat-photo-chips" hidden></div>
           <div id="chatRefChips" class="chat-ref-chips" hidden></div>
           <div id="chatRefPicker" class="chat-ref-picker" hidden></div>
+          <button class="icon-button" id="chatAttachBtn" type="button" aria-label="Attach reference photos" title="Attach reference photos">📷</button>
           <input id="chatInput" type="text" maxlength="500" placeholder="e.g. casual dinner, 60°F — @ to reference a piece or outfit" autocomplete="off" aria-label="Ask the stylist" />
           <button class="primary" id="chatSend" type="submit">Send</button>
         </form>
+        <input type="file" id="chatPhotoInput" accept="image/*" multiple hidden />
+        <input type="file" id="chatPhotoCameraInput" accept="image/*" capture="environment" hidden />
       </div>
     </section>
   </div>
@@ -4154,6 +4185,11 @@
           if (m.tripState) o.tripState = m.tripState;
           if (m.createdTripId) o.createdTripId = m.createdTripId;
           if (m.refLabels) o.refLabels = m.refLabels;
+          // PC-38: only the COUNT of reference photos is saved —
+          // the images were one turn's vision context, and
+          // base64 in the thread doc would bloat it toward the
+          // Firestore limit.
+          if (m.refPhotoCount) o.refPhotoCount = m.refPhotoCount;
           if (m.tripOutfits) o.tripOutfits = m.tripOutfits;
           if (m.tripSaveCtx) o.tripSaveCtx = m.tripSaveCtx;
           return o;
@@ -4306,6 +4342,7 @@
         chatMutedPinsByThread = {};
         chatAttachDismissedByThread = {};
         chatTripSteerDismissedByThread = {};
+        chatRefPhotos = [];
         if (activeThreadKey !== "general") { activeThreadKey = "general"; stylistMessages = []; }
         if (uid) {
           loadThread("general", function () {
@@ -4334,6 +4371,10 @@
         chatThreads[activeThreadKey] = stylistMessages;
         saveThread(activeThreadKey);
         activeThreadKey = key;
+        // PC-38: a photo draft belongs to the conversation it
+        // was attached in — switching leaves it behind.
+        clearRefPhotoDraft();
+        syncRefPhotoUi();
         stylistMessages = chatThreads[key] || [];
         if (threadLoaded[key]) {
           applyReturnDivider(key);
@@ -4380,6 +4421,7 @@
         delete chatMutedPinsByThread[key]; // muted facts return on a fresh start
         delete chatAttachDismissedByThread[key]; // a dismissed proposal may be offered again
         delete chatTripSteerDismissedByThread[key];
+        clearRefPhotoDraft(); // PC-38: a fresh conversation starts unattached — photos too
         saveThread(key);
         renderChat();
         renderContextLine();
@@ -4459,6 +4501,25 @@
           }
           var div = document.createElement("div");
           div.className = "chat-msg " + m.role + (m.thinking ? " thinking" : "");
+          // PC-38: reference photos shown in the bubble while
+          // their data lives in memory; after a reload only the
+          // count survives — say so plainly instead of a gap.
+          if (m.refPhotos && m.refPhotos.length) {
+            var strip = document.createElement("div");
+            strip.className = "chat-msg-photos";
+            m.refPhotos.forEach(function (src) {
+              var im = document.createElement("img");
+              im.src = src;
+              im.alt = "Reference photo";
+              strip.appendChild(im);
+            });
+            div.appendChild(strip);
+          } else if (m.role === "user" && m.refPhotoCount) {
+            var pc = document.createElement("div");
+            pc.className = "chat-msg-photocount";
+            pc.textContent = "📷 " + m.refPhotoCount + " reference photo" + (m.refPhotoCount > 1 ? "s" : "") + " (not saved)";
+            div.appendChild(pc);
+          }
           // PC-22: show @-referenced pieces/outfits inside the sent bubble.
           if (m.refLabels && m.refLabels.length) {
             var refs = document.createElement("div");
@@ -5111,6 +5172,7 @@
       function renderContextLine() {
         var el = document.getElementById("chatContextLine");
         if (!el) return;
+        syncRefPhotoUi(); // PC-38: the attach door follows the active thread
         if (!currentUser) { el.hidden = true; return; }
         var labels = contextEntries().map(function (e) { return e.label; });
         var text = labels.slice(0, 3).join("  ·  ");
@@ -5441,6 +5503,105 @@
         });
       }
 
+      // PC-38: reference photos for the NEXT message — vision
+      // context for one turn, general chat only. The draft is
+      // composer state (attachments' lifecycle): cleared on
+      // send, on thread switch, on Start fresh, on sign-out;
+      // a failed send restores it. Photos are downscaled once
+      // at attach (downscaleForAI, ≤1024px JPEG) — the same
+      // payload serves the thumbnail, the bubble and the model.
+      // Nothing here ever creates a wardrobe item, and the
+      // image data is never saved with the thread (only the
+      // count is) — the model sees photos on their turn only.
+      var chatRefPhotos = []; // [{ base64, mimeType, dataUrl }]
+      var refPhotoSheet = document.getElementById("refPhotoSheet");
+      var chatPhotoInput = document.getElementById("chatPhotoInput");
+      var chatPhotoCameraInput = document.getElementById("chatPhotoCameraInput");
+      function renderRefPhotoChips() {
+        var wrap = document.getElementById("chatPhotoChips");
+        wrap.textContent = "";
+        wrap.hidden = !chatRefPhotos.length;
+        chatRefPhotos.forEach(function (p, idx) {
+          var cell = document.createElement("div");
+          cell.className = "chat-photo-thumb";
+          var img = document.createElement("img");
+          img.src = p.dataUrl;
+          img.alt = "Reference photo " + (idx + 1);
+          cell.appendChild(img);
+          var x = document.createElement("button");
+          x.type = "button";
+          x.textContent = "×";
+          x.setAttribute("aria-label", "Remove reference photo " + (idx + 1));
+          x.addEventListener("click", function () {
+            chatRefPhotos.splice(idx, 1);
+            renderRefPhotoChips();
+            chatInput.focus();
+          });
+          cell.appendChild(x);
+          wrap.appendChild(cell);
+        });
+      }
+      function syncRefPhotoUi() {
+        document.getElementById("chatAttachBtn").hidden = activeThreadKey !== "general";
+        renderRefPhotoChips();
+      }
+      function clearRefPhotoDraft() {
+        if (!chatRefPhotos.length) return;
+        chatRefPhotos = [];
+        renderRefPhotoChips();
+      }
+      function addRefPhotoFiles(fileList) {
+        // FileList is live — snapshot before anything resets it.
+        var files = Array.prototype.slice.call(fileList || []);
+        if (!files.length) return;
+        var room = 4 - chatRefPhotos.length;
+        if (room <= 0) { showToast("Up to 4 reference photos — remove one to add another."); return; }
+        if (files.length > room) {
+          showToast("Only the first " + room + " fit — up to 4 reference photos per message.");
+          files = files.slice(0, room);
+        }
+        files.forEach(function (f) {
+          downscaleForAI(f).then(function (img) {
+            if (chatRefPhotos.length >= 4) return;
+            chatRefPhotos.push({
+              base64: img.base64,
+              mimeType: img.mimeType,
+              dataUrl: "data:" + img.mimeType + ";base64," + img.base64
+            });
+            renderRefPhotoChips();
+          }).catch(function () {
+            showToast("That photo couldn't be read — try another.");
+          });
+        });
+      }
+      document.getElementById("chatAttachBtn").addEventListener("click", function () {
+        if (activeThreadKey !== "general") return;
+        openOverlay(refPhotoSheet);
+      });
+      document.getElementById("refPhotoClose").addEventListener("click", function () { closeOverlay(refPhotoSheet); });
+      refPhotoSheet.addEventListener("click", function (event) {
+        if (event.target === refPhotoSheet) closeOverlay(refPhotoSheet);
+      });
+      document.getElementById("refPhotoUpload").addEventListener("click", function () {
+        closeOverlay(refPhotoSheet);
+        chatPhotoInput.click();
+      });
+      document.getElementById("refPhotoCamera").addEventListener("click", function () {
+        closeOverlay(refPhotoSheet);
+        chatPhotoCameraInput.click();
+      });
+      chatPhotoInput.addEventListener("change", function () {
+        // Snapshot FIRST — a FileList is live and dies with the reset.
+        var files = Array.prototype.slice.call(this.files || []);
+        this.value = "";
+        addRefPhotoFiles(files);
+      });
+      chatPhotoCameraInput.addEventListener("change", function () {
+        var files = Array.prototype.slice.call(this.files || []);
+        this.value = "";
+        addRefPhotoFiles(files);
+      });
+
       function refCandidates(q) {
         q = (q || "").toLowerCase();
         var arts = allItems
@@ -5524,7 +5685,13 @@
         event.preventDefault();
         if (chatBusy || !currentUser) return;
         var text = chatInput.value.trim();
-        if (!text) return;
+        // PC-38: photos alone are a message too ("more like
+        // this" is often just a look). General chat only — the
+        // draft cannot exist in a trip thread (button hidden,
+        // draft cleared on switch), the tripChat check is belt
+        // and braces.
+        var sentPhotos = (!tripChat && activeThreadKey === "general") ? chatRefPhotos.slice() : [];
+        if (!text && !sentPhotos.length) return;
         if (!functions) { showToast("The stylist isn't ready yet — reload and try again."); return; }
         chatInput.value = "";
         // WX-1: measured local weather rides along as context (cached 30
@@ -5540,6 +5707,12 @@
         });
         var userMsg = { role: "user", text: text, at: Date.now() };
         if (refLabels.length) userMsg.refLabels = refLabels;
+        // PC-38: the bubble shows the photos (memory-only data
+        // URLs); the saved thread keeps just the count.
+        if (sentPhotos.length) {
+          userMsg.refPhotos = sentPhotos.map(function (p) { return p.dataUrl; });
+          userMsg.refPhotoCount = sentPhotos.length;
+        }
         stylistMessages.push(userMsg);
         var thinking = { role: "model", text: "Thinking…", thinking: true, at: Date.now() };
         stylistMessages.push(thinking);
@@ -5578,7 +5751,16 @@
           // UX-18 W4/W5: the thread may hold the whole transcript;
           // the wire carries the reading window plus margin — the
           // server's sanitizer applies the exact window.
-          messages: stylistMessages.filter(function (m) { return !m.thinking; }).slice(-55),
+          // PC-38: a photo-only message carries no words; the
+          // wire gives the model one factual line in its place
+          // (the thread keeps the honest empty text + photos).
+          messages: stylistMessages.filter(function (m) { return !m.thinking; }).slice(-55).map(function (m) {
+            if (m.text || !m.refPhotoCount) return m;
+            return Object.assign({}, m, {
+              text: "(I attached " + m.refPhotoCount + " reference photo" +
+                (m.refPhotoCount > 1 ? "s" : "") + " to this message — they travel with it.)"
+            });
+          }),
           previousPick: previousPick,
           todayPick: todayPickCtx,
           // Shop attach: the item under consideration, when the
@@ -5595,6 +5777,9 @@
           attachProposalDismissed: !!chatAttachDismissedByThread[activeThreadKey],
           // PC-33: trip steering already dismissed here?
           tripProposalDismissed: !!chatTripSteerDismissedByThread[activeThreadKey],
+          // PC-38: reference photos — vision context for this
+          // turn only. The image data goes nowhere else.
+          refImages: sentPhotos.map(function (p) { return { mimeType: p.mimeType, data: p.base64 }; }),
           // Sprint 13: explicit vibe handle ("dress me streetwear tonight").
           // Server accepts exact vocabulary hits only.
           vibe: detectVibeTag(text),
@@ -5613,6 +5798,7 @@
           }
         };
         chatRefs = { articles: [], outfits: [] }; // per-message; PC-16 carries continuity
+        if (sentPhotos.length) { chatRefPhotos = []; renderRefPhotoChips(); } // PC-38: the draft is spent
         if (!payload.vibe && vibeIntentWithoutMatch(text)) logVibeMiss(text);
         // Sprint 16 (TRIPCHAT-1): trip mode — the trip + current packing
         // ride along; the server sanitizes, the model may tool-call.
@@ -5692,6 +5878,13 @@
         }).catch(function (err) {
           thinking.thinking = false;
           thinking.text = friendlyError(err);
+          // PC-38: a failed send hands the photos back to the
+          // composer so a retry carries them (unless the user
+          // has already attached something new).
+          if (sentPhotos.length && !chatRefPhotos.length) {
+            chatRefPhotos = sentPhotos;
+            renderRefPhotoChips();
+          }
         }).then(function () {
           chatBusy = false;
           chatSend.disabled = false;

@@ -4,6 +4,21 @@ What went live. Momentum you can see.
 
 ## Sprint 19 (2026-10-24 → )
 
+- **PC-38: Reference photos in stylist chat** — shipped
+  2026-10-24 (Sprint 24): attach up to 4 inspiration
+  photos to a message in the general chat (📷 door →
+  upload/camera chooser, composer thumbnails, removable
+  before send; photo-only messages send). They ride to
+  the model as vision context on that turn under a brief
+  section that names them inspiration, never inventory.
+  Nothing is created from them; the image data is never
+  saved (the thread keeps the count). Trip chats excluded
+  on both sides of the wire. Founder phone validation
+  pending. (Living-doc note for the PR #80 merge pass:
+  the assembler has gained three inputs since the doc's
+  snapshot — attachCtx (PC-52), steerCtx (PC-33),
+  refImages (PC-38) — fold them in with the Context
+  Standard.)
 - **PC-54: Paste intake on phones** — shipped 2026-10-24
   (Sprint 24): a Paste a photo button on the capture
   screen and in the shop sheet; the tap tries the async

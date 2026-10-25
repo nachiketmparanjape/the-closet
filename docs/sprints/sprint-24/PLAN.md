@@ -70,7 +70,11 @@ Share Target is evaluated during the build and splits
 into its own card if it grows.
 
 ### PC-38: Attach reference photos in stylist chat (M)
-- **Status:** In Sprint 24.
+- **Status:** Built + deployed 2026-10-24; founder phone
+  validation pending. Duration class "this message" per
+  the Context Standard; image data never persists (the
+  thread keeps the count); trip threads excluded on both
+  sides of the wire.
 From the Essembl teardown P3 (founder-adopted). In:
 attach up to 4 reference images to a message in the
 general chat (picker + camera, single-door pattern);

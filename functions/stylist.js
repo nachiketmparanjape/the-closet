@@ -281,6 +281,26 @@ function sanitizeShopItem(value) {
   };
 }
 
+// PC-38: reference PHOTOS attached to a chat message — vision
+// context for that turn only. Distinct from PC-22's references
+// (wardrobe pointers): these are images the user is aiming for,
+// never wardrobe items. Hard caps: at most 4, known image MIME
+// types only, each payload a plausible base64 image (the client
+// downscales to ≤1024px JPEG, ~200KB; the ceiling here is the
+// abuse guard, not the expectation). Malformed → dropped.
+const REF_IMAGE_MIMES = new Set(["image/jpeg", "image/png", "image/webp"]);
+function sanitizeRefImages(value) {
+  if (!Array.isArray(value)) return [];
+  const out = [];
+  for (const v of value.slice(0, 4)) {
+    if (!v || typeof v !== "object") continue;
+    if (!REF_IMAGE_MIMES.has(v.mimeType)) continue;
+    if (typeof v.data !== "string" || v.data.length < 100 || v.data.length > 2000000) continue;
+    out.push({ mimeType: v.mimeType, data: v.data });
+  }
+  return out;
+}
+
 // PC-22: @-mention references. The client sends { articleIds, outfits }
 // where outfits carry their itemIds (resolved from its local cache); every
 // id is re-validated against the real wardrobe here, so the model only
@@ -838,13 +858,13 @@ function assembleContext(input) {
     input.items, input.messages, input.styleProfile, input.previousPick,
     input.references, input.weatherContext, input.vibe, input.vibeProfile,
     input.tripContext, input.pins, todayStr, input.todayPick, input.shopItem,
-    input.mutedPinIds, input.attachCtx, input.steerCtx
+    input.mutedPinIds, input.attachCtx, input.steerCtx, input.refImages
   );
   const manifest = buildManifest(input, computeActivePins(input.pins, input.tripContext, todayStr, input.mutedPinIds));
   return { model: req.model, contents: req.contents, config: req.config, manifest: manifest };
 }
 
-function buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, todayPick, shopItem, mutedPinIds, attachCtx, steerCtx) {
+function buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, todayPick, shopItem, mutedPinIds, attachCtx, steerCtx, refImages) {
   const model = process.env.GEMINI_MODEL || MODEL_VERSION;
   const wardrobe = items.map((it, i) => itemLine(it, i)).join("\n");
   let system = SYSTEM + "\n\n" + PRECEDENCE;
@@ -1054,8 +1074,31 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
       "answer their question fully either way — the card never replaces advice, and creating the trip is their tap, " +
       "never your act. Vague travel talk with no timing earns no proposal.";
   }
+  // PC-38: reference photos ride with the latest user message
+  // as vision context for this turn. They are inspiration, not
+  // inventory — the brief says so in as many words, because a
+  // model that can't tell an inspo photo from an owned piece
+  // will happily dress the user in clothes they don't have.
+  const hasRefImages = !tripContext && Array.isArray(refImages) && refImages.length > 0;
+  if (hasRefImages) {
+    system += "\n\nREFERENCE PHOTOS — the user attached " + refImages.length +
+      " photo(s) to their latest message (they travel with it below). These are INSPIRATION: " +
+      "looks the user is aiming for. They are NOT in the wardrobe — never put them in an outfit, " +
+      "never treat them as owned, never suggest wearing them. Name what you actually see in them " +
+      "(the pieces, colors, silhouette, mood), then answer by building only from the wardrobe above.";
+  }
   for (const m of messages) {
     contents.push({ role: m.role, parts: [{ text: m.text }] });
+  }
+  if (hasRefImages) {
+    for (let i = contents.length - 1; i >= 0; i--) {
+      if (contents[i].role === "user") {
+        for (const img of refImages) {
+          contents[i].parts.push({ inlineData: { mimeType: img.mimeType, data: img.data } });
+        }
+        break;
+      }
+    }
   }
   // Sprint 16 (TRIPCHAT-1): trip mode. The model gets the trip + the
   // current packing (as handles) and one tool to rewrite the plan.
@@ -1349,7 +1392,7 @@ function unwrapJsonReply(text) {
 }
 
 // here; the client re-validates on execute.
-async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, hooks, todayPick, shopItem, mutedPinIds, attachCtx, steerCtx) {
+async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, hooks, todayPick, shopItem, mutedPinIds, attachCtx, steerCtx, refImages) {
   const todayStr = /^\d{4}-\d{2}-\d{2}$/.test(today || "")
     ? today
     : new Date().toISOString().slice(0, 10);
@@ -1361,7 +1404,7 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
     weatherContext: weatherContext, vibe: vibe, vibeProfile: vibeProfile,
     tripContext: tripContext, pins: pins, today: todayStr, todayPick: todayPick,
     shopItem: shopItem, mutedPinIds: mutedPinIds, attachCtx: attachCtx,
-    steerCtx: steerCtx,
+    steerCtx: steerCtx, refImages: refImages,
   });
   const { model, contents, config } = assembled;
   const manifest = assembled.manifest;
@@ -1483,4 +1526,4 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
   };
 }
 
-module.exports = { askStylist, buildStylistRequest, assembleContext, buildManifest, resolveIterBase, computeActivePins, PRECEDENCE, MAX_MESSAGES, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeTodayPick, sanitizeShopItem, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins, sanitizePinProposal, sanitizeTripProposal, extractToolCall, extractToolCalls, mapUpdateTripPacking, mapSuggestTripOutfits, handleIndex, unwrapJsonReply, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM, VIBE_TAGS };
+module.exports = { askStylist, buildStylistRequest, assembleContext, buildManifest, resolveIterBase, computeActivePins, PRECEDENCE, MAX_MESSAGES, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeTodayPick, sanitizeShopItem, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins, sanitizePinProposal, sanitizeTripProposal, sanitizeRefImages, extractToolCall, extractToolCalls, mapUpdateTripPacking, mapSuggestTripOutfits, handleIndex, unwrapJsonReply, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM, VIBE_TAGS };

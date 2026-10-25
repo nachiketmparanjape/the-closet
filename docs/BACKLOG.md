@@ -737,8 +737,30 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   suggests outfits built only from owned pieces; removing a
   thumbnail before send excludes it; no items are created.
 - **Lane:** Stylist. **Effort:** M.
-- **Status:** In Sprint 24 (planning walk 2026-10-24 —
-  adoption became scheduling there, not before).
+- **Status:** DONE 2026-10-24 (Sprint 24). Built as
+  specced: a 📷 door in the general-chat composer opens
+  the one chooser (upload / camera); up to 4 photos,
+  downscaled once at attach; thumbnails in the composer,
+  removable before send; a photo-only message sends (the
+  wire gives the model one factual line for it). The
+  assembler threads them as inlineData on the last user
+  turn under a REFERENCE PHOTOS brief section: inspiration,
+  never inventory — name what you see, build only from
+  the wardrobe. Context Standard: the duration is "this
+  message," the same class as @ pointers; the composer
+  thumbnails are that duration's shortcut view. The draft
+  follows the attachments' lifecycle (cleared on send,
+  thread switch, Start fresh, sign-out; restored when a
+  send fails). Two recorded choices: (1) the image data
+  never persists — the saved thread keeps only the count
+  (base64 would bloat the thread doc toward the Firestore
+  limit, and the card bars persistence anyway); the
+  bubble shows the photos while their data lives in
+  memory, and a quiet "(not saved)" line after a reload.
+  (2) Trip threads ignore refImages server-side as well
+  as hiding the door. tests/pc38.test.js pins the
+  sanitizer + threading. Founder phone validation
+  pending.
 
 ### PC-39: Trip weather re-check — the pill is the retry (S)
 - **Origin:** Founder, 2026-10-24. The trip page shows a frozen
