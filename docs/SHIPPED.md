@@ -743,3 +743,18 @@ What went live. Momentum you can see.
   anchor to the bottom with the backdrop above them. Modals keep
   their 92dvh cap. A layout invariant guards the sheet's
   full-height allowance. Tests 387/387.
+
+- **Phone-test buffer #9 (2026-10-25, founder screenshot): with
+  the keyboard open, the chat's header went off the top of the
+  screen.** iOS Safari does not shrink the layout viewport for
+  the keyboard — it shrinks the visual viewport and scrolls the
+  page — so a bottom-anchored panel of full layout height kept
+  its composer visible and pushed everything above the visible
+  area. The overlay stack manager (the same home as the
+  stacking fix) now fits every open overlay to
+  `window.visualViewport` — height + top offset — and tracks it
+  live on resize/scroll; panel heights resolve against that box
+  (chat and capture at 100%, sheets capped at 100%, modals at
+  min(92dvh, 100%)). Every window with an input gains it: chat,
+  form sheets, capture. A layout invariant guards the
+  mechanism's presence. Tests 387/387.
