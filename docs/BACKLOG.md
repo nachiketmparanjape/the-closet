@@ -723,6 +723,19 @@ email, guest banner + privacy note. Design:
     PC-38 (reference photos in chat).
   - 2026-10-25 — This card rewritten in the studio's
     shareable-card structure (standards/shareable-cards).
+  - 2026-10-25 — Research amendment (founder's question;
+    report `research_notes/closet-sam3-sam3d.md`): SAM 3
+    (Meta, Nov 2025) does the finding step directly —
+    prompt it per garment type ("shirt", "trousers") and
+    it returns every matching mask in the photo, under a
+    license that permits commercial use, hosted at about
+    $0.0025–0.005 per image. Recommended prototype shape,
+    founder verdict pending: SAM 3 (via fal) finds and
+    separates the garments; BiRefNet refines each cutout.
+    The parser+boxes assembly stays as the fallback. What
+    is unproven: mask quality on layered outfits — the
+    prototype on the founder's real photos settles it, as
+    chartered.
 
 ### PC-37: Trip chat is a full stylist room — outfit suggestions you can add
 - **Size:** M
@@ -1305,6 +1318,15 @@ email, guest banner + privacy note. Design:
 - **Status:** Parked with a trigger (founder-saved
   2026-10-24): revisit after PC-34 is live AND the PC-36
   prototype has a verdict.
+- **Watch note (2026-10-25, SAM research —
+  `research_notes/closet-sam3-sam3d.md`):** SAM 3D
+  (single photo → a 3D mesh of an object or a body) is
+  the named tool if this spike ever needs a real 3D
+  view of a piece. It does not dress a body — try-on
+  imagery is a generative technology, not this — and its
+  garment quality is unevaluated. Revisit trigger: this
+  spike's design work actually calls for a rotatable 3D
+  view.
 
 ### PC-50: Link intake for shop check (S)
 

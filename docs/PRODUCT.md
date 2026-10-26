@@ -92,6 +92,24 @@ and non-goals: `VISION.md`.
 
 ## Research
 
+- **SAM 3 / SAM 3D for garment photos (2026-10-25)** — full
+  report `research_notes/closet-sam3-sam3d.md`. SAM 3 (Meta,
+  Nov 19 2025) does promptable concept segmentation: one text
+  prompt per garment type returns every instance mask — it
+  replaces PC-36's planned parser+boxes finding step; the SAM
+  License permits commercial use, hosted at ~$0.0025–0.005 per
+  image (fal; per-concept calls possible). Recommendation:
+  the PC-36 prototype becomes SAM 3 via fal → BiRefNet edge
+  refinement, judged on the founder's real outfit photos as
+  chartered (founder verdict pending). PC-34 stays on
+  BiRefNet — SAM 3 makes masks, not alpha mattes. SAM 3D is
+  mesh reconstruction, not try-on: a watch item, trigger
+  recorded on PC-49. Google's "model-like" views are
+  generative imagery (try-on/Doppl); its Photos "Wardrobe"
+  (rolled out Sept 24, 2026) is extraction + generated
+  previews — the two stages are different technologies.
+
+
 Topics we investigate *before* building, so product decisions rest on
 findings — feasibility, cost, overengineering risk — instead of vibes.
 Decided topics stay as compact records; full reports live in `research_notes/`.
