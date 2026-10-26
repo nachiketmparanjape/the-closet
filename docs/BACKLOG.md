@@ -786,6 +786,28 @@ email, guest banner + privacy note. Design:
     passes, BiRefNet leaves this pipeline. (BiRefNet
     stays PC-34's engine for flat photos, where it finds
     and cuts in one call.)
+  - 2026-10-25 — Virtual try-off research (the founder's
+    diffusion question; note research_notes/
+    closet-virtual-tryoff.md): purpose-built lightweight
+    diffusion models do exactly this step — they are
+    called virtual try-off models; TryOffDiff is the best
+    measured — but there is no usable route today. Its
+    weights are academic-only by license (no commercial
+    use), no try-off model has a hosted endpoint on
+    Replicate or fal, and self-hosting is an unmeasured
+    estimate (~$0.003–0.008 per image). The general
+    image-to-image route is the research papers' own
+    losing baseline. The deeper problem: the method works
+    by inventing the hidden parts of a garment, and this
+    catalog's promise is that the picture IS the user's
+    piece; even Google's version reportedly ships with a
+    'regenerate inaccurate render' button.
+    Recommendation (founder verdict pending): extraction
+    stays the canonical view; try-off may enter this
+    prototype only as a labeled, opt-in second view, and
+    only behind two gates — a license-clean model, and a
+    pre-set fidelity test on the founder's real garments,
+    including a printed-logo piece.
 
 ### PC-37: Trip chat is a full stylist room — outfit suggestions you can add
 - **Size:** M

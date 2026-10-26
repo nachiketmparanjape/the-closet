@@ -111,7 +111,18 @@ and non-goals: `VISION.md`.
   background; PC-34's renders adopt it too. PC-34 stays on
   BiRefNet — SAM 3 makes masks, not alpha mattes. SAM 3D is
   mesh reconstruction, not try-on: ruled out above, its
-  watch trigger stays recorded on PC-49. Google's "model-like" views are
+  watch trigger stays recorded on PC-49.
+  - Virtual try-off (the generative clean-view step the
+    founder asked about next; note research_notes/
+    closet-virtual-tryoff.md): the models exist and are
+    lightweight, but the best one is license-blocked
+    (academic use only), none is hosted, and the method
+    invents hidden garment parts — against this catalog's
+    promise that the picture is the user's own piece.
+    Recommendation filed on PC-36: extraction stays
+    canonical; try-off only as a labeled, opt-in second
+    view behind a license gate and a fidelity test on
+    real garments. Founder verdict pending. Google's "model-like" views are
   generative imagery (try-on/Doppl); its Photos "Wardrobe"
   (rolled out Sept 24, 2026) is extraction + generated
   previews — the two stages are different technologies.
