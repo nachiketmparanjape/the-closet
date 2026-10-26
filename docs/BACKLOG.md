@@ -813,6 +813,12 @@ email, guest banner + privacy note. Design:
     stays the canonical view; try-off enters this
     prototype only as a labeled, opt-in second view,
     behind the license gate and the fidelity gate.
+  - 2026-10-25 — The founder splits the experiment
+    into its own card, PC-57, so it can be tested
+    independently of this card and of PC-34; this
+    card consumes PC-57's verdict when it lands. If
+    the experiment passes, the generated view arrives
+    here as a feature written from PC-57's findings.
   - 2026-10-25 — Two suggestions arrived via the founder
     from a friend, checked the same day: (1) Qwen Image
     Edit for the generated views — it is the first named
@@ -1688,3 +1694,95 @@ email, guest banner + privacy note. Design:
   problem in real use — whichever comes first.
 - **Status:** Filed 2026-10-25. Enters work only via a
   planning walk.
+
+### PC-57: Generated clean view — the Qwen experiment (not yet sized)
+
+- **Status:** Filed 2026-10-25 on the founder's call to
+  split this experiment out of PC-36 so it can be
+  tested on its own. Not started. It does not wait for
+  PC-34: it runs on photos the founder already has.
+  Next action: the founder picks the host and adds an
+  API key for it; then Bramble runs the test panel
+  below.
+- **In plain words:** Some photos hide part of a
+  garment — it is being worn, it is wrinkled, another
+  piece covers half of it. Software exists that can
+  generate the missing view: a clean picture of the
+  whole garment, as if it had been photographed flat
+  on its own. This card is an experiment, not a
+  feature. It tests whether that generated picture is
+  faithful enough to show in the app, clearly labeled
+  as generated. Only if the answer is yes does a
+  separate feature card get written.
+- **Why it matters:** The wardrobe's item pictures are
+  extracted cutouts, real by construction, and they
+  stay the canonical view (the picture the catalog
+  stands behind) whatever this experiment finds. A
+  generated view is the only way to offer a complete
+  picture of a piece that was photographed badly —
+  and the only honest way to decide about one is a
+  test with its pass bar written down first, not
+  impressions afterward. The same kind of engine is
+  also a candidate for PC-49 (the card about previewing
+  an outfit on a model of the user).
+- **Key terms:**
+  - *Generated view* — a picture produced by an
+    image-editing model: it is given a photo and a
+    written instruction and returns a new picture.
+    Unlike a cutout, parts of it are invented by
+    construction.
+  - *Fidelity test* — the comparison defined below:
+    generated views judged side by side against the
+    real garments, against criteria written before
+    the test runs.
+  - *License gate* — before any generated picture
+    could ship in the app, the model's terms must
+    allow commercial use of its outputs. The best
+    specialist model failed this gate in research
+    (academic use only).
+- **The experiment (shape):**
+  - Candidate 1: Qwen Image Edit, hosted — an
+    image-editing model from Alibaba, raised by a
+    friend of the founder's on 2026-10-25. Published
+    prices run about $0.02–0.04 per image; the real
+    price is measured on the chosen host during the
+    run.
+  - Test panel: a fixed, small set of the founder's
+    own garments — one printed-logo piece, one
+    patterned piece, one plain piece, and one
+    hard-edge piece (the sunglasses) — each starting
+    from a worn or wrinkled photo, so the hidden-part
+    problem is real.
+  - The bar, set before running: side by side, the
+    generated view must be recognizably the same
+    piece; print and pattern must survive; no
+    invented details (buttons, logos, text) may
+    appear. The founder judges; his verdict is the
+    gate.
+  - License pin: the exact host, model version, and
+    the commercial-use term relied on are recorded
+    here before the run.
+  - Outcomes. PASS → a feature card is written for
+    the labeled, opt-in generated view, for PC-36 to
+    consume (and PC-49 to consider). FAIL → the
+    verdict and the failing examples are recorded
+    here, and the gated slot on PC-36's card closes
+    unless a new candidate earns a re-run.
+- **Questions for a reader:**
+  - Is there published evidence of a generalist
+    editing model, or a specialist try-off model,
+    preserving printed text and logos on garments?
+  - What fidelity bar would you set for a catalog
+    whose promise is "this picture is your garment"?
+- **History:**
+  - 2026-10-25 — Split out of PC-36 on the founder's
+    instruction: experiment separately; add it as a
+    feature only once there is a good answer. Context
+    the same day: the virtual try-off research (note
+    research_notes/closet-virtual-tryoff.md) found the
+    specialist models license-blocked and unhosted;
+    the founder adopted extraction as canonical with a
+    generated view allowed only behind gates; Qwen
+    Image Edit arrived via a friend of the founder's
+    and was checked the same day (addendum in the
+    same note).

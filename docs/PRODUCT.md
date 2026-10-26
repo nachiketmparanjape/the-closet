@@ -123,7 +123,10 @@ and non-goals: `VISION.md`.
     canonical; try-off only as a labeled, opt-in second
     view behind a license gate and a fidelity test on
     real garments. **Founder verdict (2026-10-25):
-    adopted as recommended.** Google's "model-like" views are
+    adopted as recommended.** The experiment runs as
+    its own card, PC-57, independent of PC-36 and
+    PC-34; its verdict decides whether a feature card
+    is written. Google's "model-like" views are
   generative imagery (try-on/Doppl); its Photos "Wardrobe"
   (rolled out Sept 24, 2026) is extraction + generated
   previews — the two stages are different technologies.
