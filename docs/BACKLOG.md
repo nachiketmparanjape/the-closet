@@ -808,6 +808,11 @@ email, guest banner + privacy note. Design:
     only behind two gates — a license-clean model, and a
     pre-set fidelity test on the founder's real garments,
     including a printed-logo piece.
+  - 2026-10-25 — Founder verdict: the try-off
+    recommendation is adopted as written. Extraction
+    stays the canonical view; try-off enters this
+    prototype only as a labeled, opt-in second view,
+    behind the license gate and the fidelity gate.
 
 ### PC-37: Trip chat is a full stylist room — outfit suggestions you can add
 - **Size:** M

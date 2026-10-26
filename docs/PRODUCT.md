@@ -122,7 +122,8 @@ and non-goals: `VISION.md`.
     Recommendation filed on PC-36: extraction stays
     canonical; try-off only as a labeled, opt-in second
     view behind a license gate and a fidelity test on
-    real garments. Founder verdict pending. Google's "model-like" views are
+    real garments. **Founder verdict (2026-10-25):
+    adopted as recommended.** Google's "model-like" views are
   generative imagery (try-on/Doppl); its Photos "Wardrobe"
   (rolled out Sept 24, 2026) is extraction + generated
   previews — the two stages are different technologies.
