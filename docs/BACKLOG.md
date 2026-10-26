@@ -608,6 +608,18 @@ email, guest banner + privacy note. Design:
   - 2026-10-25 — This card rewritten in the studio's
     shareable-card structure (standards/shareable-cards)
     as the first worked example.
+  - 2026-10-25 — A render standard joins the pipeline
+    (founder's SAM 3 flow for PC-36, adopted the same
+    day): every item view — from a flat photo here, or a
+    worn photo there — is normalized to one shape:
+    fixed canvas, garment centered, standard margin and
+    fill, the cutout transparent over the app's own
+    ground. Normalization joins this pipeline when it
+    goes live, and the quality gate judges the final,
+    normalized render. Deploy note: items already in the
+    wardrobe have no renders (extraction has never run),
+    so standard views for them are a one-time backfill,
+    sized at deploy time.
 
 ### PC-36: Photo of a person → individual articles + the outfit
 - **Status:** Not started. A prototype is approved
@@ -736,6 +748,23 @@ email, guest banner + privacy note. Design:
     is unproven: mask quality on layered outfits — the
     prototype on the founder's real photos settles it, as
     chartered.
+  - 2026-10-25 — Founder verdict on the SAM research:
+    SAM 3D is ruled out, and the flow is adopted in his
+    shape: (a) SAM 3 crops each garment out of the photo;
+    (b) the crop is mapped to the standard item shape —
+    the presentation Google Wardrobe uses for an item:
+    isolated, centered, uniformly framed; (c) the same
+    standard view is generated for wardrobe items
+    generally, so every item presents the same way. The
+    render standard is geometry, not a baked background
+    (Bramble's design call): fixed canvas shape, garment
+    centered, standard margin and fill; the cutout stays
+    transparent and the app's surfaces provide the
+    ground. This is now the prototype's shape; PC-34's
+    renders adopt the same standard. Carried limit: a
+    worn photo shows only the visible part of a garment,
+    and the render shows what was seen — no silent
+    generative completion.
 
 ### PC-37: Trip chat is a full stylist room — outfit suggestions you can add
 - **Size:** M

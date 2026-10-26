@@ -101,10 +101,17 @@ and non-goals: `VISION.md`.
   image (fal; per-concept calls possible). Recommendation:
   the PC-36 prototype becomes SAM 3 via fal → BiRefNet edge
   refinement, judged on the founder's real outfit photos as
-  chartered (founder verdict pending). PC-34 stays on
+  chartered. **Founder verdict (2026-10-25): SAM 3D ruled
+  out.** The flow is adopted in his shape: SAM 3 crops each
+  garment; the crop is normalized to a standard item shape
+  (the Google Wardrobe presentation — isolated, centered,
+  uniformly framed); the same standard view is generated
+  for wardrobe items generally. The render standard is
+  geometry (canvas, centering, margin, fill), not a baked
+  background; PC-34's renders adopt it too. PC-34 stays on
   BiRefNet — SAM 3 makes masks, not alpha mattes. SAM 3D is
-  mesh reconstruction, not try-on: a watch item, trigger
-  recorded on PC-49. Google's "model-like" views are
+  mesh reconstruction, not try-on: ruled out above, its
+  watch trigger stays recorded on PC-49. Google's "model-like" views are
   generative imagery (try-on/Doppl); its Photos "Wardrobe"
   (rolled out Sept 24, 2026) is extraction + generated
   previews — the two stages are different technologies.
