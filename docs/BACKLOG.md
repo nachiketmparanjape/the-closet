@@ -819,6 +819,19 @@ email, guest banner + privacy note. Design:
     card consumes PC-57's verdict when it lands. If
     the experiment passes, the generated view arrives
     here as a feature written from PC-57's findings.
+  - 2026-10-26 — SAM 3 hosting for the prototype
+    decided (founder): Replicate, the same API and
+    token as PC-34's BiRefNet and PC-57's Qwen —
+    checked live, there is still no official Meta
+    SAM 3 model there; the community build
+    (yodagg/sam3-image-seg, ~$0.0019 per run) is
+    enough for a prototype whose real question is
+    mask quality on the founder's photos. Caveat:
+    community builds can drift or vanish; if SAM 3
+    graduates to production, hosting is re-decided —
+    the official weights deployed as our own pinned
+    Replicate model, or that one call moved to fal
+    (~$0.0025–0.005 per image there).
   - 2026-10-25 — Two suggestions arrived via the founder
     from a friend, checked the same day: (1) Qwen Image
     Edit for the generated views — it is the first named
@@ -1701,8 +1714,9 @@ email, guest banner + privacy note. Design:
   split this experiment out of PC-36 so it can be
   tested on its own. Not started. It does not wait for
   PC-34: it runs on photos the founder already has.
-  Next action: the founder picks the host and adds an
-  API key for it; then Bramble runs the test panel
+  Next action: the founder adds his Replicate API
+  token (the same step PC-34 waits on — one token
+  serves all three); then Bramble runs the test panel
   below.
 - **In plain words:** Some photos hide part of a
   garment — it is being worn, it is wrinkled, another
@@ -1786,3 +1800,14 @@ email, guest banner + privacy note. Design:
     Image Edit arrived via a friend of the founder's
     and was checked the same day (addendum in the
     same note).
+  - 2026-10-26 — Host decided (founder): Replicate,
+    for this experiment and PC-36's SAM 3 alike — one
+    API, and the same Replicate token PC-34's
+    extraction already waits on. Checked live: Qwen
+    Image Edit runs on Replicate as community builds
+    (~$0.029 per run at full settings; ~$0.003–0.007
+    in small, fast configurations). The exact build
+    and version get pinned in the license pin above
+    before the run. Cost note: at experiment scale
+    every candidate host costs pennies in total; the
+    deciding factors were one vendor and one token.
