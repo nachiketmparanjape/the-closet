@@ -813,6 +813,19 @@ email, guest banner + privacy note. Design:
     stays the canonical view; try-off enters this
     prototype only as a labeled, opt-in second view,
     behind the license gate and the fidelity gate.
+  - 2026-10-25 — Two suggestions arrived via the founder
+    from a friend, checked the same day: (1) Qwen Image
+    Edit for the generated views — it is the first named
+    candidate for the gated try-off slot above (hosted
+    today at ~$0.02–0.04 per image; might clear the
+    license gate through hosted terms — unverified; see
+    the try-off note's addendum) and a candidate engine
+    for on-model views under PC-49. It changes nothing
+    about the canonical extraction view. (2) One-photo
+    'what I wore today' logging — already shipped, as
+    PC-13's 'Save + log worn today' in the Match-a-photo
+    flow (Sprint 14); this card's stronger separation is
+    what improves its matching when it lands.
 
 ### PC-37: Trip chat is a full stylist room — outfit suggestions you can add
 - **Size:** M
