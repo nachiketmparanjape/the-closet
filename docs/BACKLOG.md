@@ -620,6 +620,12 @@ email, guest banner + privacy note. Design:
     wardrobe have no renders (extraction has never run),
     so standard views for them are a one-time backfill,
     sized at deploy time.
+  - 2026-10-25 — The standard's canvas is set from
+    measurement: 4:5, the frame the app's item tiles
+    already use; all 69 current photos measured (80%
+    already square, median ~0.5 megapixels). The cutout
+    is centered, its longest side filling a fixed share
+    of the frame, set in the PC-36 prototype.
 
 ### PC-36: Photo of a person → individual articles + the outfit
 - **Status:** Not started. A prototype is approved
@@ -765,6 +771,21 @@ email, guest banner + privacy note. Design:
     worn photo shows only the visible part of a garment,
     and the render shows what was seen — no silent
     generative completion.
+  - 2026-10-25 — The standard's shape, measured on the
+    founder's ask: all 69 wardrobe photos measured — 80%
+    are already square, median ~0.5 megapixels — and the
+    app's item tiles already present every piece in a 4:5
+    frame. The standard canvas is therefore 4:5, the
+    cutout centered, its longest side filling a fixed
+    share of the frame; the exact share is set in the
+    prototype. In the same exchange the founder asked why
+    BiRefNet is still in this flow at all: it is not
+    required here — SAM 3's mask may be enough on its own.
+    The prototype tests mask-only against mask-plus-
+    BiRefNet through the quality gate; if mask-only
+    passes, BiRefNet leaves this pipeline. (BiRefNet
+    stays PC-34's engine for flat photos, where it finds
+    and cuts in one call.)
 
 ### PC-37: Trip chat is a full stylist room — outfit suggestions you can add
 - **Size:** M
