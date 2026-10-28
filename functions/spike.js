@@ -33,6 +33,24 @@ async function createPrediction(model, input, apiKey) {
   return createWithBackoff(model, input, apiKey, headers);
 }
 
+const versionCache = {};
+
+async function resolveVersion(model, apiKey) {
+  if (versionCache[model]) return versionCache[model];
+  const mres = await fetch(API_BASE + "/models/" + model, {
+    headers: { Authorization: "Bearer " + apiKey },
+  });
+  const mj = await mres.json().catch(() => null);
+  const version = mj && mj.latest_version && mj.latest_version.id;
+  if (!version) {
+    throw new Error(
+      "model lookup failed for " + model + ": " + JSON.stringify(mj).slice(0, 200)
+    );
+  }
+  versionCache[model] = version;
+  return version;
+}
+
 async function createWithBackoff(model, input, apiKey, headers) {
   // The retry counter is a LOCAL loop variable. It used to
   // live on the function object, which persists across
@@ -40,31 +58,19 @@ async function createWithBackoff(model, input, apiKey, headers) {
   // every later create failed instantly (learned live,
   // 2026-10-27, third strike for this counter).
   for (let attempt = 0; ; attempt++) {
-    // Official models accept /models/{owner}/{name}/predictions.
-    // Community models 404 there (learned live, 2026-10-27) —
-    // resolve the latest version and create by version instead.
-    let res = await fetch(API_BASE + "/models/" + model + "/predictions", {
+    // Create by version hash, always. The earlier flow probed
+    // /models/{owner}/{name}/predictions first and fell back on
+    // 404 — but on a burst-1 throttle the probe itself eats the
+    // one allowed create, so the real create lands inside the
+    // window and 429s on every retry (the likely cause of a
+    // full evening of 429s; the balance theory never explained
+    // spaced retries failing). One create per attempt now.
+    const version = await resolveVersion(model, apiKey);
+    const res = await fetch(API_BASE + "/predictions", {
       method: "POST",
       headers,
-      body: JSON.stringify({ input }),
+      body: JSON.stringify({ version, input }),
     });
-    if (res.status === 404) {
-      const mres = await fetch(API_BASE + "/models/" + model, {
-        headers: { Authorization: "Bearer " + apiKey },
-      });
-      const mj = await mres.json().catch(() => null);
-      const version = mj && mj.latest_version && mj.latest_version.id;
-      if (!version) {
-        throw new Error(
-          "model lookup failed for " + model + ": " + JSON.stringify(mj).slice(0, 200)
-        );
-      }
-      res = await fetch(API_BASE + "/predictions", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ version, input }),
-      });
-    }
     const j = await res.json().catch(() => null);
     if (res.status === 429 && attempt < 6) {
       const waitS = j && j.retry_after ? Number(j.retry_after) + 2 : 12;
