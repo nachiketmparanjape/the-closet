@@ -11,13 +11,19 @@
 // ask Replicate to wait (Prefer: wait) and then poll the prediction
 // URL until it settles. Output is a file URL; we download the PNG.
 //
-// VERIFY-AT-FIRST-LIVE-CALL: MODEL and the "image" input name are
-// the canonical public BiRefNet deployment values, but Replicate's
-// API refuses unauthenticated model lookups, so the pinned model
-// version could not be read before the founder's token existed.
-// The deploy smoke call (one wardrobe photo, by hand) is the check:
-// a wrong model id fails loudly as EXTRACT_FAILED, and the fix is
-// this one constant (plus optionally MODEL_VERSION to pin a hash).
+// ENDPOINT HISTORY: the first pinned id, zhengpeng-7/birefnet,
+// was never verified (Replicate's API refuses unauthenticated
+// model lookups, so it could not be read before the founder's
+// token existed). At the first live check (2026-10-27, the day
+// the token landed) its public model page returned 404 and it
+// appears in no Replicate listing — the id does not resolve.
+// The endpoint is now sprited/birefnet, a maintained community
+// packaging of the same MIT BiRefNet model; its published
+// schema (read 2026-10-27) takes input "image" and an
+// output_format, pinned to "cutout" below so the pipeline
+// always receives an RGBA cutout, never a raw matte.
+// MODEL_VERSION stays null; the founder's first phone add is
+// the live end-to-end verification of this endpoint.
 //
 // This module is the swappable seam: extract.js depends only on the
 // { png, uncertainty } shape. BiRefNet returns no uncertainty score,
@@ -26,7 +32,7 @@
 
 const { codedError } = require("./errors");
 
-const MODEL = "zhengpeng-7/birefnet";
+const MODEL = "sprited/birefnet";
 const MODEL_VERSION = null; // pin a version hash here once verified live
 const API_BASE = "https://api.replicate.com/v1";
 const POLL_INTERVAL_MS = 3000;
@@ -48,8 +54,8 @@ async function segmentImage(buffer, mimeType, apiKey, fetchImpl, opts) {
     ? API_BASE + "/predictions"
     : API_BASE + "/models/" + MODEL + "/predictions";
   const createBody = version
-    ? { version, input: { image: dataUri } }
-    : { input: { image: dataUri } };
+    ? { version, input: { image: dataUri, output_format: "cutout" } }
+    : { input: { image: dataUri, output_format: "cutout" } };
 
   let prediction;
   try {

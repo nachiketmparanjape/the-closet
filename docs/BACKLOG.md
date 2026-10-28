@@ -626,6 +626,21 @@ email, guest banner + privacy note. Design:
     already square, median ~0.5 megapixels). The cutout
     is centered, its longest side filling a fixed share
     of the frame, set in the PC-36 prototype.
+  - 2026-10-27 — The founder added the Replicate token
+    (secret version 1, enabled), and extractGarment is
+    deployed: state active, token binding confirmed,
+    unauthenticated calls answered 401 (the healthy
+    sign). The first live check caught a real defect:
+    the pinned model id zhengpeng-7/birefnet does not
+    exist on Replicate (its page returns 404, and it
+    appears in no listing). The endpoint is now
+    sprited/birefnet — a maintained packaging of the
+    same MIT model — with the output format pinned to
+    a cutout; tests updated, suite green. Remaining
+    gate: the founder's phone test (add one new item
+    with a photo; the clean cutout, right way up, is
+    the pass). The three-experiment plan is
+    docs/proposals/IMAGE-PIPELINE-EXPERIMENTS.md.
 
 ### PC-36: Photo of a person → individual articles + the outfit
 - **Status:** Not started. A prototype is approved
@@ -832,6 +847,13 @@ email, guest banner + privacy note. Design:
     the official weights deployed as our own pinned
     Replicate model, or that one call moved to fal
     (~$0.0025–0.005 per image there).
+  - 2026-10-27 — This prototype is Experiment 2 in the
+    image pipeline experiments plan
+    (docs/proposals/IMAGE-PIPELINE-EXPERIMENTS.md):
+    test set, steps, and pass bar are written there.
+    It runs after Experiment 1 (PC-34's live
+    verification) passes, because its finishing step
+    is PC-34's pipeline.
   - 2026-10-25 — Two suggestions arrived via the founder
     from a friend, checked the same day: (1) Qwen Image
     Edit for the generated views — it is the first named
@@ -1714,10 +1736,10 @@ email, guest banner + privacy note. Design:
   split this experiment out of PC-36 so it can be
   tested on its own. Not started. It does not wait for
   PC-34: it runs on photos the founder already has.
-  Next action: the founder adds his Replicate API
-  token (the same step PC-34 waits on — one token
-  serves all three); then Bramble runs the test panel
-  below.
+  Next action: on the founder's word, Bramble builds
+  the run harness and runs the test panel below. (The
+  Replicate token landed 2026-10-27 — one token
+  serves PC-34, PC-36, and this card.)
 - **In plain words:** Some photos hide part of a
   garment — it is being worn, it is wrinkled, another
   piece covers half of it. Software exists that can
@@ -1811,3 +1833,11 @@ email, guest banner + privacy note. Design:
     before the run. Cost note: at experiment scale
     every candidate host costs pennies in total; the
     deciding factors were one vendor and one token.
+  - 2026-10-27 — This experiment is Experiment 3 in
+    the image pipeline experiments plan
+    (docs/proposals/IMAGE-PIPELINE-EXPERIMENTS.md),
+    which also records the founder's hypothesis about
+    Google's mechanism (standardized shapes with the
+    cloth's real details laid over them) as the
+    fallback mechanism to scope if the editing-model
+    route fails the fidelity bar.

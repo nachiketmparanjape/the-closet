@@ -154,7 +154,7 @@ describe("segmentImage (birefnet provider)", () => {
     assert.ok(out.png.equals(cutout));
     assert.equal(out.uncertainty, null);
     assert.equal(out.predictSeconds, 2.5);
-    assert.equal(MODEL, "zhengpeng-7/birefnet");
+    assert.equal(MODEL, "sprited/birefnet");
   });
 
   test("polls a processing prediction until it succeeds", async () => {
@@ -282,13 +282,13 @@ describe("priceEvent", () => {
   });
 
   test("replicate prices predict seconds", () => {
-    const cost = priceEvent({ provider: "replicate", model: "zhengpeng-7/birefnet", predictSeconds: 10 });
+    const cost = priceEvent({ provider: "replicate", model: "sprited/birefnet", predictSeconds: 10 });
     assert.ok(Math.abs(cost - 0.00225) < 1e-9);
   });
 
   test("unknown models and missing units price as null", () => {
     assert.equal(priceEvent({ provider: "vertex", model: "nope", tokensIn: 5 }), null);
-    assert.equal(priceEvent({ provider: "replicate", model: "zhengpeng-7/birefnet" }), null);
+    assert.equal(priceEvent({ provider: "replicate", model: "sprited/birefnet" }), null);
     assert.equal(priceEvent({ provider: "vertex", model: "gemini-3.5-flash" }), null);
     assert.ok(PRICING_VERSION.length > 0);
   });
