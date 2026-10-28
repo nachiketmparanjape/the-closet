@@ -2594,6 +2594,7 @@
         imageWrap.className = "item-image";
         var image = document.createElement("img");
         image.src = itemDisplayUrl(item);
+        resolveRenderUrl(item, image);
         image.alt = item.name || "Wardrobe item";
         image.loading = "lazy";
         imageWrap.appendChild(image);
@@ -2729,6 +2730,42 @@
         }).catch(function (err) {
           reportError("extractGarment", err);
         });
+      }
+
+      // PC-34 backfill (2026-10-28): a photo can carry a
+      // renderStoragePath without a renderUrl when the render was
+      // written outside the upload flow — the SAM backfill wrote
+      // renders server-side, and only an authenticated client can
+      // mint the download URL. Resolve it through the SDK, swap
+      // it into the card that asked, and persist it on the photo
+      // entry so later loads are direct. Once per item per
+      // session; failures stay silent (the original keeps
+      // showing, exactly as photoDisplayUrl already falls back).
+      var renderResolveTried = {};
+      function resolveRenderUrl(item, imgEl) {
+        if (!item || !item.id || !storage || !db || !currentUser) return;
+        var photos = itemPhotos(item);
+        if (!photos.length) return;
+        var photo = photos[0];
+        if (!photo || !photo.renderStoragePath || photo.renderUrl) return;
+        if (renderResolveTried[item.id]) return;
+        renderResolveTried[item.id] = true;
+        storage.ref().child(photo.renderStoragePath).getDownloadURL().then(function (renderUrl) {
+          if (imgEl) imgEl.src = renderUrl;
+          var ref = db.collection("users").doc(currentUser.uid).collection("items").doc(item.id);
+          return ref.get().then(function (snap) {
+            if (!snap.exists) return null;
+            var data = snap.data() || {};
+            var updated = itemPhotos(data).map(function (p) {
+              if (p.storagePath !== photo.storagePath) return p;
+              var copy = {};
+              Object.keys(p).forEach(function (k) { copy[k] = p[k]; });
+              copy.renderUrl = renderUrl;
+              return copy;
+            });
+            return ref.update({ photos: updated });
+          });
+        }).catch(function (err) { reportError("resolveRenderUrl", err); });
       }
 
       // PC-8: data model v2 — first-class colors array, top-level editable

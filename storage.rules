@@ -13,6 +13,16 @@ service firebase.storage {
       // checks above would fail closed and deny every deletion.
       allow delete: if request.auth != null && request.auth.uid == userId;
     }
+    // PC-34: extraction renders (clean cutouts of item photos).
+    // Written only by the server (the Admin SDK bypasses rules);
+    // the owner reads them so the client can resolve render
+    // download URLs, and deletes them with the item. This block
+    // was missing when PC-34 first shipped — renders saved fine
+    // server-side but no client read could ever succeed.
+    match /users/{userId}/renders/{allPaths=**} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
     // PC-13: outfit photos (parsed or user-added). Same owner-only shape
     // as item photos — the client uploads here before parseOutfitPhoto.
     match /users/{userId}/outfit-photos/{allPaths=**} {

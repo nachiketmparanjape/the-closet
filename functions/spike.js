@@ -188,6 +188,41 @@ async function spikeRunHandler(req, res) {
       });
       return;
     }
+    if (body.fileUpload) {
+      // Upload an input image to Replicate's Files API and
+      // return its serving URL, for use as a prediction
+      // input. Added 2026-10-28: Firebase download-token
+      // URLs minted through the raw Storage JSON API are
+      // stored but NOT honored by the public download
+      // endpoint (403s), which killed the first cleanup
+      // run; Replicate-side files sidestep the whole
+      // question and the token still never leaves Cloud.
+      const buf = Buffer.from(String(body.fileUpload), "base64");
+      const form = new FormData();
+      form.append(
+        "content",
+        new Blob([buf], { type: "image/jpeg" }),
+        String(body.filename || "input.jpg")
+      );
+      const fr = await fetch(API_BASE + "/files", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + apiKey },
+        body: form,
+      });
+      const fj = await fr.json().catch(() => null);
+      if (!fr.ok || !fj || !fj.urls || !fj.urls.get) {
+        res.status(502).json({
+          error:
+            "file upload failed: " +
+            fr.status +
+            " " +
+            JSON.stringify(fj).slice(0, 200),
+        });
+        return;
+      }
+      res.status(200).json({ fileUrl: fj.urls.get, fileId: fj.id });
+      return;
+    }
     if (body.poll) {
       // One status read per call. Long predictions are polled
       // by the CALLER in short requests — a cold community
