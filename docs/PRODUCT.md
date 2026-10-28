@@ -302,3 +302,46 @@ Decided topics stay as compact records; full reports live in `research_notes/`.
   steal), Cladwell. Combina + PutTogether sit below the bar
   as design-only. Teardown queue: Alta → Essembl → Whering →
   Acloset → Indyx → Fits → Stylebook → Outfit Formulas.
+
+### [RESEARCH 2026-10-27] tandpfun/wardrobe — open-source comp check
+
+- **Question (founder):** What is github.com/tandpfun/wardrobe
+  exactly? Is it direct competition? What can we use from it?
+- **Findings:** An MIT-licensed, local-only, self-hosted web app
+  (Vite + plain JS, local JSON database, no accounts, no
+  hosted service). You feed it outfit photos plus your own
+  OpenAI API key; a vision model (Responses API) detects every
+  garment, the Images API (gpt-image) then *generates* clean
+  product cutouts and optional "modeled" editorial photos of a
+  reference person wearing the pieces. The import and outfit
+  generation are packaged as agent skills run by Codex, with a
+  review/regenerate/approve step before anything enters the
+  library. Maturity check (high confidence, repo API): created
+  2026-07-16, every commit landed that same day, zero pushes
+  since; 2,258 stars / 329 forks rode a viral X post; no
+  releases, no product, no users in the distribution sense.
+- **Competition call:** Not direct competition today — no
+  hosted product, no sync, no daily stylist loop, no
+  maintenance since launch day; its user is a technical
+  hobbyist willing to self-host. It is the closest
+  open-source artifact to our concept, and its central bet is
+  the opposite of ours: generative extraction accepted, with
+  fidelity managed by a human/agent review gate, where our
+  PC-34/PC-36 experiments (2026-10-27) chose segmentation
+  (BiRefNet/SAM 3) because generation invents details
+  (labels, removes sleeves) even with typed prompts.
+- **Usable:** (1) The review-gate shape — jobs, originals kept,
+  regeneration, explicit approval before a generated image
+  joins the library — a worked example for PC-57's gating and
+  any PC-49 revival. (2) The modeled-lookbook packaging
+  (curate → generate → verify → save) as a template for PC-49
+  if its triggers fire. (3) Independent validation of our
+  pipeline shape: vision model lists garments first, then
+  per-garment processing — the same Gemini-first flow the
+  founder set for SAM 3. (4) Nothing to take on storage or
+  extraction: local JSON doesn't transfer to a multi-device
+  app, and per-image gpt-image cost is orders above our
+  cents-per-image segmentation.
+- **Status:** Filed. No action; watch-only. Revisit trigger:
+  the repo resumes activity, ships a hosted product, or PC-49
+  un-parks. Full note also in the studio inbox (2026-10-27).
