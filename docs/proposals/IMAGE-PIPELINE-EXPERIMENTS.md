@@ -194,3 +194,27 @@ Background: other shoppers (one woman directly
 behind, herself in a jacket and trousers) and racks
 of hanging clothes — the noisiest parsing case in
 the set, and Experiment 3's worn-print case.
+
+## First results (2026-10-27)
+
+The pipe is proven end to end (token → billing →
+credit → harness → stored outputs), after an evening
+of Replicate mechanics lessons now recorded on the
+cards: version-hash creation, a burst-throttle that
+punishes probe calls, per-build input shapes (Qwen
+wants its image as an array; SAM 3 wants `prompt`).
+
+- Experiment 3 (PC-57) ran first, twice, on the fast
+  Qwen build. Cat tee (easy input): faithful, one
+  color deviation (grey darkened). Jujutsu Kaisen tee
+  (hard input): print survived, garment did not —
+  sleeves deleted, a "ZARA" label invented. Detail
+  and the license pin are on PC-57's card.
+- Experiment 2's engine is the open problem: the
+  community SAM 3 build boots slowly (~25 min) and
+  crashed on a channel mismatch; a retry on a clean
+  JPEG is running. Fallbacks, if it fails again: our
+  own pinned SAM 3 deployment, or fal.
+- Experiment 1 still waits on the founder's next
+  adds in the app (extraction itself is deployed
+  with all of tonight's fixes included).

@@ -915,6 +915,23 @@ email, guest banner + privacy note. Design:
     PC-13's 'Save + log worn today' in the Match-a-photo
     flow (Sprint 14); this card's stronger separation is
     what improves its matching when it lands.
+  - 2026-10-27 — First live SAM 3 attempts (spike
+    harness, founder's photos). The community build
+    yodagg/sam3-image-seg takes its prompt in a field
+    named `prompt` (its own error named it, after a
+    first attempt sat in "starting" for ~25 minutes
+    and then failed validation). With the right field
+    it booted — and crashed inside the build on a
+    channel mismatch (tensor of 4 channels against 3),
+    on a wardrobe product photo. A retry on a clean
+    3-channel JPEG (IMG_6949, prompt "sweatshirt") is
+    running. If the build fails the same way on a
+    clean input, the Replicate community builds are a
+    dead end for SAM 3 and hosting goes to the
+    graduation options early: our own pinned
+    deployment of the official weights, or fal. The
+    second community build (visionaix/sam3-1) exposes
+    no version to create against through the API.
 
 ### PC-37: Trip chat is a full stylist room — outfit suggestions you can add
 - **Size:** M
@@ -1780,14 +1797,17 @@ email, guest banner + privacy note. Design:
 
 ### PC-57: Generated clean view — the Qwen experiment (not yet sized)
 
-- **Status:** Filed 2026-10-25 on the founder's call to
-  split this experiment out of PC-36 so it can be
-  tested on its own. Not started. It does not wait for
-  PC-34: it runs on photos the founder already has.
-  Next action: on the founder's word, Bramble builds
-  the run harness and runs the test panel below. (The
-  Replicate token landed 2026-10-27 — one token
-  serves PC-34, PC-36, and this card.)
+- **Status:** Running — first two panel runs done
+  2026-10-27 (see History). The fast Qwen build keeps
+  prints but changes the garment (sleeves removed)
+  and invents details (a Zara neck label): against
+  the bar below that is a fail for this build, and
+  the founder's verdict is the gate. Next actions:
+  finish the panel on this build (navy One Piece
+  tee, black Jujutsu Kaisen tee, the worn cat tee),
+  and run the same panel on the full-size Qwen build
+  before any verdict is treated as final for the
+  model family.
 - **In plain words:** Some photos hide part of a
   garment — it is being worn, it is wrinkled, another
   piece covers half of it. Software exists that can
@@ -1889,3 +1909,39 @@ email, guest banner + privacy note. Design:
     cloth's real details laid over them) as the
     fallback mechanism to scope if the editing-model
     route fails the fidelity bar.
+  - 2026-10-27 — License pin (recorded after the
+    first runs, which jumped it — noted as a process
+    miss, not repeated): the model family, Alibaba's
+    Qwen Image Edit line (the Aug 2025 20B editor and
+    its 2509 / 2511 successors), is released under
+    Apache 2.0 — commercial use allowed; verified
+    against the release record the day of the run.
+    The build actually run is the community packaging
+    usamaehsan/qwen-image-edit-fastest on Replicate
+    (input: image as an array, plus a prompt); which
+    exact checkpoint it packages is the build
+    author's choice and is NOT verified — a feature
+    decision would pin an exact version first.
+  - 2026-10-27 — First runs (spike harness; the
+    founder's own photos; measured predict times
+    8–19 seconds on the fast build, cents per run):
+    (1) The grey cat graphic tee, from its wardrobe
+    photo — which is itself a clean product shot, so
+    this was the easy case: the output is the same
+    tee, print intact, on a light background; the one
+    deviation is color — the heather grey came back
+    a darker charcoal. (2) The white Jujutsu Kaisen
+    UT tee, from a wrinkled on-the-bed photo with
+    paper tags — the hard case: the artwork survived
+    almost exactly (same composition, same figures),
+    but the garment did not. The output is a
+    SLEEVELESS top — the short sleeves were deleted —
+    and the neck carries an invented "ZARA" label on
+    a Uniqlo shirt. Against the bar set before
+    running (same piece; print survives; no invented
+    details): print passes, the other two fail.
+    Bramble's read: fail for the fast build; the
+    founder's verdict is the gate, and the full-size
+    build gets its own panel run before the family
+    is judged. Side-by-side sheets are in the studio
+    spikes folder.
