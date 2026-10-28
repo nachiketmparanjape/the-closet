@@ -374,6 +374,16 @@ Decided topics stay as compact records; full reports live in `research_notes/`.
   + rubric). Not taken: gpt-image at high quality for
   every garment (cost is orders above our
   segmentation cents) and the local-JSON store.
+  FOUNDER DIRECTION (2026-10-27, closing the topic):
+  clean images in the catalog are, in his words, one
+  of the most appealing things the app can have — "I
+  am sure we would do it someday" — and the approach
+  gets researched and decided BEFORE anything is
+  built. That is the standing frame for PC-34 /
+  PC-36 / PC-57 / PC-58: evidence first (the SAM 3,
+  BiRefNet, Qwen and template arms), then a decision,
+  then a build. No image-pipeline build jumps this
+  queue.
   Revisit trigger:
   the repo resumes activity, ships a hosted product, or PC-49
   un-parks. Full note also in the studio inbox (2026-10-27).
