@@ -62,7 +62,7 @@ async function createWithBackoff(model, input, apiKey, headers) {
     });
   }
   const j = await res.json().catch(() => null);
-  if (res.status === 429 && createWithBackoff.tries < 5) {
+  if (res.status === 429 && (createWithBackoff.tries || 0) < 5) {
     createWithBackoff.tries = (createWithBackoff.tries || 0) + 1;
     const waitS = j && j.retry_after ? Number(j.retry_after) + 2 : 12;
     await new Promise((r) => setTimeout(r, waitS * 1000));
