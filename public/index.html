@@ -134,7 +134,10 @@
     .view-chip { border: 1px solid var(--line); background: none; color: var(--muted); border-radius: 999px; padding: 5px 12px; font-size: 12.5px; cursor: pointer; }
     .view-chip.is-active { color: var(--ink); border-color: var(--brass, #a87c1c); font-weight: 600; }
     .view-chip:disabled { opacity: .55; cursor: default; }
-    .view-rotate { margin-left: auto; }
+    .item-photo-wrap { position: relative; }
+    .photo-rotate-overlay { position: absolute; right: 10px; bottom: 26px; display: flex; gap: 8px; }
+    .rotate-btn { width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(242,235,219,.35); background: rgba(22,18,13,.65); color: #f2ebdb; font-size: 20px; line-height: 1; cursor: pointer; }
+    .rotate-btn:active { transform: scale(.94); }
     /* Sprint 18 fix buffer (D7): hints are information, not action — muted.
        Accent-dark survives only on .ai-suggest, where the AI is speaking. */
     .hint { font-size: 13px; color: var(--muted); margin: 2px 0 0; }
@@ -1407,11 +1410,16 @@
         <button class="icon-button" id="itemClose" type="button" aria-label="Close piece details">×</button>
       </div>
       <div class="modal-body">
-        <img class="item-photo" id="itemPhoto" alt="Wardrobe piece" />
+        <div class="item-photo-wrap">
+          <img class="item-photo" id="itemPhoto" alt="Wardrobe piece" />
+          <div class="photo-rotate-overlay">
+            <button class="rotate-btn" id="rotateLeftBtn" type="button" title="Rotate left 90 degrees" aria-label="Rotate left 90 degrees">↶</button>
+            <button class="rotate-btn" id="rotateRightBtn" type="button" title="Rotate right 90 degrees" aria-label="Rotate right 90 degrees">↷</button>
+          </div>
+        </div>
         <div class="photo-view-row" id="itemPhotoViewRow" hidden>
           <button class="view-chip is-active" id="viewCleanBtn" type="button">Clean view</button>
           <button class="view-chip" id="viewOriginalBtn" type="button">Original photo</button>
-          <button class="view-chip view-rotate" id="rotateRenderBtn" type="button" title="Rotate the clean view 90 degrees">Rotate 90°</button>
         </div>
         <p class="src-note" id="itemSourceNote" hidden></p>
         <div class="thumb-strip" id="thumbStrip" hidden></div>
@@ -2605,6 +2613,7 @@
         var image = document.createElement("img");
         image.src = itemDisplayUrl(item);
         resolveRenderUrl(item, image);
+        applyPhotoRotation(image, itemPhotos(item)[0], true);
         image.alt = item.name || "Wardrobe item";
         image.loading = "lazy";
         imageWrap.appendChild(image);
@@ -3100,9 +3109,58 @@
 
       // Founder ask (2026-10-28): the item detail leads with the
       // clean, upright render; the original photo stays one tap
-      // away, and a Rotate control fixes a sideways render in
-      // place (the rotateRender callable turns the stored render
-      // 90 degrees; the new path is patched back onto the photo).
+      // away. Rotation is a per-photo field (see photoRotationDeg)
+      // turned by the overlay buttons on the photo itself.
+      // Rotation is a per-photo display field, not a file rewrite
+      // (2026-10-28, founder's redesign of the rotate control): one
+      // orientation per piece, applied to whichever view is showing
+      // (clean or original). A tap turns the image instantly via
+      // CSS and persists one small number — no image re-upload, no
+      // function round trip, and one tap the other way undoes it.
+      // Grid cards are exactly 4:5, so a quarter-turn there also
+      // scales to 0.8 so the rotated canvas still fits its frame.
+      function photoRotationDeg(photo) {
+        var r = photo && typeof photo.rotation === "number" ? photo.rotation : 0;
+        return ((r % 360) + 360) % 360;
+      }
+      function applyPhotoRotation(imgEl, photo, fit45) {
+        if (!imgEl) return;
+        var deg = photoRotationDeg(photo);
+        var t = "";
+        if (deg) {
+          t = "rotate(" + deg + "deg)";
+          if (fit45 && (deg === 90 || deg === 270)) t += " scale(0.8)";
+        }
+        imgEl.style.transform = t;
+      }
+      function rotatePhoto(dir) {
+        if (!activeItem || !currentUser) return;
+        var ps = itemPhotos(activeItem);
+        if (!ps.length) return;
+        var cover = ps[0];
+        var prev = photoRotationDeg(cover);
+        var next = (prev + dir + 360) % 360;
+        // Instant: turn the picture on screen first, persist second.
+        itemPhoto.style.transform = next ? "rotate(" + next + "deg)" : "";
+        var ref = db.collection("users").doc(currentUser.uid).collection("items").doc(activeItem.id);
+        ref.get().then(function (snap) {
+          if (!snap.exists) return null;
+          var data = snap.data() || {};
+          var updated = itemPhotos(data).map(function (p) {
+            if (p.storagePath !== cover.storagePath) return p;
+            var copy = {};
+            Object.keys(p).forEach(function (k) { copy[k] = p[k]; });
+            copy.rotation = next;
+            return copy;
+          });
+          return ref.update({ photos: updated }).then(function () {
+            activeItem.photos = updated;
+          });
+        }).catch(function (err) {
+          reportError("rotatePhoto", err);
+          itemPhoto.style.transform = prev ? "rotate(" + prev + "deg)" : "";
+        });
+      }
       function syncViewChips(cleanActive) {
         var c = document.getElementById("viewCleanBtn");
         var o = document.getElementById("viewOriginalBtn");
@@ -3124,6 +3182,7 @@
           itemPhoto.dataset.view = "clean";
           itemPhoto.src = photoDisplayUrl(ps[0]);
           resolveRenderUrl(activeItem, itemPhoto);
+          applyPhotoRotation(itemPhoto, ps[0]);
           syncViewChips(true);
         };
         document.getElementById("viewOriginalBtn").onclick = function () {
@@ -3132,51 +3191,11 @@
           if (!ps.length) return;
           itemPhoto.dataset.view = "original";
           itemPhoto.src = ps[0].url || photoDisplayUrl(ps[0]);
+          applyPhotoRotation(itemPhoto, ps[0]);
           syncViewChips(false);
         };
-        document.getElementById("rotateRenderBtn").onclick = function () {
-          if (!activeItem || !functions || !currentUser) return;
-          var item = activeItem;
-          var ps = itemPhotos(item);
-          if (!ps.length || !ps[0].renderStoragePath) return;
-          var coverPath = ps[0].storagePath;
-          var btn = this;
-          btn.disabled = true;
-          var oldLabel = btn.textContent;
-          btn.textContent = "Rotating…";
-          functions.httpsCallable("rotateRender")({ itemId: item.id }).then(function (res) {
-            var d = (res && res.data) || {};
-            if (!d.renderStoragePath) throw new Error("rotateRender returned no path");
-            var ref = db.collection("users").doc(currentUser.uid).collection("items").doc(item.id);
-            return ref.get().then(function (snap) {
-              if (!snap.exists) return null;
-              var data = snap.data() || {};
-              var updated = itemPhotos(data).map(function (p) {
-                if (p.storagePath !== coverPath) return p;
-                var copy = {};
-                Object.keys(p).forEach(function (k) { copy[k] = p[k]; });
-                copy.renderStoragePath = d.renderStoragePath;
-                copy.renderUrl = "";
-                copy.renderStatus = "passed";
-                return copy;
-              });
-              return ref.update({ photos: updated }).then(function () {
-                item.photos = updated;
-                delete renderResolveTried[item.id];
-                itemPhoto.dataset.view = "clean";
-                itemPhoto.src = photoDisplayUrl(updated[0]);
-                resolveRenderUrl(item, itemPhoto);
-                syncViewChips(true);
-                renderGallery();
-              });
-            });
-          }).catch(function (err) {
-            reportError("rotateRender", err);
-          }).then(function () {
-            btn.disabled = false;
-            btn.textContent = oldLabel;
-          });
-        };
+        document.getElementById("rotateLeftBtn").onclick = function () { rotatePhoto(-90); };
+        document.getElementById("rotateRightBtn").onclick = function () { rotatePhoto(90); };
       }
 
       function openItem(item) {
@@ -3187,6 +3206,7 @@
         itemPhoto.src = photos.length ? photoDisplayUrl(photos[0]) : "";
         itemPhoto.alt = item.name || "Wardrobe item";
         resolveRenderUrl(item, itemPhoto);
+        applyPhotoRotation(itemPhoto, photos[0]);
         setupPhotoViewRow(item);
         renderThumbs();
         var srcNote = document.getElementById("itemSourceNote");
@@ -3325,6 +3345,7 @@
             var img = document.createElement("img");
             img.src = photoDisplayUrl(ps[0]);
             resolveRenderUrl(hero, img);
+            applyPhotoRotation(img, ps[0]);
             img.alt = hero.name || cat;
             img.loading = "lazy";
             fig.appendChild(img);
@@ -7002,6 +7023,7 @@
             var img = document.createElement("img");
             img.src = photoDisplayUrl(photos[0]);
             resolveRenderUrl(it, img);
+            applyPhotoRotation(img, itemPhotos(it)[0]);
             img.alt = it.name || "item photo";
             img.loading = "lazy";
             img.className = "pack-thumb";
@@ -8238,6 +8260,7 @@
             var img = document.createElement("img");
             img.src = photoDisplayUrl(ps[0]);
             resolveRenderUrl(it, img);
+            applyPhotoRotation(img, itemPhotos(it)[0]);
             img.alt = it ? it.name : "item photo";
             img.loading = "lazy";
             fig.appendChild(img);
@@ -8587,6 +8610,7 @@
               var img = document.createElement("img");
               img.src = photoDisplayUrl(photos[0]);
               resolveRenderUrl(it, img);
+              applyPhotoRotation(img, itemPhotos(it)[0]);
               img.alt = "";
               img.loading = "lazy";
               thumbs.appendChild(img);
@@ -8709,6 +8733,7 @@
             var img = document.createElement("img");
             img.src = photoDisplayUrl(photos[0]);
             resolveRenderUrl(it, img);
+            applyPhotoRotation(img, itemPhotos(it)[0]);
             img.alt = "";
             row.appendChild(img);
           }
@@ -8958,6 +8983,7 @@
             var img = document.createElement("img");
             img.src = photoDisplayUrl(photos[0]);
             resolveRenderUrl(it, img);
+            applyPhotoRotation(img, itemPhotos(it)[0]);
             img.alt = "";
             row.appendChild(img);
           }
@@ -9160,6 +9186,7 @@
           var img = document.createElement("img");
           img.src = photoDisplayUrl(photos[0]);
           resolveRenderUrl(it, img);
+          applyPhotoRotation(img, itemPhotos(it)[0]);
           img.alt = "";
           img.loading = "lazy";
           cell.appendChild(img);
@@ -9845,6 +9872,7 @@
         var t = document.createElement("img");
         t.src = photoDisplayUrl(photos[0]);
         resolveRenderUrl(it, t);
+        applyPhotoRotation(t, itemPhotos(it)[0]);
         t.alt = it.name || "";
         t.className = "shop-thumb";
         return t;
@@ -10938,6 +10966,7 @@
             var img = document.createElement("img");
             img.src = photoDisplayUrl(photos[0]);
             resolveRenderUrl(it, img);
+            applyPhotoRotation(img, itemPhotos(it)[0]);
             img.alt = it ? it.name : "item photo";
             img.loading = "lazy";
             fig.appendChild(img);
