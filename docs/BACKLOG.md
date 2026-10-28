@@ -932,6 +932,30 @@ email, guest banner + privacy note. Design:
     deployment of the official weights, or fal. The
     second community build (visionaix/sam3-1) exposes
     no version to create against through the API.
+  - 2026-10-27 — SAM 3 WORKED. The retry on the clean
+    JPEG resolved after a long boot (~20 minutes;
+    the run itself took 10 seconds, ~$0.002): prompt
+    "sweatshirt" on the fitting-room photo returned
+    one mask, score 0.67, and the polygon (6,500+
+    points) hugs the quarter-zip exactly — collar,
+    both sleeves, hem — excluding phone, hand, watch
+    and trousers. First hard evidence for Experiment
+    2's core question: SAM 3 finds a worn garment.
+    Output shape: boxes, polygon coordinates, scores,
+    RLE mask strings, and a visualization image —
+    polygons are enough to cut with. Five more runs
+    fired the same night (trousers on the same photo;
+    jacket + trousers on the layered outdoor photo;
+    jacket + t-shirt on the noisy store photo). The
+    community build's problem is boot latency and
+    flakiness, not quality — the case for the
+    pre-approved host switch (fal, or our own pinned
+    deployment) is reliability. Founder's pipeline
+    shape (2026-10-27): a Gemini call lists the
+    garments first; SAM runs once per garment type.
+    His guiding hypothesis: SAM 3 serves both use
+    cases — this parsing and PC-34's single-garment
+    cutting — one service instead of three.
 
 ### PC-37: Trip chat is a full stylist room — outfit suggestions you can add
 - **Size:** M
@@ -1945,3 +1969,18 @@ email, guest banner + privacy note. Design:
     build gets its own panel run before the family
     is judged. Side-by-side sheets are in the studio
     spikes folder.
+  - 2026-10-27 — The founder's micro-test: name the
+    garment type in the prompt. Re-ran the Jujutsu
+    Kaisen photo with "short-sleeved crew-neck
+    t-shirt... not sleeveless... keep the short
+    sleeves" spelled out. It worked on the headline
+    failure: the sleeves are back, the garment is
+    the right category, boxier than the original.
+    It did not cure the invention habit — the
+    invented ZARA neck label is still there — and
+    the print drifted slightly further than the
+    untyped run (punchier colors, small figures
+    softened). Read: type-naming fixes category
+    errors, not hallucination. The same photo through
+    BiRefNet extraction, for contrast, is pixel-exact
+    (real cloth, paper tags and all) in 3 seconds.

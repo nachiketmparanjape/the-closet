@@ -241,3 +241,18 @@ wants its image as an array; SAM 3 wants `prompt`).
   path) or our own pinned deployment of the official
   weights on Replicate (the production-shaped path —
   same vendor, same token).
+
+## Second results (2026-10-27, night)
+
+- SAM 3 (yodagg build, Replicate): first success.
+  "sweatshirt" on IMG_6949 — one mask, score 0.67,
+  boundary hugging the garment (see the overlay in
+  the spikes folder). Boot ~20 min, run 10 s. Five
+  more concept runs fired (pants; jacket + pants on
+  the layered photo; jacket + t-shirt on the noisy
+  store photo).
+- Qwen typed-prompt micro-test: naming the garment
+  type restored the sleeves; the invented label and
+  slight print drift remain.
+- BiRefNet on IMG_0792: pixel-exact cutout, 3 s —
+  the extraction arm's standard to beat.
