@@ -83,10 +83,15 @@ function fakeReplicate(cutoutPng, { poll = false, predictSeconds = 2.5 } = {}) {
     if (url.endsWith("/predictions/pred1")) {
       return makeRes({ jsonBody: succeeded });
     }
-    if (url.includes("/models/") && url.endsWith("/predictions")) {
+    if (url === "https://api.replicate.com/v1/models/sprited/birefnet") {
+      return makeRes({ jsonBody: { latest_version: { id: "ver-test-1" } } });
+    }
+    if (url === "https://api.replicate.com/v1/predictions") {
       assert.equal(opts.headers.Authorization, "Bearer test-key");
       const body = JSON.parse(opts.body);
+      assert.equal(body.version, "ver-test-1");
       assert.ok(body.input.image.startsWith("data:image/"), "image sent as data URI");
+      assert.equal(body.input.output_format, "cutout");
       return makeRes({ jsonBody: poll ? { ...succeeded, status: "processing" } : succeeded });
     }
     throw new Error("unexpected fetch: " + url);
@@ -364,7 +369,7 @@ describe("extractGarmentPhoto", () => {
 
     // The provider received the orientation-baked image (60x40,
     // not the stored 40x60): decode what was actually sent.
-    const createCall = calls.find((c) => c.url.includes("/models/"));
+    const createCall = calls.find((c) => c.url === "https://api.replicate.com/v1/predictions");
     const sent = JSON.parse(createCall.opts.body).input.image;
     const sentMeta = await sharp(Buffer.from(sent.split(",")[1], "base64")).metadata();
     assert.equal(sentMeta.width, 60);

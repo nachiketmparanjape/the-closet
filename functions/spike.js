@@ -29,6 +29,13 @@ async function createPrediction(model, input, apiKey) {
     "Content-Type": "application/json",
     Prefer: "wait=55",
   };
+  // Replicate throttles accounts without a payment method to a
+  // burst of 1 create (429 with retry_after ~10s). The wrapper
+  // below retries creates through that window.
+  return createWithBackoff(model, input, apiKey, headers);
+}
+
+async function createWithBackoff(model, input, apiKey, headers) {
   // Official models accept /models/{owner}/{name}/predictions.
   // Community models 404 there (learned live, 2026-10-27) —
   // resolve the latest version and create by version instead.
@@ -55,6 +62,12 @@ async function createPrediction(model, input, apiKey) {
     });
   }
   const j = await res.json().catch(() => null);
+  if (res.status === 429 && createWithBackoff.tries < 5) {
+    createWithBackoff.tries = (createWithBackoff.tries || 0) + 1;
+    const waitS = j && j.retry_after ? Number(j.retry_after) + 2 : 12;
+    await new Promise((r) => setTimeout(r, waitS * 1000));
+    return createWithBackoff(model, input, apiKey, headers);
+  }
   if (!res.ok) {
     throw new Error(
       "replicate create " + res.status + ": " + JSON.stringify(j).slice(0, 300)

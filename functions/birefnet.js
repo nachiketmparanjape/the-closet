@@ -38,6 +38,52 @@ const API_BASE = "https://api.replicate.com/v1";
 const POLL_INTERVAL_MS = 3000;
 const MAX_WAIT_MS = 90000; // the callable's own timeout is 120s
 
+let resolvedVersion = null;
+
+async function resolveVersion(doFetch, apiKey) {
+  if (resolvedVersion) return resolvedVersion;
+  const res = await doFetch(API_BASE + "/models/" + MODEL, {
+    headers: { Authorization: "Bearer " + apiKey },
+  });
+  if (!res.ok) {
+    throw codedError(
+      "EXTRACT_FAILED",
+      "replicate model lookup status " + res.status
+    );
+  }
+  const j = await res.json();
+  const v = j && j.latest_version && j.latest_version.id;
+  if (!v) {
+    throw codedError(
+      "EXTRACT_FAILED",
+      "replicate model lookup returned no latest_version"
+    );
+  }
+  resolvedVersion = v;
+  return v;
+}
+
+// Replicate throttles accounts without a payment method to a
+// burst of 1 prediction create (429, retry_after ~10s). Wait
+// out the window a few times — the callable's 120s budget
+// absorbs it — rather than failing the extraction.
+async function createWithBackoff(doFetch, sleep, init) {
+  for (let attempt = 0; ; attempt++) {
+    const res = await doFetch(API_BASE + "/predictions", init);
+    if (res.status !== 429 || attempt >= 4) return res;
+    let wait = 12000;
+    try {
+      const j = JSON.parse(await res.text());
+      if (j && j.retry_after) {
+        wait = Math.min(30000, (Number(j.retry_after) + 2) * 1000);
+      }
+    } catch (e) {
+      /* unreadable body — the default wait stands */
+    }
+    await sleep(wait);
+  }
+}
+
 async function segmentImage(buffer, mimeType, apiKey, fetchImpl, opts) {
   if (!apiKey) {
     throw codedError("EXTRACT_NOT_CONFIGURED", "REPLICATE_API_TOKEN is not set");
@@ -46,20 +92,22 @@ async function segmentImage(buffer, mimeType, apiKey, fetchImpl, opts) {
   const doFetch = fetchImpl || fetch;
   const sleep =
     options.sleepImpl || ((ms) => new Promise((r) => setTimeout(r, ms)));
-  const version = options.modelVersion || MODEL_VERSION;
   const dataUri =
     "data:" + (mimeType || "image/jpeg") + ";base64," + buffer.toString("base64");
-
-  const createUrl = version
-    ? API_BASE + "/predictions"
-    : API_BASE + "/models/" + MODEL + "/predictions";
-  const createBody = version
-    ? { version, input: { image: dataUri, output_format: "cutout" } }
-    : { input: { image: dataUri, output_format: "cutout" } };
+  // Community models cannot be created through
+  // /models/{owner}/{name}/predictions (404, learned live
+  // 2026-10-27) — creation is by version hash. Resolve the
+  // latest version once per instance unless one is pinned.
+  const version =
+    options.modelVersion || MODEL_VERSION || (await resolveVersion(doFetch, apiKey));
+  const createBody = {
+    version,
+    input: { image: dataUri, output_format: "cutout" },
+  };
 
   let prediction;
   try {
-    const res = await doFetch(createUrl, {
+    const res = await createWithBackoff(doFetch, sleep, {
       method: "POST",
       headers: {
         Authorization: "Bearer " + apiKey,
