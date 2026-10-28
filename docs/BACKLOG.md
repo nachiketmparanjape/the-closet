@@ -689,6 +689,15 @@ email, guest banner + privacy note. Design:
     remaining founder step; the pipe tests re-run the
     moment it lands (Replicate advises waiting a few
     minutes after purchase before retrying).
+  - 2026-10-27 — Credit added; the pipe is proven
+    end to end through the spike harness (BiRefNet on
+    the Jujutsu Kaisen photo: pixel-exact cutout in
+    3 seconds). Extraction itself still awaits the
+    founder's first phone adds. Also this evening:
+    the founder adopted the review-gate pattern as
+    PC-58 — this card's renders gain a review state
+    when that card is built (later, if it makes
+    sense; see PC-58).
 
 ### PC-36: Photo of a person → individual articles + the outfit
 - **Status:** Not started. A prototype is approved
@@ -1984,3 +1993,51 @@ email, guest banner + privacy note. Design:
     errors, not hallucination. The same photo through
     BiRefNet extraction, for contrast, is pixel-exact
     (real cloth, paper tags and all) in 3 seconds.
+
+### PC-58: Review gate for AI-made images (not yet sized)
+- **Status:** Proposed 2026-10-27 — the founder
+  adopted the pattern ("let's steal the review gate,
+  that seems to be make or break"); build timing is
+  deliberately unset ("we can migrate to it later if
+  it makes sense"). Next action: enters a planning
+  walk once PC-34's first real renders exist or
+  PC-57 passes its fidelity bar. Owner: Bramble
+  (design), founder (verdict). GitHub issue #128.
+- **In plain words:** Any picture an AI makes for a
+  wardrobe item — an extracted cutout (PC-34), a
+  generated clean view (PC-57), a modeled photo
+  (PC-49) — waits in a review state first. It becomes
+  the item's picture only after approval: by the
+  automated quality checks we already run, and, for
+  anything generated, by the user's own eyes —
+  approve, regenerate, or keep the original. The
+  original photo is never replaced. The pattern is
+  adopted from the open-source tandpfun/wardrobe
+  project, whose whole library hangs on this gate
+  (research note in PRODUCT.md, 2026-10-27).
+- **The details:**
+  - Applies to: PC-34 extraction renders (which
+    already pass an automated two-layer quality gate
+    — this card adds the review state and the
+    user-facing actions), PC-57 generated views
+    (where the gate is the fidelity bar made
+    visible), PC-49 modeled photos (parked; the gate
+    is a precondition if it revives).
+  - In scope: a pending-review state for renders;
+    approve / regenerate / keep-original actions;
+    the original always one tap away for comparison.
+  - Out of scope: building it now; any change to how
+    originals are stored; applying it to photos the
+    user took (only AI-made images wait).
+- **Questions for a reader:**
+  1. Should borderline extractions also wait for the
+     user's eyes, or is the automated gate enough
+     there?
+  2. One review queue for all pending images, or
+     review inline on each item?
+  3. Must approval always show a side-by-side
+     against the original photo?
+- **History:**
+  - 2026-10-27 — Card created (issue #128) the same
+    evening as the tandpfun/wardrobe research note,
+    on the founder's adoption call.

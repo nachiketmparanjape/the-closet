@@ -342,6 +342,9 @@ Decided topics stay as compact records; full reports live in `research_notes/`.
   extraction: local JSON doesn't transfer to a multi-device
   app, and per-image gpt-image cost is orders above our
   cents-per-image segmentation.
-- **Status:** Filed. No action; watch-only. Revisit trigger:
+- **Status:** UPDATED the same evening — the founder adopted
+  the review gate on sight ("make or break"); it is filed as
+  PC-58 (issue #128), build timing deliberately later. The
+  repo itself stays watch-only. Revisit trigger:
   the repo resumes activity, ships a hosted product, or PC-49
   un-parks. Full note also in the studio inbox (2026-10-27).
