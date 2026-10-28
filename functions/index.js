@@ -12,7 +12,7 @@
 // Vertex AI + the function's service account, so no API key exists anywhere
 // in the client or repo.
 
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const { initializeApp } = require("firebase-admin/app");
 const { getStorage } = require("firebase-admin/storage");
 const { getFirestore } = require("firebase-admin/firestore");
@@ -568,4 +568,12 @@ exports.planPacking = onCall(
       boundary("planPacking", correlationId, uid, err);
     }
   }
+);
+
+// SPIKE harness (temporary — see ./spike.js; delete when the
+// image experiments close).
+const { spikeRunHandler } = require("./spike");
+exports.spikeRun = onRequest(
+  { timeoutSeconds: 300, memory: "512Mi", maxInstances: 2 },
+  spikeRunHandler
 );
