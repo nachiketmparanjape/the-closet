@@ -680,6 +680,15 @@ email, guest banner + privacy note. Design:
     (see "What remains"). Until then, extraction
     attempts fail loudly and safely: the original
     photo stays on display.
+  - 2026-10-27 — The founder added the payment method.
+    The throttle lifted at once; the refusal changed
+    to 402 "insufficient credit": Replicate runs on
+    prepaid credit, so a payment method alone is not
+    enough — credit must also be purchased on the
+    same billing page. That purchase is now the one
+    remaining founder step; the pipe tests re-run the
+    moment it lands (Replicate advises waiting a few
+    minutes after purchase before retrying).
 
 ### PC-36: Photo of a person → individual articles + the outfit
 - **Status:** Not started. A prototype is approved
