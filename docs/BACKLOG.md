@@ -965,6 +965,33 @@ email, guest banner + privacy note. Design:
     His guiding hypothesis: SAM 3 serves both use
     cases — this parsing and PC-34's single-garment
     cutting — one service instead of three.
+  - 2026-10-27 — Batch evidence complete (overlays in
+    the spikes folder, visually verified): trousers
+    on IMG_6949 (0.96, waistband-to-ankles exact);
+    jacket (0.70) + trousers (0.93) on the layered
+    Fuji photo — the jacket mask respects the fleece
+    collar, excludes the beanie in hand and the top
+    beneath, and stops at its hem where the trousers
+    begin; the noisy store photo — his black jacket
+    and mint tee are both masked tightly (the tee's
+    visible strip inside the open jacket included).
+    Experiment 2's mask question is answered: SAM 3
+    finds worn garments, layered and occluded
+    included. NEW PIPELINE FACT: a concept call
+    returns EVERY instance (14 "jacket" detections in
+    the store photo — racks, mannequin, other
+    shoppers). The pipeline needs an instance-
+    selection step: two levers, both cheap — the
+    Gemini first pass supplies color-attributed
+    prompts ("black zip jacket", not "jacket"), and
+    a center/size preference picks the main subject's
+    instance. OPERATIONS LESSON (paid for once):
+    Replicate prunes a finished prediction's output
+    quickly — batch 2's masks were lost by polling
+    ~90 minutes late; production must persist outputs
+    the moment a job completes. (Batch 3 re-ran with
+    harvest-at-completion; all JSON saved under
+    spikes/sam-results/.)
 
 ### PC-37: Trip chat is a full stylist room — outfit suggestions you can add
 - **Size:** M

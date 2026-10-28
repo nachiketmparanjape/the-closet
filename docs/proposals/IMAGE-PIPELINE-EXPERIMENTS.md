@@ -256,3 +256,21 @@ wants its image as an array; SAM 3 wants `prompt`).
   slight print drift remain.
 - BiRefNet on IMG_0792: pixel-exact cutout, 3 s —
   the extraction arm's standard to beat.
+
+## Batch results (2026-10-27, late)
+
+- Trousers (IMG_6949): exact, score 0.96. Jacket +
+  trousers (IMG_7257, layered): both exact — layer
+  boundary respected, beanie and underlayer excluded.
+- Store photo (IMG_6624): his jacket and tee masked
+  tightly amid 14 total "jacket" detections (racks,
+  mannequin, other shoppers). Finding: concept calls
+  return every instance; the pipeline needs instance
+  selection (color-attributed prompts from the
+  vision first pass + main-subject preference).
+- Operations: Replicate prunes finished outputs;
+  harvest at completion or lose them (batch 2 lost,
+  batch 3 re-ran clean). SAM arm evidence is now
+  complete; the remaining close-out step is the
+  template-method comparison, under the founder's
+  research-first frame (2026-10-27).
