@@ -2618,7 +2618,7 @@
         var image = document.createElement("img");
         image.src = itemDisplayUrl(item);
         resolveRenderUrl(item, image);
-        applyPhotoRotation(image, itemPhotos(item)[0], true);
+        applyPhotoRotation(image, itemPhotos(item)[0], "clean", true);
         image.alt = item.name || "Wardrobe item";
         image.loading = "lazy";
         imageWrap.appendChild(image);
@@ -3116,21 +3116,32 @@
       // clean, upright render; the original photo stays one tap
       // away. Rotation is a per-photo field (see photoRotationDeg)
       // turned by the overlay buttons on the photo itself.
-      // Rotation is a per-photo display field, not a file rewrite
-      // (2026-10-28, founder's redesign of the rotate control): one
-      // orientation per piece, applied to whichever view is showing
-      // (clean or original). A tap turns the image instantly via
-      // CSS and persists one small number — no image re-upload, no
-      // function round trip, and one tap the other way undoes it.
-      // Grid cards are exactly 4:5, so a quarter-turn there also
-      // scales to 0.8 so the rotated canvas still fits its frame.
-      function photoRotationDeg(photo) {
-        var r = photo && typeof photo.rotation === "number" ? photo.rotation : 0;
+      // Rotation is a per-picture display field, not a file rewrite
+      // (2026-10-28, founder's redesign of the rotate control, then
+      // his unlink request the same day): the clean render and the
+      // original photo each carry their own orientation —
+      // renderRotation for the clean view, rotation for the
+      // original — so fixing one never turns the other. A tap turns
+      // the picture instantly via CSS and persists one small
+      // number — no image re-upload, no function round trip, and
+      // one tap the other way undoes it. Grid cards are exactly
+      // 4:5, so a quarter-turn there also scales to 0.8 so the
+      // rotated canvas still fits its frame.
+      function photoRotationDeg(photo, view) {
+        var r;
+        if (view === "original") {
+          r = photo && typeof photo.rotation === "number" ? photo.rotation : 0;
+        } else {
+          // Clean view: its own field, falling back to the legacy
+          // shared field for pieces rotated before the split.
+          r = photo && typeof photo.renderRotation === "number" ? photo.renderRotation
+            : (photo && typeof photo.rotation === "number" ? photo.rotation : 0);
+        }
         return ((r % 360) + 360) % 360;
       }
-      function applyPhotoRotation(imgEl, photo, fit45) {
+      function applyPhotoRotation(imgEl, photo, view, fit45) {
         if (!imgEl) return;
-        var deg = photoRotationDeg(photo);
+        var deg = photoRotationDeg(photo, view);
         var t = "";
         if (deg) {
           t = "rotate(" + deg + "deg)";
@@ -3143,7 +3154,9 @@
         var ps = itemPhotos(activeItem);
         if (!ps.length) return;
         var cover = ps[0];
-        var prev = photoRotationDeg(cover);
+        var view = itemPhoto.dataset.view === "original" ? "original" : "clean";
+        var field = view === "original" ? "rotation" : "renderRotation";
+        var prev = photoRotationDeg(cover, view);
         var next = (prev + dir + 360) % 360;
         // Instant: turn the picture on screen first, persist second.
         itemPhoto.style.transform = next ? "rotate(" + next + "deg)" : "";
@@ -3155,7 +3168,7 @@
             if (p.storagePath !== cover.storagePath) return p;
             var copy = {};
             Object.keys(p).forEach(function (k) { copy[k] = p[k]; });
-            copy.rotation = next;
+            copy[field] = next;
             return copy;
           });
           return ref.update({ photos: updated }).then(function () {
@@ -3187,7 +3200,7 @@
           itemPhoto.dataset.view = "clean";
           itemPhoto.src = photoDisplayUrl(ps[0]);
           resolveRenderUrl(activeItem, itemPhoto);
-          applyPhotoRotation(itemPhoto, ps[0]);
+          applyPhotoRotation(itemPhoto, ps[0], itemPhoto.dataset.view);
           syncViewChips(true);
         };
         document.getElementById("viewOriginalBtn").onclick = function () {
@@ -3196,7 +3209,7 @@
           if (!ps.length) return;
           itemPhoto.dataset.view = "original";
           itemPhoto.src = ps[0].url || photoDisplayUrl(ps[0]);
-          applyPhotoRotation(itemPhoto, ps[0]);
+          applyPhotoRotation(itemPhoto, ps[0], itemPhoto.dataset.view);
           syncViewChips(false);
         };
         document.getElementById("rotateLeftBtn").onclick = function () { rotatePhoto(-90); };
@@ -3211,7 +3224,7 @@
         itemPhoto.src = photos.length ? photoDisplayUrl(photos[0]) : "";
         itemPhoto.alt = item.name || "Wardrobe item";
         resolveRenderUrl(item, itemPhoto);
-        applyPhotoRotation(itemPhoto, photos[0]);
+        applyPhotoRotation(itemPhoto, photos[0], itemPhoto.dataset.view);
         setupPhotoViewRow(item);
         renderThumbs();
         var srcNote = document.getElementById("itemSourceNote");
@@ -3350,7 +3363,7 @@
             var img = document.createElement("img");
             img.src = photoDisplayUrl(ps[0]);
             resolveRenderUrl(hero, img);
-            applyPhotoRotation(img, ps[0]);
+            applyPhotoRotation(img, ps[0], "clean");
             img.alt = hero.name || cat;
             img.loading = "lazy";
             fig.appendChild(img);
@@ -7028,7 +7041,7 @@
             var img = document.createElement("img");
             img.src = photoDisplayUrl(photos[0]);
             resolveRenderUrl(it, img);
-            applyPhotoRotation(img, itemPhotos(it)[0]);
+            applyPhotoRotation(img, itemPhotos(it)[0], "clean");
             img.alt = it.name || "item photo";
             img.loading = "lazy";
             img.className = "pack-thumb";
@@ -8265,7 +8278,7 @@
             var img = document.createElement("img");
             img.src = photoDisplayUrl(ps[0]);
             resolveRenderUrl(it, img);
-            applyPhotoRotation(img, itemPhotos(it)[0]);
+            applyPhotoRotation(img, itemPhotos(it)[0], "clean");
             img.alt = it ? it.name : "item photo";
             img.loading = "lazy";
             fig.appendChild(img);
@@ -8615,7 +8628,7 @@
               var img = document.createElement("img");
               img.src = photoDisplayUrl(photos[0]);
               resolveRenderUrl(it, img);
-              applyPhotoRotation(img, itemPhotos(it)[0]);
+              applyPhotoRotation(img, itemPhotos(it)[0], "clean");
               img.alt = "";
               img.loading = "lazy";
               thumbs.appendChild(img);
@@ -8738,7 +8751,7 @@
             var img = document.createElement("img");
             img.src = photoDisplayUrl(photos[0]);
             resolveRenderUrl(it, img);
-            applyPhotoRotation(img, itemPhotos(it)[0]);
+            applyPhotoRotation(img, itemPhotos(it)[0], "clean");
             img.alt = "";
             row.appendChild(img);
           }
@@ -8988,7 +9001,7 @@
             var img = document.createElement("img");
             img.src = photoDisplayUrl(photos[0]);
             resolveRenderUrl(it, img);
-            applyPhotoRotation(img, itemPhotos(it)[0]);
+            applyPhotoRotation(img, itemPhotos(it)[0], "clean");
             img.alt = "";
             row.appendChild(img);
           }
@@ -9191,7 +9204,7 @@
           var img = document.createElement("img");
           img.src = photoDisplayUrl(photos[0]);
           resolveRenderUrl(it, img);
-          applyPhotoRotation(img, itemPhotos(it)[0]);
+          applyPhotoRotation(img, itemPhotos(it)[0], "clean");
           img.alt = "";
           img.loading = "lazy";
           cell.appendChild(img);
@@ -9877,7 +9890,7 @@
         var t = document.createElement("img");
         t.src = photoDisplayUrl(photos[0]);
         resolveRenderUrl(it, t);
-        applyPhotoRotation(t, itemPhotos(it)[0]);
+        applyPhotoRotation(t, itemPhotos(it)[0], "clean");
         t.alt = it.name || "";
         t.className = "shop-thumb";
         return t;
@@ -10971,7 +10984,7 @@
             var img = document.createElement("img");
             img.src = photoDisplayUrl(photos[0]);
             resolveRenderUrl(it, img);
-            applyPhotoRotation(img, itemPhotos(it)[0]);
+            applyPhotoRotation(img, itemPhotos(it)[0], "clean");
             img.alt = it ? it.name : "item photo";
             img.loading = "lazy";
             fig.appendChild(img);
