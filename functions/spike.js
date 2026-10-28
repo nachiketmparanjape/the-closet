@@ -75,6 +75,17 @@ async function spikeRunHandler(req, res) {
       return;
     }
     const body = req.body || {};
+    if (body.diag === true) {
+      // Safe credential diagnostics: shape only, never the value.
+      res.status(200).json({
+        tokenPresent: Boolean(apiKey),
+        tokenLength: apiKey ? apiKey.length : 0,
+        tokenPrefixOk: apiKey ? apiKey.startsWith("r8_") : false,
+        tokenHasWhitespace: apiKey ? /\s/.test(apiKey) : false,
+        tokenTrimmedLength: apiKey ? apiKey.trim().length : 0,
+      });
+      return;
+    }
     const model = String(body.model || "");
     const input = body.input || {};
     if (!/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/i.test(model)) {
