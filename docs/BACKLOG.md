@@ -992,6 +992,18 @@ email, guest banner + privacy note. Design:
     the moment a job completes. (Batch 3 re-ran with
     harvest-at-completion; all JSON saved under
     spikes/sam-results/.)
+  - 2026-10-27 — DECIDED (founder, late): SAM 3 is
+    the parsing foundation. His reasoning: it is
+    good enough on this evidence, and it identifies
+    multiple garments from one photo especially when
+    told what to detect (the Gemini-first,
+    per-garment-prompt shape). The template-method
+    arm of the close-out is CLOSED without a
+    prototype — SAM answered both use cases (this
+    parsing and PC-34's cutting), so the head-to-head
+    is moot. One sub-decision remains for build time:
+    SAM hosting (community build vs our own pinned
+    deployment vs fal).
 
 ### PC-37: Trip chat is a full stylist room — outfit suggestions you can add
 - **Size:** M
@@ -2033,6 +2045,20 @@ email, guest banner + privacy note. Design:
     only source-supported details; omission beats
     invention; HOLD (neither pass nor fail) when the
     construction cannot be recovered honestly.
+  - 2026-10-27 — VERDICT (founder, late): FAIL. He
+    agreed with Bramble's read — the fast build fails
+    the first bar (sleeves deleted untyped; invented
+    label and print drift even typed). PC-57 closes
+    as a fail for the tested build, and the
+    full-size build's panel run is NOT run: his
+    reasoning — the modeling piece is complex, and
+    good output needs careful engineering under cost
+    discipline, not more one-off runs. Generation is
+    deferred, not condemned: any revival starts from
+    the filed ingredients (typed prompts, the chroma
+    technique, the PC-58 review gate) with a fresh
+    founder call. PC-36's generated-view slot closes
+    with this card.
 
 ### PC-58: Review gate for AI-made images (not yet sized)
 - **Status:** Proposed 2026-10-27 — the founder

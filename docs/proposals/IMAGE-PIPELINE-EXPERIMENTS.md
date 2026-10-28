@@ -274,3 +274,17 @@ wants its image as an array; SAM 3 wants `prompt`).
   complete; the remaining close-out step is the
   template-method comparison, under the founder's
   research-first frame (2026-10-27).
+
+## Close-out decisions (founder, 2026-10-27 late)
+
+- SAM 3 ADOPTED as the parsing foundation (PC-36)
+  and, by the one-service hypothesis, the cutting
+  engine for PC-34's worn-photo cases. Template arm
+  closed unbuilt — the head-to-head is moot.
+- Qwen generated views: FAIL verdict (PC-57
+  closed). Generation deferred as a complex,
+  cost-sensitive engineering problem; revival needs
+  a designed approach and a fresh call.
+- Still open at build time: SAM hosting (own pinned
+  deployment vs fal vs the community build), and
+  the PC-58 review gate's build slot.
