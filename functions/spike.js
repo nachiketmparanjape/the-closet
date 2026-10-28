@@ -20,14 +20,12 @@
 const { getStorage } = require("firebase-admin/storage");
 
 const API_BASE = "https://api.replicate.com/v1";
-const POLL_MS = 3000;
-const MAX_WAIT_MS = 270000;
 
 async function createPrediction(model, input, apiKey) {
   const headers = {
     Authorization: "Bearer " + apiKey,
     "Content-Type": "application/json",
-    Prefer: "wait=55",
+    Prefer: "wait=5",
   };
   // Replicate throttles accounts without a payment method to a
   // burst of 1 create (429 with retry_after ~10s). The wrapper
@@ -92,6 +90,46 @@ function firstFileUrl(output) {
   return null;
 }
 
+async function presentPrediction(pred) {
+  const out = {
+    status: pred.status,
+    predictionId: pred.id,
+    predictSeconds: (pred.metrics && pred.metrics.predict_time) || null,
+    output: pred.output || null,
+    error: pred.error || null,
+  };
+  const terminal =
+    pred.status === "succeeded" ||
+    pred.status === "failed" ||
+    pred.status === "canceled";
+  const fileUrl = terminal ? firstFileUrl(pred.output) : null;
+  if (fileUrl) {
+    try {
+      const fr = await fetch(fileUrl);
+      const buf = Buffer.from(await fr.arrayBuffer());
+      const m = fileUrl.split("?")[0].match(/\.(png|jpe?g|webp)$/i);
+      const ext = m ? m[1].toLowerCase() : "bin";
+      const storedPath =
+        "spikes/" +
+        new Date().toISOString().replace(/[:.]/g, "-") +
+        "-" +
+        String(pred.id || "pred") +
+        "." +
+        ext;
+      await getStorage()
+        .bucket("closet-404e9.firebasestorage.app")
+        .file(storedPath)
+        .save(buf, {
+          contentType: fr.headers.get("content-type") || "image/png",
+        });
+      out.storedPath = storedPath;
+    } catch (e) {
+      out.storeError = String((e && e.message) || e);
+    }
+  }
+  return out;
+}
+
 async function spikeRunHandler(req, res) {
   try {
     if (req.method !== "POST") {
@@ -120,60 +158,50 @@ async function spikeRunHandler(req, res) {
       });
       return;
     }
+    if (body.list === true) {
+      // The account's recent predictions — settles what an
+      // earlier, interrupted run actually did on the server.
+      const lr = await fetch(API_BASE + "/predictions", {
+        headers: { Authorization: "Bearer " + apiKey },
+      });
+      const lj = await lr.json().catch(() => null);
+      const results = (lj && lj.results) || [];
+      res.status(200).json({
+        predictions: results.slice(0, 8).map((p) => ({
+          id: p.id,
+          status: p.status,
+          created_at: p.created_at,
+          error: p.error || null,
+        })),
+      });
+      return;
+    }
+    if (body.poll) {
+      // One status read per call. Long predictions are polled
+      // by the CALLER in short requests — a cold community
+      // container can take minutes to boot, and holding one
+      // HTTP request open for the whole run kept dying
+      // against timeouts (learned live, 2026-10-27).
+      const pr = await fetch(
+        API_BASE + "/predictions/" + encodeURIComponent(String(body.poll)),
+        { headers: { Authorization: "Bearer " + apiKey } }
+      );
+      const pred = await pr.json().catch(() => null);
+      if (!pr.ok || !pred) {
+        res.status(502).json({ error: "poll failed: " + pr.status });
+        return;
+      }
+      res.status(200).json(await presentPrediction(pred));
+      return;
+    }
     const model = String(body.model || "");
     const input = body.input || {};
     if (!/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/i.test(model)) {
       res.status(400).json({ error: "model must be owner/name" });
       return;
     }
-    const started = Date.now();
-    let pred = await createPrediction(model, input, apiKey);
-    const deadline = started + MAX_WAIT_MS;
-    while (pred && (pred.status === "starting" || pred.status === "processing")) {
-      if (Date.now() > deadline) {
-        res.status(504).json({ status: "timeout", predictionId: pred.id });
-        return;
-      }
-      await new Promise((r) => setTimeout(r, POLL_MS));
-      const r2 = await fetch(pred.urls.get, {
-        headers: { Authorization: "Bearer " + apiKey },
-      });
-      pred = await r2.json();
-    }
-    const out = {
-      status: pred.status,
-      predictionId: pred.id,
-      predictSeconds:
-        (pred.metrics && pred.metrics.predict_time) || null,
-      output: pred.output || null,
-      error: pred.error || null,
-    };
-    const fileUrl = firstFileUrl(pred.output);
-    if (fileUrl) {
-      try {
-        const fr = await fetch(fileUrl);
-        const buf = Buffer.from(await fr.arrayBuffer());
-        const m = fileUrl.split("?")[0].match(/\.(png|jpe?g|webp)$/i);
-        const ext = m ? m[1].toLowerCase() : "png";
-        const storedPath =
-          "spikes/" +
-          new Date().toISOString().replace(/[:.]/g, "-") +
-          "-" +
-          model.replace("/", "-") +
-          "." +
-          ext;
-        await getStorage()
-          .bucket()
-          .file(storedPath)
-          .save(buf, {
-            contentType: fr.headers.get("content-type") || "image/png",
-          });
-        out.storedPath = storedPath;
-      } catch (e) {
-        out.storeError = String((e && e.message) || e);
-      }
-    }
-    res.status(200).json(out);
+    const pred = await createPrediction(model, input, apiKey);
+    res.status(200).json({ status: pred.status, predictionId: pred.id });
   } catch (e) {
     res.status(500).json({ error: String((e && e.message) || e) });
   }
