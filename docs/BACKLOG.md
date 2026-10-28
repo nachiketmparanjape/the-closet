@@ -466,10 +466,12 @@ email, guest banner + privacy note. Design:
   founder phone validation (the acceptance gate) pending.
 
 ### PC-34: Garment extraction & clean rendering
-- **Status:** Built, not yet live. Next step is the
-  founder's: add the access token for the outside service
-  (see "What remains"). Then deploy, one smoke test, and
-  the founder's phone check is the ship gate.
+- **Status:** Built and deployed; the access token is
+  in and verified. One founder step remains before the
+  first live run: add a payment method to the Replicate
+  account (the account refuses every run until then —
+  see History, 2026-10-27). Then the founder's phone
+  check is the ship gate.
 - **In plain words:** When a user adds a photo of a
   garment — usually the garment lying on a bed or a
   carpet — the app cuts the garment out of the photo and
@@ -576,16 +578,16 @@ email, guest banner + privacy note. Design:
      one photo at a time, is that a real problem for a
      consumer app, or a non-issue?
 - **What remains, in order:**
-  1. The founder adds a version to the secret named
-     REPLICATE_API_TOKEN. The secret exists in the
-     project; it holds no value yet. This step is
-     parked with the founder, by his instruction.
-  2. Deploy the `extractGarment` function.
-  3. One smoke test: a single call against the real
-     service, checking the model name, the input name,
-     and the price of the run.
-  4. The founder checks the result on his phone. That
-     check is the ship gate.
+  1. The founder adds a payment method to the Replicate
+     account (Replicate → Settings → Billing). Until
+     then the account refuses every prediction create,
+     however the calls are spaced.
+  2. Bramble re-runs the pipe tests (SAM 3 and Qwen
+     through the spike harness) to confirm creates go
+     through.
+  3. The founder checks extraction on his phone: add
+     one new item with a photo; the clean cutout, right
+     way up, is the pass. That check is the ship gate.
 - **History:**
   - 2026-10-21 — The founder sets the direction after
     seeing Google Photos' auto-built clothing collection
@@ -654,6 +656,30 @@ email, guest banner + privacy note. Design:
     add a new secret version whose value is the token
     from replicate.com/account/api-tokens, then
     Bramble re-checks the shape and re-runs the tests.
+  - 2026-10-27 — The founder added secret version 2
+    (and disabled version 1). The shape check passes:
+    40 characters, starts with r8_, no whitespace —
+    the token is a real Replicate token, and the spike
+    harness's calls are now accepted as authenticated.
+    The pipe tests then caught two mechanics defects,
+    both fixed the same evening in the harness and in
+    this card's production seam (functions/birefnet.js),
+    tests green throughout: (1) community models cannot
+    be created through the /models/{owner}/{name}
+    endpoint (it returns 404) — creation must name a
+    version hash, so the code resolves the model's
+    latest version first; this would have broken
+    extraction itself on its first live call. (2)
+    Accounts with no payment method are throttled on
+    prediction creates (429, "burst of 1"); the code
+    now waits out the window and retries. Even with
+    the retries, every create across two minutes of
+    spaced attempts was refused — in practice the
+    account creates nothing until a payment method is
+    added. That is the one remaining founder step
+    (see "What remains"). Until then, extraction
+    attempts fail loudly and safely: the original
+    photo stays on display.
 
 ### PC-36: Photo of a person → individual articles + the outfit
 - **Status:** Not started. A prototype is approved

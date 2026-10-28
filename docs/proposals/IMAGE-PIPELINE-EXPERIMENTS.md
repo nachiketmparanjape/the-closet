@@ -145,3 +145,44 @@ runs whenever the founder calls it — before, during, or
 after 2. Total spend across all three, at the estimates
 above: a few dollars at most, most of it Experiment 3
 retries.
+
+## Test set received (2026-10-27)
+
+The founder supplied seven photos (his own; a second
+person's outfit photos were offered and may follow).
+Files live in the user media library under the names
+below; at run time they are uploaded to Storage under
+`spikes/inputs/` so the harness can pass URLs.
+
+Worn, multi-garment — Experiment 2's test set:
+- `IMG_6949.jpg` — mirror selfie, fitting room: light
+  quarter-zip sweatshirt, tan chinos, watch. Clean
+  separation; the baseline parse.
+- `IMG_7257.jpg` — outdoors: olive trucker jacket with
+  fleece collar OVER a white top, tan chinos, bright
+  running shoes, beanie in hand. The layering /
+  occlusion case. Same chinos as IMG_6949 (a
+  cross-photo matching datum for later).
+- Both are stored sideways (EXIF orientation); the
+  runs use orientation-baked copies, as production
+  does.
+
+Flat, single garment — Experiment 1-style inputs and
+Experiment 3's print panel:
+- `IMG_0792.jpg` — white UT tee, large multi-character
+  manga print (Jujutsu Kaisen), on a bed, tags on.
+- `IMG_0794.jpg` — navy UT tee, One Piece flame print,
+  on a bed, tags on.
+- `IMG_0797.jpg` — black UT tee, yellow-panel manga
+  print (Jujutsu Kaisen), on a bed, tags on.
+- `IMG_0850.jpg` — black joggers on carpet (the dark
+  garment case).
+- `IMG_0852.jpg` — khaki shorts on carpet, wrinkled
+  (the wrinkle case).
+
+Panel gaps, accepted for the first run: no worn shot
+of a printed tee, no patterned (plaid / striped) worn
+piece, no sunglasses. The three flat prints are a
+harder print-fidelity test than the planned small
+logo; the worn panel is plain pieces plus one
+occlusion case.
