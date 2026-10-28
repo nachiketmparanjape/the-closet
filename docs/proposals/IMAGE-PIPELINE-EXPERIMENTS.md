@@ -180,9 +180,17 @@ Experiment 3's print panel:
 - `IMG_0852.jpg` — khaki shorts on carpet, wrinkled
   (the wrinkle case).
 
-Panel gaps, accepted for the first run: no worn shot
-of a printed tee, no patterned (plaid / striped) worn
-piece, no sunglasses. The three flat prints are a
-harder print-fidelity test than the planned small
-logo; the worn panel is plain pieces plus one
-occlusion case.
+Panel gaps, accepted for the first run: no patterned
+(plaid / striped) worn piece, no sunglasses. The
+three flat prints are a harder print-fidelity test
+than the planned small logo; the worn panel is plain
+pieces plus one occlusion case.
+
+Addendum (2026-10-27, later): the worn-print gap is
+closed by `IMG_6624.jpg` — a store mirror selfie: the
+mint cat-graphic tee worn under an open black jacket
+(the print partly covered), black shorts, slides.
+Background: other shoppers (one woman directly
+behind, herself in a jacket and trousers) and racks
+of hanging clothes — the noisiest parsing case in
+the set, and Experiment 3's worn-print case.
