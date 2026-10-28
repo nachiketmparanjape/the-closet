@@ -24,6 +24,7 @@ const { parseOutfitPhoto } = require("./photo");
 const { shopCheck } = require("./shopcheck");
 const { fetchLinkItem } = require("./linkimport");
 const { extractGarmentPhoto } = require("./extract");
+const { rotateItemRender } = require("./rotate");
 const { makeUsageRecorder, createAiTracker, flushAiUsage } = require("./usage");
 // Sprint 15 (PC-29 Phase 1): trip packing. sanitizeItems/sanitizeVibeProfile
 // come from ./stylist (already imported above); only the trip-specific
@@ -185,6 +186,37 @@ exports.extractGarment = onCall(
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "EXTRACT_FAILED";
       boundary("extractGarment", correlationId, uid, err);
+    }
+  }
+);
+
+exports.rotateRender = onCall(
+  {
+    region: "us-central1",
+    timeoutSeconds: 60,
+    memory: "512MiB",
+    maxInstances: 3,
+  },
+  async (request) => {
+    const correlationId = newCorrelationId();
+    const uid = request.auth ? request.auth.uid : null;
+    const start = Date.now();
+    if (!request.auth) {
+      fail("NOT_SIGNED_IN");
+    }
+    const data = request.data || {};
+    try {
+      if (typeof data.itemId !== "string" || data.itemId.length === 0) {
+        fail("NO_ITEM");
+      }
+      const result = await rotateItemRender(uid, data.itemId, {
+        db: getFirestore(),
+        bucket: getStorage().bucket(),
+      });
+      return finish("rotateRender", correlationId, uid, start, result);
+    } catch (err) {
+      if (!(err instanceof HttpsError) && !err.key) err.key = "ROTATE_FAILED";
+      boundary("rotateRender", correlationId, uid, err);
     }
   }
 );

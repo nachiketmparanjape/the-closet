@@ -130,6 +130,11 @@
     .danger:hover { background: #b3261e; color: #fff; }
     .danger:disabled { cursor: not-allowed; opacity: .48; }
     .item-photo { width: 100%; max-height: 320px; object-fit: contain; border-radius: var(--r-md); margin-bottom: 16px; background: var(--paper-soft); display: block; }
+    .photo-view-row { display: flex; gap: 8px; align-items: center; margin: -6px 0 14px; }
+    .view-chip { border: 1px solid var(--line); background: none; color: var(--muted); border-radius: 999px; padding: 5px 12px; font-size: 12.5px; cursor: pointer; }
+    .view-chip.is-active { color: var(--ink); border-color: var(--brass, #a87c1c); font-weight: 600; }
+    .view-chip:disabled { opacity: .55; cursor: default; }
+    .view-rotate { margin-left: auto; }
     /* Sprint 18 fix buffer (D7): hints are information, not action — muted.
        Accent-dark survives only on .ai-suggest, where the AI is speaking. */
     .hint { font-size: 13px; color: var(--muted); margin: 2px 0 0; }
@@ -649,7 +654,7 @@
     .cat-count { font-size: 12px; color: var(--muted); white-space: nowrap; }
     .item { min-width: 0; }
     .item-image { aspect-ratio: 4 / 5; overflow: hidden; background: var(--paper-soft); position: relative; border-radius: var(--r-md); }
-    .item-image img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .item-image img { width: 100%; height: 100%; object-fit: contain; display: block; }
     .item-details { padding: 13px 1px 4px; }
     .item-name { margin: 0 0 4px; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .item-name.is-naming { color: var(--muted); font-style: italic; font-weight: 500; }
@@ -1403,6 +1408,11 @@
       </div>
       <div class="modal-body">
         <img class="item-photo" id="itemPhoto" alt="Wardrobe piece" />
+        <div class="photo-view-row" id="itemPhotoViewRow" hidden>
+          <button class="view-chip is-active" id="viewCleanBtn" type="button">Clean view</button>
+          <button class="view-chip" id="viewOriginalBtn" type="button">Original photo</button>
+          <button class="view-chip view-rotate" id="rotateRenderBtn" type="button" title="Rotate the clean view 90 degrees">Rotate 90°</button>
+        </div>
         <p class="src-note" id="itemSourceNote" hidden></p>
         <div class="thumb-strip" id="thumbStrip" hidden></div>
         <div class="photo-manage">
@@ -2751,7 +2761,7 @@
         if (renderResolveTried[item.id]) return;
         renderResolveTried[item.id] = true;
         storage.ref().child(photo.renderStoragePath).getDownloadURL().then(function (renderUrl) {
-          if (imgEl) imgEl.src = renderUrl;
+          if (imgEl && !(imgEl.dataset && imgEl.dataset.view === "original")) imgEl.src = renderUrl;
           var ref = db.collection("users").doc(currentUser.uid).collection("items").doc(item.id);
           return ref.get().then(function (snap) {
             if (!snap.exists) return null;
@@ -3088,12 +3098,96 @@
         }
       });
 
+      // Founder ask (2026-10-28): the item detail leads with the
+      // clean, upright render; the original photo stays one tap
+      // away, and a Rotate control fixes a sideways render in
+      // place (the rotateRender callable turns the stored render
+      // 90 degrees; the new path is patched back onto the photo).
+      function syncViewChips(cleanActive) {
+        var c = document.getElementById("viewCleanBtn");
+        var o = document.getElementById("viewOriginalBtn");
+        if (c) c.classList.toggle("is-active", !!cleanActive);
+        if (o) o.classList.toggle("is-active", !cleanActive);
+      }
+      function setupPhotoViewRow(item) {
+        var row = document.getElementById("itemPhotoViewRow");
+        if (!row) return;
+        var photos = itemPhotos(item);
+        var cover = photos.length ? photos[0] : null;
+        var hasRender = !!(cover && (cover.renderStoragePath || cover.renderUrl));
+        row.hidden = !hasRender;
+        syncViewChips(true);
+        document.getElementById("viewCleanBtn").onclick = function () {
+          if (!activeItem) return;
+          var ps = itemPhotos(activeItem);
+          if (!ps.length) return;
+          itemPhoto.dataset.view = "clean";
+          itemPhoto.src = photoDisplayUrl(ps[0]);
+          resolveRenderUrl(activeItem, itemPhoto);
+          syncViewChips(true);
+        };
+        document.getElementById("viewOriginalBtn").onclick = function () {
+          if (!activeItem) return;
+          var ps = itemPhotos(activeItem);
+          if (!ps.length) return;
+          itemPhoto.dataset.view = "original";
+          itemPhoto.src = ps[0].url || photoDisplayUrl(ps[0]);
+          syncViewChips(false);
+        };
+        document.getElementById("rotateRenderBtn").onclick = function () {
+          if (!activeItem || !functions || !currentUser) return;
+          var item = activeItem;
+          var ps = itemPhotos(item);
+          if (!ps.length || !ps[0].renderStoragePath) return;
+          var coverPath = ps[0].storagePath;
+          var btn = this;
+          btn.disabled = true;
+          var oldLabel = btn.textContent;
+          btn.textContent = "Rotating…";
+          functions.httpsCallable("rotateRender")({ itemId: item.id }).then(function (res) {
+            var d = (res && res.data) || {};
+            if (!d.renderStoragePath) throw new Error("rotateRender returned no path");
+            var ref = db.collection("users").doc(currentUser.uid).collection("items").doc(item.id);
+            return ref.get().then(function (snap) {
+              if (!snap.exists) return null;
+              var data = snap.data() || {};
+              var updated = itemPhotos(data).map(function (p) {
+                if (p.storagePath !== coverPath) return p;
+                var copy = {};
+                Object.keys(p).forEach(function (k) { copy[k] = p[k]; });
+                copy.renderStoragePath = d.renderStoragePath;
+                copy.renderUrl = "";
+                copy.renderStatus = "passed";
+                return copy;
+              });
+              return ref.update({ photos: updated }).then(function () {
+                item.photos = updated;
+                delete renderResolveTried[item.id];
+                itemPhoto.dataset.view = "clean";
+                itemPhoto.src = photoDisplayUrl(updated[0]);
+                resolveRenderUrl(item, itemPhoto);
+                syncViewChips(true);
+                renderGallery();
+              });
+            });
+          }).catch(function (err) {
+            reportError("rotateRender", err);
+          }).then(function () {
+            btn.disabled = false;
+            btn.textContent = oldLabel;
+          });
+        };
+      }
+
       function openItem(item) {
         activeItem = item;
         itemTitle.textContent = item.shortName || item.name || "Untitled piece";
         var photos = itemPhotos(item);
-        itemPhoto.src = photos.length ? photos[0].url : "";
+        itemPhoto.dataset.view = "clean";
+        itemPhoto.src = photos.length ? photoDisplayUrl(photos[0]) : "";
         itemPhoto.alt = item.name || "Wardrobe item";
+        resolveRenderUrl(item, itemPhoto);
+        setupPhotoViewRow(item);
         renderThumbs();
         var srcNote = document.getElementById("itemSourceNote");
         var cover0 = photos.length ? photos[0] : null;
@@ -3230,6 +3324,7 @@
           if (ps.length && ps[0].url) {
             var img = document.createElement("img");
             img.src = photoDisplayUrl(ps[0]);
+            resolveRenderUrl(hero, img);
             img.alt = hero.name || cat;
             img.loading = "lazy";
             fig.appendChild(img);
@@ -6906,6 +7001,7 @@
           if (photos.length && photos[0].url) {
             var img = document.createElement("img");
             img.src = photoDisplayUrl(photos[0]);
+            resolveRenderUrl(it, img);
             img.alt = it.name || "item photo";
             img.loading = "lazy";
             img.className = "pack-thumb";
@@ -8141,6 +8237,7 @@
           if (ps.length && ps[0].url) {
             var img = document.createElement("img");
             img.src = photoDisplayUrl(ps[0]);
+            resolveRenderUrl(it, img);
             img.alt = it ? it.name : "item photo";
             img.loading = "lazy";
             fig.appendChild(img);
@@ -8489,6 +8586,7 @@
             if (photos.length) {
               var img = document.createElement("img");
               img.src = photoDisplayUrl(photos[0]);
+              resolveRenderUrl(it, img);
               img.alt = "";
               img.loading = "lazy";
               thumbs.appendChild(img);
@@ -8610,6 +8708,7 @@
           if (photos.length) {
             var img = document.createElement("img");
             img.src = photoDisplayUrl(photos[0]);
+            resolveRenderUrl(it, img);
             img.alt = "";
             row.appendChild(img);
           }
@@ -8858,6 +8957,7 @@
           if (photos.length) {
             var img = document.createElement("img");
             img.src = photoDisplayUrl(photos[0]);
+            resolveRenderUrl(it, img);
             img.alt = "";
             row.appendChild(img);
           }
@@ -9059,6 +9159,7 @@
         if (photos.length) {
           var img = document.createElement("img");
           img.src = photoDisplayUrl(photos[0]);
+          resolveRenderUrl(it, img);
           img.alt = "";
           img.loading = "lazy";
           cell.appendChild(img);
@@ -9743,6 +9844,7 @@
         if (!photos.length) return null;
         var t = document.createElement("img");
         t.src = photoDisplayUrl(photos[0]);
+        resolveRenderUrl(it, t);
         t.alt = it.name || "";
         t.className = "shop-thumb";
         return t;
@@ -10835,6 +10937,7 @@
           if (photos.length && photos[0].url) {
             var img = document.createElement("img");
             img.src = photoDisplayUrl(photos[0]);
+            resolveRenderUrl(it, img);
             img.alt = it ? it.name : "item photo";
             img.loading = "lazy";
             fig.appendChild(img);
