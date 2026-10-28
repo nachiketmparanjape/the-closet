@@ -24,15 +24,36 @@ const POLL_MS = 3000;
 const MAX_WAIT_MS = 270000;
 
 async function createPrediction(model, input, apiKey) {
-  const res = await fetch(API_BASE + "/models/" + model + "/predictions", {
+  const headers = {
+    Authorization: "Bearer " + apiKey,
+    "Content-Type": "application/json",
+    Prefer: "wait=55",
+  };
+  // Official models accept /models/{owner}/{name}/predictions.
+  // Community models 404 there (learned live, 2026-10-27) —
+  // resolve the latest version and create by version instead.
+  let res = await fetch(API_BASE + "/models/" + model + "/predictions", {
     method: "POST",
-    headers: {
-      Authorization: "Bearer " + apiKey,
-      "Content-Type": "application/json",
-      Prefer: "wait=55",
-    },
+    headers,
     body: JSON.stringify({ input }),
   });
+  if (res.status === 404) {
+    const mres = await fetch(API_BASE + "/models/" + model, {
+      headers: { Authorization: "Bearer " + apiKey },
+    });
+    const mj = await mres.json().catch(() => null);
+    const version = mj && mj.latest_version && mj.latest_version.id;
+    if (!version) {
+      throw new Error(
+        "model lookup failed for " + model + ": " + JSON.stringify(mj).slice(0, 200)
+      );
+    }
+    res = await fetch(API_BASE + "/predictions", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ version, input }),
+    });
+  }
   const j = await res.json().catch(() => null);
   if (!res.ok) {
     throw new Error(
