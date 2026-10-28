@@ -641,6 +641,19 @@ email, guest banner + privacy note. Design:
     with a photo; the clean cutout, right way up, is
     the pass). The three-experiment plan is
     docs/proposals/IMAGE-PIPELINE-EXPERIMENTS.md.
+  - 2026-10-27 — Correction to the entry above: the
+    token's value is not a Replicate API token. The
+    spike harness's first live calls were refused by
+    Replicate (401), and its safe shape diagnostics
+    (length and prefix only — the value is never read)
+    show what is stored is 238 characters and does not
+    start with r8_; a Replicate token is about 40
+    characters and starts with r8_. Everything else in
+    the chain is ready (function deployed, harness
+    live, gate working). Remaining step, the founder's:
+    add a new secret version whose value is the token
+    from replicate.com/account/api-tokens, then
+    Bramble re-checks the shape and re-runs the tests.
 
 ### PC-36: Photo of a person → individual articles + the outfit
 - **Status:** Not started. A prototype is approved
