@@ -364,6 +364,11 @@ email, guest banner + privacy note. Design:
   matching existing trip suppresses the card. The card's
   education line is Bramble's wording, flagged for the
   founder's copy verdict. tests/pc33.test.js.
+  COPY VERDICT (2026-10-27, late): the founder
+  approved the education line as written — "a trip
+  gets its own chat, its own weather, and a packing
+  list, kept out of your daily outfits until you go"
+  stands.
 
 ### UX-13: Visual redesign + design system (L)
 - **Idea (founder 2026-10-20):** the app looks extremely
