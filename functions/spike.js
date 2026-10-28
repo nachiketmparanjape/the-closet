@@ -34,44 +34,50 @@ async function createPrediction(model, input, apiKey) {
 }
 
 async function createWithBackoff(model, input, apiKey, headers) {
-  // Official models accept /models/{owner}/{name}/predictions.
-  // Community models 404 there (learned live, 2026-10-27) —
-  // resolve the latest version and create by version instead.
-  let res = await fetch(API_BASE + "/models/" + model + "/predictions", {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ input }),
-  });
-  if (res.status === 404) {
-    const mres = await fetch(API_BASE + "/models/" + model, {
-      headers: { Authorization: "Bearer " + apiKey },
-    });
-    const mj = await mres.json().catch(() => null);
-    const version = mj && mj.latest_version && mj.latest_version.id;
-    if (!version) {
-      throw new Error(
-        "model lookup failed for " + model + ": " + JSON.stringify(mj).slice(0, 200)
-      );
-    }
-    res = await fetch(API_BASE + "/predictions", {
+  // The retry counter is a LOCAL loop variable. It used to
+  // live on the function object, which persists across
+  // requests on a warm instance — after five lifetime 429s
+  // every later create failed instantly (learned live,
+  // 2026-10-27, third strike for this counter).
+  for (let attempt = 0; ; attempt++) {
+    // Official models accept /models/{owner}/{name}/predictions.
+    // Community models 404 there (learned live, 2026-10-27) —
+    // resolve the latest version and create by version instead.
+    let res = await fetch(API_BASE + "/models/" + model + "/predictions", {
       method: "POST",
       headers,
-      body: JSON.stringify({ version, input }),
+      body: JSON.stringify({ input }),
     });
+    if (res.status === 404) {
+      const mres = await fetch(API_BASE + "/models/" + model, {
+        headers: { Authorization: "Bearer " + apiKey },
+      });
+      const mj = await mres.json().catch(() => null);
+      const version = mj && mj.latest_version && mj.latest_version.id;
+      if (!version) {
+        throw new Error(
+          "model lookup failed for " + model + ": " + JSON.stringify(mj).slice(0, 200)
+        );
+      }
+      res = await fetch(API_BASE + "/predictions", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ version, input }),
+      });
+    }
+    const j = await res.json().catch(() => null);
+    if (res.status === 429 && attempt < 6) {
+      const waitS = j && j.retry_after ? Number(j.retry_after) + 2 : 12;
+      await new Promise((r) => setTimeout(r, waitS * 1000));
+      continue;
+    }
+    if (!res.ok) {
+      throw new Error(
+        "replicate create " + res.status + ": " + JSON.stringify(j).slice(0, 300)
+      );
+    }
+    return j;
   }
-  const j = await res.json().catch(() => null);
-  if (res.status === 429 && (createWithBackoff.tries || 0) < 5) {
-    createWithBackoff.tries = (createWithBackoff.tries || 0) + 1;
-    const waitS = j && j.retry_after ? Number(j.retry_after) + 2 : 12;
-    await new Promise((r) => setTimeout(r, waitS * 1000));
-    return createWithBackoff(model, input, apiKey, headers);
-  }
-  if (!res.ok) {
-    throw new Error(
-      "replicate create " + res.status + ": " + JSON.stringify(j).slice(0, 300)
-    );
-  }
-  return j;
 }
 
 function firstFileUrl(output) {
