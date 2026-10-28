@@ -1993,6 +1993,19 @@ email, guest banner + privacy note. Design:
     errors, not hallucination. The same photo through
     BiRefNet extraction, for contrast, is pixel-exact
     (real cloth, paper tags and all) in 3 seconds.
+  - 2026-10-27 — From the tandpfun/wardrobe deep read
+    (PRODUCT.md research, same date): two steals for
+    this experiment's remaining runs. (1) Chroma-key
+    generation: prompt the model for the garment on a
+    flat solid key color picked to be maximally
+    distant from the garment's own color, then key
+    the background out locally — transparent PNGs
+    from any edit model, instead of the baked light
+    backgrounds both runs above produced. (2) Their
+    anti-invention rubric as panel criteria: preserve
+    only source-supported details; omission beats
+    invention; HOLD (neither pass nor fail) when the
+    construction cannot be recovered honestly.
 
 ### PC-58: Review gate for AI-made images (not yet sized)
 - **Status:** Proposed 2026-10-27 — the founder
@@ -2041,3 +2054,15 @@ email, guest banner + privacy note. Design:
   - 2026-10-27 — Card created (issue #128) the same
     evening as the tandpfun/wardrobe research note,
     on the founder's adoption call.
+  - 2026-10-27 — Deep read of the source repo added
+    the gate's working machinery (steal list):
+    a per-image stage record (status, decision,
+    attempt count, prompt used); failed attempts are
+    KEPT and viewable, never silently discarded;
+    regeneration takes a written direction appended
+    to the prompt ("user regeneration direction"),
+    not a blind re-roll; automated cleanup produces
+    diagnostics and a preview the reviewer sees;
+    and a third verdict besides pass/fail — HOLD,
+    for items whose construction cannot be recovered
+    without inventing details.

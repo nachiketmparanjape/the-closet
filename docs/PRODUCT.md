@@ -345,6 +345,35 @@ Decided topics stay as compact records; full reports live in `research_notes/`.
 - **Status:** UPDATED the same evening — the founder adopted
   the review gate on sight ("make or break"); it is filed as
   PC-58 (issue #128), build timing deliberately later. The
-  repo itself stays watch-only. Revisit trigger:
+  repo itself stays watch-only. DEEP READ (same night,
+  founder's follow-up: "how are the final images
+  generated, what else can be stolen?"): their cutout
+  trick is chroma-key generation — the image model is
+  told to render the garment on a perfectly flat solid
+  key color chosen to be maximally distant from the
+  garment's own detected color (#00ff00 default,
+  #ff00ff for green), then a local script keys the
+  background out (soft matte + despill) and COUNTS
+  leftover chroma-contaminated pixels, failing the
+  stage if cleanup is dirty. Around it: an
+  anti-invention ruleset (preserve only
+  source-supported details; prefer omission over
+  invented logos, seams, pockets; HOLD items whose
+  construction cannot be recovered without invention),
+  a stage record per image (status, decision,
+  attempts, the failed attempts kept and viewable,
+  cleanup diagnostics, reviewer direction appended
+  to the prompt on regeneration), corrective passes
+  instead of blind re-rolls (attach the failure, name
+  it, preserve what worked), a layered-look prompt
+  clause (never invent a zipper or opening; inner
+  layer visible only at real collar, cuff, or a
+  2-4 cm hem), and content-derived stable IDs so
+  re-imports update instead of duplicating. Filed to
+  PC-58 (gate machinery) and PC-57 (chroma technique
+  + rubric). Not taken: gpt-image at high quality for
+  every garment (cost is orders above our
+  segmentation cents) and the local-JSON store.
+  Revisit trigger:
   the repo resumes activity, ships a hosted product, or PC-49
   un-parks. Full note also in the studio inbox (2026-10-27).
