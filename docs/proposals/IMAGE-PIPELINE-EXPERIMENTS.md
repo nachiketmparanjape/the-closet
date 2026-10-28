@@ -218,3 +218,26 @@ wants its image as an array; SAM 3 wants `prompt`).
 - Experiment 1 still waits on the founder's next
   adds in the app (extraction itself is deployed
   with all of tonight's fixes included).
+
+## Direction update (founder, 2026-10-27, later)
+
+- The SAM 3 pipeline shape is his: a Gemini vision
+  call first lists the garments in a photo; SAM 3
+  then runs once per garment type ("t-shirt",
+  "pants", ...). Prompt quality stops being guesswork.
+- His intuition, adopted as the close-out's guiding
+  hypothesis: SAM 3, run cheaply, may serve BOTH use
+  cases — parsing worn multi-garment photos (PC-36)
+  and cutting single garments for the standard view
+  (PC-34) — one service instead of three. The
+  comparison to close out first: that SAM 3 pipeline
+  vs the template method (standard shape per garment
+  type + the real cloth's details laid over it).
+  Qwen stays a labeled, gated extra (PC-57), with
+  one open micro-test: does naming the garment type
+  in the prompt stop its assumption errors?
+- Switching SAM 3 hosts is pre-approved if the
+  community build keeps failing: fal (fastest spike
+  path) or our own pinned deployment of the official
+  weights on Replicate (the production-shaped path —
+  same vendor, same token).
