@@ -21,7 +21,7 @@ const { askStylist, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanit
 const { reflectOutfit } = require("./reflect");
 const { critiqueOutfit } = require("./critique");
 const { parseOutfitPhoto } = require("./photo");
-const { startParse, advanceParse, retryGarment } = require("./parse");
+const { startParse, advanceParse, retryGarment, listParses } = require("./parse");
 const { shopCheck } = require("./shopcheck");
 const { fetchLinkItem } = require("./linkimport");
 const { extractGarmentPhoto } = require("./extract");
@@ -561,6 +561,33 @@ exports.retryOutfitGarment = onCall(
       if (!(err instanceof HttpsError) && !err.key) err.key = "SAM_FAILED";
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
       boundary("retryOutfitGarment", correlationId, uid, err);
+    }
+  }
+);
+
+// PC-36 resume: list the user's unfinished parses so the
+// Add-an-outfit sheet can offer a way back in. Read-only,
+// so it needs no secret.
+exports.listOutfitParses = onCall(
+  {
+    region: "us-central1",
+    timeoutSeconds: 60,
+    memory: "512MiB",
+    maxInstances: 5,
+  },
+  async (request) => {
+    const correlationId = newCorrelationId();
+    const uid = request.auth ? request.auth.uid : null;
+    const start = Date.now();
+    try {
+      if (!request.auth) {
+        fail("NOT_SIGNED_IN");
+      }
+      const result = await listParses(uid, { db: getFirestore() });
+      return finish("listOutfitParses", correlationId, uid, start, result);
+    } catch (err) {
+      if (!(err instanceof HttpsError) && !err.key) err.key = "SAM_FAILED";
+      boundary("listOutfitParses", correlationId, uid, err);
     }
   }
 );

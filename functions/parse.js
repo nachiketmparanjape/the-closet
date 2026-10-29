@@ -281,6 +281,35 @@ function publicGarment(g) {
   return rest;
 }
 
+// listParses: the resume list. Parses a user can return
+// to — still listing, still cutting, or sitting at review
+// unsaved. Saved ("done") parses are already wardrobe data
+// and failed ones have no drafts to review, so neither is
+// listed. Public fields only: no prediction ids, no
+// embeddings, no boxes.
+async function listParses(uid, deps) {
+  const snap = await parsesCollection(deps.db, uid)
+    .orderBy("createdAt", "desc")
+    .limit(20)
+    .get();
+  const out = [];
+  for (const s of snap.docs) {
+    if (!s.exists) continue;
+    const d = s.data();
+    if (d.status !== "listing" && d.status !== "cutting" && d.status !== "review") continue;
+    const garments = d.garments || [];
+    out.push({
+      parseId: s.id,
+      status: d.status,
+      createdAt: d.createdAt && d.createdAt.toDate ? d.createdAt.toDate().toISOString() : null,
+      storagePath: d.sourcePhoto && d.sourcePhoto.storagePath ? d.sourcePhoto.storagePath : null,
+      garmentCount: garments.length,
+      readyCount: garments.filter((g) => g.status === "ready").length,
+    });
+  }
+  return { parses: out };
+}
+
 async function startParse(uid, sourceStoragePath, deps) {
   const db = deps.db;
   const bucket = deps.bucket;
@@ -602,6 +631,7 @@ module.exports = {
   startParse,
   advanceParse,
   retryGarment,
+  listParses,
   parseListJson,
   buildPrompt,
   buildListRequest,

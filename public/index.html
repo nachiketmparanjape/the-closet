@@ -1153,6 +1153,7 @@
       <button class="sheet-option" id="sheetOutfitPhoto" type="button">
         <span><span class="opt-title">From a photo</span><span class="opt-sub">Recognizes pieces, adds what's new</span></span>
       </button>
+      <div id="outfitParseResumes"></div>
     </section>
   </div>
 
@@ -8961,7 +8962,7 @@
         return kept >= 1 && !blocked;
       }
 
-      var outfitParseState = null; // { photoUrl, storagePath, parseId, status, garments, sourceWidth, sourceHeight, decisions, renderUrls, pollTimer, pollFails, pollError, saved, createdItemIds, appendedItemIds }
+      var outfitParseState = null; // { photoUrl, storagePath, parseId, status, garments, sourceWidth, sourceHeight, decisions, renderUrls, pollTimer, pollFails, pollError, saved, createdItemIds, appendedItemIds, resumed }
 
       function openOutfitParse() {
         document.getElementById("outfitParseInput").click();
@@ -8988,7 +8989,7 @@
         // orphan upload the same way closing does, so
         // retries don't pile up files in Storage.
         var prev = outfitParseState;
-        if (prev && !prev.saved && !prev.createdItemIds.length && !prev.appendedItemIds.length && prev.storagePath) {
+        if (prev && !prev.resumed && !prev.saved && !prev.createdItemIds.length && !prev.appendedItemIds.length && prev.storagePath) {
           try { storage.ref().child(prev.storagePath).delete().catch(function () {}); } catch (e) {}
         }
         // Open the review sheet FIRST, so progress — and
@@ -9014,7 +9015,8 @@
           saved: false,
           createdItemIds: [],
           appendedItemIds: [],
-          file: file
+          file: file,
+          resumed: false
         };
         openOverlay(document.getElementById("outfitParseOverlay"));
         renderOutfitParse();
@@ -9034,6 +9036,12 @@
           // Upload landed: from here the file is tracked,
           // so a later close (or retry) cleans it up.
           outfitParseState.storagePath = storagePath;
+          // Upload done, server work starting: say so — the
+          // callable can take a minute (cold start + list +
+          // SAM creates), and "Uploading…" during it reads as
+          // stuck (founder report, 2026-10-28).
+          outfitParseState.status = "starting";
+          renderOutfitParse();
           return functions.httpsCallable("startOutfitParse")({ storagePath: storagePath }).then(function (res) {
             var data = res.data || {};
             var st = outfitParseState;
@@ -9166,6 +9174,8 @@
         var statusEl = document.getElementById("outfitParseStatus");
         if (st.status === "uploading") {
           statusEl.textContent = "Uploading your photo…";
+        } else if (st.status === "starting" || st.status === "listing") {
+          statusEl.textContent = "Finding pieces in your photo…";
         } else if (st.status === "cutting") {
           statusEl.textContent = "Still cutting — pieces appear below as they finish.";
         } else if (st.status === "failed") {
@@ -9361,12 +9371,90 @@
         // photo is an orphan, delete it like the photo
         // matcher does. Once anything was created or
         // appended, the photo is wardrobe data — keep it.
-        if (st && !st.saved && !st.createdItemIds.length && !st.appendedItemIds.length && st.storagePath) {
+        // A resumed parse's photo belongs to that parse,
+        // not to this session, so it is never deleted here.
+        if (st && !st.resumed && !st.saved && !st.createdItemIds.length && !st.appendedItemIds.length && st.storagePath) {
           storage.ref().child(st.storagePath).delete().catch(function () {});
         }
         outfitParseState = null;
         document.getElementById("outfitParseInput").value = "";
         document.getElementById("outfitParseInputCamera").value = "";
+      }
+
+      // PC-36 resume (2026-10-28): a parse outlives the
+      // sheet that started it — SAM takes ~11 minutes, so
+      // the user will usually have closed the sheet before
+      // the drafts are ready. The Add-an-outfit sheet lists
+      // unfinished parses; tapping one reopens the review
+      // sheet on that parse, polling again if still
+      // cutting. Decisions live in memory only, so a
+      // resumed review starts undecided — the drafts
+      // themselves persist.
+      function outfitParseResumeLabel(entry) {
+        var time = "Earlier";
+        if (entry.createdAt) {
+          try { time = new Date(entry.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); } catch (e) {}
+        }
+        var state = entry.status === "review" ? "pieces ready to review" : entry.status === "listing" ? "still finding pieces" : "still cutting";
+        return { title: "Continue — photo from " + time, sub: entry.garmentCount + (entry.garmentCount === 1 ? " piece · " : " pieces · ") + state };
+      }
+
+      function refreshOutfitParseResumes() {
+        var box = document.getElementById("outfitParseResumes");
+        if (!box || !currentUser) return;
+        box.innerHTML = "";
+        functions.httpsCallable("listOutfitParses")({}).then(function (res) {
+          var list = (res.data && res.data.parses) || [];
+          list.forEach(function (entry) {
+            var label = outfitParseResumeLabel(entry);
+            var btn = document.createElement("button");
+            btn.className = "sheet-option";
+            btn.type = "button";
+            var wrap = document.createElement("span");
+            var t = document.createElement("span"); t.className = "opt-title"; t.textContent = label.title;
+            var s = document.createElement("span"); s.className = "opt-sub"; s.textContent = label.sub;
+            wrap.appendChild(t); wrap.appendChild(s);
+            btn.appendChild(wrap);
+            btn.addEventListener("click", function () { closeAddOutfitSheet(); resumeOutfitParse(entry); });
+            box.appendChild(btn);
+          });
+        }).catch(function () { /* resumes are a convenience; a failed list hides quietly */ });
+      }
+
+      function resumeOutfitParse(entry) {
+        if (!currentUser || !entry.storagePath || !entry.parseId) return;
+        outfitParseStopPolling();
+        noteTrail("outfit-parse: resumed " + entry.parseId);
+        outfitParseState = {
+          photoUrl: "",
+          storagePath: entry.storagePath,
+          parseId: entry.parseId,
+          status: "cutting",
+          garments: [],
+          sourceWidth: null,
+          sourceHeight: null,
+          decisions: {},
+          renderUrls: {},
+          pollTimer: null,
+          pollFails: 0,
+          pollError: false,
+          saved: false,
+          createdItemIds: [],
+          appendedItemIds: [],
+          file: null,
+          resumed: true
+        };
+        openOverlay(document.getElementById("outfitParseOverlay"));
+        renderOutfitParse();
+        storage.ref().child(entry.storagePath).getDownloadURL().then(function (url) {
+          if (!outfitParseState) return;
+          outfitParseState.photoUrl = url;
+          renderOutfitParse();
+        }).catch(function () {});
+        pollOutfitParseOnce();
+        // pollOutfitParseOnce stops itself on review/done/
+        // failed; while still cutting, keep polling.
+        outfitParseStartPolling();
       }
 
       function saveOutfitParse(logWear) {
@@ -9898,7 +9986,7 @@
       // for a later cleanup pass.
       var addOutfitSheet = document.getElementById("addOutfitSheet");
       function closeAddOutfitSheet() { closeOverlay(addOutfitSheet); }
-      document.getElementById("addOutfitBtn").addEventListener("click", function () { openOverlay(addOutfitSheet); });
+      document.getElementById("addOutfitBtn").addEventListener("click", function () { openOverlay(addOutfitSheet); refreshOutfitParseResumes(); });
       document.getElementById("sheetBuild").addEventListener("click", function () { closeAddOutfitSheet(); openBuilder(); });
       document.getElementById("sheetOutfitPhoto").addEventListener("click", function () { closeAddOutfitSheet(); openOutfitParse(); });
       document.getElementById("addOutfitClose").addEventListener("click", closeAddOutfitSheet);
@@ -11097,6 +11185,14 @@
       document.getElementById("outfitParseSaveWear").addEventListener("click", function () { saveOutfitParse(true); });
       document.getElementById("outfitParseRetry").addEventListener("click", function () {
         if (outfitParseState && outfitParseState.file) handleOutfitParseFile(outfitParseState.file);
+        // A resumed parse has no file to re-upload: retry
+        // means poll again (the parse already exists).
+        else if (outfitParseState && outfitParseState.parseId) {
+          outfitParseState.status = "cutting";
+          renderOutfitParse();
+          pollOutfitParseOnce();
+          outfitParseStartPolling();
+        }
       });
       document.getElementById("outfitParseInput").addEventListener("change", function () {
         handleOutfitParseFile(this.files && this.files[0]);
