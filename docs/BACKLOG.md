@@ -705,11 +705,12 @@ email, guest banner + privacy note. Design:
     sense; see PC-58).
 
 ### PC-36: Photo of a person → individual articles + the outfit
-- **Status:** Not started. A prototype is approved
-  (founder, 2026-10-21) but waits for PC-34 to go live:
-  both use the same garment-extraction core, and PC-34
-  waits for the founder's token step (see its card).
-  Next action after that: the prototype below.
+- **Status:** IN SPRINT 25 (approved 2026-10-28, headline
+  card). Design doc first for the founder's validation,
+  then build — the 2026-10-28 design sketch on issue #78
+  is the starting point. The prototype precondition is met:
+  PC-34's renders are live (69 normalized renders) and SAM
+  3 is proven on the founder's photos.
 - **In plain words:** Take one photo of a person wearing
   an outfit — a new photo, or one already on the phone.
   The app finds each garment in the photo, creates a
@@ -2074,6 +2075,10 @@ email, guest banner + privacy note. Design:
   walk once PC-34's first real renders exist or
   PC-57 passes its fidelity bar. Owner: Bramble
   (design), founder (verdict). GitHub issue #128.
+  2026-10-28 — First alternate at the Sprint 25 walk:
+  the trigger fired (renders exist), but PC-36's
+  draft-confirm covers this gate's core for the
+  multi-photo flow, so it follows rather than leads.
 - **In plain words:** Any picture an AI makes for a
   wardrobe item — an extracted cutout (PC-34), a
   generated clean view (PC-57), a modeled photo
@@ -2124,3 +2129,34 @@ email, guest banner + privacy note. Design:
     and a third verdict besides pass/fail — HOLD,
     for items whose construction cannot be recovered
     without inventing details.
+
+### PC-59: Uniform display scaling + too-small-in-photo warning
+
+- **Status:** Part 1 DONE 2026-10-28 (Stage C: every render
+  trimmed and scaled to the same 92% frame box, so photo
+  distance no longer decides display size; founder's
+  sizing call the same day: uniform size everywhere,
+  including outfit compositions). Part 2 IN SPRINT 25
+  (approved 2026-10-28): the too-small warning, measured
+  at extraction time. GitHub issue #129.
+- **In plain words:** Every piece appears at a similar
+  size in the app no matter how big or small it was in
+  its photo — and if a photo is taken from too far away,
+  the app says so and asks for a closer photo, instead of
+  quietly showing a fuzzy piece forever.
+- **Part 2 scope:** at extraction, measure garment frame
+  share (mask pixels / photo pixels) and source long
+  edge. Proposed trigger: frame share under ~25% or long
+  edge under ~700px on a camera photo (retail-sourced
+  photos exempt — the remedy there is "add your own
+  photo"). Surfaces: a note at add time and a small
+  persistent note on the item until a better cover photo
+  replaces it. Non-blocking: the render still ships.
+- **History:**
+  - 2026-10-28 — Filed from the founder's follow-up
+    thought after approving the Stage C renders. Audit
+    the same day: no camera photo in the wardrobe is in
+    the danger zone; the softest renders are three small
+    store images (~450px wide). Outfit-sizing question
+    answered by the founder the same day: uniform size
+    everywhere; category-relative sizing rejected.
