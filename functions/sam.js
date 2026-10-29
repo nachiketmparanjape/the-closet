@@ -89,6 +89,21 @@ async function createWithBackoff(doFetch, sleep, init) {
 
 // Upload an input image to Replicate's Files API. Returns
 // the serving URL for use as a prediction input.
+// SAM 3 takes RGB. An RGBA input fails INSIDE the model
+// ("The size of tensor a (4) must match the size of
+// tensor b (3)") — the backfill never hit this because
+// it baked everything to JPEG first, but production
+// normalizeOrientation preserves PNG, so a store PNG
+// with an alpha channel breaks the prediction. Flatten
+// over white (what the viewer sees) and encode JPEG.
+// Dimensions are unchanged, so polygon coordinates
+// still match the stored baked pixels exactly. Only
+// the copy sent to SAM is flattened — the stored baked
+// bytes stay RGBA, so cutting keeps translucent pixels.
+async function toSamInput(buffer) {
+  return sharp(buffer).flatten({ background: "#ffffff" }).jpeg({ quality: 92 }).toBuffer();
+}
+
 async function uploadInputImage({ apiKey, buffer, filename, contentType, fetchImpl }) {
   const doFetch = fetchImpl || fetch;
   const form = new FormData();
@@ -243,6 +258,7 @@ async function polygonToCutout({ imageBuffer, rings }) {
 module.exports = {
   MODEL,
   resolveVersion,
+  toSamInput,
   uploadInputImage,
   createSegmentation,
   getSegmentation,

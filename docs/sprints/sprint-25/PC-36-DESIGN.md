@@ -346,12 +346,12 @@ the build lands:
 | Gemini garment list (1 call) | ~$0.009 |
 | SAM, 3 runs | $0.0057 |
 | Orientation verdicts, 3 calls | ~$0.0225 |
-| Embeddings, 3 pieces | TBD at build time |
-| **Total** | **~$0.037 + embeddings** |
+| Embeddings, 3 pieces | $0.0003 |
+| **Total** | **~$0.0375** |
 
-Note: the cost sheet's PC-36 row ($0.0147) counted the
-list + SAM only. It will be updated to this fuller math
-when the build lands. At experiment scale the whole
+Note: the cost sheet's PC-36 row is updated to this
+fuller math (it previously counted list + SAM only, at
+$0.0147). At experiment scale the whole
 photo costs less than a nickel; the decision that
 matters is capability, not cost, until volume grows.
 The 5,000-images-a-month self-host trigger still stands.
@@ -501,10 +501,20 @@ design above; they pin the machinery down.
   (us-central1 default, `VERTEX_EMBED_LOCATION`
   override), authenticated by ADC. The render goes in
   composited over white, the same ground as the hash.
-  Price is filled from billing when the first real
-  calls land — it is not estimated here. An embedding
-  failure soft-fails to pHash-only matching; it never
-  blocks a piece.
+  Price: $0.0001 per image (Google Cloud pricing page,
+  2026-10-28); the sheet's PC-36 row now computes
+  $0.0375 for a 3-piece photo. An embedding failure
+  soft-fails to pHash-only matching; it never blocks
+  a piece.
+- **SAM inputs are RGB, never RGBA.** An RGBA PNG
+  fails INSIDE the SAM 3 model (tensor band error) —
+  the backfill never hit this because it baked
+  everything to JPEG first. `startParse` and
+  `retryGarment` flatten the baked bytes over white
+  and JPEG-encode the copy sent to Replicate; the
+  stored baked bytes stay RGBA so cutting keeps
+  translucent pixels, and dimensions are unchanged
+  so polygon coordinates still match exactly.
 - **Baked source stored.** `startParse` stores the
   EXIF-baked source bytes under the parse
   (`parses/{id}/source-baked.*`) so `advanceParse`

@@ -263,6 +263,36 @@ describe("startParse -> advanceParse", () => {
     assert.strictEqual(g.predictionId, undefined); // stripped from the public shape
   });
 
+  test("RGBA PNG source: stored baked bytes stay PNG, SAM gets the flattened copy", async () => {
+    const db = new FakeDb();
+    const bucket = new FakeBucket();
+    const rgba = await sharp({
+      create: { width: 200, height: 200, channels: 4, background: { r: 200, g: 30, b: 30, alpha: 1 } },
+    })
+      .png()
+      .toBuffer();
+    bucket.files.set("users/u1/photos/a.png", { buffer: rgba });
+    const listModel = async () => ({
+      text: JSON.stringify({ garments: [{ type: "tee", colors: ["red"], detail: "" }] }),
+    });
+    const started = await startParse("u1", "users/u1/photos/a.png", {
+      db,
+      bucket,
+      apiKey: "k",
+      fetchImpl: replicateStub(null),
+      callModel: listModel,
+    });
+    assert.strictEqual(started.status, "cutting");
+    // The stored baked file keeps the original RGBA PNG
+    // (cutting fidelity, incl. translucent pixels).
+    const bakedPath = "users/u1/parses/" + started.parseId + "/source-baked.png";
+    const stored = bucket.files.get(bakedPath);
+    assert.ok(stored, "baked file stored");
+    const meta = await sharp(stored.buffer).metadata();
+    assert.strictEqual(meta.format, "png");
+    assert.strictEqual(meta.channels, 4);
+  });
+
   test("still processing leaves the garment cutting", async () => {
     const db = new FakeDb();
     const bucket = new FakeBucket();

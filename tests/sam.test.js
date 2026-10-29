@@ -15,7 +15,37 @@ const {
   createSegmentation,
   getSegmentation,
   uploadInputImage,
+  toSamInput,
 } = require("../functions/sam");
+
+describe("toSamInput", () => {
+  test("RGBA PNG becomes RGB JPEG at the same size", async () => {
+    const rgba = await sharp({
+      create: { width: 40, height: 30, channels: 4, background: { r: 200, g: 30, b: 30, alpha: 0.5 } },
+    })
+      .png()
+      .toBuffer();
+    const out = await toSamInput(rgba);
+    const meta = await sharp(out).metadata();
+    assert.strictEqual(meta.format, "jpeg");
+    assert.strictEqual(meta.channels, 3);
+    assert.strictEqual(meta.width, 40);
+    assert.strictEqual(meta.height, 30);
+  });
+  test("RGB JPEG stays RGB JPEG at the same size", async () => {
+    const rgb = await sharp({
+      create: { width: 40, height: 30, channels: 3, background: { r: 200, g: 30, b: 30 } },
+    })
+      .jpeg()
+      .toBuffer();
+    const out = await toSamInput(rgb);
+    const meta = await sharp(out).metadata();
+    assert.strictEqual(meta.format, "jpeg");
+    assert.strictEqual(meta.channels, 3);
+    assert.strictEqual(meta.width, 40);
+    assert.strictEqual(meta.height, 30);
+  });
+});
 
 describe("ringArea", () => {
   test("square 10x10 has area 100", () => {

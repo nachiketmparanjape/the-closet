@@ -54,6 +54,7 @@ const { codedError } = require("./errors");
 const { normalizeOrientation, alphaStats, judgeMask } = require("./imagenorm");
 const { getClient, reportUsage, MODEL_VERSION } = require("./describe");
 const {
+  toSamInput,
   uploadInputImage,
   createSegmentation,
   getSegmentation,
@@ -337,11 +338,14 @@ async function startParse(uid, sourceStoragePath, deps) {
         sourceHeight: baked.height,
       };
     }
+    // SAM gets the flattened RGB copy, never the stored
+    // baked bytes (RGBA PNGs fail inside the model).
+    const samInput = await toSamInput(baked.buffer);
     const fileUrl = await uploadInputImage({
       apiKey: deps.apiKey,
-      buffer: baked.buffer,
-      filename: parseId + "." + ext,
-      contentType: baked.mimeType,
+      buffer: samInput,
+      filename: parseId + ".jpg",
+      contentType: "image/jpeg",
       fetchImpl: deps.fetchImpl,
     });
     const garments = [];
@@ -571,10 +575,12 @@ async function retryGarment(uid, parseId, garmentId, deps) {
     throw codedError("SAM_NOT_CONFIGURED", "REPLICATE_API_TOKEN is not set");
   }
   const [bakedBuffer] = await deps.bucket.file(doc.bakedStoragePath).download();
+  const samInput = await toSamInput(bakedBuffer);
   const fileUrl = await uploadInputImage({
     apiKey: deps.apiKey,
-    buffer: bakedBuffer,
+    buffer: samInput,
     filename: parseId + "-" + garmentId + ".jpg",
+    contentType: "image/jpeg",
     fetchImpl: deps.fetchImpl,
   });
   const created = await createSegmentation({
