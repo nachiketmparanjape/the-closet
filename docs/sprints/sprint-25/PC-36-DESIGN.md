@@ -1,9 +1,8 @@
 # PC-36 design — one photo → wardrobe items + outfit
 
-- **Status:** DRAFT, Q1–Q5 validated by the founder
-  2026-10-28 (see "Open questions" for the record);
-  Q6 still open — the founder asked what the gate is,
-  and no code moves until he answers it. Sprint 25,
+- **Status:** VALIDATED by the founder 2026-10-28
+  (all six questions answered; see "Open questions"
+  for the record). Build may proceed. Sprint 25,
   card 1.
 - **Owner:** Bramble (design + build), founder (validation).
 - **Related:** PC-36 card (`docs/BACKLOG.md`), design sketch on
@@ -423,9 +422,15 @@ The 5,000-images-a-month self-host trigger still stands.
   accepting the recommendation — per-card only in v1,
   no "confirm all new" button. If he meant the
   opposite, one word corrects this line.
-- **Q6 — Gate on drafts: OPEN.** The founder asked
-  what the gate is (2026-10-28). See the plain-words
-  version below; no code moves until he answers.
+- **Q6 — Gate on drafts: DECIDED 2026-10-28.** Skip
+  the automated gate for PC-36 v1 drafts — the
+  founder's review is the gate. The automated check
+  becomes its own card, PC-60, designed later with
+  research behind it (web literature + his manual
+  checks as the calibration set). The founder's
+  reasoning: an automated check will be needed at
+  some point, so plan it properly rather than
+  rushing it into this sprint.
   - The gate, in plain words: today, when a flat photo
     is cut, the app runs a second automated check — a
     Gemini call that looks at the cut and judges

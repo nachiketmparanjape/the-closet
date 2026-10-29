@@ -108,6 +108,14 @@ with it.
 - PC-48 trip planning — on visa watch (Canada visa pending,
   not landed).
 
+## Follow-up cards (proposed, later walks)
+
+- PC-60 automated cutout check — proposed 2026-10-28
+  from PC-36's Q6: a well-designed unified check,
+  calibrated against the founder's verdicts. Enters
+  a walk when draft volume makes manual review the
+  bottleneck, or when the flat-photo swap lands.
+
 ## Held / parked (triggers unmet, not in this sprint)
 
 - PC-41: waits for the founder's shop-attach phone verdict.

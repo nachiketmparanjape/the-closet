@@ -2160,3 +2160,140 @@ email, guest banner + privacy note. Design:
     store images (~450px wide). Outfit-sizing question
     answered by the founder the same day: uniform size
     everywhere; category-relative sizing rejected.
+
+### PC-60: Automated cutout check — a well-designed second opinion (not yet sized)
+
+- **Status:** Proposed 2026-10-28 — the founder
+  decided (closing PC-36's Q6) that an automated check
+  is needed at some point, but not inside PC-36 v1:
+  his own review is the gate for drafts, and the
+  automated check gets its own well-designed card
+  instead of being rushed into the sprint. Next action:
+  enters a planning walk when PC-36's review flow is
+  live and draft volume makes manual review the
+  bottleneck, or when the flat-photo swap lands — the
+  check then covers both flows (drafts + flat photos),
+  not one. Owner: Bramble (design), founder (verdicts
+  — his eyes are the calibration set). GitHub issue #130.
+- **In plain words:** One day the app should check its
+  own cuts the way the founder does — whole garment,
+  nothing extra, no holes, clean edges, the right
+  piece, upright — and flag the bad ones before a
+  human has to look. This card designs that check
+  properly instead of bolting on another guess.
+- **Why a separate card:** the current gate is two
+  layers that grew organically (mask heuristics, then
+  a vision-model judge added after a real failure —
+  a bag strap that rode along on a BiRefNet cut).
+  They catch different failures, they were never
+  calibrated against a labeled set, and their
+  fail-direction differs by surface (flat photos fail
+  safe toward the original; drafts have no gate at
+  all). A unified check needs its own design: one
+  checklist, one calibration set, one stated
+  fail-direction per surface.
+- **The checklist (distilled from the founder's own
+  manual checks — this is the spec, not a wish list):**
+  1. Whole garment present — no cut-off sleeves,
+     legs, straps, or edges.
+  2. Nothing extra — no other objects, body parts,
+     furniture, or background remnants (the bag-strap
+     case).
+  3. No holes — no background showing through the
+     garment (the magenta-through-holes test).
+  4. Clean edges — no fringe or halo, checked on dark
+     AND light grounds (one ground hides what the
+     other reveals).
+  5. Right garment — the cut matches the named
+     garment, not a neighboring item (the store-photo
+     failure: a bare concept call returned 14
+     detections).
+  6. Upright — collar / waistband position correct
+     (two of the founder's own first-pass rotation
+     reads were wrong, so even the human check needs
+     care — and the automated check must be judged
+     against verified verdicts, not first passes).
+  7. Judged on final pixels — the normalized render,
+     at full size. Thumbnails misled a rotation read;
+     scores misled twice (a 0.91-scored cleanup was
+     blank; a 0.54 cut was broken). Scores are not
+     verification.
+- **The calibration set (already exists):** the 69
+  verified renders (all pass, with per-item notes in
+  the backfill review) plus the known failures (the
+  broken 0.54 cut, the zero-detection holds, the
+  Qwen inventions). Rule for this card: the check
+  must first agree with the founder's verdicts on
+  this set — agreement rate reported, thresholds
+  tuned on it, never guessed — before it gates
+  anything. Every future review verdict (confirm /
+  reject with reason) extends the set.
+- **Approaches found in research (Oct 2026), with
+  tradeoffs:**
+  1. Model-confidence signals (free): SAM's
+     predicted-IoU and scores. Weak on their own —
+     the literature's model-score protocol trails the
+     oracle, and the 0.91-blank lesson agrees. A
+     signal, never a verdict.
+  2. Mask-geometry heuristics (free, extends today's
+     layer 1 — aspect match, foreground fraction,
+     largest-component share, semi-transparent
+     share): add fringe measurement (alpha gradient
+     at the boundary, composited on black / gray /
+     white), hole detection (enclosed transparent
+     regions inside the mask), and edge-touch as a
+     cropping signal. Cheap, explainable, and every
+     failure names its reason.
+  3. Semantic verification (cheap, reuses PC-36's
+     machinery): CLIP / Vertex-multimodal similarity
+     between the cutout render and the garment
+     description — the same "does this match the
+     named thing" test the literature uses to filter
+     false detections. Catches wrong-object cuts,
+     which geometry cannot see.
+  4. Vision-model judge (today's layer 2, kept):
+     the strict magenta-composite prompt, but with
+     the checklist above written into it and its
+     verdicts logged against the calibration set.
+     Costs one call per piece; occasionally doubts
+     a good cut.
+  5. Self-consistency (expensive): cut with two
+     engines (SAM + BiRefNet) and compare masks;
+     agreement is confidence. 2× cut cost — a
+     spot-check sample, not every cut, unless the
+     stakes justify it.
+  6. Learned quality evaluator (research frontier,
+     later phase): a trained pixel-wise error map
+     without ground truth (MatAnyone 2's MQE —
+     https://arxiv.org/html/2512.11782v1; and the
+     reference-free MLLM auditor MQ-Auditor). Only
+     worth it if heuristics + judge prove
+     insufficient; training it needs labeled errors,
+     which the growing verdict set could become.
+- **Design requirements (to be settled in this
+  card's own design doc, before build):**
+  - One checklist, one verdict shape with named
+    reasons (a flag must say WHY, like the layer-2
+    problems list does).
+  - Flag, never hide: a flagged cut shows with its
+    flag and reason; nothing is silently dropped.
+    The per-surface fail-direction is stated
+    explicitly (flat photos today fail safe toward
+    the original; drafts surface the flag on the
+    review card).
+  - Calibration report first: agreement with the
+    founder's verdicts on the labeled set, per
+    checklist item, before any gating.
+  - Cost per piece, from the studio cost sheet's
+    assumptions (heuristics free; semantic check
+    rides the embedding call; judge call priced).
+  - Boundary: source-quality warnings stay PC-59's
+    job; orientation verdicts stay the pipeline's
+    layer 3. This card judges the CUT, not the
+    photo.
+- **History:**
+  - 2026-10-28 — Proposed from PC-36's Q6. The
+    founder: an automated check will be needed at
+    some point; if not now, plan a separate PC and
+    design it well, researching both the literature
+    and his own manual checks.
