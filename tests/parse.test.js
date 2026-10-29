@@ -11,6 +11,7 @@ const sharp = require("module").createRequire(
 const {
   startParse,
   advanceParse,
+  retryGarment,
   parseListJson,
   buildPrompt,
   renderPathForParse,
@@ -286,6 +287,59 @@ describe("startParse -> advanceParse", () => {
     });
     assert.strictEqual(advanced.status, "cutting");
     assert.strictEqual(advanced.garments[0].status, "cutting");
+  });
+
+  test("retry re-creates a failed garment and reopens polling", async () => {
+    const db = new FakeDb();
+    const bucket = new FakeBucket();
+    const baked = await redJpeg();
+    const parseRef = db.collection("users").doc("u1").collection("parses").doc("p9");
+    await parseRef.set({
+      bakedStoragePath: "users/u1/parses/p9/source-baked.jpg",
+      sourceWidth: 200,
+      sourceHeight: 200,
+      status: "review",
+      garments: [
+        { id: "g0", type: "tee", prompt: "red tee", predictionId: "old", status: "failed", error: "SAM failed" },
+      ],
+    });
+    bucket.files.set("users/u1/parses/p9/source-baked.jpg", { buffer: baked });
+    const fetchImpl = async (url, init) => {
+      if (url.includes("/models/")) {
+        return { ok: true, json: async () => ({ latest_version: { id: "v1" } }) };
+      }
+      if (url.endsWith("/files")) {
+        return { ok: true, json: async () => ({ urls: { get: "https://r.delivery/f" } }) };
+      }
+      if (url.endsWith("/predictions") && init.method === "POST") {
+        return { ok: true, json: async () => ({ id: "pred2", status: "starting" }) };
+      }
+      throw new Error("unexpected fetch: " + url);
+    };
+    const out = await retryGarment("u1", "p9", "g0", { db, bucket, apiKey: "k", fetchImpl });
+    assert.strictEqual(out.status, "cutting");
+    assert.strictEqual(out.garment.status, "cutting");
+    assert.strictEqual(out.garment.predictionId, undefined); // public shape strips it
+    const after = await parseRef.get();
+    assert.strictEqual(after.data().status, "cutting");
+    assert.strictEqual(after.data().garments[0].status, "cutting");
+    assert.strictEqual(after.data().garments[0].predictionId, "pred2");
+    assert.strictEqual(after.data().garments[0].error, null);
+  });
+
+  test("retry refuses a garment that is not failed or not-found", async () => {
+    const db = new FakeDb();
+    const bucket = new FakeBucket();
+    const parseRef = db.collection("users").doc("u1").collection("parses").doc("p9");
+    await parseRef.set({
+      bakedStoragePath: "users/u1/parses/p9/source-baked.jpg",
+      status: "cutting",
+      garments: [{ id: "g0", type: "tee", prompt: "tee", predictionId: "p", status: "cutting" }],
+    });
+    await assert.rejects(
+      retryGarment("u1", "p9", "g0", { db, bucket, apiKey: "k", fetchImpl: async () => ({}) }),
+      /not retryable/
+    );
   });
 
   test("zero detections marks not-found", async () => {

@@ -786,6 +786,15 @@
       .form-actions { flex-direction: column-reverse; }
       .form-actions button { width: 100%; }
     }
+    /* PC-36: outfit-photo review. Outlines are positioned by
+       percentage against the source dims, so they track any
+       display size without image-load timing. */
+    .outfit-parse-photo-wrap { position: relative; }
+    .outfit-parse-photo-wrap img { display: block; width: 100%; height: auto; }
+    .outfit-parse-box { position: absolute; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.35); border-radius: 4px; cursor: pointer; }
+    .outfit-parse-card { border: 1px solid rgba(0,0,0,.14); border-radius: 8px; padding: 10px; margin-top: 10px; }
+    .outfit-parse-card img { display: block; width: 100%; max-height: 320px; object-fit: contain; background: var(--paper); }
+    .outfit-parse-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
   </style>
 </head>
 <body>
@@ -884,6 +893,8 @@
         <button class="secondary" id="addOutfitBtn" type="button" style="margin-left:auto">+ Add outfit</button>
         <input type="file" id="photoParseInput" accept="image/*" hidden>
         <input type="file" id="photoParseInputCamera" accept="image/*" capture="environment" hidden>
+        <input type="file" id="outfitParseInput" accept="image/*" hidden>
+        <input type="file" id="outfitParseInputCamera" accept="image/*" capture="environment" hidden>
       </div>
       <p class="hint" id="outfitsHint">Ask the stylist, build one yourself, or match a photo of an outfit — saved outfits land here.</p>
       <div class="gallery" id="outfitsGallery"></div>
@@ -940,6 +951,33 @@
       <div class="form-actions">
         <button class="primary" id="photoParseSave" type="button">Save outfit</button>
         <button class="primary" id="photoParseSaveWear" type="button" style="margin-left:8px" title="Save the outfit and log it as worn today">Save + log worn today</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- PC-36: outfit-photo parse — review the drafts before
+       anything becomes a wardrobe item. The source photo
+       carries tappable outlines (scaled by percentage, so
+       no image-load timing matters); each card below it
+       is one draft with its own confirm / match / dismiss. -->
+  <div class="overlay" id="outfitParseOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="outfitParseTitle">
+    <section class="modal">
+      <div class="modal-head">
+        <h2 id="outfitParseTitle">Pieces from your photo</h2>
+        <button class="icon-button" id="outfitParseClose" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="hint" id="outfitParseStatus"></p>
+        <div class="outfit-parse-photo-wrap" id="outfitParsePhotoWrap">
+          <img id="outfitParsePhoto" alt="Your outfit photo">
+          <div id="outfitParseBoxes"></div>
+        </div>
+        <div id="outfitParseCards"></div>
+        <p class="hint" id="outfitParseSaveHint"></p>
+      </div>
+      <div class="form-actions">
+        <button class="primary" id="outfitParseSave" type="button">Save outfit</button>
+        <button class="primary" id="outfitParseSaveWear" type="button" style="margin-left:8px" title="Save the outfit and log it as worn today">Save + log worn today</button>
       </div>
     </section>
   </div>
@@ -1107,6 +1145,9 @@
       </button>
       <button class="sheet-option" id="sheetCamera" type="button">
         <span><span class="opt-title">Match with camera</span><span class="opt-sub">Photograph an outfit now</span></span>
+      </button>
+      <button class="sheet-option" id="sheetOutfitPhoto" type="button">
+        <span><span class="opt-title">Outfit photo</span><span class="opt-sub">One photo, several pieces</span></span>
       </button>
     </section>
   </div>
@@ -8865,6 +8906,530 @@
         });
       }
 
+      // PC-36: outfit-photo parse — one photo in, draft pieces
+      // + outfit out. The review sheet is the gate: nothing
+      // becomes a wardrobe item until the founder confirms
+      // it, piece by piece. Decisions live in memory during
+      // the sheet session; the server owns pipeline status,
+      // the client owns decisions, and rendering merges the
+      // two (decisions win over status).
+      function outfitParseDraftName(type, colors) {
+        var parts = (colors || []).slice();
+        parts.push(type || "piece");
+        var name = parts.join(" ").trim();
+        return name.charAt(0).toUpperCase() + name.slice(1);
+      }
+
+      function outfitParseCategoryForType(type) {
+        var t = (type || "").toLowerCase();
+        if (/(tee|shirt|blouse|sweater|hoodie|tank|polo|cardigan|vest|top)/.test(t)) return "Tops";
+        if (/(trouser|pant|jean|short|skirt|legging)/.test(t)) return "Bottoms";
+        if (/(jacket|coat|blazer|parka|overcoat)/.test(t)) return "Outerwear";
+        if (/(shoe|sneaker|boot|sandal|heel|loafer|trainer)/.test(t)) return "Shoes";
+        if (/(bag|hat|scarf|belt|sunglass|cap|beanie|glove)/.test(t)) return "Accessories";
+        return "Other";
+      }
+
+      function outfitParseCardStatus(g, decision) {
+        if (decision && decision.decision === "dismissed") return { text: "Dismissed", tag: null };
+        if (g.status === "cutting") return { text: "Still cutting…", tag: null };
+        if (g.status === "failed") return { text: "Couldn't cut", tag: null };
+        if (g.status === "not-found") return { text: "Not found in this photo", tag: null };
+        var cands = g.matchCandidates || [];
+        var propose = cands.filter(function (c) { return c.band === "propose"; });
+        var tag = (typeof g.score === "number" && g.score < 0.7) ? "Needs a look" : null;
+        if (propose.length) return { text: "Looks like your " + propose[0].itemName, tag: tag };
+        if (cands.length) return { text: "Might be your " + cands[0].itemName + "?", tag: tag };
+        return { text: "New", tag: tag };
+      }
+
+      function outfitParseCanSave(garments, decisions) {
+        var kept = 0;
+        var blocked = false;
+        garments.forEach(function (g) {
+          var d = decisions[g.id];
+          if (d && (d.decision === "confirmed-new" || d.decision === "matched")) {
+            kept++;
+          } else if (!d || !d.decision) {
+            blocked = true;
+          }
+        });
+        return kept >= 1 && !blocked;
+      }
+
+      var outfitParseState = null; // { photoUrl, storagePath, parseId, status, garments, sourceWidth, sourceHeight, decisions, renderUrls, pollTimer, pollFails, pollError, saved, createdItemIds, appendedItemIds }
+
+      function openOutfitParse() {
+        document.getElementById("outfitParseInput").click();
+      }
+
+      function outfitParseStopPolling() {
+        if (outfitParseState && outfitParseState.pollTimer) {
+          clearInterval(outfitParseState.pollTimer);
+          outfitParseState.pollTimer = null;
+        }
+      }
+
+      function outfitParseStartPolling() {
+        outfitParseStopPolling();
+        if (!outfitParseState) return;
+        outfitParseState.pollTimer = setInterval(pollOutfitParseOnce, 8000);
+      }
+
+      function handleOutfitParseFile(file) {
+        if (!file || !currentUser) return;
+        showToast("Cutting your photo into pieces…");
+        var safeName = Date.now() + "-" + file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+        var storagePath = "users/" + currentUser.uid + "/outfit-photos/" + safeName;
+        var fileRef = storage.ref().child(storagePath);
+        fileRef.put(file, { contentType: file.type }).then(function () {
+          return fileRef.getDownloadURL();
+        }).then(function (url) {
+          return functions.httpsCallable("startOutfitParse")({ storagePath: storagePath }).then(function (res) {
+            var data = res.data || {};
+            outfitParseState = {
+              photoUrl: url,
+              storagePath: storagePath,
+              parseId: data.parseId,
+              status: data.status,
+              garments: data.garments || [],
+              sourceWidth: data.sourceWidth || null,
+              sourceHeight: data.sourceHeight || null,
+              decisions: {},
+              renderUrls: {},
+              pollTimer: null,
+              pollFails: 0,
+              pollError: false,
+              saved: false,
+              createdItemIds: [],
+              appendedItemIds: []
+            };
+            openOverlay(document.getElementById("outfitParseOverlay"));
+            renderOutfitParse();
+            if (data.status === "cutting") outfitParseStartPolling();
+          });
+        }).catch(function (err) {
+          showToast(friendlyError(err));
+        });
+      }
+
+      function pollOutfitParseOnce() {
+        var st = outfitParseState;
+        if (!st || st.saved) { outfitParseStopPolling(); return; }
+        functions.httpsCallable("pollOutfitParse")({ parseId: st.parseId }).then(function (res) {
+          var data = res.data || {};
+          // Server owns pipeline status; decisions stay in
+          // memory and win at render time, so replacing
+          // the garment list here never clobbers a tap.
+          st.garments = data.garments || st.garments;
+          st.status = data.status || st.status;
+          if (data.sourceWidth) st.sourceWidth = data.sourceWidth;
+          if (data.sourceHeight) st.sourceHeight = data.sourceHeight;
+          st.pollFails = 0;
+          st.pollError = false;
+          renderOutfitParse();
+          if (st.status === "review" || st.status === "done" || st.status === "failed") outfitParseStopPolling();
+        }).catch(function () {
+          st.pollFails++;
+          if (st.pollFails >= 3) {
+            outfitParseStopPolling();
+            st.pollError = true;
+            renderOutfitParse();
+          }
+        });
+      }
+
+      function outfitParseDecision(garmentId, patch) {
+        var st = outfitParseState;
+        if (!st) return;
+        st.decisions[garmentId] = Object.assign({}, st.decisions[garmentId] || {}, patch);
+        renderOutfitParse();
+      }
+
+      function outfitParseUndo(garmentId) {
+        var st = outfitParseState;
+        if (!st) return;
+        delete st.decisions[garmentId];
+        renderOutfitParse();
+      }
+
+      function outfitParseConfirmNew(garment) {
+        var st = outfitParseState;
+        if (!st) return;
+        outfitParseDecision(garment.id, { decision: "confirmed-new" });
+        // Confirming as new IS the rejection of every match
+        // shown on the card — record it so the matcher
+        // never proposes those items for this render again.
+        // Best-effort: a rejection write must never block
+        // the confirm itself.
+        if (garment.renderEmbedding) {
+          (garment.matchCandidates || []).forEach(function (c) {
+            db.collection("users").doc(currentUser.uid).collection("match_rejections").doc().set({
+              itemId: c.itemId,
+              embedding: garment.renderEmbedding,
+              createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            }).catch(function () {});
+          });
+        }
+      }
+
+      function outfitParseMatch(garment, candidate) {
+        outfitParseDecision(garment.id, { decision: "matched", matchedItemId: candidate.itemId, matchedItemName: candidate.itemName });
+      }
+
+      function outfitParseRetry(garment) {
+        var st = outfitParseState;
+        if (!st) return;
+        functions.httpsCallable("retryOutfitGarment")({ parseId: st.parseId, garmentId: garment.id }).then(function () {
+          garment.status = "cutting";
+          garment.error = null;
+          st.status = "cutting";
+          st.pollError = false;
+          st.pollFails = 0;
+          renderOutfitParse();
+          outfitParseStartPolling();
+        }).catch(function (err) {
+          showToast(friendlyError(err));
+        });
+      }
+
+      function outfitParsePhotoEntry(garment) {
+        var st = outfitParseState;
+        return {
+          url: st.photoUrl,
+          storagePath: st.storagePath,
+          renderStoragePath: garment.renderStoragePath,
+          renderStatus: "passed",
+          rotation: garment.rotation || 0,
+          renderRotation: 0,
+          source: "photo-parse"
+        };
+      }
+
+      function renderOutfitParse() {
+        var st = outfitParseState;
+        if (!st) return;
+        var statusEl = document.getElementById("outfitParseStatus");
+        if (st.status === "cutting") {
+          statusEl.textContent = "Still cutting — pieces appear below as they finish.";
+        } else if (st.status === "failed") {
+          statusEl.textContent = "This photo couldn't be parsed. Close and try another photo.";
+        } else if (!st.garments.length) {
+          statusEl.textContent = "No garments found in this photo.";
+        } else {
+          statusEl.textContent = "";
+        }
+        var photo = document.getElementById("outfitParsePhoto");
+        photo.src = st.photoUrl;
+        // Outlines: percentage positioning against the
+        // baked source dims, so they track any display
+        // size. (The browser applies EXIF orientation to
+        // the displayed original, matching the baked
+        // pixels the boxes were measured on.)
+        var boxesEl = document.getElementById("outfitParseBoxes");
+        boxesEl.innerHTML = "";
+        if (st.sourceWidth && st.sourceHeight) {
+          st.garments.forEach(function (g) {
+            if (!g.box || g.box.length !== 4) return;
+            var box = document.createElement("div");
+            box.className = "outfit-parse-box";
+            box.style.left = (g.box[0] / st.sourceWidth * 100) + "%";
+            box.style.top = (g.box[1] / st.sourceHeight * 100) + "%";
+            box.style.width = ((g.box[2] - g.box[0]) / st.sourceWidth * 100) + "%";
+            box.style.height = ((g.box[3] - g.box[1]) / st.sourceHeight * 100) + "%";
+            box.title = outfitParseDraftName(g.type, g.colors);
+            box.addEventListener("click", function () {
+              var card = document.getElementById("outfit-parse-card-" + g.id);
+              if (card) card.scrollIntoView({ behavior: "smooth", block: "center" });
+            });
+            boxesEl.appendChild(box);
+          });
+        }
+        var cardsEl = document.getElementById("outfitParseCards");
+        cardsEl.innerHTML = "";
+        st.garments.forEach(function (g) {
+          var d = st.decisions[g.id] || {};
+          var card = document.createElement("div");
+          card.className = "outfit-parse-card";
+          card.id = "outfit-parse-card-" + g.id;
+          var name = d.userName || outfitParseDraftName(g.type, g.colors);
+          var category = d.userCategory || outfitParseCategoryForType(g.type);
+          var stText = outfitParseCardStatus(g, d);
+          var head = document.createElement("div");
+          var nameEl = document.createElement("strong");
+          nameEl.textContent = name;
+          head.appendChild(nameEl);
+          var statusSpan = document.createElement("span");
+          statusSpan.textContent = " — " + stText.text;
+          head.appendChild(statusSpan);
+          if (stText.tag) {
+            var tag = document.createElement("span");
+            tag.className = "chip";
+            tag.textContent = stText.tag;
+            head.appendChild(tag);
+          }
+          card.appendChild(head);
+          if (g.renderStoragePath) {
+            var img = document.createElement("img");
+            img.alt = name;
+            if (st.renderUrls[g.id]) {
+              img.src = st.renderUrls[g.id];
+            } else {
+              storage.ref().child(g.renderStoragePath).getDownloadURL().then(function (url) {
+                st.renderUrls[g.id] = url;
+                img.src = url;
+              }).catch(function () {});
+            }
+            card.appendChild(img);
+          } else if (g.status === "cutting") {
+            var cutting = document.createElement("p");
+            cutting.className = "hint";
+            cutting.textContent = "Cutting…";
+            card.appendChild(cutting);
+          } else if (g.error) {
+            var errEl = document.createElement("p");
+            errEl.className = "hint";
+            errEl.textContent = g.error;
+            card.appendChild(errEl);
+          }
+          var meta = document.createElement("p");
+          meta.className = "hint";
+          var metaParts = [category].concat(g.colors || []);
+          if (g.detail) metaParts.push(g.detail);
+          meta.textContent = metaParts.join(" · ");
+          card.appendChild(meta);
+          if (d.editing) {
+            var nameInput = document.createElement("input");
+            nameInput.type = "text";
+            nameInput.value = name;
+            nameInput.maxLength = 120;
+            card.appendChild(nameInput);
+            var catSelect = document.createElement("select");
+            ["Tops", "Bottoms", "Outerwear", "Shoes", "Accessories", "Other"].forEach(function (c) {
+              var opt = document.createElement("option");
+              opt.value = c;
+              opt.textContent = c;
+              if (c === category) opt.selected = true;
+              catSelect.appendChild(opt);
+            });
+            card.appendChild(catSelect);
+            var doneBtn = document.createElement("button");
+            doneBtn.className = "secondary";
+            doneBtn.type = "button";
+            doneBtn.textContent = "Done";
+            doneBtn.addEventListener("click", function () {
+              outfitParseDecision(g.id, { userName: nameInput.value.trim() || name, userCategory: catSelect.value, editing: false });
+            });
+            card.appendChild(doneBtn);
+          }
+          var actions = document.createElement("div");
+          actions.className = "outfit-parse-actions";
+          function addAction(label, fn) {
+            var b = document.createElement("button");
+            b.className = "secondary";
+            b.type = "button";
+            b.textContent = label;
+            b.addEventListener("click", fn);
+            actions.appendChild(b);
+          }
+          if (d.decision === "dismissed") {
+            var dis = document.createElement("span");
+            dis.textContent = "Dismissed";
+            actions.appendChild(dis);
+            addAction("Undo", function () { outfitParseUndo(g.id); });
+          } else if (d.decision === "confirmed-new") {
+            var conf = document.createElement("span");
+            conf.textContent = "Confirmed as new ✓";
+            actions.appendChild(conf);
+            addAction("Undo", function () { outfitParseUndo(g.id); });
+          } else if (d.decision === "matched") {
+            var mat = document.createElement("span");
+            mat.textContent = "Matched to " + (d.matchedItemName || "a piece") + " ✓";
+            actions.appendChild(mat);
+            addAction("Undo", function () { outfitParseUndo(g.id); });
+          } else if (g.status === "cutting") {
+            addAction("Dismiss", function () { outfitParseDecision(g.id, { decision: "dismissed" }); });
+          } else if (g.status === "failed") {
+            addAction("Retry", function () { outfitParseRetry(g); });
+            addAction("Dismiss", function () { outfitParseDecision(g.id, { decision: "dismissed" }); });
+          } else if (g.status === "not-found") {
+            addAction("Dismiss", function () { outfitParseDecision(g.id, { decision: "dismissed" }); });
+          } else if (g.status === "ready") {
+            addAction("Confirm as new", function () { outfitParseConfirmNew(g); });
+            (g.matchCandidates || []).forEach(function (c) {
+              addAction("This is " + c.itemName, function () { outfitParseMatch(g, c); });
+            });
+            addAction("Not a garment", function () { outfitParseDecision(g.id, { decision: "dismissed" }); });
+            if (!d.editing) addAction("Edit details", function () { outfitParseDecision(g.id, { editing: true }); });
+          }
+          card.appendChild(actions);
+          cardsEl.appendChild(card);
+        });
+        var canSave = outfitParseCanSave(st.garments, st.decisions);
+        document.getElementById("outfitParseSave").disabled = !canSave;
+        document.getElementById("outfitParseSaveWear").disabled = !canSave;
+        var hintEl = document.getElementById("outfitParseSaveHint");
+        if (st.pollError) {
+          hintEl.textContent = "";
+          var retryPoll = document.createElement("button");
+          retryPoll.className = "secondary";
+          retryPoll.type = "button";
+          retryPoll.textContent = "Lost contact with the server — retry polling";
+          retryPoll.addEventListener("click", function () {
+            st.pollError = false;
+            st.pollFails = 0;
+            pollOutfitParseOnce();
+            if (st.status === "cutting") outfitParseStartPolling();
+          });
+          hintEl.appendChild(retryPoll);
+        } else if (!canSave && st.garments.length) {
+          hintEl.textContent = "Decide every piece first — confirm it, match it, or dismiss it.";
+        } else {
+          hintEl.textContent = "";
+        }
+      }
+
+      function closeOutfitParse() {
+        outfitParseStopPolling();
+        closeOverlay(document.getElementById("outfitParseOverlay"));
+        var st = outfitParseState;
+        // Abandoned before anything was saved: the source
+        // photo is an orphan, delete it like the photo
+        // matcher does. Once anything was created or
+        // appended, the photo is wardrobe data — keep it.
+        if (st && !st.saved && !st.createdItemIds.length && !st.appendedItemIds.length && st.storagePath) {
+          storage.ref().child(st.storagePath).delete().catch(function () {});
+        }
+        outfitParseState = null;
+        document.getElementById("outfitParseInput").value = "";
+        document.getElementById("outfitParseInputCamera").value = "";
+      }
+
+      function saveOutfitParse(logWear) {
+        var st = outfitParseState;
+        if (!st) return;
+        var kept = st.garments.filter(function (g) {
+          var d = st.decisions[g.id];
+          return d && (d.decision === "confirmed-new" || d.decision === "matched");
+        });
+        if (!kept.length) { showToast("Keep at least one piece to save."); return; }
+        var sel = [];
+        var names = [];
+        var chain = Promise.resolve();
+        var appendErrors = 0;
+        kept.forEach(function (g) {
+          var d = st.decisions[g.id];
+          if (d.decision === "matched") {
+            chain = chain.then(function () {
+              var ref = db.collection("users").doc(currentUser.uid).collection("items").doc(d.matchedItemId);
+              return ref.update({
+                photos: firebase.firestore.FieldValue.arrayUnion(outfitParsePhotoEntry(g))
+              }).then(function () {
+                st.appendedItemIds.push(d.matchedItemId);
+                sel.push(d.matchedItemId);
+                var it = itemById(d.matchedItemId);
+                names.push(it ? it.name : (d.matchedItemName || "Unknown item"));
+              }).catch(function () {
+                appendErrors++;
+                sel.push(d.matchedItemId);
+                names.push(d.matchedItemName || "Unknown item");
+              });
+            });
+          } else {
+            chain = chain.then(function () {
+              var name = d.userName || outfitParseDraftName(g.type, g.colors);
+              var category = d.userCategory || outfitParseCategoryForType(g.type);
+              var docRef = db.collection("users").doc(currentUser.uid).collection("items").doc();
+              var doc = {
+                name: name,
+                shortName: capShortName(name),
+                category: category,
+                imageUrl: st.photoUrl,
+                storagePath: st.storagePath,
+                photos: [outfitParsePhotoEntry(g)],
+                colors: (g.colors || []).map(function (w, i) {
+                  return { name: w, hex: null, source: "ai", primary: i === 0 };
+                }),
+                ai: {
+                  name: name,
+                  category: category,
+                  colors: g.colors || [],
+                  parseId: st.parseId,
+                  prompt: g.prompt,
+                  score: g.score || null
+                },
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+              };
+              return docRef.set(doc).then(function () {
+                st.createdItemIds.push(docRef.id);
+                sel.push(docRef.id);
+                names.push(name);
+              });
+            });
+          }
+        });
+        chain.then(function () {
+          // Same dedup check as the photo matcher. A dup
+          // can only fire for an all-matched selection —
+          // a new item's id is in no existing outfit.
+          return findDuplicateOutfit(sel, "photo");
+        }).then(function (dup) {
+          if (dup) {
+            st.saved = true;
+            closeOutfitParse();
+            showToast("This exact outfit is already saved — opening the existing one.");
+            switchView("outfits");
+            openOutfit(dup.id);
+            return null;
+          }
+          var ref = db.collection("users").doc(currentUser.uid).collection("outfits").doc();
+          return ref.set({
+            versionGroup: ref.id,
+            version: 1,
+            supersedes: null,
+            itemIds: sel,
+            itemNames: names,
+            source: "photo",
+            name: defaultOutfitName(sel),
+            shortName: outfitComboName(sel),
+            occasion: null,
+            weather: null,
+            appConfidence: null,
+            appReasoning: "",
+            appStyleNote: "",
+            photoUrl: st.photoUrl,
+            dedupHash: outfitDedupHash(sel, "photo"),
+            favorite: false,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          }).then(function () {
+            return ref;
+          });
+        }).then(function (ref) {
+          if (!ref) return;
+          st.saved = true;
+          db.collection("users").doc(currentUser.uid).collection("parses").doc(st.parseId).update({ status: "done" }).catch(function () {});
+          closeOutfitParse();
+          showToast(logWear ? "Outfit saved — logged as worn today." : "Outfit saved.");
+          if (appendErrors) showToast("Couldn't attach the photo to " + appendErrors + " piece(s) — the outfit still saved.");
+          if (logWear) {
+            db.collection("users").doc(currentUser.uid).collection("wear_events").doc().set({
+              wornAt: firebase.firestore.FieldValue.serverTimestamp(),
+              articleIds: sel,
+              articleNames: names,
+              outfitId: ref.id,
+              occasion: null,
+              note: "",
+              createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            }).catch(function (err) { showToast(friendlyError(err)); });
+            recordVibeSignal(vibeDeltasForItems(sel, 0.04));
+          }
+          switchView("outfits");
+          openOutfit(ref.id);
+        }).catch(function (err) {
+          showToast(friendlyError(err));
+        });
+      }
+
       // PC-13: add a photo to an existing outfit. No validation (parked —
       // it's the user's own photo on their own outfit).
       function handleOutfitPhotoFile(file, outfit) {
@@ -9238,6 +9803,7 @@
       document.getElementById("addOutfitBtn").addEventListener("click", function () { openOverlay(addOutfitSheet); });
       document.getElementById("sheetBuild").addEventListener("click", function () { closeAddOutfitSheet(); openBuilder(); });
       document.getElementById("sheetPhoto").addEventListener("click", function () { closeAddOutfitSheet(); openPhotoParse(); });
+      document.getElementById("sheetOutfitPhoto").addEventListener("click", function () { closeAddOutfitSheet(); openOutfitParse(); });
       document.getElementById("sheetCamera").addEventListener("click", function () {
         closeAddOutfitSheet();
         document.getElementById("photoParseInputCamera").click();
@@ -10433,6 +10999,17 @@
       document.getElementById("photoParseClose").addEventListener("click", function () { closePhotoParse(true); });
       document.getElementById("photoParseSave").addEventListener("click", function () { savePhotoParseOutfit(false); });
       document.getElementById("photoParseSaveWear").addEventListener("click", function () { savePhotoParseOutfit(true); });
+      document.getElementById("outfitParseClose").addEventListener("click", closeOutfitParse);
+      document.getElementById("outfitParseSave").addEventListener("click", function () { saveOutfitParse(false); });
+      document.getElementById("outfitParseSaveWear").addEventListener("click", function () { saveOutfitParse(true); });
+      document.getElementById("outfitParseInput").addEventListener("change", function () {
+        handleOutfitParseFile(this.files && this.files[0]);
+      });
+      document.getElementById("outfitParseInputCamera").addEventListener("change", function () {
+        var file = this.files && this.files[0];
+        this.value = "";
+        if (file) handleOutfitParseFile(file);
+      });
       document.getElementById("builderClose").addEventListener("click", closeBuilder);
       document.getElementById("builderSave").addEventListener("click", function () {
         if (builderSelection.length < 2) { showToast("Pick at least 2 pieces."); return; }

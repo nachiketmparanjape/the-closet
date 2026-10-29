@@ -314,6 +314,8 @@ async function startParse(uid, sourceStoragePath, deps) {
   await parseRef.set({
     sourcePhoto: { storagePath: sourceStoragePath },
     bakedStoragePath,
+    sourceWidth: baked.width,
+    sourceHeight: baked.height,
     status: "listing",
     garments: [],
     createdAt: FieldValue.serverTimestamp(),
@@ -327,7 +329,13 @@ async function startParse(uid, sourceStoragePath, deps) {
     });
     if (!listed.length) {
       await parseRef.update({ status: "review", garments: [] });
-      return { parseId, status: "review", garments: [] };
+      return {
+        parseId,
+        status: "review",
+        garments: [],
+        sourceWidth: baked.width,
+        sourceHeight: baked.height,
+      };
     }
     const fileUrl = await uploadInputImage({
       apiKey: deps.apiKey,
@@ -357,7 +365,13 @@ async function startParse(uid, sourceStoragePath, deps) {
       });
     }
     await parseRef.update({ status: "cutting", garments });
-    return { parseId, status: "cutting", garments: garments.map(publicGarment) };
+    return {
+      parseId,
+      status: "cutting",
+      garments: garments.map(publicGarment),
+      sourceWidth: baked.width,
+      sourceHeight: baked.height,
+    };
   } catch (err) {
     await parseRef.update({ status: "failed", error: String((err && err.message) || err) }).catch(() => {});
     throw err;
@@ -378,12 +392,20 @@ async function advanceParse(uid, parseId, deps) {
       parseId,
       status: doc.status,
       garments: (doc.garments || []).map(publicGarment),
+      sourceWidth: doc.sourceWidth || null,
+      sourceHeight: doc.sourceHeight || null,
     };
   }
   const garments = doc.garments || [];
   const cutting = garments.filter((g) => g.status === "cutting");
   if (!cutting.length) {
-    return { parseId, status: doc.status, garments: garments.map(publicGarment) };
+    return {
+      parseId,
+      status: doc.status,
+      garments: garments.map(publicGarment),
+      sourceWidth: doc.sourceWidth || null,
+      sourceHeight: doc.sourceHeight || null,
+    };
   }
   // Matching inputs: every photo entry carrying a render
   // hash or embedding. Absent until the slice-4 backfill
@@ -514,12 +536,66 @@ async function advanceParse(uid, parseId, deps) {
   );
   const status = allTerminal ? "review" : doc.status;
   await parseRef.update({ garments, status });
-  return { parseId, status, garments: garments.map(publicGarment) };
+  return {
+    parseId,
+    status,
+    garments: garments.map(publicGarment),
+    sourceWidth: doc.sourceWidth || null,
+    sourceHeight: doc.sourceHeight || null,
+  };
+}
+
+// Retry one garment: re-upload the stored baked bytes
+// and create a fresh SAM prediction with the same
+// prompt. Only failed / not-found garments retry —
+// cutting ones are already in flight, ready ones are
+// done. The parse returns to "cutting" so polling
+// resumes (a "review" parse with a retried garment is
+// cutting again, not done).
+async function retryGarment(uid, parseId, garmentId, deps) {
+  const parseRef = parsesCollection(deps.db, uid).doc(parseId);
+  const snap = await parseRef.get();
+  if (!snap.exists) {
+    throw codedError("PARSE_NOT_FOUND", "parse: no such parse");
+  }
+  const doc = snap.data();
+  const garments = doc.garments || [];
+  const garment = garments.find((g) => g.id === garmentId);
+  if (!garment) {
+    throw codedError("BAD_REQUEST", "parse: no such garment");
+  }
+  if (garment.status !== "failed" && garment.status !== "not-found") {
+    throw codedError("BAD_REQUEST", "parse: garment is not retryable");
+  }
+  if (!deps.apiKey) {
+    throw codedError("SAM_NOT_CONFIGURED", "REPLICATE_API_TOKEN is not set");
+  }
+  const [bakedBuffer] = await deps.bucket.file(doc.bakedStoragePath).download();
+  const fileUrl = await uploadInputImage({
+    apiKey: deps.apiKey,
+    buffer: bakedBuffer,
+    filename: parseId + "-" + garmentId + ".jpg",
+    fetchImpl: deps.fetchImpl,
+  });
+  const created = await createSegmentation({
+    apiKey: deps.apiKey,
+    imageUrl: fileUrl,
+    prompt: garment.prompt,
+    fetchImpl: deps.fetchImpl,
+  });
+  garment.predictionId = created.predictionId;
+  garment.status = "cutting";
+  garment.error = null;
+  garment.renderStoragePath = null;
+  garment.renderStatus = null;
+  await parseRef.update({ garments, status: "cutting" });
+  return { parseId, status: "cutting", garment: publicGarment(garment) };
 }
 
 module.exports = {
   startParse,
   advanceParse,
+  retryGarment,
   parseListJson,
   buildPrompt,
   buildListRequest,

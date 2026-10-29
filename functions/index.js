@@ -21,7 +21,7 @@ const { askStylist, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanit
 const { reflectOutfit } = require("./reflect");
 const { critiqueOutfit } = require("./critique");
 const { parseOutfitPhoto } = require("./photo");
-const { startParse, advanceParse } = require("./parse");
+const { startParse, advanceParse, retryGarment } = require("./parse");
 const { shopCheck } = require("./shopcheck");
 const { fetchLinkItem } = require("./linkimport");
 const { extractGarmentPhoto } = require("./extract");
@@ -520,6 +520,47 @@ exports.pollOutfitParse = onCall(
       if (!(err instanceof HttpsError) && !err.key) err.key = "SAM_FAILED";
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
       boundary("pollOutfitParse", correlationId, uid, err);
+    }
+  }
+);
+
+exports.retryOutfitGarment = onCall(
+  {
+    region: "us-central1",
+    timeoutSeconds: 120,
+    memory: "1GiB",
+    maxInstances: 5,
+    secrets: ["REPLICATE_API_TOKEN"],
+  },
+  async (request) => {
+    const correlationId = newCorrelationId();
+    const uid = request.auth ? request.auth.uid : null;
+    const start = Date.now();
+    const aiTracker = createAiTracker();
+    const recordUsage = makeUsageRecorder(getFirestore());
+    const usageBase = { correlationId, uid, feature: "retryOutfitGarment", surface: "upload", refId: null };
+    try {
+      if (!request.auth) {
+        fail("NOT_SIGNED_IN");
+      }
+      const data = request.data || {};
+      const parseId = typeof data.parseId === "string" ? data.parseId.trim() : "";
+      const garmentId = typeof data.garmentId === "string" ? data.garmentId.trim() : "";
+      if (!parseId || parseId.length > 100 || !garmentId || garmentId.length > 100) {
+        fail("BAD_REQUEST");
+      }
+      usageBase.refId = parseId;
+      const result = await retryGarment(uid, parseId, garmentId, {
+        db: getFirestore(),
+        bucket: getStorage().bucket(),
+        apiKey: process.env.REPLICATE_API_TOKEN || null,
+      });
+      await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: true });
+      return finish("retryOutfitGarment", correlationId, uid, start, result);
+    } catch (err) {
+      if (!(err instanceof HttpsError) && !err.key) err.key = "SAM_FAILED";
+      await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
+      boundary("retryOutfitGarment", correlationId, uid, err);
     }
   }
 );

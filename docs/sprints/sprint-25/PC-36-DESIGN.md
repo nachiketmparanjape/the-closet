@@ -513,3 +513,18 @@ design above; they pin the machinery down.
 - **New error catalog keys.** `SAM_FAILED`,
   `SAM_NOT_CONFIGURED`, `RENDER_FAILED`,
   `PARSE_NOT_FOUND` (see `functions/errors.js`).
+- **Decisions live in the client during review.** The
+  parse doc owns pipeline status; the review sheet owns
+  decisions (confirm / match / dismiss + name and
+  category edits) in memory for the session, merged at
+  render time with decisions winning over status.
+  Rationale: the poll step rewrites the whole garments
+  array, so persisting tap-time decisions to the doc
+  mid-flight would race with it. The doc is updated to
+  "done" at save; the outfit and items carry the final
+  record.
+- **Retry is a callable.** `retryOutfitGarment`
+  re-uploads the stored baked bytes and creates a fresh
+  SAM prediction with the same prompt, for failed and
+  not-found garments only; the parse returns to
+  "cutting" so polling resumes.
