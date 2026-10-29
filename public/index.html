@@ -789,9 +789,18 @@
     /* PC-36: outfit-photo review. Outlines are positioned by
        percentage against the source dims, so they track any
        display size without image-load timing. */
-    .outfit-parse-photo-wrap { position: relative; }
+    .outfit-parse-photo-wrap { position: relative; overflow: hidden; }
     .outfit-parse-photo-wrap img { display: block; width: 100%; height: auto; }
     .outfit-parse-box { position: absolute; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.35); border-radius: 4px; cursor: pointer; }
+    /* PC-36 review sheet: actions stay pinned. The modal used to
+       scroll as a whole, so a tall photo pushed the Save/Try-again
+       row below the fold — and a fixed toast (above the overlay)
+       covered it (founder phone report, 2026-10-28). The body now
+       scrolls internally while head + actions stay put. */
+    #outfitParseOverlay .modal { display: flex; flex-direction: column; overflow: hidden; }
+    #outfitParseOverlay .modal-head { flex-shrink: 0; }
+    #outfitParseOverlay .modal-body { flex: 1; min-height: 0; overflow-y: auto; overflow-x: clip; overscroll-behavior: contain; }
+    #outfitParseOverlay .form-actions { flex-shrink: 0; padding-bottom: max(10px, env(safe-area-inset-bottom)); }
     .outfit-parse-card { border: 1px solid rgba(0,0,0,.14); border-radius: 8px; padding: 10px; margin-top: 10px; }
     .outfit-parse-card img { display: block; width: 100%; max-height: 320px; object-fit: contain; background: var(--paper); }
     .outfit-parse-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
@@ -9009,7 +9018,6 @@
         };
         openOverlay(document.getElementById("outfitParseOverlay"));
         renderOutfitParse();
-        showToast("Cutting your photo into pieces…");
         var safeName = Date.now() + "-" + file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
         var storagePath = "users/" + currentUser.uid + "/outfit-photos/" + safeName;
         var fileRef = storage.ref().child(storagePath);
@@ -9044,13 +9052,13 @@
         }).catch(function (err) {
           // Closed mid-flight is not a failure: stay silent.
           if (!outfitParseState) return;
-          // The sheet is already open, so the failure stays
-          // visible with a Try-again button — never just a
-          // toast over a blank screen. Tracked in
+          // The sheet itself is the feedback — status line +
+          // Try-again button. No toast here: a fixed toast sits
+          // above the overlay and covered the action row
+          // (founder phone report, 2026-10-28). Tracked in
           // client_errors like every other client failure.
           var st = outfitParseState;
           if (st) { st.status = "failed"; renderOutfitParse(); }
-          showToast(friendlyError(err));
           reportError("outfit-parse.start", err);
         });
       }
@@ -9181,10 +9189,17 @@
             if (!g.box || g.box.length !== 4) return;
             var box = document.createElement("div");
             box.className = "outfit-parse-box";
-            box.style.left = (g.box[0] / st.sourceWidth * 100) + "%";
-            box.style.top = (g.box[1] / st.sourceHeight * 100) + "%";
-            box.style.width = ((g.box[2] - g.box[0]) / st.sourceWidth * 100) + "%";
-            box.style.height = ((g.box[3] - g.box[1]) / st.sourceHeight * 100) + "%";
+            // Clamp to the wrap: an unclamped box at the edge used
+            // to stick out past the photo and widen the sheet
+            // (founder phone report: slight horizontal roll).
+            var leftPct = Math.min(100, Math.max(0, g.box[0] / st.sourceWidth * 100));
+            var topPct = Math.min(100, Math.max(0, g.box[1] / st.sourceHeight * 100));
+            var widthPct = Math.min(100 - leftPct, Math.max(0, (g.box[2] - g.box[0]) / st.sourceWidth * 100));
+            var heightPct = Math.min(100 - topPct, Math.max(0, (g.box[3] - g.box[1]) / st.sourceHeight * 100));
+            box.style.left = leftPct + "%";
+            box.style.top = topPct + "%";
+            box.style.width = widthPct + "%";
+            box.style.height = heightPct + "%";
             box.title = outfitParseDraftName(g.type, g.colors);
             box.addEventListener("click", function () {
               var card = document.getElementById("outfit-parse-card-" + g.id);
