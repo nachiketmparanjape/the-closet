@@ -187,7 +187,7 @@ preferences sit *pending* until the user confirms them.
 | supersedes | string? | previous version's doc ID; null on v1 |
 | itemIds | string[] | item doc IDs — the stable join key |
 | itemNames | string[] | parallel snapshot; display survives item deletion |
-| source | `"stylist"` \| `"manual"` | provenance of origin (v1); preserved across versions |
+| source | \"stylist\" \| \"manual\" \| \"photo\" | provenance of origin; preserved across versions. "photo" added by the shipped photo-parse save (PC-13 remainder) for outfits composed from a photo. |
 | name | string | user-editable |
 | occasion | string? | *intent* — what it was assembled for |
 | weather | string? | as given at recommendation time |

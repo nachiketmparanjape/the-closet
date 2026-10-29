@@ -18,6 +18,8 @@ with it.
    living design doc comes before code, for the founder's
    validation. The design sketch filed on issue #78 (2026-10-28)
    is the starting point, not the doc.
+   Design doc (draft for validation, 2026-10-28):
+   `docs/sprints/sprint-25/PC-36-DESIGN.md`.
 2. **SAM service, then the PC-34 swap.** The service proves itself
    on PC-36's multi-garment path first; the flat-photo path
    switches to it second, since it is the same service.
