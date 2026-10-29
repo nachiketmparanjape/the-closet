@@ -9000,88 +9000,47 @@
 
       function handleOutfitParseFile(file) {
         if (!file || !currentUser) return;
-        outfitParseStopPolling();
         noteTrail("outfit-parse: photo picked");
-        // A retry replaces an abandoned attempt: drop its
-        // orphan upload the same way closing does, so
-        // retries don't pile up files in Storage.
-        var prev = outfitParseState;
-        if (prev && !prev.parseId && !prev.resumed && !prev.saved && !prev.createdItemIds.length && !prev.appendedItemIds.length && prev.storagePath) {
-          try { storage.ref().child(prev.storagePath).delete().catch(function () {}); } catch (e) {}
-        }
-        // Open the review sheet FIRST, so progress — and
-        // failure — stays visible on screen, not just a
-        // toast that can be missed (founder report
-        // 2026-10-28: the photo flow went blank for
-        // seconds with no signal). The photo shows
-        // instantly from a local preview; the server URL
-        // replaces it once the parse starts.
-        outfitParseState = {
-          photoUrl: URL.createObjectURL(file),
-          storagePath: null,
-          parseId: null,
-          status: "uploading",
-          garments: [],
-          sourceWidth: null,
-          sourceHeight: null,
-          decisions: {},
-          renderUrls: {},
-          pollTimer: null,
-          pollFails: 0,
-          pollError: false,
-          saved: false,
-          createdItemIds: [],
-          appendedItemIds: [],
-          file: file,
-          resumed: false
-        };
-        openOverlay(document.getElementById("outfitParseOverlay"));
-        renderOutfitParse();
+        document.getElementById("outfitParseInput").value = "";
+        document.getElementById("outfitParseInputCamera").value = "";
+        // Passive flow (founder direction 2026-10-28): no
+        // review sheet opens on upload — the draft card
+        // appears in the Drafts gallery immediately
+        // (optimistic, with a local photo preview) and the
+        // upload + parse start run behind it. The old
+        // sheet-on-upload broke when closed mid-start: the
+        // photo was deleted as an orphan and the parse id
+        // dropped, so no draft card ever appeared. The
+        // review sheet now opens only on tap-to-resume —
+        // it is the draft's detail view.
+        var pendingKey = addPendingDraft(file);
         var safeName = Date.now() + "-" + file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
         var storagePath = "users/" + currentUser.uid + "/outfit-photos/" + safeName;
         var fileRef = storage.ref().child(storagePath);
         fileRef.put(file, { contentType: file.type }).then(function () {
-          return fileRef.getDownloadURL();
-        }).then(function (url) {
-          // The user may have closed the sheet mid-upload:
-          // then this result belongs to nobody — drop the
-          // just-uploaded file instead of orphaning it.
-          if (!outfitParseState) {
-            try { fileRef.delete().catch(function () {}); } catch (e) {}
-            return null;
-          }
-          // Upload landed: from here the file is tracked,
-          // so a later close (or retry) cleans it up.
-          outfitParseState.storagePath = storagePath;
-          // Upload done, server work starting: say so — the
-          // callable can take a minute (cold start + list +
-          // SAM creates), and "Uploading…" during it reads as
-          // stuck (founder report, 2026-10-28).
-          outfitParseState.status = "starting";
-          renderOutfitParse();
-          // The callable SDK times out at 70s by default — but a
-          // cold start runs ~2.3 min (observed 2026-10-28), so
-          // the client gave up while the server was still
-          // working. Match the 300s server timeout.
-          return functions.httpsCallable("startOutfitParse", { timeout: 300000 })({ storagePath: storagePath }).then(function (res) {
-            var data = res.data || {};
-            var st = outfitParseState;
-            if (!st) return;
-            var oldUrl = st.photoUrl;
-            st.photoUrl = url;
-            if (oldUrl && oldUrl.indexOf("blob:") === 0) { try { URL.revokeObjectURL(oldUrl); } catch (e) {} }
-            applyOutfitParseStart(data);
-          });
+          // Upload done, server work starting: the callable
+          // can take a couple of minutes on a cold start
+          // (observed 2026-10-28), so the card says what's
+          // happening instead of sitting on "Uploading…".
+          updatePendingDraft(pendingKey, "Finding pieces in your photo…");
+          // The callable SDK times out at 70s by default —
+          // match the 300s server timeout instead.
+          return functions.httpsCallable("startOutfitParse", { timeout: 300000 })({ storagePath: storagePath });
+        }).then(function (res) {
+          // Parse created server-side: the optimistic card
+          // hands off to the real draft card.
+          removePendingDraft(pendingKey);
+          refreshDrafts();
+          showToast("Processing — your pieces will show up as drafts in Outfits in about " + DRAFT_ETA_MINUTES + " minutes.");
         }).catch(function (err) {
-          // Closed mid-flight is not a failure: stay silent.
-          if (!outfitParseState) return;
-          // The sheet itself is the feedback — status line +
-          // Try-again button. No toast here: a fixed toast sits
-          // above the overlay and covered the action row
-          // (founder phone report, 2026-10-28). Tracked in
-          // client_errors like every other client failure.
-          var st = outfitParseState;
-          if (st) { st.status = "failed"; renderOutfitParse(); }
+          // Upload or start failed: drop the optimistic card,
+          // delete the upload if it landed (nothing references
+          // it), and say so — there is no sheet anymore to
+          // carry the error. Tracked in client_errors like
+          // every other client failure.
+          removePendingDraft(pendingKey);
+          try { fileRef.delete().catch(function () {}); } catch (e) {}
+          showToast(friendlyError(err));
           reportError("outfit-parse.start", err);
         });
       }
@@ -9426,6 +9385,83 @@
       var DRAFT_ETA_MINUTES = 15;
       var draftPhotoUrls = {};
 
+      // Pending (optimistic) draft cards: one per in-flight
+      // upload+start, shown until the server confirms the
+      // parse and refreshDrafts replaces them with real
+      // draft cards. The photo preview is a local object
+      // URL, so the card appears the instant a photo is
+      // picked — no waiting on the upload.
+      var pendingDrafts = [];
+      var pendingDraftSeq = 0;
+
+      function renderPendingDrafts() {
+        var gal = document.getElementById("draftsGallery");
+        if (!gal) return;
+        Array.prototype.slice.call(gal.querySelectorAll(".pending-draft")).forEach(function (n) { n.remove(); });
+        pendingDrafts.forEach(function (p) {
+          var card = document.createElement("article");
+          card.className = "item pending-draft";
+          var imageWrap = document.createElement("div");
+          imageWrap.className = "item-image";
+          var image = document.createElement("img");
+          image.alt = "Draft photo";
+          image.src = p.objectUrl;
+          imageWrap.appendChild(image);
+          var details = document.createElement("div");
+          details.className = "item-details";
+          var name = document.createElement("p");
+          name.className = "item-name";
+          name.textContent = p.title;
+          var meta = document.createElement("div");
+          meta.className = "item-meta";
+          var when = document.createElement("span");
+          when.textContent = draftPhotoTime({ createdAt: p.createdAt });
+          var tag = document.createElement("span");
+          tag.className = "src-tag";
+          tag.textContent = "· Draft";
+          meta.appendChild(when);
+          meta.appendChild(tag);
+          details.appendChild(name);
+          details.appendChild(meta);
+          card.appendChild(imageWrap);
+          card.appendChild(details);
+          // Not resumable yet — no tap handler until the
+          // parse exists server-side.
+          gal.insertBefore(card, gal.firstChild);
+        });
+        var sec = document.getElementById("draftsSection");
+        if (sec) sec.hidden = gal.children.length === 0;
+      }
+
+      function addPendingDraft(file) {
+        var key = "pending-" + (++pendingDraftSeq) + "-" + Date.now();
+        pendingDrafts.push({
+          key: key,
+          objectUrl: URL.createObjectURL(file),
+          title: "Uploading…",
+          createdAt: new Date().toISOString()
+        });
+        renderPendingDrafts();
+        return key;
+      }
+
+      function updatePendingDraft(key, title) {
+        for (var i = 0; i < pendingDrafts.length; i++) {
+          if (pendingDrafts[i].key === key) { pendingDrafts[i].title = title; }
+        }
+        renderPendingDrafts();
+      }
+
+      function removePendingDraft(key) {
+        for (var i = pendingDrafts.length - 1; i >= 0; i--) {
+          if (pendingDrafts[i].key === key) {
+            try { URL.revokeObjectURL(pendingDrafts[i].objectUrl); } catch (e) {}
+            pendingDrafts.splice(i, 1);
+          }
+        }
+        renderPendingDrafts();
+      }
+
       function draftCardTitle(entry, etaMinutes) {
         if (entry.status === "failed") return "Couldn't cut this photo";
         if (entry.status === "review") {
@@ -9452,9 +9488,10 @@
           var list = (res.data && res.data.parses) || [];
           var eta = (res.data && res.data.etaMinutes) || DRAFT_ETA_MINUTES;
           gal.innerHTML = "";
-          if (!list.length) { sec.hidden = true; return; }
+          var total = list.length + pendingDrafts.length;
+          if (!total) { sec.hidden = true; return; }
           sec.hidden = false;
-          document.getElementById("draftCount").textContent = list.length + (list.length === 1 ? " photo" : " photos");
+          document.getElementById("draftCount").textContent = total + (total === 1 ? " photo" : " photos");
           list.forEach(function (entry) {
             var card = document.createElement("article");
             card.className = "item";
@@ -9503,6 +9540,7 @@
             card.addEventListener("click", function () { resumeOutfitParse(entry); });
             gal.appendChild(card);
           });
+          renderPendingDrafts();
         }).catch(function () { /* drafts hide quietly on a failed list */ });
       }
 

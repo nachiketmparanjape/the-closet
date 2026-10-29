@@ -72,8 +72,9 @@ flowchart TD
     F --> G[Cutout + normalize to Stage C standard]
     G --> H[Layer-1 mask gate: free heuristics]
     H --> I[Orientation verdict per piece]
-    I --> J[Draft appears on the review screen]
-    J --> K[Matching: pHash, then embeddings]
+    I --> J[Draft card appears in the Drafts gallery]
+    J --> J2[User taps the card: review sheet opens]
+    J2 --> K[Matching: pHash, then embeddings]
     K --> L[User confirms or corrects each draft]
     L --> M[Items created + outfit composed]
     M --> N[Optional: Save + log worn today]
@@ -295,6 +296,16 @@ sheets, or full-screen for workspaces like this one):
   that item's photo. A saved (`done`) parse is refused.
   Durable match rejections are kept: they record a
   judgment about an item, not about the draft.
+- **No sheet on upload (added 2026-10-28).** The flow
+  is passive: picking a photo drops an optimistic draft
+  card into the Drafts gallery immediately ("Uploading…",
+  then "Finding pieces in your photo…") while the upload
+  and the parse start run behind it. The review sheet
+  opens only when the user taps a draft card — it is the
+  draft's detail view. The old sheet-on-upload broke when
+  closed mid-start: the photo was deleted as an orphan
+  and the parse id dropped, so no draft card ever
+  appeared.
 - **Known edge, stated not solved:** if Gemini lists two
   garments with identical descriptions, both SAM calls
   return the same mask and the review shows duplicate
