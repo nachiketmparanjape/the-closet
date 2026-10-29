@@ -1,7 +1,10 @@
 # PC-36 design — one photo → wardrobe items + outfit
 
-- **Status:** DRAFT for founder validation (2026-10-28). No code
-  moves until the founder validates this doc. Sprint 25, card 1.
+- **Status:** DRAFT, Q1–Q5 validated by the founder
+  2026-10-28 (see "Open questions" for the record);
+  Q6 still open — the founder asked what the gate is,
+  and no code moves until he answers it. Sprint 25,
+  card 1.
 - **Owner:** Bramble (design + build), founder (validation).
 - **Related:** PC-36 card (`docs/BACKLOG.md`), design sketch on
   GitHub issue #78 (2026-10-28), Sprint 25 plan
@@ -81,17 +84,21 @@ Stages, in order, with what each one does and what it costs:
 
 ### 1. Entry — a dedicated "Outfit photo" door
 
-A new door on the Add screen, next to "Add pieces": "Outfit
-photo — one photo, several pieces." The single-piece path
-is untouched. The existing "Match a photo" flow stays for
-quick match-only logging (it is the lowest-friction wear
-logger); this flow is for creation, not a replacement.
+A fourth option in the "Add an outfit" sheet
+(`addOutfitSheet` in `public/index.html`), alongside
+"Build manually", "Match a photo", and "Match with
+camera": "Outfit photo — one photo, several pieces."
+The single-piece path is untouched. The existing "Match
+a photo" flow stays for quick match-only logging (it is
+the lowest-friction wear logger); this flow is for
+creation, not a replacement.
 
 Why a dedicated door instead of auto-detecting by garment
 count: auto-routing risks misrouting single-piece photos
 into a heavier flow, and the user knows what kind of photo
 they hold. Auto-detect is a v2 refinement once the flow
-proves out. (Open question Q1.)
+proves out. (Q1, validated 2026-10-28: dedicated door
+inside the add-outfit / log-what-you're-wearing CTA.)
 
 ### 2. Parse doc — the flow's own record
 
@@ -398,24 +405,44 @@ The 5,000-images-a-month self-host trigger still stands.
 
 ## Open questions for the founder (validation items)
 
-- **Q1 — Entry:** dedicated "Outfit photo" door (this
-  doc's recommendation) vs auto-detect by garment
-  count?
-- **Q2 — Embedding provider:** Vertex multimodal
-  embeddings (recommendation — same vendor as Gemini)
-  vs Replicate CLIP? Price confirmed at build time.
-- **Q3 — Matched photo:** append to the item's photos
-  as a non-cover entry (recommendation) vs a separate
-  reference array?
-- **Q4 — SAM hosting for the build:** community build
-  first with fal as fallback (recommendation — proven,
-  cheapest, same token) vs pinned deployment now?
-- **Q5 — Bulk confirm:** per-card only in v1
-  (recommendation) vs a "confirm all new" button?
-- **Q6 — Gate on drafts:** skip the Gemini quality gate
-  because the user's review is the gate
-  (recommendation) vs run it anyway for a second
-  opinion?
+- **Q1 — Entry: DECIDED 2026-10-28.** Dedicated
+  "Outfit photo" door inside the add-outfit /
+  log-what-you're-wearing CTA (the "Add an outfit"
+  sheet), as this doc recommends.
+- **Q2 — Embedding provider: DECIDED 2026-10-28.**
+  Vertex multimodal embeddings (the recommendation).
+  Price confirmed at build time.
+- **Q3 — Matched photo: DECIDED 2026-10-28.** Append
+  to the item's photos as a non-cover entry (the
+  recommendation).
+- **Q4 — SAM hosting for the build: DECIDED
+  2026-10-28.** Community build first with fal as
+  fallback (the recommendation).
+- **Q5 — Bulk confirm: DECIDED 2026-10-28, reading
+  flagged.** The founder's "Yes" is recorded as
+  accepting the recommendation — per-card only in v1,
+  no "confirm all new" button. If he meant the
+  opposite, one word corrects this line.
+- **Q6 — Gate on drafts: OPEN.** The founder asked
+  what the gate is (2026-10-28). See the plain-words
+  version below; no code moves until he answers.
+  - The gate, in plain words: today, when a flat photo
+    is cut, the app runs a second automated check — a
+    Gemini call that looks at the cut and judges
+    whether it looks right — before the result is
+    shown. That check is the "quality gate."
+  - For PC-36 drafts, this doc recommends SKIPPING
+    that automated check, because the founder reviews
+    every draft with his own eyes on the review screen
+    — his eyes are the gate. A bad cut still shows up;
+    he rejects it in one tap.
+  - Running it anyway would mean: bad cuts get
+    flagged (or held back) before he sees them, at one
+    extra AI call per piece (~$0.0075), with the small
+    risk that the judge occasionally doubts a good
+    cut. The question is whether he wants that second
+    opinion in front of his own review, or is happy
+    with just his review.
 
 ## Alternatives considered (and why they lost)
 
