@@ -280,6 +280,21 @@ sheets, or full-screen for workspaces like this one):
 - **No bulk confirm in v1.** Each draft deserves eyes;
   a "confirm all" button would reintroduce silent
   creation through the back door. (Open question Q5.)
+- **Discard a draft (added 2026-10-28).** Every draft
+  card carries a Discard button, and the review sheet
+  carries Discard draft beside the save actions. Both
+  confirm first ("Discard this draft? Its pieces and
+  photo will be deleted.") because a discard is
+  destructive: the `discardOutfitParse` callable deletes
+  the whole lineage for that photo (a retry creates a
+  new parse for the same upload), each parse's baked
+  file and renders, and the uploaded photo itself —
+  but only when the photo lives under the user's
+  outfit-photos/ upload area, so a future flow that
+  parses an existing wardrobe photo can never lose
+  that item's photo. A saved (`done`) parse is refused.
+  Durable match rejections are kept: they record a
+  judgment about an item, not about the draft.
 - **Known edge, stated not solved:** if Gemini lists two
   garments with identical descriptions, both SAM calls
   return the same mask and the review shows duplicate

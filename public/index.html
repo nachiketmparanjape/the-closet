@@ -992,6 +992,7 @@
         <p class="hint" id="outfitParseSaveHint"></p>
       </div>
       <div class="form-actions">
+        <button class="danger" id="outfitParseDiscard" type="button" style="margin-right:auto" hidden>Discard draft</button>
         <button class="secondary" id="outfitParseRetry" type="button" hidden>Try again</button>
         <button class="primary" id="outfitParseSave" type="button">Save outfit</button>
         <button class="primary" id="outfitParseSaveWear" type="button" style="margin-left:8px" title="Save the outfit and log it as worn today">Save + log worn today</button>
@@ -9359,6 +9360,7 @@
         document.getElementById("outfitParseSave").disabled = !canSave || !!st.saving;
         document.getElementById("outfitParseSaveWear").disabled = !canSave || !!st.saving;
         document.getElementById("outfitParseRetry").hidden = st.status !== "failed";
+        document.getElementById("outfitParseDiscard").hidden = !st.parseId;
         var hintEl = document.getElementById("outfitParseSaveHint");
         if (st.pollError) {
           hintEl.textContent = "";
@@ -9490,12 +9492,38 @@
               retry.addEventListener("click", function (ev) { ev.stopPropagation(); restartOutfitParseFromEntry(entry); });
               details.appendChild(retry);
             }
+            var discard = document.createElement("button");
+            discard.className = "look-btn";
+            discard.type = "button";
+            discard.textContent = "Discard";
+            discard.addEventListener("click", function (ev) { ev.stopPropagation(); discardDraft(entry.parseId, false); });
+            details.appendChild(discard);
             card.appendChild(imageWrap);
             card.appendChild(details);
             card.addEventListener("click", function () { resumeOutfitParse(entry); });
             gal.appendChild(card);
           });
         }).catch(function () { /* drafts hide quietly on a failed list */ });
+      }
+
+      // Discard a draft, from its card or from the review
+      // sheet: confirm first (this deletes the parse, its
+      // renders, its baked file and the uploaded photo),
+      // then the server callable does the deleting. From
+      // the sheet the sheet closes too; from a card the
+      // list just refreshes and the card is gone.
+      function discardDraft(parseId, fromSheet) {
+        if (!currentUser || !parseId) return;
+        if (fromSheet && outfitParseState && outfitParseState.saving) return;
+        if (!window.confirm("Discard this draft? Its pieces and photo will be deleted.")) return;
+        if (fromSheet) outfitParseStopPolling();
+        functions.httpsCallable("discardOutfitParse")({ parseId: parseId }).then(function () {
+          if (fromSheet) closeOutfitParse();
+          showToast("Draft discarded.");
+          refreshDrafts();
+        }).catch(function (error) {
+          showToast(friendlyError(error));
+        });
       }
 
       // A failed parse's retry re-parses the same upload —
@@ -11347,6 +11375,10 @@
           pollOutfitParseOnce();
           outfitParseStartPolling();
         }
+      });
+      document.getElementById("outfitParseDiscard").addEventListener("click", function () {
+        if (!outfitParseState || !outfitParseState.parseId) return;
+        discardDraft(outfitParseState.parseId, true);
       });
       document.getElementById("outfitParseInput").addEventListener("change", function () {
         handleOutfitParseFile(this.files && this.files[0]);

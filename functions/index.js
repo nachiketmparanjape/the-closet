@@ -22,6 +22,7 @@ const { reflectOutfit } = require("./reflect");
 const { critiqueOutfit } = require("./critique");
 const { parseOutfitPhoto } = require("./photo");
 const { startParse, advanceParse, retryGarment, listParses } = require("./parse");
+const { discardParse } = require("./discard");
 const { advanceAllParses } = require("./advance");
 const { shopCheck } = require("./shopcheck");
 const { fetchLinkItem } = require("./linkimport");
@@ -589,6 +590,42 @@ exports.listOutfitParses = onCall(
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "SAM_FAILED";
       boundary("listOutfitParses", correlationId, uid, err);
+    }
+  }
+);
+
+// Discard a draft parse: confirm-first on the client, then this
+// callable deletes the parse lineage and its files (see
+// functions/discard.js for the scope and guards). No secrets —
+// Firestore + Storage only, same shape as listOutfitParses.
+exports.discardOutfitParse = onCall(
+  {
+    region: "us-central1",
+    timeoutSeconds: 60,
+    memory: "512MiB",
+    maxInstances: 5,
+  },
+  async (request) => {
+    const correlationId = newCorrelationId();
+    const uid = request.auth ? request.auth.uid : null;
+    const start = Date.now();
+    try {
+      if (!request.auth) {
+        fail("NOT_SIGNED_IN");
+      }
+      const data = request.data || {};
+      const parseId = typeof data.parseId === "string" ? data.parseId.trim() : "";
+      if (!parseId || parseId.length > 100) {
+        fail("BAD_REQUEST");
+      }
+      const result = await discardParse(uid, parseId, {
+        db: getFirestore(),
+        bucket: getStorage().bucket(),
+      });
+      return finish("discardOutfitParse", correlationId, uid, start, result);
+    } catch (err) {
+      if (!(err instanceof HttpsError) && !err.key) err.key = "SAM_FAILED";
+      boundary("discardOutfitParse", correlationId, uid, err);
     }
   }
 );
