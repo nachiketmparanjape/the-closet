@@ -9042,7 +9042,11 @@
           // stuck (founder report, 2026-10-28).
           outfitParseState.status = "starting";
           renderOutfitParse();
-          return functions.httpsCallable("startOutfitParse")({ storagePath: storagePath }).then(function (res) {
+          // The callable SDK times out at 70s by default — but a
+          // cold start runs ~2.3 min (observed 2026-10-28), so
+          // the client gave up while the server was still
+          // working. Match the 300s server timeout.
+          return functions.httpsCallable("startOutfitParse", { timeout: 300000 })({ storagePath: storagePath }).then(function (res) {
             var data = res.data || {};
             var st = outfitParseState;
             if (!st) return;
@@ -9074,7 +9078,10 @@
       function pollOutfitParseOnce() {
         var st = outfitParseState;
         if (!st || st.saved) { outfitParseStopPolling(); return; }
-        functions.httpsCallable("pollOutfitParse")({ parseId: st.parseId }).then(function (res) {
+        // Harvesting finished pieces on a cold start can also
+        // pass the 70s SDK default; polls are idempotent, so a
+        // longer timeout only cuts spurious errors.
+        functions.httpsCallable("pollOutfitParse", { timeout: 180000 })({ parseId: st.parseId }).then(function (res) {
           var data = res.data || {};
           // Server owns pipeline status; decisions stay in
           // memory and win at render time, so replacing
@@ -9139,7 +9146,7 @@
       function outfitParseRetry(garment) {
         var st = outfitParseState;
         if (!st) return;
-        functions.httpsCallable("retryOutfitGarment")({ parseId: st.parseId, garmentId: garment.id }).then(function () {
+        functions.httpsCallable("retryOutfitGarment", { timeout: 120000 })({ parseId: st.parseId, garmentId: garment.id }).then(function () {
           if (!outfitParseState) return;
           garment.status = "cutting";
           garment.error = null;
