@@ -475,3 +475,41 @@ The 5,000-images-a-month self-host trigger still stands.
 - **One orientation call for the whole photo:**
   rejected — in a worn photo each piece can sit at a
   different angle. The verdict is per piece.
+
+## Implementation notes (added during build, 2026-10-28)
+
+These record decisions the build had to make that the
+design left open. They do not change the user-facing
+design above; they pin the machinery down.
+
+- **Poll driver.** The client drives polling: it calls
+  `pollOutfitParse` every few seconds while the review
+  sheet is open, and again when the sheet reopens. A
+  parse left mid-flight resumes instead of restarting.
+  No request ever waits out a SAM boot.
+- **Rotation fields are degrees.** The client's
+  `photoRotationDeg` reads numbers, so the verdict
+  maps to degrees (none 0, cw90 90, ccw90 270, flip180
+  180). `renderRotation` is set explicitly to 0 on
+  draft/matched photo entries — the render is baked
+  upright, and leaving it unset would make the clean
+  view fall back to `rotation` and double-turn it.
+- **Embeddings via Vertex REST.** The GenAI SDK's
+  embedContent does not cover the publisher model, so
+  the pipeline calls the
+  `multimodalembedding@001:predict` REST endpoint
+  (us-central1 default, `VERTEX_EMBED_LOCATION`
+  override), authenticated by ADC. The render goes in
+  composited over white, the same ground as the hash.
+  Price is filled from billing when the first real
+  calls land — it is not estimated here. An embedding
+  failure soft-fails to pHash-only matching; it never
+  blocks a piece.
+- **Baked source stored.** `startParse` stores the
+  EXIF-baked source bytes under the parse
+  (`parses/{id}/source-baked.*`) so `advanceParse`
+  cuts from exactly the pixels the polygon
+  coordinates were measured on, without re-baking.
+- **New error catalog keys.** `SAM_FAILED`,
+  `SAM_NOT_CONFIGURED`, `RENDER_FAILED`,
+  `PARSE_NOT_FOUND` (see `functions/errors.js`).

@@ -21,6 +21,7 @@ const { askStylist, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanit
 const { reflectOutfit } = require("./reflect");
 const { critiqueOutfit } = require("./critique");
 const { parseOutfitPhoto } = require("./photo");
+const { startParse, advanceParse } = require("./parse");
 const { shopCheck } = require("./shopcheck");
 const { fetchLinkItem } = require("./linkimport");
 const { extractGarmentPhoto } = require("./extract");
@@ -427,6 +428,98 @@ exports.parseOutfitPhoto = onCall(
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
       boundary("parseOutfitPhoto", correlationId, uid, err);
+    }
+  }
+);
+
+// PC-36: outfit-photo parse. Two callables because SAM
+// boots can run ~20 minutes on the community build:
+// startOutfitParse lists garments and creates one SAM
+// prediction per garment, then returns; the client
+// drives pollOutfitParse every few seconds while the
+// review sheet is open (and again on reopen — a parse
+// left mid-flight resumes, never restarts). Newly
+// terminal predictions are harvested the moment they
+// complete. Both bind REPLICATE_API_TOKEN from Secret
+// Manager, like extractGarment.
+exports.startOutfitParse = onCall(
+  {
+    region: "us-central1",
+    timeoutSeconds: 120,
+    memory: "1GiB",
+    maxInstances: 5,
+    secrets: ["REPLICATE_API_TOKEN"],
+  },
+  async (request) => {
+    const correlationId = newCorrelationId();
+    const uid = request.auth ? request.auth.uid : null;
+    const start = Date.now();
+    const aiTracker = createAiTracker();
+    const recordUsage = makeUsageRecorder(getFirestore());
+    const usageBase = { correlationId, uid, feature: "startOutfitParse", surface: "upload", refId: null };
+    try {
+      if (!request.auth) {
+        fail("NOT_SIGNED_IN");
+      }
+      const data = request.data || {};
+      const storagePath = typeof data.storagePath === "string" ? data.storagePath.trim() : "";
+      if (!storagePath || storagePath.length > 300) {
+        fail("BAD_REQUEST");
+      }
+      usageBase.refId = storagePath;
+      const result = await startParse(uid, storagePath, {
+        db: getFirestore(),
+        bucket: getStorage().bucket(),
+        apiKey: process.env.REPLICATE_API_TOKEN || null,
+        hooks: aiTracker.hooks,
+      });
+      await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: true });
+      return finish("startOutfitParse", correlationId, uid, start, result);
+    } catch (err) {
+      if (!(err instanceof HttpsError) && !err.key) err.key = "SAM_FAILED";
+      await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
+      boundary("startOutfitParse", correlationId, uid, err);
+    }
+  }
+);
+
+exports.pollOutfitParse = onCall(
+  {
+    region: "us-central1",
+    timeoutSeconds: 120,
+    memory: "1GiB",
+    maxInstances: 5,
+    secrets: ["REPLICATE_API_TOKEN"],
+  },
+  async (request) => {
+    const correlationId = newCorrelationId();
+    const uid = request.auth ? request.auth.uid : null;
+    const start = Date.now();
+    const aiTracker = createAiTracker();
+    const recordUsage = makeUsageRecorder(getFirestore());
+    const usageBase = { correlationId, uid, feature: "pollOutfitParse", surface: "upload", refId: null };
+    try {
+      if (!request.auth) {
+        fail("NOT_SIGNED_IN");
+      }
+      const data = request.data || {};
+      const parseId = typeof data.parseId === "string" ? data.parseId.trim() : "";
+      if (!parseId || parseId.length > 100) {
+        fail("BAD_REQUEST");
+      }
+      usageBase.refId = parseId;
+      const result = await advanceParse(uid, parseId, {
+        db: getFirestore(),
+        bucket: getStorage().bucket(),
+        apiKey: process.env.REPLICATE_API_TOKEN || null,
+        hooks: aiTracker.hooks,
+      });
+      await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: true });
+      return finish("pollOutfitParse", correlationId, uid, start, result);
+    } catch (err) {
+      if (!(err instanceof HttpsError) && !err.key) err.key = "SAM_FAILED";
+      await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
+      boundary("pollOutfitParse", correlationId, uid, err);
     }
   }
 );
