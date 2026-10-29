@@ -976,6 +976,7 @@
         <p class="hint" id="outfitParseSaveHint"></p>
       </div>
       <div class="form-actions">
+        <button class="secondary" id="outfitParseRetry" type="button" hidden>Try again</button>
         <button class="primary" id="outfitParseSave" type="button">Save outfit</button>
         <button class="primary" id="outfitParseSaveWear" type="button" style="margin-left:8px" title="Save the outfit and log it as worn today">Save + log worn today</button>
       </div>
@@ -1140,14 +1141,8 @@
       <button class="sheet-option" id="sheetBuild" type="button">
         <span><span class="opt-title">Build manually</span><span class="opt-sub">Pick pieces from your wardrobe</span></span>
       </button>
-      <button class="sheet-option" id="sheetPhoto" type="button">
-        <span><span class="opt-title">Match a photo</span><span class="opt-sub">Upload a photo of an outfit</span></span>
-      </button>
-      <button class="sheet-option" id="sheetCamera" type="button">
-        <span><span class="opt-title">Match with camera</span><span class="opt-sub">Photograph an outfit now</span></span>
-      </button>
       <button class="sheet-option" id="sheetOutfitPhoto" type="button">
-        <span><span class="opt-title">Outfit photo</span><span class="opt-sub">One photo, several pieces</span></span>
+        <span><span class="opt-title">From a photo</span><span class="opt-sub">Recognizes pieces, adds what's new</span></span>
       </button>
     </section>
   </div>
@@ -8978,6 +8973,42 @@
 
       function handleOutfitParseFile(file) {
         if (!file || !currentUser) return;
+        outfitParseStopPolling();
+        noteTrail("outfit-parse: photo picked");
+        // A retry replaces an abandoned attempt: drop its
+        // orphan upload the same way closing does, so
+        // retries don't pile up files in Storage.
+        var prev = outfitParseState;
+        if (prev && !prev.saved && !prev.createdItemIds.length && !prev.appendedItemIds.length && prev.storagePath) {
+          try { storage.ref().child(prev.storagePath).delete().catch(function () {}); } catch (e) {}
+        }
+        // Open the review sheet FIRST, so progress — and
+        // failure — stays visible on screen, not just a
+        // toast that can be missed (founder report
+        // 2026-10-28: the photo flow went blank for
+        // seconds with no signal). The photo shows
+        // instantly from a local preview; the server URL
+        // replaces it once the parse starts.
+        outfitParseState = {
+          photoUrl: URL.createObjectURL(file),
+          storagePath: null,
+          parseId: null,
+          status: "uploading",
+          garments: [],
+          sourceWidth: null,
+          sourceHeight: null,
+          decisions: {},
+          renderUrls: {},
+          pollTimer: null,
+          pollFails: 0,
+          pollError: false,
+          saved: false,
+          createdItemIds: [],
+          appendedItemIds: [],
+          file: file
+        };
+        openOverlay(document.getElementById("outfitParseOverlay"));
+        renderOutfitParse();
         showToast("Cutting your photo into pieces…");
         var safeName = Date.now() + "-" + file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
         var storagePath = "users/" + currentUser.uid + "/outfit-photos/" + safeName;
@@ -8985,31 +9016,42 @@
         fileRef.put(file, { contentType: file.type }).then(function () {
           return fileRef.getDownloadURL();
         }).then(function (url) {
+          // The user may have closed the sheet mid-upload:
+          // then this result belongs to nobody — drop the
+          // just-uploaded file instead of orphaning it.
+          if (!outfitParseState) {
+            try { fileRef.delete().catch(function () {}); } catch (e) {}
+            return null;
+          }
+          // Upload landed: from here the file is tracked,
+          // so a later close (or retry) cleans it up.
+          outfitParseState.storagePath = storagePath;
           return functions.httpsCallable("startOutfitParse")({ storagePath: storagePath }).then(function (res) {
             var data = res.data || {};
-            outfitParseState = {
-              photoUrl: url,
-              storagePath: storagePath,
-              parseId: data.parseId,
-              status: data.status,
-              garments: data.garments || [],
-              sourceWidth: data.sourceWidth || null,
-              sourceHeight: data.sourceHeight || null,
-              decisions: {},
-              renderUrls: {},
-              pollTimer: null,
-              pollFails: 0,
-              pollError: false,
-              saved: false,
-              createdItemIds: [],
-              appendedItemIds: []
-            };
-            openOverlay(document.getElementById("outfitParseOverlay"));
+            var st = outfitParseState;
+            if (!st) return;
+            var oldUrl = st.photoUrl;
+            st.photoUrl = url;
+            st.parseId = data.parseId;
+            st.status = data.status;
+            st.garments = data.garments || [];
+            st.sourceWidth = data.sourceWidth || null;
+            st.sourceHeight = data.sourceHeight || null;
+            if (oldUrl && oldUrl.indexOf("blob:") === 0) { try { URL.revokeObjectURL(oldUrl); } catch (e) {} }
             renderOutfitParse();
             if (data.status === "cutting") outfitParseStartPolling();
           });
         }).catch(function (err) {
+          // Closed mid-flight is not a failure: stay silent.
+          if (!outfitParseState) return;
+          // The sheet is already open, so the failure stays
+          // visible with a Try-again button — never just a
+          // toast over a blank screen. Tracked in
+          // client_errors like every other client failure.
+          var st = outfitParseState;
+          if (st) { st.status = "failed"; renderOutfitParse(); }
           showToast(friendlyError(err));
+          reportError("outfit-parse.start", err);
         });
       }
 
@@ -9029,12 +9071,13 @@
           st.pollError = false;
           renderOutfitParse();
           if (st.status === "review" || st.status === "done" || st.status === "failed") outfitParseStopPolling();
-        }).catch(function () {
+        }).catch(function (err) {
           st.pollFails++;
           if (st.pollFails >= 3) {
             outfitParseStopPolling();
             st.pollError = true;
             renderOutfitParse();
+            reportError("outfit-parse.poll", err);
           }
         });
       }
@@ -9081,6 +9124,7 @@
         var st = outfitParseState;
         if (!st) return;
         functions.httpsCallable("retryOutfitGarment")({ parseId: st.parseId, garmentId: garment.id }).then(function () {
+          if (!outfitParseState) return;
           garment.status = "cutting";
           garment.error = null;
           st.status = "cutting";
@@ -9089,7 +9133,9 @@
           renderOutfitParse();
           outfitParseStartPolling();
         }).catch(function (err) {
+          if (!outfitParseState) return;
           showToast(friendlyError(err));
+          reportError("outfit-parse.retry-garment", err);
         });
       }
 
@@ -9110,10 +9156,12 @@
         var st = outfitParseState;
         if (!st) return;
         var statusEl = document.getElementById("outfitParseStatus");
-        if (st.status === "cutting") {
+        if (st.status === "uploading") {
+          statusEl.textContent = "Uploading your photo…";
+        } else if (st.status === "cutting") {
           statusEl.textContent = "Still cutting — pieces appear below as they finish.";
         } else if (st.status === "failed") {
-          statusEl.textContent = "This photo couldn't be parsed. Close and try another photo.";
+          statusEl.textContent = "This photo couldn't be parsed. Try again below, or close and try another photo.";
         } else if (!st.garments.length) {
           statusEl.textContent = "No garments found in this photo.";
         } else {
@@ -9266,8 +9314,9 @@
           cardsEl.appendChild(card);
         });
         var canSave = outfitParseCanSave(st.garments, st.decisions);
-        document.getElementById("outfitParseSave").disabled = !canSave;
-        document.getElementById("outfitParseSaveWear").disabled = !canSave;
+        document.getElementById("outfitParseSave").disabled = !canSave || !!st.saving;
+        document.getElementById("outfitParseSaveWear").disabled = !canSave || !!st.saving;
+        document.getElementById("outfitParseRetry").hidden = st.status !== "failed";
         var hintEl = document.getElementById("outfitParseSaveHint");
         if (st.pollError) {
           hintEl.textContent = "";
@@ -9308,11 +9357,18 @@
       function saveOutfitParse(logWear) {
         var st = outfitParseState;
         if (!st) return;
+        // One save at a time: a double-tap used to start two
+        // chains that could duplicate items and outfits.
+        if (st.saving) return;
         var kept = st.garments.filter(function (g) {
           var d = st.decisions[g.id];
           return d && (d.decision === "confirmed-new" || d.decision === "matched");
         });
         if (!kept.length) { showToast("Keep at least one piece to save."); return; }
+        st.saving = true;
+        document.getElementById("outfitParseSave").disabled = true;
+        document.getElementById("outfitParseSaveWear").disabled = true;
+        document.getElementById("outfitParseSaveHint").textContent = "Saving your outfit…";
         var sel = [];
         var names = [];
         var chain = Promise.resolve();
@@ -9321,6 +9377,14 @@
           var d = st.decisions[g.id];
           if (d.decision === "matched") {
             chain = chain.then(function () {
+              if (st.appendedItemIds.indexOf(d.matchedItemId) !== -1) {
+                // Retry after a partial save: this photo is
+                // already on the item, don't append twice.
+                sel.push(d.matchedItemId);
+                var it0 = itemById(d.matchedItemId);
+                names.push(it0 ? it0.name : (d.matchedItemName || "Unknown item"));
+                return;
+              }
               var ref = db.collection("users").doc(currentUser.uid).collection("items").doc(d.matchedItemId);
               return ref.update({
                 photos: firebase.firestore.FieldValue.arrayUnion(outfitParsePhotoEntry(g))
@@ -9337,6 +9401,13 @@
             });
           } else {
             chain = chain.then(function () {
+              if (d.createdItemId) {
+                // Retry after a partial save: reuse the item
+                // already created instead of duplicating it.
+                sel.push(d.createdItemId);
+                names.push(d.userName || outfitParseDraftName(g.type, g.colors));
+                return;
+              }
               var name = d.userName || outfitParseDraftName(g.type, g.colors);
               var category = d.userCategory || outfitParseCategoryForType(g.type);
               var docRef = db.collection("users").doc(currentUser.uid).collection("items").doc();
@@ -9362,6 +9433,7 @@
               };
               return docRef.set(doc).then(function () {
                 st.createdItemIds.push(docRef.id);
+                d.createdItemId = docRef.id;
                 sel.push(docRef.id);
                 names.push(name);
               });
@@ -9426,7 +9498,13 @@
           switchView("outfits");
           openOutfit(ref.id);
         }).catch(function (err) {
+          // Save stays retryable: buttons come back, the
+          // decisions are intact, and the retry reuses
+          // anything already written instead of doubling it.
+          st.saving = false;
+          renderOutfitParse();
           showToast(friendlyError(err));
+          reportError("outfit-parse.save", err);
         });
       }
 
@@ -9797,17 +9875,17 @@
         closeOverlay(document.getElementById("builderOverlay"));
       }
 
-      // UX-11: one "Add outfit" entry — the sheet names the three ways.
+      // UX-11: one "Add outfit" entry — the sheet names the two ways:
+      // build by hand, or one photo flow (founder verdict 2026-10-28:
+      // Match-a-photo, Match-with-camera and Outfit-photo are one
+      // flow — recognize, validate, add what's new, save the
+      // outfit). The match-only photo-parse code stays, unreachable,
+      // for a later cleanup pass.
       var addOutfitSheet = document.getElementById("addOutfitSheet");
       function closeAddOutfitSheet() { closeOverlay(addOutfitSheet); }
       document.getElementById("addOutfitBtn").addEventListener("click", function () { openOverlay(addOutfitSheet); });
       document.getElementById("sheetBuild").addEventListener("click", function () { closeAddOutfitSheet(); openBuilder(); });
-      document.getElementById("sheetPhoto").addEventListener("click", function () { closeAddOutfitSheet(); openPhotoParse(); });
       document.getElementById("sheetOutfitPhoto").addEventListener("click", function () { closeAddOutfitSheet(); openOutfitParse(); });
-      document.getElementById("sheetCamera").addEventListener("click", function () {
-        closeAddOutfitSheet();
-        document.getElementById("photoParseInputCamera").click();
-      });
       document.getElementById("addOutfitClose").addEventListener("click", closeAddOutfitSheet);
       addOutfitSheet.addEventListener("click", function (event) { if (event.target === addOutfitSheet) closeAddOutfitSheet(); });
 
@@ -11002,6 +11080,9 @@
       document.getElementById("outfitParseClose").addEventListener("click", closeOutfitParse);
       document.getElementById("outfitParseSave").addEventListener("click", function () { saveOutfitParse(false); });
       document.getElementById("outfitParseSaveWear").addEventListener("click", function () { saveOutfitParse(true); });
+      document.getElementById("outfitParseRetry").addEventListener("click", function () {
+        if (outfitParseState && outfitParseState.file) handleOutfitParseFile(outfitParseState.file);
+      });
       document.getElementById("outfitParseInput").addEventListener("change", function () {
         handleOutfitParseFile(this.files && this.files[0]);
       });
