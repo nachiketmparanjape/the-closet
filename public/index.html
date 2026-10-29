@@ -877,14 +877,6 @@
         </label>
       </div>
 
-      <div id="draftsSection" hidden>
-        <div class="catalog-head">
-          <h2>Drafts</h2>
-          <span class="count" id="draftCount"></span>
-        </div>
-        <div class="gallery" id="draftsGallery"></div>
-      </div>
-
       <div class="gallery" id="gallery">
         <div class="empty" id="emptyState">
           <div class="empty-art" aria-hidden="true">
@@ -914,6 +906,13 @@
         <input type="file" id="outfitParseInputCamera" accept="image/*" capture="environment" hidden>
       </div>
       <p class="hint" id="outfitsHint">Ask the stylist, build one yourself, or match a photo of an outfit — saved outfits land here.</p>
+      <div id="draftsSection" hidden>
+        <div class="catalog-head">
+          <h2>Drafts</h2>
+          <span class="count" id="draftCount"></span>
+        </div>
+        <div class="gallery" id="draftsGallery"></div>
+      </div>
       <div class="gallery" id="outfitsGallery"></div>
     </section>
 
@@ -8540,7 +8539,7 @@
         document.getElementById("tripsView").hidden = view !== "trips";
         document.getElementById("tripView").hidden = view !== "trip";
         if (view === "today") renderToday();
-        if (view === "wardrobe") refreshDrafts();
+        if (view === "outfits") refreshDrafts();
         // Motion basics (§5): the incoming view fades + rises 8px.
         var secIds = { today: "todayView", wardrobe: "wardrobeView", outfits: "outfitsView", shoplist: "shopListView", trips: "tripsView", trip: "tripView" };
         var sec = document.getElementById(secIds[view] || "");
@@ -8557,7 +8556,7 @@
         // Coming back to the app is when a background draft
         // is most likely ready — the advancer finished it
         // while the user was away.
-        if (!document.hidden && !document.getElementById("wardrobeView").hidden) refreshDrafts();
+        if (!document.hidden && !document.getElementById("outfitsView").hidden) refreshDrafts();
       });
 
       function itemById(id) {
@@ -9407,13 +9406,13 @@
       // that started it — SAM takes ~11 minutes, so the user
       // will usually have closed the sheet before the drafts
       // are ready. Unfinished parses surface as Drafts at
-      // the top of the wardrobe: one card per photo, with a
-      // remaining-time estimate while cutting, a ready count
+      // the top of the Outfits tab: one card per photo, with
+      // a remaining-time estimate while cutting, a ready count
       // at review, and a retry on failure. The scheduled
       // advancer (not the client) finishes them; the client
-      // only refreshes this list when the wardrobe is shown,
-      // when the app comes back to the foreground, and after
-      // an upload or a save. Tapping a card reopens the
+      // only refreshes this list when the Outfits tab is
+      // shown, when the app comes back to the foreground,
+      // and after an upload or a save. Tapping a card reopens the
       // review sheet on that parse. Decisions live in memory
       // only, so a resumed review starts undecided — the
       // drafts themselves persist.
@@ -9549,7 +9548,7 @@
       // listing means minutes of server work — the passive
       // flow closes the sheet, says the photo is processing
       // with the estimate, and leaves the draft card visible
-      // in the wardrobe. Review means the pieces are already
+      // in Outfits. Review means the pieces are already
       // there, so the sheet stays open on them.
       function applyOutfitParseStart(data) {
         var st = outfitParseState;
@@ -9561,7 +9560,7 @@
         st.sourceHeight = data.sourceHeight || null;
         if (data.status === "cutting" || data.status === "listing") {
           closeOutfitParse();
-          showToast("Processing — your pieces will show up as drafts in about " + DRAFT_ETA_MINUTES + " minutes.");
+          showToast("Processing — your pieces will show up as drafts in Outfits in about " + DRAFT_ETA_MINUTES + " minutes.");
           refreshDrafts();
         } else {
           renderOutfitParse();
