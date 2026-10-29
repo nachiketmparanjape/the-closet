@@ -282,11 +282,13 @@ function publicGarment(g) {
 }
 
 // The photo-to-draft estimate, in minutes, for the current SAM
-// backend (community build, measured ~11 min end to end
-// 2026-10-28). The client shows remaining time from it; update
-// it when the backend changes (fal) — and keep the client's
-// toast constant in step.
-const PARSE_ETA_MINUTES = 10;
+// backend (community build). Measured twice 2026-10-28: ~11 min
+// for the evening selfie parses, ~18 min for the advancer test
+// parse (cold boot dominates and varies). 15 splits the range;
+// the card degrades to "almost ready" past it. The client
+// shows remaining time from it; update it when the backend
+// changes (fal) — and keep the client's toast constant in step.
+const PARSE_ETA_MINUTES = 15;
 
 // listParses: the drafts list. Parses a user can return to —
 // still listing, still cutting, sitting at review unsaved, or
