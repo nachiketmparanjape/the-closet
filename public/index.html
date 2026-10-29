@@ -877,6 +877,14 @@
         </label>
       </div>
 
+      <div id="draftsSection" hidden>
+        <div class="catalog-head">
+          <h2>Drafts</h2>
+          <span class="count" id="draftCount"></span>
+        </div>
+        <div class="gallery" id="draftsGallery"></div>
+      </div>
+
       <div class="gallery" id="gallery">
         <div class="empty" id="emptyState">
           <div class="empty-art" aria-hidden="true">
@@ -1153,7 +1161,6 @@
       <button class="sheet-option" id="sheetOutfitPhoto" type="button">
         <span><span class="opt-title">From a photo</span><span class="opt-sub">Recognizes pieces, adds what's new</span></span>
       </button>
-      <div id="outfitParseResumes"></div>
     </section>
   </div>
 
@@ -8533,6 +8540,7 @@
         document.getElementById("tripsView").hidden = view !== "trips";
         document.getElementById("tripView").hidden = view !== "trip";
         if (view === "today") renderToday();
+        if (view === "wardrobe") refreshDrafts();
         // Motion basics (§5): the incoming view fades + rises 8px.
         var secIds = { today: "todayView", wardrobe: "wardrobeView", outfits: "outfitsView", shoplist: "shopListView", trips: "tripsView", trip: "tripView" };
         var sec = document.getElementById(secIds[view] || "");
@@ -8544,6 +8552,12 @@
       }
       document.querySelectorAll(".tab").forEach(function (t) {
         t.addEventListener("click", function () { switchView(t.getAttribute("data-view")); });
+      });
+      document.addEventListener("visibilitychange", function () {
+        // Coming back to the app is when a background draft
+        // is most likely ready — the advancer finished it
+        // while the user was away.
+        if (!document.hidden && !document.getElementById("wardrobeView").hidden) refreshDrafts();
       });
 
       function itemById(id) {
@@ -8860,6 +8874,8 @@
           if (dup) {
             closePhotoParse(true);
             showToast("This exact outfit is already saved — opening the existing one.");
+            if (st.parseId) db.collection("users").doc(currentUser.uid).collection("parses").doc(st.parseId).update({ status: "done" }).catch(function () {});
+            refreshDrafts();
             switchView("outfits");
             openOutfit(dup.id);
             return;
@@ -8887,6 +8903,7 @@
           }).then(function () {
             closePhotoParse(false);
             showToast(logWear ? "Outfit saved — logged as worn today." : "Outfit saved.");
+          refreshDrafts();
             // Sprint 14: PC-13 remainder — photo doubles as the lowest-friction
             // wear logger. Wear uses the same shape as the outfit view's wear button.
             if (logWear) {
@@ -8989,7 +9006,7 @@
         // orphan upload the same way closing does, so
         // retries don't pile up files in Storage.
         var prev = outfitParseState;
-        if (prev && !prev.resumed && !prev.saved && !prev.createdItemIds.length && !prev.appendedItemIds.length && prev.storagePath) {
+        if (prev && !prev.parseId && !prev.resumed && !prev.saved && !prev.createdItemIds.length && !prev.appendedItemIds.length && prev.storagePath) {
           try { storage.ref().child(prev.storagePath).delete().catch(function () {}); } catch (e) {}
         }
         // Open the review sheet FIRST, so progress — and
@@ -9052,14 +9069,8 @@
             if (!st) return;
             var oldUrl = st.photoUrl;
             st.photoUrl = url;
-            st.parseId = data.parseId;
-            st.status = data.status;
-            st.garments = data.garments || [];
-            st.sourceWidth = data.sourceWidth || null;
-            st.sourceHeight = data.sourceHeight || null;
             if (oldUrl && oldUrl.indexOf("blob:") === 0) { try { URL.revokeObjectURL(oldUrl); } catch (e) {} }
-            renderOutfitParse();
-            if (data.status === "cutting") outfitParseStartPolling();
+            applyOutfitParseStart(data);
           });
         }).catch(function (err) {
           // Closed mid-flight is not a failure: stay silent.
@@ -9380,7 +9391,11 @@
         // appended, the photo is wardrobe data — keep it.
         // A resumed parse's photo belongs to that parse,
         // not to this session, so it is never deleted here.
-        if (st && !st.resumed && !st.saved && !st.createdItemIds.length && !st.appendedItemIds.length && st.storagePath) {
+        // Same for any parse with an id: once start has
+        // created the parse, the photo belongs to it — the
+        // passive flow closes the sheet right after start
+        // and the draft card still needs the photo.
+        if (st && !st.parseId && !st.resumed && !st.saved && !st.createdItemIds.length && !st.appendedItemIds.length && st.storagePath) {
           storage.ref().child(st.storagePath).delete().catch(function () {});
         }
         outfitParseState = null;
@@ -9388,44 +9403,169 @@
         document.getElementById("outfitParseInputCamera").value = "";
       }
 
-      // PC-36 resume (2026-10-28): a parse outlives the
-      // sheet that started it — SAM takes ~11 minutes, so
-      // the user will usually have closed the sheet before
-      // the drafts are ready. The Add-an-outfit sheet lists
-      // unfinished parses; tapping one reopens the review
-      // sheet on that parse, polling again if still
-      // cutting. Decisions live in memory only, so a
-      // resumed review starts undecided — the drafts
-      // themselves persist.
-      function outfitParseResumeLabel(entry) {
-        var time = "Earlier";
-        if (entry.createdAt) {
-          try { time = new Date(entry.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); } catch (e) {}
+      // PC-36 drafts (2026-10-28): a parse outlives the sheet
+      // that started it — SAM takes ~11 minutes, so the user
+      // will usually have closed the sheet before the drafts
+      // are ready. Unfinished parses surface as Drafts at
+      // the top of the wardrobe: one card per photo, with a
+      // remaining-time estimate while cutting, a ready count
+      // at review, and a retry on failure. The scheduled
+      // advancer (not the client) finishes them; the client
+      // only refreshes this list when the wardrobe is shown,
+      // when the app comes back to the foreground, and after
+      // an upload or a save. Tapping a card reopens the
+      // review sheet on that parse. Decisions live in memory
+      // only, so a resumed review starts undecided — the
+      // drafts themselves persist.
+      //
+      // The upload toast's estimate lives here (client
+      // constant); the card's estimate comes from the server
+      // (listOutfitParses etaMinutes). Keep the two in step
+      // with functions/parse.js PARSE_ETA_MINUTES.
+      var DRAFT_ETA_MINUTES = 10;
+      var draftPhotoUrls = {};
+
+      function draftCardTitle(entry, etaMinutes) {
+        if (entry.status === "failed") return "Couldn't cut this photo";
+        if (entry.status === "review") {
+          if (!entry.readyCount) return "No pieces came out — tap to retry";
+          return entry.readyCount + (entry.readyCount === 1 ? " piece ready to review" : " pieces ready to review");
         }
-        var state = entry.status === "review" ? "pieces ready to review" : entry.status === "listing" ? "still finding pieces" : "still cutting";
-        return { title: "Continue — photo from " + time, sub: entry.garmentCount + (entry.garmentCount === 1 ? " piece · " : " pieces · ") + state };
+        if (entry.status === "listing") return "Finding pieces in your photo…";
+        var created = entry.createdAt ? Date.parse(entry.createdAt) : NaN;
+        var remaining = Number.isFinite(created) ? Math.ceil(etaMinutes - (Date.now() - created) / 60000) : etaMinutes;
+        if (remaining <= 0) return "Processing… almost ready";
+        return "Processing… about " + remaining + (remaining === 1 ? " minute" : " minutes") + " left";
       }
 
-      function refreshOutfitParseResumes() {
-        var box = document.getElementById("outfitParseResumes");
-        if (!box || !currentUser) return;
-        box.innerHTML = "";
+      function draftPhotoTime(entry) {
+        if (!entry.createdAt) return "Earlier";
+        try { return "Photo from " + new Date(entry.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); } catch (e) { return "Earlier"; }
+      }
+
+      function refreshDrafts() {
+        var sec = document.getElementById("draftsSection");
+        var gal = document.getElementById("draftsGallery");
+        if (!sec || !gal || !currentUser) return;
         functions.httpsCallable("listOutfitParses")({}).then(function (res) {
           var list = (res.data && res.data.parses) || [];
+          var eta = (res.data && res.data.etaMinutes) || DRAFT_ETA_MINUTES;
+          gal.innerHTML = "";
+          if (!list.length) { sec.hidden = true; return; }
+          sec.hidden = false;
+          document.getElementById("draftCount").textContent = list.length + (list.length === 1 ? " photo" : " photos");
           list.forEach(function (entry) {
-            var label = outfitParseResumeLabel(entry);
-            var btn = document.createElement("button");
-            btn.className = "sheet-option";
-            btn.type = "button";
-            var wrap = document.createElement("span");
-            var t = document.createElement("span"); t.className = "opt-title"; t.textContent = label.title;
-            var s = document.createElement("span"); s.className = "opt-sub"; s.textContent = label.sub;
-            wrap.appendChild(t); wrap.appendChild(s);
-            btn.appendChild(wrap);
-            btn.addEventListener("click", function () { closeAddOutfitSheet(); resumeOutfitParse(entry); });
-            box.appendChild(btn);
+            var card = document.createElement("article");
+            card.className = "item";
+            var imageWrap = document.createElement("div");
+            imageWrap.className = "item-image";
+            var image = document.createElement("img");
+            image.alt = "Draft photo";
+            image.loading = "lazy";
+            if (entry.storagePath) {
+              if (draftPhotoUrls[entry.storagePath]) image.src = draftPhotoUrls[entry.storagePath];
+              else storage.ref().child(entry.storagePath).getDownloadURL().then(function (u) { draftPhotoUrls[entry.storagePath] = u; image.src = u; }).catch(function () {});
+            }
+            imageWrap.appendChild(image);
+            var details = document.createElement("div");
+            details.className = "item-details";
+            var name = document.createElement("p");
+            name.className = "item-name";
+            name.textContent = draftCardTitle(entry, eta);
+            var meta = document.createElement("div");
+            meta.className = "item-meta";
+            var when = document.createElement("span");
+            when.textContent = draftPhotoTime(entry);
+            var tag = document.createElement("span");
+            tag.className = "src-tag";
+            tag.textContent = "· Draft";
+            meta.appendChild(when);
+            meta.appendChild(tag);
+            details.appendChild(name);
+            details.appendChild(meta);
+            if (entry.status === "failed") {
+              var retry = document.createElement("button");
+              retry.className = "look-btn";
+              retry.type = "button";
+              retry.textContent = "Try again";
+              retry.addEventListener("click", function (ev) { ev.stopPropagation(); restartOutfitParseFromEntry(entry); });
+              details.appendChild(retry);
+            }
+            card.appendChild(imageWrap);
+            card.appendChild(details);
+            card.addEventListener("click", function () { resumeOutfitParse(entry); });
+            gal.appendChild(card);
           });
-        }).catch(function () { /* resumes are a convenience; a failed list hides quietly */ });
+        }).catch(function () { /* drafts hide quietly on a failed list */ });
+      }
+
+      // A failed parse's retry re-parses the same upload —
+      // no re-upload, no new photo. The new parse replaces
+      // the failed card (listParses keeps one card per
+      // photo, newest wins), and the passive flow applies:
+      // cutting closes the sheet and the draft card carries
+      // the wait.
+      function restartOutfitParseFromEntry(entry) {
+        if (!currentUser || !entry.storagePath) return;
+        outfitParseStopPolling();
+        noteTrail("outfit-parse: restarted " + entry.parseId);
+        outfitParseState = {
+          photoUrl: "",
+          storagePath: entry.storagePath,
+          parseId: null,
+          status: "starting",
+          garments: [],
+          sourceWidth: null,
+          sourceHeight: null,
+          decisions: {},
+          renderUrls: {},
+          pollTimer: null,
+          pollFails: 0,
+          pollError: false,
+          saved: false,
+          createdItemIds: [],
+          appendedItemIds: [],
+          file: null,
+          resumed: true
+        };
+        openOverlay(document.getElementById("outfitParseOverlay"));
+        renderOutfitParse();
+        storage.ref().child(entry.storagePath).getDownloadURL().then(function (u) {
+          if (outfitParseState) { outfitParseState.photoUrl = u; renderOutfitParse(); }
+        }).catch(function () {});
+        functions.httpsCallable("startOutfitParse", { timeout: 300000 })({ storagePath: entry.storagePath }).then(function (res) {
+          applyOutfitParseStart(res.data || {});
+        }).catch(function (err) {
+          if (!outfitParseState) return;
+          outfitParseState.status = "failed";
+          renderOutfitParse();
+          reportError("outfit-parse.start", err);
+        });
+      }
+
+      // Shared by a fresh upload and by a restart: takes a
+      // startOutfitParse response and decides whether the
+      // user watches or the draft carries it. Cutting or
+      // listing means minutes of server work — the passive
+      // flow closes the sheet, says the photo is processing
+      // with the estimate, and leaves the draft card visible
+      // in the wardrobe. Review means the pieces are already
+      // there, so the sheet stays open on them.
+      function applyOutfitParseStart(data) {
+        var st = outfitParseState;
+        if (!st) return;
+        st.parseId = data.parseId;
+        st.status = data.status;
+        st.garments = data.garments || [];
+        st.sourceWidth = data.sourceWidth || null;
+        st.sourceHeight = data.sourceHeight || null;
+        if (data.status === "cutting" || data.status === "listing") {
+          closeOutfitParse();
+          showToast("Processing — your pieces will show up as drafts in about " + DRAFT_ETA_MINUTES + " minutes.");
+          refreshDrafts();
+        } else {
+          renderOutfitParse();
+        }
       }
 
       function resumeOutfitParse(entry) {
@@ -9560,6 +9700,8 @@
             st.saved = true;
             closeOutfitParse();
             showToast("This exact outfit is already saved — opening the existing one.");
+            if (st.parseId) db.collection("users").doc(currentUser.uid).collection("parses").doc(st.parseId).update({ status: "done" }).catch(function () {});
+            refreshDrafts();
             switchView("outfits");
             openOutfit(dup.id);
             return null;
@@ -9592,6 +9734,7 @@
           db.collection("users").doc(currentUser.uid).collection("parses").doc(st.parseId).update({ status: "done" }).catch(function () {});
           closeOutfitParse();
           showToast(logWear ? "Outfit saved — logged as worn today." : "Outfit saved.");
+          refreshDrafts();
           if (appendErrors) showToast("Couldn't attach the photo to " + appendErrors + " piece(s) — the outfit still saved.");
           if (logWear) {
             db.collection("users").doc(currentUser.uid).collection("wear_events").doc().set({
@@ -9993,7 +10136,7 @@
       // for a later cleanup pass.
       var addOutfitSheet = document.getElementById("addOutfitSheet");
       function closeAddOutfitSheet() { closeOverlay(addOutfitSheet); }
-      document.getElementById("addOutfitBtn").addEventListener("click", function () { openOverlay(addOutfitSheet); refreshOutfitParseResumes(); });
+      document.getElementById("addOutfitBtn").addEventListener("click", function () { openOverlay(addOutfitSheet); });
       document.getElementById("sheetBuild").addEventListener("click", function () { closeAddOutfitSheet(); openBuilder(); });
       document.getElementById("sheetOutfitPhoto").addEventListener("click", function () { closeAddOutfitSheet(); openOutfitParse(); });
       document.getElementById("addOutfitClose").addEventListener("click", closeAddOutfitSheet);
@@ -11192,8 +11335,13 @@
       document.getElementById("outfitParseSaveWear").addEventListener("click", function () { saveOutfitParse(true); });
       document.getElementById("outfitParseRetry").addEventListener("click", function () {
         if (outfitParseState && outfitParseState.file) handleOutfitParseFile(outfitParseState.file);
-        // A resumed parse has no file to re-upload: retry
-        // means poll again (the parse already exists).
+        // A resumed parse has no file to re-upload. If it
+        // failed, polling would just return failed again —
+        // restart it from the same photo instead. If it is
+        // merely cutting, retry means poll again.
+        else if (outfitParseState && outfitParseState.parseId && outfitParseState.status === "failed") {
+          restartOutfitParseFromEntry({ parseId: outfitParseState.parseId, storagePath: outfitParseState.storagePath });
+        }
         else if (outfitParseState && outfitParseState.parseId) {
           outfitParseState.status = "cutting";
           renderOutfitParse();
@@ -11862,6 +12010,7 @@
             syncTodayChrome(); // DESIGN-HOME-1
             watchTodaySettings(user); // fix buffer 5: server-side toggle
             watchTodayPicks(user); // fix buffer 5: cross-device picks
+            refreshDrafts();
           });
         } catch (error) {
           configured = false;

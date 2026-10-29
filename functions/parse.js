@@ -281,33 +281,49 @@ function publicGarment(g) {
   return rest;
 }
 
-// listParses: the resume list. Parses a user can return
-// to — still listing, still cutting, or sitting at review
-// unsaved. Saved ("done") parses are already wardrobe data
-// and failed ones have no drafts to review, so neither is
-// listed. Public fields only: no prediction ids, no
-// embeddings, no boxes.
+// The photo-to-draft estimate, in minutes, for the current SAM
+// backend (community build, measured ~11 min end to end
+// 2026-10-28). The client shows remaining time from it; update
+// it when the backend changes (fal) — and keep the client's
+// toast constant in step.
+const PARSE_ETA_MINUTES = 10;
+
+// listParses: the drafts list. Parses a user can return to —
+// still listing, still cutting, sitting at review unsaved, or
+// failed. Saved ("done") parses are already wardrobe data, so
+// only they are excluded. Failed parses ARE listed: a passive
+// flow must surface failure, never swallow it — the card
+// carries the retry. One card per photo: a retry re-parses
+// the same upload, so the newest parse for a photo replaces
+// its failed predecessor. Public fields only: no prediction
+// ids, no embeddings, no boxes.
 async function listParses(uid, deps) {
   const snap = await parsesCollection(deps.db, uid)
     .orderBy("createdAt", "desc")
     .limit(20)
     .get();
   const out = [];
+  const seenPhotos = new Set();
   for (const s of snap.docs) {
     if (!s.exists) continue;
     const d = s.data();
-    if (d.status !== "listing" && d.status !== "cutting" && d.status !== "review") continue;
+    if (d.status !== "listing" && d.status !== "cutting" && d.status !== "review" && d.status !== "failed") continue;
+    const storagePath = d.sourcePhoto && d.sourcePhoto.storagePath ? d.sourcePhoto.storagePath : null;
+    if (storagePath) {
+      if (seenPhotos.has(storagePath)) continue;
+      seenPhotos.add(storagePath);
+    }
     const garments = d.garments || [];
     out.push({
       parseId: s.id,
       status: d.status,
       createdAt: d.createdAt && d.createdAt.toDate ? d.createdAt.toDate().toISOString() : null,
-      storagePath: d.sourcePhoto && d.sourcePhoto.storagePath ? d.sourcePhoto.storagePath : null,
+      storagePath,
       garmentCount: garments.length,
       readyCount: garments.filter((g) => g.status === "ready").length,
     });
   }
-  return { parses: out };
+  return { parses: out, etaMinutes: PARSE_ETA_MINUTES };
 }
 
 async function startParse(uid, sourceStoragePath, deps) {
@@ -632,6 +648,7 @@ module.exports = {
   advanceParse,
   retryGarment,
   listParses,
+  PARSE_ETA_MINUTES,
   parseListJson,
   buildPrompt,
   buildListRequest,

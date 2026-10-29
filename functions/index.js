@@ -22,6 +22,7 @@ const { reflectOutfit } = require("./reflect");
 const { critiqueOutfit } = require("./critique");
 const { parseOutfitPhoto } = require("./photo");
 const { startParse, advanceParse, retryGarment, listParses } = require("./parse");
+const { advanceAllParses } = require("./advance");
 const { shopCheck } = require("./shopcheck");
 const { fetchLinkItem } = require("./linkimport");
 const { extractGarmentPhoto } = require("./extract");
@@ -588,6 +589,39 @@ exports.listOutfitParses = onCall(
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "SAM_FAILED";
       boundary("listOutfitParses", correlationId, uid, err);
+    }
+  }
+);
+
+// PC-36 background advancer, driven by Cloud Scheduler every 2 min.
+// NOT a callable: Scheduler calls plain HTTPS with a shared secret
+// header (CRON_SECRET). No Firebase Auth here — the secret IS the
+// auth, and the function only advances parses (never items, outfits,
+// or user data). Usage recording is skipped: the tick has no user.
+exports.advanceParsesHttp = onRequest(
+  {
+    region: "us-central1",
+    timeoutSeconds: 540,
+    memory: "1GiB",
+    maxInstances: 5,
+    secrets: ["REPLICATE_API_TOKEN", "CRON_SECRET"],
+  },
+  async (req, res) => {
+    const correlationId = newCorrelationId();
+    try {
+      if (!process.env.CRON_SECRET || req.header("x-closet-cron") !== process.env.CRON_SECRET) {
+        res.status(403).json({ error: "forbidden" });
+        return;
+      }
+      const summary = await advanceAllParses({
+        db: getFirestore(),
+        bucket: getStorage().bucket(),
+        apiKey: process.env.REPLICATE_API_TOKEN || null,
+      });
+      res.json({ ok: true, ...summary });
+    } catch (err) {
+      try { boundary("advanceParsesHttp", correlationId, null, err); } catch (e) {}
+      res.status(500).json({ ok: false, error: (err && err.message) || "internal" });
     }
   }
 );
