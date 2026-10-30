@@ -807,6 +807,11 @@
     .outfit-parse-card { border: 1px solid rgba(0,0,0,.14); border-radius: 8px; padding: 10px; margin-top: 10px; }
     .outfit-parse-card img { display: block; width: 100%; max-height: 320px; object-fit: contain; background: var(--paper); }
     .outfit-parse-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    #outfitParseMatchOverlay .modal { display: flex; flex-direction: column; overflow: hidden; }
+    #outfitParseMatchOverlay .modal-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+    .match-pick-row { display: flex; align-items: center; gap: 12px; width: 100%; box-sizing: border-box; padding: 8px; margin: 0 0 6px; border: 1px solid rgba(0,0,0,.12); border-radius: 10px; background: transparent; color: var(--ink); font-size: 16px; text-align: left; cursor: pointer; }
+    .match-pick-row img { width: 52px; height: 52px; object-fit: cover; border-radius: 8px; background: var(--paper); flex-shrink: 0; }
+    .match-pick-row .match-pick-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   </style>
 </head>
 <body>
@@ -999,6 +1004,24 @@
         <button class="secondary" id="outfitParseRetry" type="button" hidden>Try again</button>
         <button class="primary" id="outfitParseSave" type="button">Save outfit</button>
         <button class="primary" id="outfitParseSaveWear" type="button" style="margin-left:8px" title="Save the outfit and log it as worn today">Save + log worn today</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- PC-36 follow-up: manually match a cut piece to an existing
+       wardrobe item when the auto-matcher finds nothing. Opens
+       stacked above the review sheet; picking an item records a
+       "matched" decision for the garment. -->
+  <div class="overlay" id="outfitParseMatchOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="outfitParseMatchTitle">
+    <section class="modal">
+      <div class="modal-head">
+        <h2 id="outfitParseMatchTitle">Match to an existing piece</h2>
+        <button class="icon-button" id="outfitParseMatchClose" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <input id="outfitParseMatchSearch" type="search" placeholder="Search your wardrobe…" autocomplete="off"
+               style="width:100%;box-sizing:border-box;margin:4px 0 12px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--input-bg);color:var(--ink);font-size:16px;">
+        <div id="outfitParseMatchList"></div>
       </div>
     </section>
   </div>
@@ -9139,6 +9162,62 @@
         outfitParseDecision(garment.id, { decision: "matched", matchedItemId: candidate.itemId, matchedItemName: candidate.itemName });
       }
 
+      // Manual match: the auto-matcher proposes, but the founder
+      // can always pick the existing piece himself. Opens a
+      // searchable wardrobe picker stacked above the review sheet.
+      var outfitParseMatchTarget = null;
+      function outfitParseOpenMatcher(garment) {
+        outfitParseMatchTarget = garment;
+        var input = document.getElementById("outfitParseMatchSearch");
+        if (input) input.value = "";
+        outfitParseRenderMatcher("");
+        openOverlay(document.getElementById("outfitParseMatchOverlay"));
+        if (input) setTimeout(function () { try { input.focus(); } catch (e) {} }, 350);
+      }
+      function outfitParseRenderMatcher(query) {
+        var list = document.getElementById("outfitParseMatchList");
+        if (!list) return;
+        list.innerHTML = "";
+        var q = (query || "").trim().toLowerCase();
+        var shown = 0;
+        allItems.forEach(function (item) {
+          if (!item || !item.id) return;
+          var name = item.name || "Untitled";
+          if (q && name.toLowerCase().indexOf(q) === -1) return;
+          if (shown >= 100) return;
+          shown++;
+          var row = document.createElement("button");
+          row.type = "button";
+          row.className = "match-pick-row";
+          var thumb = document.createElement("img");
+          thumb.alt = "";
+          thumb.loading = "lazy";
+          var url = "";
+          try { url = itemDisplayUrl(item); } catch (e) {}
+          if (url) thumb.src = url;
+          else thumb.style.display = "none";
+          row.appendChild(thumb);
+          var label = document.createElement("span");
+          label.className = "match-pick-name";
+          label.textContent = name;
+          row.appendChild(label);
+          row.addEventListener("click", function () {
+            if (outfitParseMatchTarget) {
+              outfitParseMatch(outfitParseMatchTarget, { itemId: item.id, itemName: name });
+            }
+            outfitParseMatchTarget = null;
+            closeOverlay(document.getElementById("outfitParseMatchOverlay"));
+          });
+          list.appendChild(row);
+        });
+        if (!shown) {
+          var empty = document.createElement("p");
+          empty.className = "hint";
+          empty.textContent = q ? "No pieces match that search." : "Your wardrobe is empty.";
+          list.appendChild(empty);
+        }
+      }
+
       function outfitParseRetry(garment) {
         var st = outfitParseState;
         if (!st) return;
@@ -9347,6 +9426,7 @@
             (g.matchCandidates || []).forEach(function (c) {
               addAction("This is " + c.itemName, function () { outfitParseMatch(g, c); });
             });
+            addAction("Match to existing…", function () { outfitParseOpenMatcher(g); });
             addAction("Not a garment", function () { outfitParseDecision(g.id, { decision: "dismissed" }); });
             if (!d.editing) addAction("Edit details", function () { outfitParseDecision(g.id, { editing: true }); });
           }
@@ -9705,7 +9785,11 @@
           storagePath: entry.storagePath,
           parseId: entry.parseId,
           status: "cutting",
-          garments: [],
+          // Paint the rows instantly from the draft list entry —
+          // the first poll's roundtrip used to leave the sheet
+          // blank for a couple of seconds (founder report).
+          // The poll replaces these with fresh data on return.
+          garments: Array.isArray(entry.garments) ? entry.garments : [],
           sourceWidth: null,
           sourceHeight: null,
           decisions: {},
@@ -11462,6 +11546,13 @@
       document.getElementById("photoParseSave").addEventListener("click", function () { savePhotoParseOutfit(false); });
       document.getElementById("photoParseSaveWear").addEventListener("click", function () { savePhotoParseOutfit(true); });
       document.getElementById("outfitParseClose").addEventListener("click", closeOutfitParse);
+      document.getElementById("outfitParseMatchClose").addEventListener("click", function () {
+        outfitParseMatchTarget = null;
+        closeOverlay(document.getElementById("outfitParseMatchOverlay"));
+      });
+      document.getElementById("outfitParseMatchSearch").addEventListener("input", function (e) {
+        outfitParseRenderMatcher(e.target.value);
+      });
       document.getElementById("outfitParseSave").addEventListener("click", function () { saveOutfitParse(false); });
       document.getElementById("outfitParseSaveWear").addEventListener("click", function () { saveOutfitParse(true); });
       document.getElementById("outfitParseRetry").addEventListener("click", function () {

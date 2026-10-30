@@ -360,6 +360,9 @@ async function listParses(uid, deps) {
       storagePath,
       garmentCount: garments.length,
       readyCount: garments.filter((g) => g.status === "ready").length,
+      // Instant sheet render: resume paints these immediately
+      // instead of waiting for the first poll's roundtrip.
+      garments: garments.map(publicGarment),
     });
   }
   return { parses: out, etaMinutes: PARSE_ETA_MINUTES };

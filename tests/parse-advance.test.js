@@ -185,3 +185,37 @@ test("advancer: one bad parse never blocks the rest", async () => {
   assert.equal(summary.errors.length, 1);
   assert.equal(summary.errors[0].parseId, "pBad");
 });
+
+test("listParses: entries carry public garments for instant sheet render", async () => {
+  const db = fakeDb({
+    u1: {
+      parses: {
+        p1: {
+          status: "review",
+          createdAt: ts(5),
+          sourcePhoto: { storagePath: "users/u1/outfit-photos/a.jpg" },
+          garments: [
+            {
+              id: "g0", status: "failed",
+              error: '{"detail":"secret"}',
+              userMessage: "Try again.",
+              predictionId: "p1",
+              type: "Shorts", colors: ["black"],
+            },
+            { id: "g1", status: "ready", type: "Tee", colors: ["white"] },
+          ],
+        },
+      },
+    },
+  });
+  const res = await listParses("u1", { db });
+  assert.equal(res.parses.length, 1);
+  const gs = res.parses[0].garments;
+  assert.equal(gs.length, 2);
+  // Instant render needs the friendly message and the basics…
+  assert.equal(gs[0].userMessage, "Try again.");
+  assert.equal(gs[0].type, "Shorts");
+  // …but never the technical error or the prediction id.
+  assert.ok(!("error" in gs[0]));
+  assert.ok(!("predictionId" in gs[0]));
+});
