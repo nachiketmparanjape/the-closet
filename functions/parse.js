@@ -60,7 +60,9 @@ const {
   getSegmentation,
   selectInstance,
   polygonToCutout,
+  maskToCutout,
 } = require("./sam");
+const { fetchMaskBuffer } = require("./sam-fal");
 const { normalizeRender, ROTATION_TO_ANGLE } = require("./render");
 const { renderHash, phashDistance } = require("./phash");
 const { judgeOrientation } = require("./orient");
@@ -529,7 +531,14 @@ async function advanceParse(uid, parseId, deps) {
         garment.status = "not-found";
         continue;
       }
-      const cut = await polygonToCutout({ imageBuffer: bakedBuffer, rings: inst.rings });
+      // fal backend: the mask arrives as an image, not polygons.
+      let cut;
+      if (inst.maskUrl) {
+        const maskBuffer = await fetchMaskBuffer({ url: inst.maskUrl, fetchImpl: deps.fetchImpl });
+        cut = await maskToCutout({ imageBuffer: bakedBuffer, maskBuffer });
+      } else {
+        cut = await polygonToCutout({ imageBuffer: bakedBuffer, rings: inst.rings });
+      }
       const stats = await alphaStats(cut);
       const gate = judgeMask(stats);
       if (!gate.pass) {

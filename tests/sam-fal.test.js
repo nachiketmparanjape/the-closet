@@ -1,0 +1,224 @@
+// PC-36: fal SAM backend (founder decision 2026-10-29 —
+// Replicate's cold starts are too slow). The queue HTTP
+// runs against stub fetch implementations (no network);
+// maskToCutout is exercised on synthetic pixels.
+const { test, describe } = require("node:test");
+const assert = require("node:assert");
+const sharp = require("module").createRequire(
+  __dirname + "/../functions/sam.js"
+)("sharp");
+const {
+  convertBox,
+  createFalSegmentation,
+  getFalSegmentation,
+  fetchMaskBuffer,
+} = require("../functions/sam-fal");
+const sam = require("../functions/sam");
+
+// A stub fetch that plays a canned fal queue conversation:
+// submit -> IN_PROGRESS -> COMPLETED -> result, plus the
+// mask download. Records every request for assertions.
+function falStub(maskPng) {
+  const seen = [];
+  let polls = 0;
+  const fetchImpl = async (url, init) => {
+    seen.push({ url, init });
+    const json = (obj) => ({ ok: true, status: 200, json: async () => obj });
+    if (url.endsWith("/fal-ai/sam-3/image") && init && init.method === "POST") {
+      return json({ status: "IN_QUEUE", request_id: "req-1" });
+    }
+    if (url.includes("/requests/req-1/status")) {
+      polls++;
+      return json({ status: polls === 1 ? "IN_PROGRESS" : "COMPLETED", request_id: "req-1" });
+    }
+    if (url.includes("/requests/req-1")) {
+      return json({
+        masks: [{ url: "https://fal.media/mask.png", width: 100, height: 100 }],
+        scores: [0.93],
+        boxes: [[0.5, 0.5, 0.4, 0.6]],
+      });
+    }
+    if (url === "https://fal.media/mask.png") {
+      return { ok: true, status: 200, arrayBuffer: async () => maskPng };
+    }
+    throw new Error("unexpected url " + url);
+  };
+  return { fetchImpl, seen };
+}
+
+// 100x100 PNG: white rect (20,20)-(80,80) on black.
+async function syntheticMask() {
+  const svg = `<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100" fill="black"/><rect x="20" y="20" width="60" height="60" fill="white"/></svg>`;
+  return sharp(Buffer.from(svg)).png().toBuffer();
+}
+
+describe("convertBox", () => {
+  test("fal [cx,cy,w,h] becomes pipeline [x_min,y_min,w,h]", () => {
+    assert.deepStrictEqual(convertBox([0.5, 0.5, 0.4, 0.6]), [0.3, 0.2, 0.4, 0.6]);
+  });
+  test("clamps to the unit square", () => {
+    assert.deepStrictEqual(convertBox([0.9, 0.9, 0.4, 0.4]), [0.7, 0.7, 0.4, 0.4]);
+  });
+  test("garbage in, null out", () => {
+    assert.strictEqual(convertBox(null), null);
+    assert.strictEqual(convertBox([0.5, 0.5]), null);
+    assert.strictEqual(convertBox(["a", 0, 0, 0]), null);
+  });
+});
+
+describe("fal queue client", () => {
+  test("submit sends Key auth and returns the request id", async () => {
+    const { fetchImpl, seen } = falStub(await syntheticMask());
+    const r = await createFalSegmentation({
+      apiKey: "FALKEY",
+      imageUrl: "https://x/in.jpg",
+      prompt: "shirt",
+      fetchImpl,
+    });
+    assert.deepStrictEqual(r, { predictionId: "req-1", status: "processing" });
+    const auth = seen[0].init.headers.Authorization;
+    assert.strictEqual(auth, "Key FALKEY");
+    const body = JSON.parse(seen[0].init.body);
+    assert.strictEqual(body.prompt, "shirt");
+    assert.strictEqual(body.include_scores, true);
+    assert.strictEqual(body.include_boxes, true);
+  });
+
+  test("submit without a key fails closed", async () => {
+    const { fetchImpl } = falStub(await syntheticMask());
+    await assert.rejects(
+      createFalSegmentation({ imageUrl: "x", prompt: "y", fetchImpl }),
+      (e) => e.key === "SAM_NOT_CONFIGURED"
+    );
+  });
+
+  test("poll maps IN_PROGRESS then harvests COMPLETED", async () => {
+    const { fetchImpl } = falStub(await syntheticMask());
+    const p1 = await getFalSegmentation({ apiKey: "FALKEY", predictionId: "req-1", fetchImpl });
+    assert.strictEqual(p1.status, "processing");
+    assert.strictEqual(p1.output, null);
+    const p2 = await getFalSegmentation({ apiKey: "FALKEY", predictionId: "req-1", fetchImpl });
+    assert.strictEqual(p2.status, "succeeded");
+    assert.deepStrictEqual(p2.output.pred_scores, [0.93]);
+    assert.deepStrictEqual(p2.output.pred_boxes, [[0.3, 0.2, 0.4, 0.6]]);
+    assert.strictEqual(p2.output.pred_masks.length, 1);
+    assert.strictEqual(p2.output.pred_masks[0].url, "https://fal.media/mask.png");
+  });
+});
+
+describe("selectInstance with fal output", () => {
+  test("picks the mask image by score", () => {
+    const inst = sam.selectInstance({
+      pred_scores: [0.4, 0.93],
+      pred_boxes: [
+        [0, 0, 0.1, 0.1],
+        [0.3, 0.2, 0.4, 0.6],
+      ],
+      pred_masks: [{ url: "https://a/m.png" }, { url: "https://b/m.png" }],
+    });
+    assert.strictEqual(inst.score, 0.93);
+    assert.strictEqual(inst.maskUrl, "https://b/m.png");
+    assert.deepStrictEqual(inst.box, [0.3, 0.2, 0.4, 0.6]);
+    assert.deepStrictEqual(inst.rings, []);
+  });
+  test("empty masks is not-found", () => {
+    assert.strictEqual(
+      sam.selectInstance({ pred_scores: [], pred_boxes: [], pred_masks: [] }),
+      null
+    );
+  });
+});
+
+describe("maskToCutout", () => {
+  test("mask becomes the alpha channel at image resolution", async () => {
+    const image = await sharp({
+      create: { width: 200, height: 150, channels: 3, background: { r: 200, g: 30, b: 30 } },
+    })
+      .png()
+      .toBuffer();
+    const mask = await syntheticMask(); // 100x100, white rect (20,20)-(80,80)
+    const cut = await sam.maskToCutout({ imageBuffer: image, maskBuffer: mask });
+    const { data, info } = await sharp(cut).raw().toBuffer({ resolveWithObject: true });
+    assert.strictEqual(info.channels, 4);
+    // Mask rect scales 100x100 -> 200x150 (fill): rect (40,30)-(160,120).
+    const alphaAt = (x, y) => data[(y * info.width + x) * 4 + 3];
+    assert.strictEqual(alphaAt(100, 75), 255); // inside the rect
+    assert.strictEqual(alphaAt(5, 5), 0); // outside the rect
+    assert.strictEqual(alphaAt(195, 145), 0);
+  });
+
+  test("mostly-white mask is treated as inverted", async () => {
+    const image = await sharp({
+      create: { width: 40, height: 40, channels: 3, background: { r: 200, g: 30, b: 30 } },
+    })
+      .png()
+      .toBuffer();
+    const allWhite = await sharp({
+      create: { width: 40, height: 40, channels: 3, background: { r: 255, g: 255, b: 255 } },
+    })
+      .png()
+      .toBuffer();
+    const cut = await sam.maskToCutout({ imageBuffer: image, maskBuffer: allWhite });
+    const { data, info } = await sharp(cut).raw().toBuffer({ resolveWithObject: true });
+    assert.strictEqual(data[(20 * info.width + 20) * 4 + 3], 0);
+  });
+});
+
+describe("samBackend router", () => {
+  test("fal without FAL_API_KEY fails closed", async () => {
+    process.env.SAM_BACKEND = "fal";
+    delete process.env.FAL_API_KEY;
+    try {
+      await assert.rejects(
+        sam.createSegmentation({ imageUrl: "x", prompt: "y", fetchImpl: async () => ({}) }),
+        (e) => e.key === "SAM_NOT_CONFIGURED"
+      );
+    } finally {
+      delete process.env.SAM_BACKEND;
+    }
+  });
+
+  test("fal routes to the queue client when the key is set", async () => {
+    process.env.SAM_BACKEND = "fal";
+    process.env.FAL_API_KEY = "FALKEY";
+    const { fetchImpl } = falStub(await syntheticMask());
+    try {
+      const r = await sam.createSegmentation({
+        imageUrl: "https://x/in.jpg",
+        prompt: "shirt",
+        fetchImpl,
+      });
+      assert.strictEqual(r.predictionId, "req-1");
+    } finally {
+      delete process.env.SAM_BACKEND;
+      delete process.env.FAL_API_KEY;
+    }
+  });
+
+  test("default routes to Replicate", async () => {
+    delete process.env.SAM_BACKEND;
+    const fetchImpl = async (url, init) => {
+      if (url.includes("/models/")) {
+        return { ok: true, json: async () => ({ latest_version: { id: "v1" } }) };
+      }
+      return { ok: true, json: async () => ({ id: "p1", status: "starting" }) };
+    };
+    const r = await sam.createSegmentation({
+      apiKey: "k",
+      imageUrl: "https://x/in.jpg",
+      prompt: "shirt",
+      fetchImpl,
+      sleep: async () => {},
+    });
+    assert.strictEqual(r.predictionId, "p1");
+  });
+});
+
+describe("fetchMaskBuffer", () => {
+  test("downloads the mask bytes", async () => {
+    const mask = await syntheticMask();
+    const { fetchImpl } = falStub(mask);
+    const buf = await fetchMaskBuffer({ url: "https://fal.media/mask.png", fetchImpl });
+    assert.ok(buf.equals(mask));
+  });
+});

@@ -127,9 +127,45 @@ async function uploadInputImage({ apiKey, buffer, filename, contentType, fetchIm
   return j.urls.get;
 }
 
-// Create one segmentation prediction for one garment.
+// Backend switch (founder decision 2026-10-29): the Replicate
+// community build is too slow (~11-minute cold starts), so the
+// official fal build is the fast path. SAM_BACKEND=fal routes
+// through sam-fal.js with FAL_API_KEY from Secret Manager;
+// anything else (including unset) keeps the Replicate path.
+// parse.js calls the router names (createSegmentation /
+// getSegmentation) and never knows which backend is live.
+const falBackend = require("./sam-fal");
+
+function samBackend() {
+  return process.env.SAM_BACKEND === "fal" ? "fal" : "replicate";
+}
+
+async function createSegmentation(args) {
+  if (samBackend() === "fal") {
+    return falBackend.createFalSegmentation({
+      apiKey: process.env.FAL_API_KEY,
+      imageUrl: args.imageUrl,
+      prompt: args.prompt,
+      fetchImpl: args.fetchImpl,
+    });
+  }
+  return createReplicateSegmentation(args);
+}
+
+async function getSegmentation(args) {
+  if (samBackend() === "fal") {
+    return falBackend.getFalSegmentation({
+      apiKey: process.env.FAL_API_KEY,
+      predictionId: args.predictionId,
+      fetchImpl: args.fetchImpl,
+    });
+  }
+  return getReplicateSegmentation(args);
+}
+
+// Create one segmentation prediction for one garment (Replicate).
 // Returns { predictionId, status }. Never waits.
-async function createSegmentation({ apiKey, imageUrl, prompt, fetchImpl, sleep }) {
+async function createReplicateSegmentation({ apiKey, imageUrl, prompt, fetchImpl, sleep }) {
   const doFetch = fetchImpl || fetch;
   const doSleep = sleep || ((ms) => new Promise((r) => setTimeout(r, ms)));
   if (!apiKey) {
@@ -155,9 +191,9 @@ async function createSegmentation({ apiKey, imageUrl, prompt, fetchImpl, sleep }
   return { predictionId: j.id, status: j.status || "starting" };
 }
 
-// One status read. Returns { status, output, error } where
-// output is present only on "succeeded".
-async function getSegmentation({ apiKey, predictionId, fetchImpl }) {
+// One status read (Replicate). Returns { status, output, error }
+// where output is present only on "succeeded".
+async function getReplicateSegmentation({ apiKey, predictionId, fetchImpl }) {
   const doFetch = fetchImpl || fetch;
   const res = await doFetch(
     API_BASE + "/predictions/" + encodeURIComponent(String(predictionId)),
@@ -197,11 +233,16 @@ function instanceArea(rings) {
 // the main-subject preference. Returns null when SAM
 // found nothing — the caller marks "not found", never
 // an error.
+// Two output shapes: the Replicate path gives polygons
+// (pred_polygons), the fal path gives mask images
+// (pred_masks: [{url}]); the caller cuts via rings or
+// maskUrl accordingly.
 function selectInstance(output) {
   const scores = (output && output.pred_scores) || [];
   const polygons = (output && output.pred_polygons) || [];
+  const masks = (output && output.pred_masks) || [];
   const boxes = (output && output.pred_boxes) || [];
-  if (!scores.length || !polygons.length) return null;
+  if (!scores.length || (!polygons.length && !masks.length)) return null;
   let best = 0;
   for (let i = 1; i < scores.length; i++) {
     if (scores[i] > scores[best]) best = i;
@@ -212,11 +253,13 @@ function selectInstance(output) {
       best = i;
     }
   }
+  const mask = masks[best] || null;
   return {
     index: best,
     score: scores[best],
     box: boxes[best] || null,
     rings: polygons[best] || [],
+    maskUrl: mask && mask.url ? mask.url : null,
     detections: scores.length,
   };
 }
@@ -255,14 +298,45 @@ async function polygonToCutout({ imageBuffer, rings }) {
   return sharp(imageBuffer).removeAlpha().joinChannel(mask).png().toBuffer();
 }
 
+// Cut one instance out of the uploaded image from a mask
+// IMAGE (the fal path) instead of polygon rings. The mask
+// may arrive at a different resolution than the image
+// (fal serves 1024x1024), so it is resized to the image's
+// exact pixels first. Inversion guard: a garment rarely
+// covers most of the photo, so a mostly-white mask is
+// treated as inverted. Same tail as polygonToCutout
+// (removeAlpha + joinChannel) so the downstream gates see
+// identical pixels.
+async function maskToCutout({ imageBuffer, maskBuffer }) {
+  const md = await sharp(imageBuffer).metadata();
+  if (!md.width || !md.height) {
+    throw codedError("SAM_FAILED", "maskToCutout: image has no dimensions");
+  }
+  const maskPng = await sharp(maskBuffer)
+    .resize(md.width, md.height, { fit: "fill" })
+    .greyscale()
+    .png()
+    .toBuffer();
+  const { data } = await sharp(maskPng).raw().toBuffer({ resolveWithObject: true });
+  let white = 0;
+  for (let i = 0; i < data.length; i++) if (data[i] > 127) white++;
+  const finalMask =
+    white / data.length > 0.6 ? await sharp(maskPng).negate().toBuffer() : maskPng;
+  return sharp(imageBuffer).removeAlpha().joinChannel(finalMask).png().toBuffer();
+}
+
 module.exports = {
   MODEL,
+  samBackend,
   resolveVersion,
   toSamInput,
   uploadInputImage,
   createSegmentation,
   getSegmentation,
+  createReplicateSegmentation,
+  getReplicateSegmentation,
   selectInstance,
   polygonToCutout,
+  maskToCutout,
   ringArea,
 };

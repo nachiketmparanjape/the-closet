@@ -665,6 +665,9 @@
     .item-image img { width: 100%; height: 100%; object-fit: contain; display: block; }
     .item-details { padding: 13px 1px 4px; }
     .item-name { margin: 0 0 4px; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* Draft cards: the status line ("Processing… about 7
+       minutes left") must never clip mid-word — wrap it. */
+    .item-name.draft-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
     .item-name.is-naming { color: var(--muted); font-style: italic; font-weight: 500; }
     .item-meta { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; }
     .color-dot { width: 9px; height: 9px; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--ink) 15%, transparent); flex: 0 0 auto; }
@@ -9002,8 +9005,19 @@
         outfitParseState.pollTimer = setInterval(pollOutfitParseOnce, 8000);
       }
 
+      // One outfit-photo upload at a time: a second pick
+      // while the first is still uploading used to create
+      // a duplicate pending card next to the real one
+      // (founder report 2026-10-29).
+      var outfitParseUploadInFlight = false;
+
       function handleOutfitParseFile(file) {
         if (!file || !currentUser) return;
+        if (outfitParseUploadInFlight) {
+          showToast("Already uploading a photo — give it a moment.");
+          return;
+        }
+        outfitParseUploadInFlight = true;
         noteTrail("outfit-parse: photo picked");
         document.getElementById("outfitParseInput").value = "";
         document.getElementById("outfitParseInputCamera").value = "";
@@ -9017,9 +9031,9 @@
         // dropped, so no draft card ever appeared. The
         // review sheet now opens only on tap-to-resume —
         // it is the draft's detail view.
-        var pendingKey = addPendingDraft(file);
         var safeName = Date.now() + "-" + file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
         var storagePath = "users/" + currentUser.uid + "/outfit-photos/" + safeName;
+        var pendingKey = addPendingDraft(file, storagePath);
         var fileRef = storage.ref().child(storagePath);
         fileRef.put(file, { contentType: file.type }).then(function () {
           // Upload done, server work starting: the callable
@@ -9033,17 +9047,25 @@
         }).then(function (res) {
           // Parse created server-side: the optimistic card
           // hands off to the real draft card.
+          outfitParseUploadInFlight = false;
           removePendingDraft(pendingKey);
           refreshDrafts();
           showToast("Processing — your pieces will show up as drafts in Outfits in about " + DRAFT_ETA_MINUTES + " minutes.");
         }).catch(function (err) {
-          // Upload or start failed: drop the optimistic card,
-          // delete the upload if it landed (nothing references
-          // it), and say so — there is no sheet anymore to
-          // carry the error. Tracked in client_errors like
-          // every other client failure.
+          // Upload or start failed: drop the optimistic card
+          // and say so — there is no sheet anymore to carry
+          // the error. The uploaded photo is NEVER deleted
+          // here: the failure may be client-side only
+          // (timeout, backgrounded tab) while the server
+          // already created the parse — deleting the photo
+          // orphans a live parse with a permanently broken
+          // image (founder hit this 2026-10-29). Orphaned
+          // photos are cheap; a broken draft is not. Refresh
+          // anyway: a server-side parse may exist, and its
+          // real card should surface.
+          outfitParseUploadInFlight = false;
           removePendingDraft(pendingKey);
-          try { fileRef.delete().catch(function () {}); } catch (e) {}
+          refreshDrafts();
           showToast(friendlyError(err));
           reportError("outfit-parse.start", err);
         });
@@ -9414,7 +9436,7 @@
           var details = document.createElement("div");
           details.className = "item-details";
           var name = document.createElement("p");
-          name.className = "item-name";
+          name.className = "item-name draft-title";
           name.textContent = p.title;
           var meta = document.createElement("div");
           meta.className = "item-meta";
@@ -9437,10 +9459,11 @@
         if (sec) sec.hidden = gal.children.length === 0;
       }
 
-      function addPendingDraft(file) {
+      function addPendingDraft(file, storagePath) {
         var key = "pending-" + (++pendingDraftSeq) + "-" + Date.now();
         pendingDrafts.push({
           key: key,
+          storagePath: storagePath || null,
           objectUrl: URL.createObjectURL(file),
           title: "Uploading…",
           createdAt: new Date().toISOString()
@@ -9491,6 +9514,19 @@
         functions.httpsCallable("listOutfitParses")({}).then(function (res) {
           var list = (res.data && res.data.parses) || [];
           var eta = (res.data && res.data.etaMinutes) || DRAFT_ETA_MINUTES;
+          // The server is the source of truth: a pending card
+          // whose photo already has a real parse is obsolete.
+          // This kills the "two drafts" race where the pending
+          // card lingered next to the real one (the pending
+          // card has no tap handler, so it looked broken).
+          var realPaths = {};
+          list.forEach(function (e) { if (e.storagePath) realPaths[e.storagePath] = true; });
+          for (var pi = pendingDrafts.length - 1; pi >= 0; pi--) {
+            if (pendingDrafts[pi].storagePath && realPaths[pendingDrafts[pi].storagePath]) {
+              try { URL.revokeObjectURL(pendingDrafts[pi].objectUrl); } catch (e2) {}
+              pendingDrafts.splice(pi, 1);
+            }
+          }
           gal.innerHTML = "";
           var total = list.length + pendingDrafts.length;
           if (!total) { sec.hidden = true; return; }
@@ -9506,13 +9542,19 @@
             image.loading = "lazy";
             if (entry.storagePath) {
               if (draftPhotoUrls[entry.storagePath]) image.src = draftPhotoUrls[entry.storagePath];
-              else storage.ref().child(entry.storagePath).getDownloadURL().then(function (u) { draftPhotoUrls[entry.storagePath] = u; image.src = u; }).catch(function () {});
+              else storage.ref().child(entry.storagePath).getDownloadURL().then(function (u) { draftPhotoUrls[entry.storagePath] = u; image.src = u; }).catch(function (e) {
+                // Never a silent broken image: report the path
+                // (never the URL) and hide the img so the card
+                // shows its title instead of a ? icon.
+                try { reportError("outfit-parse.photo", new Error("draft photo load failed: " + entry.storagePath + " :: " + (e && e.message))); } catch (e2) {}
+                image.style.display = "none";
+              });
             }
             imageWrap.appendChild(image);
             var details = document.createElement("div");
             details.className = "item-details";
             var name = document.createElement("p");
-            name.className = "item-name";
+            name.className = "item-name draft-title";
             name.textContent = draftCardTitle(entry, eta);
             var meta = document.createElement("div");
             meta.className = "item-meta";
@@ -9666,7 +9708,10 @@
           if (!outfitParseState) return;
           outfitParseState.photoUrl = url;
           renderOutfitParse();
-        }).catch(function () {});
+        }).catch(function (e) {
+          // A blank review sheet used to be silent — report it.
+          try { reportError("outfit-parse.photo", new Error("review photo load failed: " + entry.storagePath + " :: " + (e && e.message))); } catch (e2) {}
+        });
         pollOutfitParseOnce();
         // pollOutfitParseOnce stops itself on review/done/
         // failed; while still cutting, keep polling.
