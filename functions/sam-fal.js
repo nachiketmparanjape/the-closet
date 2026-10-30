@@ -136,7 +136,11 @@ async function getFalSegmentation({ apiKey, predictionId, statusUrl, responseUrl
   }
   const rj = await rres.json().catch(() => null);
   if (!rres.ok || !rj) {
-    return { status: "failed", output: null, error: "fal result status " + rres.status };
+    // Include fal's error body — a bare status never says WHY
+    // the request failed (live lesson 2026-10-29: 422 hid the
+    // real cause until the body was surfaced).
+    const detail = rj ? JSON.stringify(rj).slice(0, 300) : ("HTTP " + rres.status);
+    return { status: "failed", output: null, error: "fal result: " + detail };
   }
   const masks = Array.isArray(rj.masks) ? rj.masks : [];
   const scores = Array.isArray(rj.scores) ? rj.scores : [];

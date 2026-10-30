@@ -133,6 +133,23 @@ describe("fal queue client", () => {
     assert.strictEqual(p1.status, "processing");
     assert.ok(seen.some((s) => s.url === "https://queue.fal.run/fal-ai/sam-3/image/requests/req-1/status"));
   });
+
+  test("a failed result surfaces fal's error body", async () => {
+    const fetchImpl = async (url) => {
+      const json = (obj, status = 200) => ({ ok: status === 200, status, json: async () => obj });
+      if (url.includes("/status")) return json({ status: "COMPLETED", request_id: "req-1" });
+      return json({ detail: "image fetch failed" }, 422);
+    };
+    const p = await getFalSegmentation({
+      apiKey: "FALKEY",
+      predictionId: "req-1",
+      statusUrl: "https://queue.fal.run/fal-ai/sam-3/image/requests/req-1/status",
+      responseUrl: "https://queue.fal.run/fal-ai/sam-3/image/requests/req-1",
+      fetchImpl,
+    });
+    assert.strictEqual(p.status, "failed");
+    assert.ok(p.error.includes("image fetch failed"), p.error);
+  });
 });
 
 describe("selectInstance with fal output", () => {

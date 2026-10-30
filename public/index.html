@@ -9142,17 +9142,26 @@
       function outfitParseRetry(garment) {
         var st = outfitParseState;
         if (!st) return;
+        // Optimistic: the button must react instantly — the
+        // server roundtrip for a new fal request is the ~1s
+        // lag the founder felt. Polling starts once the server
+        // confirms, so the UI never flickers back to "failed".
+        var prevStatus = garment.status;
+        var prevError = garment.error;
+        garment.status = "cutting";
+        garment.error = null;
+        st.status = "cutting";
+        st.pollError = false;
+        st.pollFails = 0;
+        renderOutfitParse();
         functions.httpsCallable("retryOutfitGarment", { timeout: 120000 })({ parseId: st.parseId, garmentId: garment.id }).then(function () {
           if (!outfitParseState) return;
-          garment.status = "cutting";
-          garment.error = null;
-          st.status = "cutting";
-          st.pollError = false;
-          st.pollFails = 0;
-          renderOutfitParse();
           outfitParseStartPolling();
         }).catch(function (err) {
           if (!outfitParseState) return;
+          garment.status = prevStatus;
+          garment.error = prevError;
+          renderOutfitParse();
           showToast(friendlyError(err));
           reportError("outfit-parse.retry-garment", err);
         });
