@@ -8388,7 +8388,11 @@
         sample.appendChild(shopCheckEl("p", "today-eyebrow", "A sample pick"));
         var photos = document.createElement("div");
         photos.className = "today-pick-photos";
-        [["photo-1591047139829-d91aecb6caea", "Olive field jacket"], ["photo-1521572163474-6864f9cf17ab", "Striped cotton tee"], ["photo-1542272604-787c3835535d", "Slim indigo jeans"]].forEach(function (s) {
+        // Captions describe what each Unsplash photo actually
+        // shows (founder report 2026-10-29: the old labels —
+        // "Olive field jacket", "Striped cotton tee" — did not
+        // match the images).
+        [["photo-1591047139829-d91aecb6caea", "Rust bomber jacket"], ["photo-1521572163474-6864f9cf17ab", "White cotton tee"], ["photo-1542272604-787c3835535d", "Dark denim jeans"]].forEach(function (s) {
           var fig = document.createElement("figure");
           var img = document.createElement("img");
           img.src = "https://images.unsplash.com/" + s[0] + "?auto=format&fit=crop&w=300&q=60";
