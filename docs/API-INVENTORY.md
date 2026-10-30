@@ -22,7 +22,7 @@ not currently called), **local** (runs inside our functions, no API).
 | Gemini 3.5 Flash (via Vertex AI, global endpoint) | The app's vision-and-language model: catalogues a garment (name, category, colors), lists the garments in an outfit photo, judges photo orientation, powers the stylist chat | `functions/describe.js`, `functions/parse.js`, `functions/extract.js`, `functions/extractcheck.js`, `functions/stylist.js` | $1.50 input / $9.00 output per 1M tokens | live |
 | Vertex multimodal embeddings `multimodalembedding@001` | Turns a garment render into a vector (a list of numbers describing the image) so the app can propose "this looks like a piece you own" by cosine similarity | `functions/parse.js` | ~$0.0001 per image | live |
 | Replicate Files API | Temporary public image hosting, so Replicate models can fetch their inputs | `functions/sam.js` (`uploadInputImage`) | free (part of Replicate) | live |
-| SAM 3, official `fal-ai/sam-3/image-rle` (via fal) | Evaluated as a faster alternative to the Replicate community SAM build (no cold starts, pay per call) | spike `spikes/pc36-fal-spike.js`; connector `~/workspace/custom-connectors/custom.fal/` (local, not in this repo) | $0.005 per call | paused 2026-10-28 (connector returns 401: the saved key is valid, but the connector cannot send fal's required `Key ` auth scheme) |
+| SAM 3, official `fal-ai/sam-3/image` (via fal) | The fast SAM backend: returns masks as PNGs (no RLE decode); selected by `SAM_BACKEND=fal` | `functions/sam-fal.js`, seam in `functions/sam.js`; key `FAL_API_KEY` in Secret Manager, called server-side (the custom.fal connector cannot send fal's `Key ` auth scheme, so the connector path stays paused) | $0.005 per call | live 2026-10-29 |
 
 Notes:
 
