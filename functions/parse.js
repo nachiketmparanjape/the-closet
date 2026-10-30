@@ -287,24 +287,6 @@ function publicGarment(g) {
   return rest;
 }
 
-// fal's workers download the input image themselves. A signed URL
-// from our own bucket is the reliable path — the Replicate Files
-// URL 422'd live 2026-10-29 (file_download_error: "Failed to
-// download the file"). Falls back to the given URL rather than
-// introducing a new failure mode.
-async function falInputUrl({ bucket, bakedStoragePath, fallbackUrl }) {
-  try {
-    const [url] = await bucket.file(bakedStoragePath).getSignedUrl({
-      action: "read",
-      expires: Date.now() + 7 * 24 * 3600 * 1000,
-    });
-    if (url) return url;
-  } catch (e) {
-    /* fall through to the Replicate URL */
-  }
-  return fallbackUrl;
-}
-
 // Every failed garment carries both halves: the full technical
 // detail (server-side only, for the ledger and debugging) and the
 // one human sentence the client is allowed to render.
@@ -443,23 +425,28 @@ async function startParse(uid, sourceStoragePath, deps) {
     // SAM gets the flattened RGB copy, never the stored
     // baked bytes (RGBA PNGs fail inside the model).
     const samInput = await toSamInput(baked.buffer);
-    const fileUrl = await uploadInputImage({
-      apiKey: deps.apiKey,
-      buffer: samInput,
-      filename: parseId + ".jpg",
-      contentType: "image/jpeg",
-      fetchImpl: deps.fetchImpl,
-    });
+    // fal path: the bytes go straight to fal's storage inside
+    // createSegmentation — no Replicate Files upload, fal
+    // couldn't fetch from it (file_download_error, 2026-10-29).
+    const fileUrl =
+      samBackend() === "fal"
+        ? null
+        : await uploadInputImage({
+            apiKey: deps.apiKey,
+            buffer: samInput,
+            filename: parseId + ".jpg",
+            contentType: "image/jpeg",
+            fetchImpl: deps.fetchImpl,
+          });
     const garments = [];
     for (let i = 0; i < listed.length; i++) {
       const g = listed[i];
       const prompt = buildPrompt(g);
       const created = await createSegmentation({
         apiKey: deps.apiKey,
-        imageUrl:
-          samBackend() === "fal"
-            ? await falInputUrl({ bucket, bakedStoragePath, fallbackUrl: fileUrl })
-            : fileUrl,
+        imageUrl: fileUrl,
+        imageBuffer: samBackend() === "fal" ? samInput : null,
+        filename: parseId + ".jpg",
         prompt,
         fetchImpl: deps.fetchImpl,
       });
@@ -719,23 +706,21 @@ async function retryGarment(uid, parseId, garmentId, deps) {
   }
   const [bakedBuffer] = await deps.bucket.file(doc.bakedStoragePath).download();
   const samInput = await toSamInput(bakedBuffer);
-  const fileUrl = await uploadInputImage({
-    apiKey: deps.apiKey,
-    buffer: samInput,
-    filename: parseId + "-" + garmentId + ".jpg",
-    contentType: "image/jpeg",
-    fetchImpl: deps.fetchImpl,
-  });
+  const fileUrl =
+    samBackend() === "fal"
+      ? null
+      : await uploadInputImage({
+          apiKey: deps.apiKey,
+          buffer: samInput,
+          filename: parseId + "-" + garmentId + ".jpg",
+          contentType: "image/jpeg",
+          fetchImpl: deps.fetchImpl,
+        });
   const created = await createSegmentation({
     apiKey: deps.apiKey,
-    imageUrl:
-      samBackend() === "fal"
-        ? await falInputUrl({
-            bucket: deps.bucket,
-            bakedStoragePath: doc.bakedStoragePath,
-            fallbackUrl: fileUrl,
-          })
-        : fileUrl,
+    imageUrl: fileUrl,
+    imageBuffer: samBackend() === "fal" ? samInput : null,
+    filename: parseId + "-" + garmentId + ".jpg",
     prompt: garment.prompt,
     fetchImpl: deps.fetchImpl,
   });
@@ -771,5 +756,4 @@ module.exports = {
   REJECT_SUPPRESS,
   publicGarment,
   garmentFailure,
-  falInputUrl,
 };

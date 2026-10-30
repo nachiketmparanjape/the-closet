@@ -15,15 +15,25 @@ const {
 } = require("../functions/sam-fal");
 const sam = require("../functions/sam");
 
-// A stub fetch that plays a canned fal queue conversation:
-// submit -> IN_PROGRESS -> COMPLETED -> result, plus the
-// mask download. Records every request for assertions.
+// A stub fetch that plays a canned fal conversation: storage
+// upload (initiate -> PUT) -> queue submit -> IN_PROGRESS ->
+// COMPLETED -> result, plus the mask download. Records every
+// request for assertions.
 function falStub(maskPng) {
   const seen = [];
   let polls = 0;
   const fetchImpl = async (url, init) => {
     seen.push({ url, init });
     const json = (obj) => ({ ok: true, status: 200, json: async () => obj });
+    if (url === "https://rest.alpha.fal.ai/storage/upload/initiate" && init && init.method === "POST") {
+      return json({
+        upload_url: "https://upload.example/put",
+        file_url: "https://fal.media/files/input.jpg",
+      });
+    }
+    if (url === "https://upload.example/put" && init && init.method === "PUT") {
+      return { ok: true, status: 200, json: async () => ({}) };
+    }
     if (url.endsWith("/fal-ai/sam-3/image") && init && init.method === "POST") {
       return json({
         status: "IN_QUEUE",
@@ -72,11 +82,12 @@ describe("convertBox", () => {
 });
 
 describe("fal queue client", () => {
-  test("submit sends Key auth and returns the request id", async () => {
+  test("submit uploads the bytes to fal storage and sends Key auth", async () => {
     const { fetchImpl, seen } = falStub(await syntheticMask());
     const r = await createFalSegmentation({
       apiKey: "FALKEY",
-      imageUrl: "https://x/in.jpg",
+      imageBuffer: Buffer.from([1, 2, 3]),
+      filename: "p1.jpg",
       prompt: "shirt",
       fetchImpl,
     });
@@ -84,9 +95,22 @@ describe("fal queue client", () => {
     assert.strictEqual(r.status, "processing");
     assert.strictEqual(r.statusUrl, "https://queue.fal.run/fal-ai/sam-3/image/requests/req-1/status");
     assert.strictEqual(r.responseUrl, "https://queue.fal.run/fal-ai/sam-3/image/requests/req-1");
-    const auth = seen[0].init.headers.Authorization;
-    assert.strictEqual(auth, "Key FALKEY");
-    const body = JSON.parse(seen[0].init.body);
+    // the storage initiate carries Key auth and the file metadata
+    const init = seen.find((s) => s.url.includes("/storage/upload/initiate"));
+    assert.strictEqual(init.init.headers.Authorization, "Key FALKEY");
+    assert.deepStrictEqual(JSON.parse(init.init.body), {
+      file_name: "p1.jpg",
+      content_type: "image/jpeg",
+    });
+    // the raw bytes go to the upload URL with no auth header
+    const put = seen.find((s) => s.url === "https://upload.example/put");
+    assert.strictEqual(put.init.headers.Authorization, undefined);
+    assert.deepStrictEqual(put.init.body, Buffer.from([1, 2, 3]));
+    // the queue submit references the fal storage URL — never a
+    // third-party URL (that 422'd live 2026-10-29)
+    const submit = seen.find((s) => s.url.endsWith("/fal-ai/sam-3/image"));
+    const body = JSON.parse(submit.init.body);
+    assert.strictEqual(body.image_url, "https://fal.media/files/input.jpg");
     assert.strictEqual(body.prompt, "shirt");
     assert.strictEqual(body.include_scores, true);
     assert.strictEqual(body.include_boxes, true);
@@ -95,8 +119,34 @@ describe("fal queue client", () => {
   test("submit without a key fails closed", async () => {
     const { fetchImpl } = falStub(await syntheticMask());
     await assert.rejects(
-      createFalSegmentation({ imageUrl: "x", prompt: "y", fetchImpl }),
+      createFalSegmentation({ imageBuffer: Buffer.from([1]), prompt: "y", fetchImpl }),
       (e) => e.key === "SAM_NOT_CONFIGURED"
+    );
+  });
+
+  test("submit without image bytes fails closed", async () => {
+    const { fetchImpl } = falStub(await syntheticMask());
+    await assert.rejects(
+      createFalSegmentation({ apiKey: "FALKEY", prompt: "y", fetchImpl }),
+      (e) => e.key === "SAM_FAILED"
+    );
+  });
+
+  test("a failed storage upload throws loudly — never a silent fallback", async () => {
+    const { uploadToFalStorage } = require("../functions/sam-fal");
+    const fetchImpl = async () => ({
+      ok: false,
+      status: 500,
+      json: async () => ({ detail: "boom" }),
+    });
+    await assert.rejects(
+      uploadToFalStorage({
+        apiKey: "FALKEY",
+        buffer: Buffer.from([1]),
+        filename: "p1.jpg",
+        fetchImpl,
+      }),
+      (e) => e.key === "SAM_FAILED" && /initiate status 500/.test(e.message)
     );
   });
 
@@ -230,7 +280,8 @@ describe("samBackend router", () => {
     const { fetchImpl } = falStub(await syntheticMask());
     try {
       const r = await sam.createSegmentation({
-        imageUrl: "https://x/in.jpg",
+        imageBuffer: Buffer.from([1, 2, 3]),
+        filename: "p1.jpg",
         prompt: "shirt",
         fetchImpl,
       });

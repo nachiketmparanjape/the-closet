@@ -403,7 +403,6 @@ describe("friendly vs technical garment errors", () => {
   const {
     publicGarment,
     garmentFailure,
-    falInputUrl,
   } = require("../functions/parse");
 
   test("publicGarment strips the technical error but keeps the user message", () => {
@@ -431,35 +430,5 @@ describe("friendly vs technical garment errors", () => {
     assert.strictEqual(g.status, "failed");
     assert.strictEqual(g.error, '{"detail":"x"}');
     assert.strictEqual(g.userMessage, "Try again.");
-  });
-
-  test("falInputUrl prefers the signed Storage URL", async () => {
-    const bucket = {
-      file: (p) => ({
-        getSignedUrl: async () => ["https://signed.example/" + p],
-      }),
-    };
-    const url = await falInputUrl({
-      bucket,
-      bakedStoragePath: "users/u1/baked.jpg",
-      fallbackUrl: "https://replicate.delivery/x.jpg",
-    });
-    assert.strictEqual(url, "https://signed.example/users/u1/baked.jpg");
-  });
-
-  test("falInputUrl falls back to the Replicate URL when signing fails", async () => {
-    const bucket = {
-      file: () => ({
-        getSignedUrl: async () => {
-          throw new Error("nope");
-        },
-      }),
-    };
-    const url = await falInputUrl({
-      bucket,
-      bakedStoragePath: "users/u1/baked.jpg",
-      fallbackUrl: "https://replicate.delivery/x.jpg",
-    });
-    assert.strictEqual(url, "https://replicate.delivery/x.jpg");
   });
 });

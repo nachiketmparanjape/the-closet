@@ -40,6 +40,51 @@
 const { codedError } = require("./errors");
 
 const FAL_QUEUE = "https://queue.fal.run/fal-ai/sam-3/image";
+const FAL_STORAGE_INITIATE = "https://rest.alpha.fal.ai/storage/upload/initiate";
+
+// Upload the input bytes to fal's own storage and return the
+// file URL. This is fal's designed path for model inputs —
+// handing fal a third-party URL 422'd live 2026-10-29
+// (file_download_error), and a signed Storage URL silently fell
+// back for the same reason. No silent fallbacks here: a failed
+// upload throws loudly into the error ledger.
+async function uploadToFalStorage({ apiKey, buffer, filename, fetchImpl }) {
+  const doFetch = fetchImpl || fetch;
+  if (!apiKey) {
+    throw codedError("SAM_NOT_CONFIGURED", "FAL_API_KEY is not set");
+  }
+  let initRes;
+  try {
+    initRes = await doFetch(FAL_STORAGE_INITIATE, {
+      method: "POST",
+      headers: { Authorization: "Key " + apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        file_name: filename || "input.jpg",
+        content_type: "image/jpeg",
+      }),
+    });
+  } catch (e) {
+    throw codedError("SAM_FAILED", "fal storage initiate failed: " + (e && e.message ? e.message : e));
+  }
+  const ij = await initRes.json().catch(() => null);
+  if (!initRes.ok || !ij || !ij.upload_url || !ij.file_url) {
+    throw codedError("SAM_FAILED", "fal storage initiate status " + initRes.status);
+  }
+  let putRes;
+  try {
+    putRes = await doFetch(ij.upload_url, {
+      method: "PUT",
+      headers: { "Content-Type": "image/jpeg" },
+      body: buffer,
+    });
+  } catch (e) {
+    throw codedError("SAM_FAILED", "fal storage upload failed: " + (e && e.message ? e.message : e));
+  }
+  if (!putRes.ok) {
+    throw codedError("SAM_FAILED", "fal storage upload status " + putRes.status);
+  }
+  return ij.file_url;
+}
 
 function falHeaders(apiKey) {
   return { Authorization: "Key " + apiKey, "Content-Type": "application/json" };
@@ -55,17 +100,27 @@ function convertBox(box) {
 }
 
 // Create one segmentation request for one garment.
-// Returns { predictionId, status, statusUrl, responseUrl }.
-// The status_url / response_url from fal's submit response are
-// the authoritative poll endpoints — never reconstructed by
-// hand (a hand-built .../requests/{id}/status 405'd live on
-// 2026-10-29 while the submit on the same host succeeded).
-// Never waits.
-async function createFalSegmentation({ apiKey, imageUrl, prompt, fetchImpl }) {
+// Takes the image BYTES and uploads them to fal's storage —
+// never a third-party URL. Returns { predictionId, status,
+// statusUrl, responseUrl }. The status_url / response_url from
+// fal's submit response are the authoritative poll endpoints —
+// never reconstructed by hand (a hand-built
+// .../requests/{id}/status 405'd live on 2026-10-29 while the
+// submit on the same host succeeded). Never waits.
+async function createFalSegmentation({ apiKey, imageBuffer, filename, prompt, fetchImpl }) {
   const doFetch = fetchImpl || fetch;
   if (!apiKey) {
     throw codedError("SAM_NOT_CONFIGURED", "FAL_API_KEY is not set");
   }
+  if (!imageBuffer || !imageBuffer.length) {
+    throw codedError("SAM_FAILED", "fal create: no image bytes");
+  }
+  const imageUrl = await uploadToFalStorage({
+    apiKey,
+    buffer: imageBuffer,
+    filename,
+    fetchImpl,
+  });
   let res;
   try {
     res = await doFetch(FAL_QUEUE, {
@@ -183,4 +238,5 @@ module.exports = {
   createFalSegmentation,
   getFalSegmentation,
   fetchMaskBuffer,
+  uploadToFalStorage,
 };

@@ -144,7 +144,8 @@ async function createSegmentation(args) {
   if (samBackend() === "fal") {
     return falBackend.createFalSegmentation({
       apiKey: process.env.FAL_API_KEY,
-      imageUrl: args.imageUrl,
+      imageBuffer: args.imageBuffer,
+      filename: args.filename,
       prompt: args.prompt,
       fetchImpl: args.fetchImpl,
     });
