@@ -55,7 +55,12 @@ function convertBox(box) {
 }
 
 // Create one segmentation request for one garment.
-// Returns { predictionId, status }. Never waits.
+// Returns { predictionId, status, statusUrl, responseUrl }.
+// The status_url / response_url from fal's submit response are
+// the authoritative poll endpoints — never reconstructed by
+// hand (a hand-built .../requests/{id}/status 405'd live on
+// 2026-10-29 while the submit on the same host succeeded).
+// Never waits.
 async function createFalSegmentation({ apiKey, imageUrl, prompt, fetchImpl }) {
   const doFetch = fetchImpl || fetch;
   if (!apiKey) {
@@ -84,23 +89,31 @@ async function createFalSegmentation({ apiKey, imageUrl, prompt, fetchImpl }) {
       "fal submit status " + res.status + ": " + JSON.stringify(j).slice(0, 300)
     );
   }
-  return { predictionId: j.request_id, status: "processing" };
+  return {
+    predictionId: j.request_id,
+    status: "processing",
+    statusUrl: typeof j.status_url === "string" ? j.status_url : null,
+    responseUrl: typeof j.response_url === "string" ? j.response_url : null,
+  };
 }
 
 // One status read. Returns { status, output, error } where
 // output is present only on "succeeded", shaped like the
 // Replicate path's output ({ pred_scores, pred_boxes,
 // pred_masks }) so the harvest code needs only a small
-// branch for the mask-image cutout.
-async function getFalSegmentation({ apiKey, predictionId, fetchImpl }) {
+// branch for the mask-image cutout. Polls fal's own
+// status_url / response_url when the caller has them.
+async function getFalSegmentation({ apiKey, predictionId, statusUrl, responseUrl, fetchImpl }) {
   const doFetch = fetchImpl || fetch;
   if (!apiKey) {
     throw codedError("SAM_NOT_CONFIGURED", "FAL_API_KEY is not set");
   }
   const base = FAL_QUEUE + "/requests/" + encodeURIComponent(String(predictionId));
+  const statusEndpoint = typeof statusUrl === "string" && statusUrl ? statusUrl : base + "/status";
+  const resultEndpoint = typeof responseUrl === "string" && responseUrl ? responseUrl : base;
   let res;
   try {
-    res = await doFetch(base + "/status", { headers: { Authorization: "Key " + apiKey } });
+    res = await doFetch(statusEndpoint, { headers: { Authorization: "Key " + apiKey } });
   } catch (e) {
     throw codedError("SAM_FAILED", "fal poll failed: " + (e && e.message ? e.message : e));
   }
@@ -117,7 +130,7 @@ async function getFalSegmentation({ apiKey, predictionId, fetchImpl }) {
   }
   let rres;
   try {
-    rres = await doFetch(base, { headers: { Authorization: "Key " + apiKey } });
+    rres = await doFetch(resultEndpoint, { headers: { Authorization: "Key " + apiKey } });
   } catch (e) {
     throw codedError("SAM_FAILED", "fal result fetch failed: " + (e && e.message ? e.message : e));
   }

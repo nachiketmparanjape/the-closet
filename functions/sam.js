@@ -157,6 +157,8 @@ async function getSegmentation(args) {
     return falBackend.getFalSegmentation({
       apiKey: process.env.FAL_API_KEY,
       predictionId: args.predictionId,
+      statusUrl: args.statusUrl,
+      responseUrl: args.responseUrl,
       fetchImpl: args.fetchImpl,
     });
   }

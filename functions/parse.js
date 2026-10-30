@@ -279,7 +279,7 @@ function parsesCollection(db, uid) {
 }
 
 function publicGarment(g) {
-  const { predictionId, ...rest } = g;
+  const { predictionId, falStatusUrl, falResponseUrl, ...rest } = g;
   return rest;
 }
 
@@ -414,6 +414,8 @@ async function startParse(uid, sourceStoragePath, deps) {
         detail: g.detail,
         prompt,
         predictionId: created.predictionId,
+        falStatusUrl: created.statusUrl || null,
+        falResponseUrl: created.responseUrl || null,
         status: "cutting",
       });
     }
@@ -517,6 +519,8 @@ async function advanceParse(uid, parseId, deps) {
       const seg = await getSegmentation({
         apiKey: deps.apiKey,
         predictionId: garment.predictionId,
+        statusUrl: garment.falStatusUrl,
+        responseUrl: garment.falResponseUrl,
         fetchImpl: deps.fetchImpl,
       });
       if (seg.status === "starting" || seg.status === "processing") continue;
@@ -646,6 +650,8 @@ async function retryGarment(uid, parseId, garmentId, deps) {
     fetchImpl: deps.fetchImpl,
   });
   garment.predictionId = created.predictionId;
+  garment.falStatusUrl = created.statusUrl || null;
+  garment.falResponseUrl = created.responseUrl || null;
   garment.status = "cutting";
   garment.error = null;
   garment.renderStoragePath = null;

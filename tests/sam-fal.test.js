@@ -25,7 +25,12 @@ function falStub(maskPng) {
     seen.push({ url, init });
     const json = (obj) => ({ ok: true, status: 200, json: async () => obj });
     if (url.endsWith("/fal-ai/sam-3/image") && init && init.method === "POST") {
-      return json({ status: "IN_QUEUE", request_id: "req-1" });
+      return json({
+        status: "IN_QUEUE",
+        request_id: "req-1",
+        status_url: "https://queue.fal.run/fal-ai/sam-3/image/requests/req-1/status",
+        response_url: "https://queue.fal.run/fal-ai/sam-3/image/requests/req-1",
+      });
     }
     if (url.includes("/requests/req-1/status")) {
       polls++;
@@ -75,7 +80,10 @@ describe("fal queue client", () => {
       prompt: "shirt",
       fetchImpl,
     });
-    assert.deepStrictEqual(r, { predictionId: "req-1", status: "processing" });
+    assert.strictEqual(r.predictionId, "req-1");
+    assert.strictEqual(r.status, "processing");
+    assert.strictEqual(r.statusUrl, "https://queue.fal.run/fal-ai/sam-3/image/requests/req-1/status");
+    assert.strictEqual(r.responseUrl, "https://queue.fal.run/fal-ai/sam-3/image/requests/req-1");
     const auth = seen[0].init.headers.Authorization;
     assert.strictEqual(auth, "Key FALKEY");
     const body = JSON.parse(seen[0].init.body);
@@ -93,16 +101,37 @@ describe("fal queue client", () => {
   });
 
   test("poll maps IN_PROGRESS then harvests COMPLETED", async () => {
-    const { fetchImpl } = falStub(await syntheticMask());
-    const p1 = await getFalSegmentation({ apiKey: "FALKEY", predictionId: "req-1", fetchImpl });
+    const { fetchImpl, seen } = falStub(await syntheticMask());
+    const p1 = await getFalSegmentation({
+      apiKey: "FALKEY",
+      predictionId: "req-1",
+      statusUrl: "https://queue.fal.run/fal-ai/sam-3/image/requests/req-1/status",
+      responseUrl: "https://queue.fal.run/fal-ai/sam-3/image/requests/req-1",
+      fetchImpl,
+    });
     assert.strictEqual(p1.status, "processing");
     assert.strictEqual(p1.output, null);
-    const p2 = await getFalSegmentation({ apiKey: "FALKEY", predictionId: "req-1", fetchImpl });
+    // the poll hits fal's own status_url, not a hand-built path
+    assert.ok(seen.some((s) => s.url === "https://queue.fal.run/fal-ai/sam-3/image/requests/req-1/status"));
+    const p2 = await getFalSegmentation({
+      apiKey: "FALKEY",
+      predictionId: "req-1",
+      statusUrl: "https://queue.fal.run/fal-ai/sam-3/image/requests/req-1/status",
+      responseUrl: "https://queue.fal.run/fal-ai/sam-3/image/requests/req-1",
+      fetchImpl,
+    });
     assert.strictEqual(p2.status, "succeeded");
     assert.deepStrictEqual(p2.output.pred_scores, [0.93]);
     assert.deepStrictEqual(p2.output.pred_boxes, [[0.3, 0.2, 0.4, 0.6]]);
     assert.strictEqual(p2.output.pred_masks.length, 1);
     assert.strictEqual(p2.output.pred_masks[0].url, "https://fal.media/mask.png");
+  });
+
+  test("poll falls back to the constructed path without status_url", async () => {
+    const { fetchImpl, seen } = falStub(await syntheticMask());
+    const p1 = await getFalSegmentation({ apiKey: "FALKEY", predictionId: "req-1", fetchImpl });
+    assert.strictEqual(p1.status, "processing");
+    assert.ok(seen.some((s) => s.url === "https://queue.fal.run/fal-ai/sam-3/image/requests/req-1/status"));
   });
 });
 
