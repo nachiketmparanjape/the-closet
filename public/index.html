@@ -9271,10 +9271,12 @@
             cutting.className = "hint";
             cutting.textContent = "Cutting…";
             card.appendChild(cutting);
-          } else if (g.error) {
+          } else if (g.error || g.userMessage) {
             var errEl = document.createElement("p");
             errEl.className = "hint";
-            errEl.textContent = g.error;
+            // The raw technical error never reaches the screen —
+            // the server keeps it in the doc + error ledger.
+            errEl.textContent = g.userMessage || "Couldn't cut this piece — try again.";
             card.appendChild(errEl);
           }
           var meta = document.createElement("p");

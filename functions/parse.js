@@ -61,6 +61,7 @@ const {
   selectInstance,
   polygonToCutout,
   maskToCutout,
+  samBackend,
 } = require("./sam");
 const { fetchMaskBuffer } = require("./sam-fal");
 const { normalizeRender, ROTATION_TO_ANGLE } = require("./render");
@@ -279,8 +280,60 @@ function parsesCollection(db, uid) {
 }
 
 function publicGarment(g) {
-  const { predictionId, falStatusUrl, falResponseUrl, ...rest } = g;
+  // The user never sees raw provider errors. `error` carries the
+  // full technical detail for the ledger and debugging; it is
+  // stripped here. The client renders only `userMessage`.
+  const { predictionId, falStatusUrl, falResponseUrl, error, ...rest } = g;
   return rest;
+}
+
+// fal's workers download the input image themselves. A signed URL
+// from our own bucket is the reliable path — the Replicate Files
+// URL 422'd live 2026-10-29 (file_download_error: "Failed to
+// download the file"). Falls back to the given URL rather than
+// introducing a new failure mode.
+async function falInputUrl({ bucket, bakedStoragePath, fallbackUrl }) {
+  try {
+    const [url] = await bucket.file(bakedStoragePath).getSignedUrl({
+      action: "read",
+      expires: Date.now() + 7 * 24 * 3600 * 1000,
+    });
+    if (url) return url;
+  } catch (e) {
+    /* fall through to the Replicate URL */
+  }
+  return fallbackUrl;
+}
+
+// Every failed garment carries both halves: the full technical
+// detail (server-side only, for the ledger and debugging) and the
+// one human sentence the client is allowed to render.
+function garmentFailure(garment, technical, userMessage) {
+  garment.status = "failed";
+  garment.error = String(technical || "unknown").slice(0, 500);
+  garment.userMessage =
+    userMessage || "Couldn't cut this piece — try again.";
+}
+
+// Bulletproof logging: a failed garment is written to the error
+// ledger with its full technical detail, best-effort and never
+// throwing — a failing log write must not cascade.
+async function logParseError({ db, uid, where, message, parseId, garmentId }) {
+  try {
+    await db
+      .collection("users")
+      .doc(uid)
+      .collection("client_errors")
+      .add({
+        where: String(where || "").slice(0, 120),
+        message: String(message || "").slice(0, 500),
+        parseId: parseId || null,
+        garmentId: garmentId || null,
+        createdAt: new Date().toISOString(),
+      });
+  } catch (e) {
+    /* logging must never throw */
+  }
 }
 
 // The photo-to-draft estimate, in minutes, for the current SAM
@@ -403,7 +456,10 @@ async function startParse(uid, sourceStoragePath, deps) {
       const prompt = buildPrompt(g);
       const created = await createSegmentation({
         apiKey: deps.apiKey,
-        imageUrl: fileUrl,
+        imageUrl:
+          samBackend() === "fal"
+            ? await falInputUrl({ bucket, bakedStoragePath, fallbackUrl: fileUrl })
+            : fileUrl,
         prompt,
         fetchImpl: deps.fetchImpl,
       });
@@ -525,8 +581,17 @@ async function advanceParse(uid, parseId, deps) {
       });
       if (seg.status === "starting" || seg.status === "processing") continue;
       if (seg.status !== "succeeded" || !seg.output) {
-        garment.status = "failed";
-        garment.error = seg.error || ("SAM " + seg.status);
+        garmentFailure(
+          garment,
+          seg.error || "SAM " + seg.status,
+          "The cutting service stumbled on this one — try again."
+        );
+        await logParseError({
+          db, uid,
+          where: "outfit-parse.harvest",
+          message: garment.error,
+          parseId, garmentId: garment.id,
+        });
         continue;
       }
       // Harvested the moment it completed — never read later.
@@ -546,8 +611,17 @@ async function advanceParse(uid, parseId, deps) {
       const stats = await alphaStats(cut);
       const gate = judgeMask(stats);
       if (!gate.pass) {
-        garment.status = "failed";
-        garment.error = "mask: " + gate.reasons.join("; ");
+        garmentFailure(
+          garment,
+          "mask: " + gate.reasons.join("; "),
+          "Couldn't find a clean cut for this piece — try again."
+        );
+        await logParseError({
+          db, uid,
+          where: "outfit-parse.mask-gate",
+          message: garment.error,
+          parseId, garmentId: garment.id,
+        });
         continue;
       }
       const orient = await judgeOrientation({
@@ -591,8 +665,17 @@ async function advanceParse(uid, parseId, deps) {
         rejections
       );
     } catch (err) {
-      garment.status = "failed";
-      garment.error = String((err && err.message) || err).slice(0, 300);
+      garmentFailure(
+        garment,
+        String((err && err.message) || err),
+        "Something went wrong cutting this piece — try again."
+      );
+      await logParseError({
+        db, uid,
+        where: "outfit-parse.harvest",
+        message: garment.error,
+        parseId, garmentId: garment.id,
+      });
     }
   }
   const allTerminal = garments.every((g) =>
@@ -645,7 +728,14 @@ async function retryGarment(uid, parseId, garmentId, deps) {
   });
   const created = await createSegmentation({
     apiKey: deps.apiKey,
-    imageUrl: fileUrl,
+    imageUrl:
+      samBackend() === "fal"
+        ? await falInputUrl({
+            bucket: deps.bucket,
+            bakedStoragePath: doc.bakedStoragePath,
+            fallbackUrl: fileUrl,
+          })
+        : fileUrl,
     prompt: garment.prompt,
     fetchImpl: deps.fetchImpl,
   });
@@ -654,6 +744,7 @@ async function retryGarment(uid, parseId, garmentId, deps) {
   garment.falResponseUrl = created.responseUrl || null;
   garment.status = "cutting";
   garment.error = null;
+  garment.userMessage = null;
   garment.renderStoragePath = null;
   garment.renderStatus = null;
   await parseRef.update({ garments, status: "cutting" });
@@ -678,4 +769,7 @@ module.exports = {
   MATCH_PROPOSE,
   MATCH_POSSIBLE,
   REJECT_SUPPRESS,
+  publicGarment,
+  garmentFailure,
+  falInputUrl,
 };

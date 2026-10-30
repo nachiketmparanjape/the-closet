@@ -398,3 +398,68 @@ describe("startParse -> advanceParse", () => {
     assert.strictEqual(advanced.garments[0].status, "not-found");
   });
 });
+
+describe("friendly vs technical garment errors", () => {
+  const {
+    publicGarment,
+    garmentFailure,
+    falInputUrl,
+  } = require("../functions/parse");
+
+  test("publicGarment strips the technical error but keeps the user message", () => {
+    const g = {
+      id: "g0",
+      status: "failed",
+      error: 'fal result: {"detail":[{"msg":"boom"}]}',
+      userMessage: "The cutting service stumbled on this one — try again.",
+      predictionId: "p1",
+      falStatusUrl: "https://x/status",
+      falResponseUrl: "https://x",
+    };
+    const pub = publicGarment(g);
+    assert.strictEqual(pub.userMessage, "The cutting service stumbled on this one — try again.");
+    assert.ok(!("error" in pub), "raw error must never reach the client");
+    assert.ok(!("predictionId" in pub));
+    assert.ok(!("falStatusUrl" in pub));
+    assert.ok(!("falResponseUrl" in pub));
+    assert.strictEqual(pub.id, "g0");
+  });
+
+  test("garmentFailure sets both halves", () => {
+    const g = { id: "g0", status: "cutting" };
+    garmentFailure(g, '{"detail":"x"}', "Try again.");
+    assert.strictEqual(g.status, "failed");
+    assert.strictEqual(g.error, '{"detail":"x"}');
+    assert.strictEqual(g.userMessage, "Try again.");
+  });
+
+  test("falInputUrl prefers the signed Storage URL", async () => {
+    const bucket = {
+      file: (p) => ({
+        getSignedUrl: async () => ["https://signed.example/" + p],
+      }),
+    };
+    const url = await falInputUrl({
+      bucket,
+      bakedStoragePath: "users/u1/baked.jpg",
+      fallbackUrl: "https://replicate.delivery/x.jpg",
+    });
+    assert.strictEqual(url, "https://signed.example/users/u1/baked.jpg");
+  });
+
+  test("falInputUrl falls back to the Replicate URL when signing fails", async () => {
+    const bucket = {
+      file: () => ({
+        getSignedUrl: async () => {
+          throw new Error("nope");
+        },
+      }),
+    };
+    const url = await falInputUrl({
+      bucket,
+      bakedStoragePath: "users/u1/baked.jpg",
+      fallbackUrl: "https://replicate.delivery/x.jpg",
+    });
+    assert.strictEqual(url, "https://replicate.delivery/x.jpg");
+  });
+});
