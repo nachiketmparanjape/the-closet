@@ -9819,8 +9819,23 @@
         outfitParseStartPolling();
       }
 
-      function saveOutfitParse(logWear) {
+      // Mark the draft done server-side, then refresh the list.
+      // The client cannot write the parses collection directly
+      // (no Firestore rule — permission-denied failed silently
+      // and saved outfits stayed in drafts, founder report
+      // 2026-10-30). Refresh waits for the finish so the card
+      // is gone on the first paint, not the second.
+      function finishOutfitParseDraft() {
         var st = outfitParseState;
+        var done = st && st.parseId
+          ? functions.httpsCallable("finishOutfitParse", { timeout: 60000 })({ parseId: st.parseId }).catch(function (err) {
+              try { reportError("outfit-parse.finish", err); } catch (e2) {}
+            })
+          : Promise.resolve();
+        return done.then(function () { refreshDrafts(); });
+      }
+
+      function saveOutfitParse(logWear) {        var st = outfitParseState;
         if (!st) return;
         // One save at a time: a double-tap used to start two
         // chains that could duplicate items and outfits.
@@ -9915,8 +9930,7 @@
             st.saved = true;
             closeOutfitParse();
             showToast("This exact outfit is already saved — opening the existing one.");
-            if (st.parseId) db.collection("users").doc(currentUser.uid).collection("parses").doc(st.parseId).update({ status: "done" }).catch(function () {});
-            refreshDrafts();
+            finishOutfitParseDraft();
             switchView("outfits");
             openOutfit(dup.id);
             return null;
@@ -9946,10 +9960,9 @@
         }).then(function (ref) {
           if (!ref) return;
           st.saved = true;
-          db.collection("users").doc(currentUser.uid).collection("parses").doc(st.parseId).update({ status: "done" }).catch(function () {});
           closeOutfitParse();
           showToast(logWear ? "Outfit saved — logged as worn today." : "Outfit saved.");
-          refreshDrafts();
+          finishOutfitParseDraft();
           if (appendErrors) showToast("Couldn't attach the photo to " + appendErrors + " piece(s) — the outfit still saved.");
           if (logWear) {
             db.collection("users").doc(currentUser.uid).collection("wear_events").doc().set({

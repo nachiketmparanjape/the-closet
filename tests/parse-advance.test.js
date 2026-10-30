@@ -219,3 +219,19 @@ test("listParses: entries carry public garments for instant sheet render", async
   assert.ok(!("error" in gs[0]));
   assert.ok(!("predictionId" in gs[0]));
 });
+
+test("finishParse: marks the parse done; missing parse throws", async () => {
+  const { finishParse } = require("../functions/parse.js");
+  const db = fakeDb({
+    u1: {
+      parses: {
+        p1: { status: "review", createdAt: ts(5), garments: [] },
+      },
+    },
+  });
+  const res = await finishParse("u1", "p1", { db });
+  assert.equal(res.status, "done");
+  const snap = await db.collection("users").doc("u1").collection("parses").doc("p1").get();
+  assert.equal(snap.data().status, "done");
+  await assert.rejects(finishParse("u1", "nope", { db }), (e) => e.key === "PARSE_NOT_FOUND");
+});

@@ -21,7 +21,7 @@ const { askStylist, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanit
 const { reflectOutfit } = require("./reflect");
 const { critiqueOutfit } = require("./critique");
 const { parseOutfitPhoto } = require("./photo");
-const { startParse, advanceParse, retryGarment, listParses } = require("./parse");
+const { startParse, advanceParse, retryGarment, listParses, finishParse } = require("./parse");
 const { discardParse } = require("./discard");
 const { advanceAllParses } = require("./advance");
 const { shopCheck } = require("./shopcheck");
@@ -626,6 +626,40 @@ exports.discardOutfitParse = onCall(
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "SAM_FAILED";
       boundary("discardOutfitParse", correlationId, uid, err);
+    }
+  }
+);
+
+// Mark a parse done after its outfit saved. Firestore + Storage
+// only, same shape as discardOutfitParse — the client cannot
+// write the parses collection directly (no rule, by design).
+exports.finishOutfitParse = onCall(
+  {
+    region: "us-central1",
+    timeoutSeconds: 60,
+    memory: "512MiB",
+    maxInstances: 5,
+  },
+  async (request) => {
+    const correlationId = newCorrelationId();
+    const uid = request.auth ? request.auth.uid : null;
+    const start = Date.now();
+    try {
+      if (!request.auth) {
+        fail("NOT_SIGNED_IN");
+      }
+      const data = request.data || {};
+      const parseId = typeof data.parseId === "string" ? data.parseId.trim() : "";
+      if (!parseId || parseId.length > 100) {
+        fail("BAD_REQUEST");
+      }
+      const result = await finishParse(uid, parseId, {
+        db: getFirestore(),
+      });
+      return finish("finishOutfitParse", correlationId, uid, start, result);
+    } catch (err) {
+      if (!(err instanceof HttpsError) && !err.key) err.key = "SAM_FAILED";
+      boundary("finishOutfitParse", correlationId, uid, err);
     }
   }
 );

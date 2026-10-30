@@ -336,8 +336,24 @@ const PARSE_ETA_MINUTES = 15;
 // the same upload, so the newest parse for a photo replaces
 // its failed predecessor. Public fields only: no prediction
 // ids, no embeddings, no boxes.
-async function listParses(uid, deps) {
-  const snap = await parsesCollection(deps.db, uid)
+// Mark a parse done after its outfit saved. The client cannot
+// write the parses collection directly (no Firestore rule —
+// parses are server-only by design), so the save flow calls
+// this instead. A direct client update used to fail silently
+// with permission-denied and the draft never left the list
+// (founder report 2026-10-30).
+async function finishParse(uid, parseId, deps) {
+  const db = deps.db;
+  const parseRef = parsesCollection(db, uid).doc(parseId);
+  const snap = await parseRef.get();
+  if (!snap.exists) {
+    throw codedError("PARSE_NOT_FOUND", "parse: no such parse");
+  }
+  await parseRef.update({ status: "done" });
+  return { parseId, status: "done" };
+}
+
+async function listParses(uid, deps) {  const snap = await parsesCollection(deps.db, uid)
     .orderBy("createdAt", "desc")
     .limit(20)
     .get();
@@ -759,4 +775,5 @@ module.exports = {
   REJECT_SUPPRESS,
   publicGarment,
   garmentFailure,
+  finishParse,
 };
