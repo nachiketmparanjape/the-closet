@@ -114,6 +114,9 @@ describe("fal queue client", () => {
     assert.strictEqual(body.prompt, "shirt");
     assert.strictEqual(body.include_scores, true);
     assert.strictEqual(body.include_boxes, true);
+    // raw binary masks — the default (applied mask) misreads as
+    // alpha and fails the mask gate (live 2026-10-29)
+    assert.strictEqual(body.apply_mask, false);
   });
 
   test("submit without a key fails closed", async () => {
@@ -257,6 +260,26 @@ describe("maskToCutout", () => {
     const cut = await sam.maskToCutout({ imageBuffer: image, maskBuffer: allWhite });
     const { data, info } = await sharp(cut).raw().toBuffer({ resolveWithObject: true });
     assert.strictEqual(data[(20 * info.width + 20) * 4 + 3], 0);
+  });
+
+  test("a soft mask thresholds to binary alpha — no semi-transparent mush", async () => {
+    const image = await sharp({
+      create: { width: 40, height: 40, channels: 3, background: { r: 200, g: 30, b: 30 } },
+    })
+      .png()
+      .toBuffer();
+    // mid-gray everywhere: without a threshold the whole
+    // foreground would read as semi-transparent (live 2026-10-29)
+    const soft = await sharp({
+      create: { width: 40, height: 40, channels: 3, background: { r: 120, g: 120, b: 120 } },
+    })
+      .png()
+      .toBuffer();
+    const cut = await sam.maskToCutout({ imageBuffer: image, maskBuffer: soft });
+    const { data, info } = await sharp(cut).raw().toBuffer({ resolveWithObject: true });
+    for (let i = 3; i < data.length; i += 4) {
+      assert.ok(data[i] === 0 || data[i] === 255, "alpha must be binary, got " + data[i]);
+    }
   });
 });
 

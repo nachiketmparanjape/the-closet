@@ -9233,6 +9233,7 @@
         var cardsEl = document.getElementById("outfitParseCards");
         cardsEl.innerHTML = "";
         st.garments.forEach(function (g) {
+          try {
           var d = st.decisions[g.id] || {};
           var card = document.createElement("div");
           card.className = "outfit-parse-card";
@@ -9351,6 +9352,11 @@
           }
           card.appendChild(actions);
           cardsEl.appendChild(card);
+          } catch (e) {
+            // One bad garment must never blank the whole list —
+            // report it and keep rendering the rest.
+            try { reportError("outfit-parse.render-card", e); } catch (e2) {}
+          }
         });
         var canSave = outfitParseCanSave(st.garments, st.decisions);
         document.getElementById("outfitParseSave").disabled = !canSave || !!st.saving;

@@ -323,8 +323,12 @@ async function maskToCutout({ imageBuffer, maskBuffer }) {
   const { data } = await sharp(maskPng).raw().toBuffer({ resolveWithObject: true });
   let white = 0;
   for (let i = 0; i < data.length; i++) if (data[i] > 127) white++;
-  const finalMask =
+  const oriented =
     white / data.length > 0.6 ? await sharp(maskPng).negate().toBuffer() : maskPng;
+  // SAM masks can carry soft edges; the alpha channel must be
+  // binary or the whole foreground reads as semi-transparent
+  // and the mask gate rejects it (live 2026-10-29).
+  const finalMask = await sharp(oriented).threshold(128).toBuffer();
   return sharp(imageBuffer).removeAlpha().joinChannel(finalMask).png().toBuffer();
 }
 

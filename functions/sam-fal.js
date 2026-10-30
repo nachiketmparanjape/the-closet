@@ -132,6 +132,12 @@ async function createFalSegmentation({ apiKey, imageBuffer, filename, prompt, fe
         include_scores: true,
         include_boxes: true,
         return_multiple_masks: false,
+        // Raw binary masks, not the masked photo. With the
+        // default (true) fal returns the mask applied to the
+        // image — reading that as alpha produced a 100%
+        // semi-transparent "foreground" that the mask gate
+        // rejected live 2026-10-29.
+        apply_mask: false,
       }),
     });
   } catch (e) {
