@@ -65,6 +65,12 @@ with it.
 
 ## Card 2 — SAM engine swap + automatic orientation (PC-34)
 
+> **Deferred to next sprint** (founder decision 2026-10-29):
+> the fal SAM backend proved itself on the outfit flow
+> first; the individual-item migration (including the
+> worn-photo describe-first prompt strategy) moves to the
+> next sprint's planning walk.
+
 - The flat-photo extraction path moves from BiRefNet to the
   SAM service. BiRefNet stays as the fallback for
   single-garment photos where SAM finds nothing (the rescue
