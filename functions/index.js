@@ -1014,12 +1014,18 @@ exports.standardizeItem = onCall(
       });
       } finally {
         // Guarantee: never leave the item stuck in 'processing'.
+        // Only update if still processing (don't overwrite a specific error
+        // like flux_error: with the generic processing_interrupted).
         if (!processingCompleted) {
           try {
-            await itemRef.update({
-              "standardization.status": "failed",
-              "standardization.lastError": "processing_interrupted",
-            });
+            const checkSnap = await itemRef.get();
+            const checkStd = checkSnap.exists ? (checkSnap.data().standardization || {}) : {};
+            if (checkStd.status === "processing") {
+              await itemRef.update({
+                "standardization.status": "failed",
+                "standardization.lastError": "processing_interrupted",
+              });
+            }
           } catch (cleanupErr) {
             // Best-effort; the outer catch will handle the original error.
           }
