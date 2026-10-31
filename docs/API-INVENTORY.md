@@ -23,6 +23,7 @@ not currently called), **local** (runs inside our functions, no API).
 | Vertex multimodal embeddings `multimodalembedding@001` | Turns a garment render into a vector (a list of numbers describing the image) so the app can propose "this looks like a piece you own" by cosine similarity | `functions/parse.js` | ~$0.0001 per image | live |
 | Replicate Files API | Temporary public image hosting, so Replicate models can fetch their inputs | `functions/sam.js` (`uploadInputImage`) | free (part of Replicate) | live |
 | SAM 3, official `fal-ai/sam-3/image` (via fal) | The fast SAM backend: returns masks as PNGs (no RLE decode); selected by `SAM_BACKEND=fal` | `functions/sam-fal.js`, seam in `functions/sam.js`; key `FAL_API_KEY` in Secret Manager, called server-side (the custom.fal connector cannot send fal's `Key ` auth scheme, so the connector path stays paused) | $0.005 per call | live 2026-10-29 |
+| FLUX Kontext Dev `fal-ai/flux-kontext/dev` (via fal) | Stage 3 garment standardization (PC-58): completes + standardizes garment photos into clean product shots | `functions/standardize.js`, callable `standardizeItem`; key `FAL_API_KEY` in Secret Manager | ~$0.025 per run (~$0.03/item with retries) | live 2026-10-31 |
 
 Notes:
 
