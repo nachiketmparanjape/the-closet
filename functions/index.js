@@ -921,6 +921,11 @@ exports.standardizeItem = onCall(
         "standardization.lastAttemptAt": new Date().toISOString(),
       });
 
+      // Bug #2 fix (2026-10-31): guarantee the status is updated even on
+      // unexpected crashes. Without this, a throw anywhere below leaves the
+      // item stuck in 'processing' forever.
+      let processingCompleted = false;
+      try {
       // Get the item's image URL
       const photos = item.photos || [];
       if (!photos.length || !photos[0].url) {
@@ -964,21 +969,69 @@ exports.standardizeItem = onCall(
         expires: "2030-01-01",
       });
 
-      // Mark ready
-      await itemRef.update({
-        "standardization.status": "ready",
-        "standardization.standardizedUrl": stdUrl,
-        "standardization.standardizedStoragePath": stdPath,
-        "standardization.completedAt": new Date().toISOString(),
-        "standardization.lastError": null,
+      // PC-58 photo type tags: swap logic.
+      // - New photo gets type='standardized'
+      // - Any existing photo with type='standardized' gets re-tagged to type='actual'
+      //   (it's the source material; the new AI output takes the standardized slot)
+      // - If the input was an 'actual' photo, it stays as 'actual'
+      const existingPhotos = item.photos || [];
+      const updatedPhotos = existingPhotos.map(p => {
+        const pf = p.mapValue ? p.mapValue.fields : p; // handle Firestore format
+        const ptype = pf.type ? (pf.type.stringValue || pf.type) : null;
+        if (ptype === 'standardized') {
+          // Swap: old standardized becomes actual
+          if (p.mapValue) {
+            return { mapValue: { fields: { ...pf, type: { stringValue: 'actual' } } } };
+          }
+          return { ...p, type: 'actual' };
+        }
+        return p;
+      });
+      // Add the new standardized photo
+      const newPhoto = {
+        mapValue: {
+          fields: {
+            url: { stringValue: stdUrl },
+            storagePath: { stringValue: stdPath },
+            type: { stringValue: 'standardized' },
+            createdAt: { timestampValue: new Date().toISOString() },
+          },
+        },
+      };
+      updatedPhotos.push(newPhoto);
+
+      // Mark ready (transactional: photos + status together)
+      await db.runTransaction(async (t) => {
+        t.update(itemRef, {
+          photos: { arrayValue: { values: updatedPhotos } },
+          "standardization.status": "ready",
+          "standardization.standardizedUrl": stdUrl,
+          "standardization.standardizedStoragePath": stdPath,
+          "standardization.completedAt": new Date().toISOString(),
+          "standardization.lastError": null,
+        });
       });
 
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: true });
+      processingCompleted = true;
       return finish("standardizeItem", correlationId, uid, start, {
         ready: true,
         standardizedUrl: stdUrl,
         attempts: attempts + 1,
       });
+      } finally {
+        // Guarantee: never leave the item stuck in 'processing'.
+        if (!processingCompleted) {
+          try {
+            await itemRef.update({
+              "standardization.status": "failed",
+              "standardization.lastError": "processing_interrupted",
+            });
+          } catch (cleanupErr) {
+            // Best-effort; the outer catch will handle the original error.
+          }
+        }
+      }
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "STANDARDIZE_FAILED";
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
