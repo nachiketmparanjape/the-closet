@@ -3391,8 +3391,15 @@
           note.textContent = "The AI version didn't come out right. You can try again.";
           note.hidden = false;
           refreshBtn.hidden = false;
+        } else {
+          // No standardization yet ('pending', undefined, or no field):
+          // show the Generate button so existing items can be processed.
+          // (Passive background processing covers new adds; this covers the backlog.)
+          actionsBox.hidden = false;
+          note.textContent = "Get a clean, standardized product shot of this piece.";
+          note.hidden = false;
+          genBtn.hidden = false;
         }
-        // 'pending' or no status: nothing shown (processing happens passively)
       }
 
       // PC-58: call the standardizeItem callable.
@@ -3407,7 +3414,7 @@
           .then(function (res) { return res.data || {}; });
       }
 
-      // PC-58: "Generate standardized view" CTA (already_clean escape hatch)
+      // PC-58: "Generate standardized view" button (first run or already_clean escape hatch)
       document.getElementById("stdGenerateBtn").addEventListener("click", function () {
         if (!activeItem || !currentUser) return;
         var btn = this;
