@@ -959,15 +959,15 @@ exports.standardizeItem = onCall(
       // const gates = await runQualityGates(inputBuffer, outputBuffer);
       // if (!gates.pass) { ... retry or mark failed ... }
 
-      // Upload the standardized image to the user's storage
+      // Upload the standardized image to the user's storage.
+      // Note: getSignedUrl requires iam.serviceAccounts.signBlob which the
+      // function service account lacks. Use public URL instead.
       const bucket = getStorage().bucket();
       const outputBuffer = Buffer.from(await (await fetch(outputUrl)).arrayBuffer());
       const stdPath = `users/${uid}/items/${itemId}/standardized.png`;
       await bucket.file(stdPath).save(outputBuffer, { contentType: "image/png" });
-      const [stdUrl] = await bucket.file(stdPath).getSignedUrl({
-        action: "read",
-        expires: "2030-01-01",
-      });
+      await bucket.file(stdPath).makePublic();
+      const stdUrl = `https://storage.googleapis.com/${bucket.name}/${stdPath}`;
 
       // PC-58 photo type tags: swap logic.
       // - New photo gets type='standardized'
