@@ -94,7 +94,7 @@ function buildPrompt(garment) {
     : head;
 }
 
-const LIST_PROMPT = `List every distinct garment visible in this photo. A jacket and the tee visible inside it are two garments; a pair of trousers is one garment. Skip people, furniture, and background objects.
+const LIST_PROMPT = `List every distinct garment visible in this photo. A jacket and the tee visible inside it are two garments; a pair of trousers is one garment; a pair of shoes is one garment (never list the left and right shoe separately). Skip people, furniture, and background objects.
 
 Answer with ONLY a JSON object (no markdown, no prose): {"garments": [{"type": "jacket", "colors": ["black"], "detail": "open front, tee visible inside"}]}.
 
