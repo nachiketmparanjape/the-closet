@@ -108,9 +108,15 @@ async function redJpeg() {
 describe("parseListJson", () => {
   test("parses a valid list", () => {
     const out = parseListJson(
+      JSON.stringify({ garments: [{ type: "tee", colors: ["red"], detail: "graphic", pattern: "graphic", fit: "regular", fabric_guess: "cotton", formality: "casual", warmth: "light", description: "Red graphic tee" }] })
+    );
+    assert.deepStrictEqual(out, [{ type: "tee", colors: ["red"], detail: "graphic", pattern: "graphic", fit: "regular", fabric_guess: "cotton", formality: "casual", warmth: "light", description: "Red graphic tee" }]);
+  });
+  test("v2 attributes default to empty when absent", () => {
+    const out = parseListJson(
       JSON.stringify({ garments: [{ type: "tee", colors: ["red"], detail: "graphic" }] })
     );
-    assert.deepStrictEqual(out, [{ type: "tee", colors: ["red"], detail: "graphic" }]);
+    assert.deepStrictEqual(out, [{ type: "tee", colors: ["red"], detail: "graphic", pattern: "", fit: "", fabric_guess: "", formality: "", warmth: "", description: "" }]);
   });
   test("caps at 8 and skips typeless entries", () => {
     const garments = Array.from({ length: 10 }, (_, i) => ({ type: "tee" + i }));

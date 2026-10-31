@@ -96,9 +96,9 @@ function buildPrompt(garment) {
 
 const LIST_PROMPT = `List every distinct garment visible in this photo, one entry per wearable unit: pieces that are worn and stored as a single unit count as one garment (a pair of shoes, gloves, or socks is one garment — never list the left and right separately), while pieces that can be worn on their own are separate garments (a jacket and the tee visible inside it are two garments; a pair of trousers is one garment). Skip people, furniture, and background objects.
 
-Answer with ONLY a JSON object (no markdown, no prose): {"garments": [{"type": "jacket", "colors": ["black"], "detail": "open front, tee visible inside"}]}.
+Answer with ONLY a JSON object (no markdown, no prose): {"garments": [{"type": "jacket", "colors": ["black"], "detail": "open front, tee visible inside", "pattern": "solid", "fit": "regular", "fabric_guess": "denim", "formality": "casual", "warmth": "medium", "description": "Black denim jacket with an open front"}]}.
 
-type is the garment kind in plain words ("jacket", "trousers", "tee", "dress", "shoes"). colors are plain words, up to 3, the garment's own colors (not the background's). detail is one short distinguishing phrase (a print, a zip, an open front) or "" when nothing distinguishes it.`;
+type is the garment kind in plain words ("jacket", "trousers", "tee", "dress", "shoes"). colors are plain words, up to 3, the garment's own colors (not the background's). detail is one short distinguishing phrase (a print, a zip, an open front) or "" when nothing distinguishes it. pattern is one of: solid, striped, checked, floral, graphic, other. fit is one of: slim, regular, relaxed, oversized, unknown. fabric_guess is the likely fabric in plain words ("cotton", "denim", "synthetic blend") or "unknown". formality is one of: casual, smart-casual, formal. warmth is one of: light, medium, heavy. description is one short sentence describing the garment.`;
 
 function parseListJson(text) {
   if (typeof text !== "string" || !text.trim()) {
@@ -123,12 +123,21 @@ function parseListJson(text) {
   const out = [];
   for (const g of parsed.garments) {
     if (!g || typeof g.type !== "string" || !g.type.trim()) continue;
+    const str = (v) => (typeof v === "string" ? v.trim() : "");
     out.push({
       type: g.type.trim(),
       colors: Array.isArray(g.colors)
         ? g.colors.filter((c) => typeof c === "string" && c.trim()).slice(0, 3)
         : [],
-      detail: typeof g.detail === "string" ? g.detail.trim() : "",
+      detail: str(g.detail),
+      // v2 attributes (2026-10-30): the outfit flow now populates
+      // the same item fields as the single-upload flow.
+      pattern: str(g.pattern),
+      fit: str(g.fit),
+      fabric_guess: str(g.fabric_guess),
+      formality: str(g.formality),
+      warmth: str(g.warmth),
+      description: str(g.description),
     });
     if (out.length >= MAX_GARMENTS) break;
   }

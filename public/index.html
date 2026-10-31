@@ -9891,6 +9891,28 @@
               var name = d.userName || outfitParseDraftName(g.type, g.colors);
               var category = d.userCategory || outfitParseCategoryForType(g.type);
               var docRef = db.collection("users").doc(currentUser.uid).collection("items").doc();
+              // v2 attributes (2026-10-30): outfit-sourced items now carry
+              // the same fields as single-upload items, built from the
+              // listing's attributes via the shared buildV2Fields helper.
+              var aiForV2 = {
+                colors: g.colors || [],
+                description: g.description || "",
+                pattern: g.pattern || "",
+                fit: g.fit || "",
+                fabric_guess: g.fabric_guess || "",
+                formality: g.formality || "",
+                warmth: g.warmth || "",
+                brand: null,
+                brandKey: null,
+                subtype: null,
+                style_tags: []
+              };
+              var v2 = buildV2Fields(aiForV2, null);
+              // The outfit flow has no sampled dominant hex yet — keep
+              // null hexes rather than the helper's gray fallback.
+              v2.colors = (g.colors || []).map(function (w, i) {
+                return { name: w, hex: null, source: "ai", primary: i === 0 };
+              });
               var doc = {
                 name: name,
                 shortName: capShortName(name),
@@ -9898,13 +9920,27 @@
                 imageUrl: st.photoUrl,
                 storagePath: st.storagePath,
                 photos: [outfitParsePhotoEntry(g)],
-                colors: (g.colors || []).map(function (w, i) {
-                  return { name: w, hex: null, source: "ai", primary: i === 0 };
-                }),
+                colors: v2.colors,
+                description: v2.description,
+                pattern: v2.pattern,
+                fit: v2.fit,
+                fabricGuess: v2.fabricGuess,
+                formality: v2.formality,
+                warmth: v2.warmth,
+                brand: v2.brand,
+                brandKey: v2.brandKey,
+                subtype: v2.subtype,
+                styleTags: v2.styleTags,
                 ai: {
                   name: name,
                   category: category,
                   colors: g.colors || [],
+                  pattern: g.pattern || "",
+                  fit: g.fit || "",
+                  fabric_guess: g.fabric_guess || "",
+                  formality: g.formality || "",
+                  warmth: g.warmth || "",
+                  description: g.description || "",
                   parseId: st.parseId,
                   prompt: g.prompt,
                   score: g.score || null
