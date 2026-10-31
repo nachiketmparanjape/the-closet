@@ -969,41 +969,34 @@ exports.standardizeItem = onCall(
       await bucket.file(stdPath).makePublic();
       const stdUrl = `https://storage.googleapis.com/${bucket.name}/${stdPath}`;
 
-      // PC-58 photo type tags: swap logic.
+      // PC-58 photo type tags: swap logic (Admin SDK format — plain objects).
       // - New photo gets type='standardized'
       // - Any existing photo with type='standardized' gets re-tagged to type='actual'
       //   (it's the source material; the new AI output takes the standardized slot)
       // - If the input was an 'actual' photo, it stays as 'actual'
+      // NOTE (2026-10-31 bugfix): The Admin SDK returns plain JS objects, NOT
+      // Firestore REST format. Writing {mapValue:{fields:...}} or
+      // {arrayValue:{values:...}} corrupts the document. Use plain objects/arrays.
       const existingPhotos = item.photos || [];
       const updatedPhotos = existingPhotos.map(p => {
-        const pf = p.mapValue ? p.mapValue.fields : p; // handle Firestore format
-        const ptype = pf.type ? (pf.type.stringValue || pf.type) : null;
-        if (ptype === 'standardized') {
-          // Swap: old standardized becomes actual
-          if (p.mapValue) {
-            return { mapValue: { fields: { ...pf, type: { stringValue: 'actual' } } } };
-          }
+        // p is a plain object like {url, storagePath, type, ...}
+        if (p && p.type === 'standardized') {
           return { ...p, type: 'actual' };
         }
         return p;
       });
-      // Add the new standardized photo
-      const newPhoto = {
-        mapValue: {
-          fields: {
-            url: { stringValue: stdUrl },
-            storagePath: { stringValue: stdPath },
-            type: { stringValue: 'standardized' },
-            createdAt: { timestampValue: new Date().toISOString() },
-          },
-        },
-      };
-      updatedPhotos.push(newPhoto);
+      // Add the new standardized photo (plain object)
+      updatedPhotos.push({
+        url: stdUrl,
+        storagePath: stdPath,
+        type: 'standardized',
+        createdAt: new Date().toISOString(),
+      });
 
       // Mark ready (transactional: photos + status together)
       await db.runTransaction(async (t) => {
         t.update(itemRef, {
-          photos: { arrayValue: { values: updatedPhotos } },
+          photos: updatedPhotos,
           "standardization.status": "ready",
           "standardization.standardizedUrl": stdUrl,
           "standardization.standardizedStoragePath": stdPath,
