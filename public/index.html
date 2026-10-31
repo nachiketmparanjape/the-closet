@@ -3343,6 +3343,17 @@
       function renderStandardizationUI(item) {
         var std = item.standardization || {};
         var status = std.status || null;
+        var photos = item.photos || [];
+        // PC-58: photo type is the source of truth.
+        // Find the standardized photo by type tag.
+        var stdPhoto = null;
+        for (var i = 0; i < photos.length; i++) {
+          if (photos[i] && photos[i].type === "standardized") {
+            stdPhoto = photos[i];
+            break;
+          }
+        }
+        var hasStandardized = !!stdPhoto;
         var statusLine = document.getElementById("stdStatusLine");
         var actionsBox = document.getElementById("stdActions");
         var note = document.getElementById("stdNote");
@@ -3356,45 +3367,61 @@
         actionsBox.hidden = true;
         note.hidden = true;
         genBtn.hidden = true;
+        genBtn.textContent = "Generate standardized view"; // reset from "Try again"
         refreshBtn.hidden = true;
         if (stdChip) stdChip.hidden = true;
 
         if (status === "processing") {
-          // Subtle, non-blocking indicator
+          // Subtle, non-blocking indicator (workflow state)
           statusLine.textContent = "Standardizing…";
           statusLine.hidden = false;
-        } else if (status === "ready" && std.standardizedUrl) {
-          // Gated reveal: show the AI view chip + refresh option
+        } else if (hasStandardized) {
+          // A standardized photo exists (by type tag) — show it.
+          // This covers: AI-generated, already-clean uploads, and swapped originals.
           if (stdChip) {
             stdChip.hidden = false;
             stdChip.onclick = function () {
               if (!activeItem) return;
-              var s = (activeItem.standardization || {}).standardizedUrl;
-              if (!s) return;
-              itemPhoto.dataset.view = "std";
-              itemPhoto.src = s;
-              syncViewChips("std");
+              var ps = activeItem.photos || [];
+              for (var j = 0; j < ps.length; j++) {
+                if (ps[j] && ps[j].type === "standardized" && ps[j].url) {
+                  itemPhoto.dataset.view = "std";
+                  itemPhoto.src = ps[j].url;
+                  syncViewChips("std");
+                  break;
+                }
+              }
             };
           }
           actionsBox.hidden = false;
-          note.textContent = "AI-generated view — colors and details are matched to your photo.";
+          // Distinguish AI-generated from already-clean uploads
+          var wasAiGenerated = std.status === "ready";
+          note.textContent = wasAiGenerated
+            ? "AI-generated view — colors and details are matched to your photo."
+            : "This one already looked like a clean product shot, so we skipped it.";
           note.hidden = false;
-          refreshBtn.hidden = false;
-        } else if (status === "already_clean") {
-          // Escape hatch for misattributed items
-          actionsBox.hidden = false;
-          note.textContent = "This one already looked like a clean product shot, so we skipped it.";
-          note.hidden = false;
-          genBtn.hidden = false;
+          // If it was already clean, offer Generate (escape hatch).
+          // If AI-generated, offer Refresh.
+          if (wasAiGenerated || status === "failed") {
+            refreshBtn.hidden = false;
+          } else {
+            genBtn.hidden = false;
+          }
         } else if (status === "failed") {
           actionsBox.hidden = false;
           note.textContent = "The AI version didn't come out right. You can try again.";
           note.hidden = false;
-          refreshBtn.hidden = false;
+          // If a standardized photo exists (previous success), offer Refresh.
+          // If not (never succeeded), offer Generate — there's nothing to refresh.
+          if (hasStandardized) {
+            refreshBtn.hidden = false;
+          } else {
+            genBtn.hidden = false;
+            // Update the Generate button text for the retry case
+            genBtn.textContent = "Try again";
+          }
         } else {
-          // No standardization yet ('pending', undefined, or no field):
-          // show the Generate button so existing items can be processed.
-          // (Passive background processing covers new adds; this covers the backlog.)
+          // No standardized photo yet: show Generate (one-time).
           actionsBox.hidden = false;
           note.textContent = "Get a clean, standardized product shot of this piece.";
           note.hidden = false;
