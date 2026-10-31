@@ -139,6 +139,14 @@
     .view-chip { border: 1px solid var(--line); background: none; color: var(--muted); border-radius: 999px; padding: 5px 12px; font-size: 12.5px; cursor: pointer; }
     .view-chip.is-active { color: var(--ink); border-color: var(--brass, #a87c1c); font-weight: 600; }
     .view-chip:disabled { opacity: .55; cursor: default; }
+    /* PC-58: standardization status + actions. Subtle, Warm Editorial. */
+    .std-status { font-size: 13px; color: var(--muted); margin: -8px 0 12px; font-style: italic; }
+    .std-actions { margin: 0 0 14px; }
+    .std-note { font-size: 12.5px; color: var(--muted); margin: 0 0 10px; }
+    .std-actions .secondary { margin-right: 8px; margin-bottom: 4px; }
+    .std-warning { background: var(--paper-soft); border: 1px solid var(--brass, #a87c1c); border-radius: var(--r-md); padding: 12px 14px; margin-bottom: 14px; }
+    .std-warning p { margin: 0 0 6px; font-size: 14px; }
+    .std-warning p:last-child { margin-bottom: 0; }
     .item-photo-wrap { position: relative; aspect-ratio: 1; background: var(--paper-soft); border-radius: var(--r-md); overflow: hidden; margin-bottom: 16px; }
     .photo-rotate-overlay { position: absolute; right: 10px; bottom: 10px; display: flex; gap: 8px; }
     .rotate-btn { width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(242,235,219,.35); background: rgba(22,18,13,.65); color: #f2ebdb; font-size: 20px; line-height: 1; cursor: pointer; }
@@ -1504,7 +1512,9 @@
         <div class="photo-view-row" id="itemPhotoViewRow" hidden>
           <button class="view-chip is-active" id="viewCleanBtn" type="button">Clean view</button>
           <button class="view-chip" id="viewOriginalBtn" type="button">Original photo</button>
+          <button class="view-chip" id="viewStdBtn" type="button" hidden>AI view</button>
         </div>
+        <p class="std-status" id="stdStatusLine" hidden></p>
         <p class="src-note" id="itemSourceNote" hidden></p>
         <div class="thumb-strip" id="thumbStrip" hidden></div>
         <div class="photo-manage">
@@ -1513,6 +1523,12 @@
           <button class="secondary" id="setCoverBtn" type="button">Set as cover</button>
           <input id="addPhotoInput" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden />
           <input id="addPhotoInputCamera" type="file" accept="image/*" capture="environment" hidden />
+        </div>
+        <!-- PC-58: Stage 3 standardization actions -->
+        <div class="std-actions" id="stdActions" hidden>
+          <p class="std-note" id="stdNote" hidden></p>
+          <button class="secondary" id="stdGenerateBtn" type="button" hidden>Generate standardized view</button>
+          <button class="secondary" id="stdRefreshBtn" type="button" hidden>Refresh AI view</button>
         </div>
         <p class="hint" id="itemWearStats" hidden></p>
         <div class="field">
@@ -1615,6 +1631,29 @@
 
   <button class="chat-fab" id="chatFab" type="button"><span aria-hidden="true">✨</span><span>Ask the stylist</span></button>
   <button class="feedback-fab" id="feedbackFab" type="button" hidden aria-label="Send feedback"><span class="fb-icon" aria-hidden="true">✎</span> <span class="fb-label">Feedback</span></button>
+
+  <!-- PC-58: refresh confirmation sheet for the AI-generated standardized view.
+       Deliberate action only: explicit button + confirmation, cost disclosed.
+       No swipe, no long-press, no accidental triggers. -->
+  <div class="overlay sheet-overlay" id="stdRefreshSheet" hidden role="dialog" aria-modal="true" aria-labelledby="stdRefreshTitle">
+    <section class="sheet">
+      <div class="sheet-head">
+        <h2 class="sheet-title" id="stdRefreshTitle">Refresh the AI view?</h2>
+        <button class="icon-button" id="stdRefreshClose" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="std-warning" id="stdExpenseWarning" hidden>
+        <p><strong>Heads up:</strong> <span id="stdExpenseWarningText"></span></p>
+        <p class="sheet-fine">The model may not be able to improve this one further.</p>
+      </div>
+      <p class="sheet-intro" id="stdRefreshIntro">This generates a new AI version of this piece. It costs about $0.03.</p>
+      <div class="field">
+        <label for="stdFeedbackInput">What's off about it? <span class="hint">(optional)</span></label>
+        <input type="text" id="stdFeedbackInput" maxlength="200" placeholder="e.g. the color looks wrong, the sleeve is cut off" autocomplete="off" />
+      </div>
+      <button class="primary" id="stdRefreshGo" type="button" style="width:100%;">Generate new version ($0.03)</button>
+      <button class="link-button" id="stdRefreshCancel" type="button" style="margin-top:8px;">Cancel</button>
+    </section>
+  </div>
 
   <div class="overlay" id="feedbackOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="feedbackTitle">
     <section class="modal">
@@ -3258,11 +3297,14 @@
           itemPhoto.style.transform = prev ? "rotate(" + prev + "deg)" : "";
         });
       }
-      function syncViewChips(cleanActive) {
+      function syncViewChips(activeView) {
+        // activeView: "clean" | "original" | "std"
         var c = document.getElementById("viewCleanBtn");
         var o = document.getElementById("viewOriginalBtn");
-        if (c) c.classList.toggle("is-active", !!cleanActive);
-        if (o) o.classList.toggle("is-active", !cleanActive);
+        var s = document.getElementById("viewStdBtn");
+        if (c) c.classList.toggle("is-active", activeView === "clean");
+        if (o) o.classList.toggle("is-active", activeView === "original");
+        if (s) s.classList.toggle("is-active", activeView === "std");
       }
       function setupPhotoViewRow(item) {
         var row = document.getElementById("itemPhotoViewRow");
@@ -3271,7 +3313,7 @@
         var cover = photos.length ? photos[0] : null;
         var hasRender = !!(cover && (cover.renderStoragePath || cover.renderUrl));
         row.hidden = !hasRender;
-        syncViewChips(true);
+        syncViewChips("clean");
         document.getElementById("viewCleanBtn").onclick = function () {
           if (!activeItem) return;
           var ps = itemPhotos(activeItem);
@@ -3280,7 +3322,7 @@
           itemPhoto.src = photoDisplayUrl(ps[0]);
           resolveRenderUrl(activeItem, itemPhoto);
           applyPhotoRotation(itemPhoto, ps[0], itemPhoto.dataset.view);
-          syncViewChips(true);
+          syncViewChips("clean");
         };
         document.getElementById("viewOriginalBtn").onclick = function () {
           if (!activeItem) return;
@@ -3289,11 +3331,165 @@
           itemPhoto.dataset.view = "original";
           itemPhoto.src = ps[0].url || photoDisplayUrl(ps[0]);
           applyPhotoRotation(itemPhoto, ps[0], itemPhoto.dataset.view);
-          syncViewChips(false);
+          syncViewChips("original");
         };
         document.getElementById("rotateLeftBtn").onclick = function () { rotatePhoto(-90); };
         document.getElementById("rotateRightBtn").onclick = function () { rotatePhoto(90); };
       }
+
+      // PC-58: Stage 3 standardization UI.
+      // The standardized image only appears when status === 'ready' (gates passed).
+      // Refresh is a deliberate action: explicit button + confirmation + cost disclosed.
+      function renderStandardizationUI(item) {
+        var std = item.standardization || {};
+        var status = std.status || null;
+        var statusLine = document.getElementById("stdStatusLine");
+        var actionsBox = document.getElementById("stdActions");
+        var note = document.getElementById("stdNote");
+        var genBtn = document.getElementById("stdGenerateBtn");
+        var refreshBtn = document.getElementById("stdRefreshBtn");
+        var stdChip = document.getElementById("viewStdBtn");
+        if (!statusLine || !actionsBox) return;
+
+        // Reset
+        statusLine.hidden = true;
+        actionsBox.hidden = true;
+        note.hidden = true;
+        genBtn.hidden = true;
+        refreshBtn.hidden = true;
+        if (stdChip) stdChip.hidden = true;
+
+        if (status === "processing") {
+          // Subtle, non-blocking indicator
+          statusLine.textContent = "Standardizing…";
+          statusLine.hidden = false;
+        } else if (status === "ready" && std.standardizedUrl) {
+          // Gated reveal: show the AI view chip + refresh option
+          if (stdChip) {
+            stdChip.hidden = false;
+            stdChip.onclick = function () {
+              if (!activeItem) return;
+              var s = (activeItem.standardization || {}).standardizedUrl;
+              if (!s) return;
+              itemPhoto.dataset.view = "std";
+              itemPhoto.src = s;
+              syncViewChips("std");
+            };
+          }
+          actionsBox.hidden = false;
+          note.textContent = "AI-generated view — colors and details are matched to your photo.";
+          note.hidden = false;
+          refreshBtn.hidden = false;
+        } else if (status === "already_clean") {
+          // Escape hatch for misattributed items
+          actionsBox.hidden = false;
+          note.textContent = "This one already looked like a clean product shot, so we skipped it.";
+          note.hidden = false;
+          genBtn.hidden = false;
+        } else if (status === "failed") {
+          actionsBox.hidden = false;
+          note.textContent = "The AI version didn't come out right. You can try again.";
+          note.hidden = false;
+          refreshBtn.hidden = false;
+        }
+        // 'pending' or no status: nothing shown (processing happens passively)
+      }
+
+      // PC-58: call the standardizeItem callable.
+      // opts: { feedback, force, acknowledgedWarning }
+      function callStandardize(itemId, opts) {
+        opts = opts || {};
+        var payload = { itemId: itemId };
+        if (opts.feedback) payload.feedback = opts.feedback;
+        if (opts.force) payload.force = true;
+        if (opts.acknowledgedWarning) payload.acknowledgedWarning = true;
+        return functions.httpsCallable("standardizeItem", { timeout: 300000 })(payload)
+          .then(function (res) { return res.data || {}; });
+      }
+
+      // PC-58: "Generate standardized view" CTA (already_clean escape hatch)
+      document.getElementById("stdGenerateBtn").addEventListener("click", function () {
+        if (!activeItem || !currentUser) return;
+        var btn = this;
+        if (!window.confirm("Generate an AI version of this piece? It costs about $0.03.")) return;
+        btn.disabled = true;
+        callStandardize(activeItem.id, { force: true }).then(function (data) {
+          btn.disabled = false;
+          if (data.needsWarningAck) {
+            openStdRefreshSheet(data);
+            return;
+          }
+          showToast("Generating… check back in a minute.");
+          // Refresh the item data to show processing state
+          if (activeItem) activeItem.standardization = { status: "processing" };
+          renderStandardizationUI(activeItem);
+        }).catch(function (err) {
+          btn.disabled = false;
+          showToast(friendlyError(err));
+        });
+      });
+
+      // PC-58: Refresh button opens the confirmation sheet (never accidental)
+      document.getElementById("stdRefreshBtn").addEventListener("click", function () {
+        if (!activeItem) return;
+        openStdRefreshSheet(null);
+      });
+
+      // PC-58: refresh confirmation sheet
+      var stdRefreshSheet = document.getElementById("stdRefreshSheet");
+      function openStdRefreshSheet(warningData) {
+        var warnBox = document.getElementById("stdExpenseWarning");
+        var warnText = document.getElementById("stdExpenseWarningText");
+        var intro = document.getElementById("stdRefreshIntro");
+        var goBtn = document.getElementById("stdRefreshGo");
+        document.getElementById("stdFeedbackInput").value = "";
+        if (warningData && warningData.needsWarningAck) {
+          // Expense warning: 10+ refreshes
+          warnBox.hidden = false;
+          warnText.textContent = "You've refreshed this piece " + warningData.refreshCount +
+            " times (about $" + warningData.estimatedCost + ").";
+          intro.textContent = "Continue anyway? It costs about $0.03 each time.";
+          goBtn.textContent = "Continue anyway ($0.03)";
+          goBtn.dataset.warningAck = "true";
+        } else {
+          warnBox.hidden = true;
+          intro.textContent = "This generates a new AI version of this piece. It costs about $0.03.";
+          goBtn.textContent = "Generate new version ($0.03)";
+          delete goBtn.dataset.warningAck;
+        }
+        openOverlay(stdRefreshSheet);
+      }
+      document.getElementById("stdRefreshClose").addEventListener("click", function () {
+        closeOverlay(stdRefreshSheet);
+      });
+      document.getElementById("stdRefreshCancel").addEventListener("click", function () {
+        closeOverlay(stdRefreshSheet);
+      });
+      document.getElementById("stdRefreshGo").addEventListener("click", function () {
+        if (!activeItem || !currentUser) return;
+        var btn = this;
+        var feedback = document.getElementById("stdFeedbackInput").value.trim();
+        var ackWarning = btn.dataset.warningAck === "true";
+        btn.disabled = true;
+        var opts = { force: true };
+        if (feedback) opts.feedback = feedback;
+        if (ackWarning) opts.acknowledgedWarning = true;
+        callStandardize(activeItem.id, opts).then(function (data) {
+          btn.disabled = false;
+          closeOverlay(stdRefreshSheet);
+          if (data.needsWarningAck) {
+            // Backend wants explicit ack — reopen with warning
+            openStdRefreshSheet(data);
+            return;
+          }
+          showToast("Generating… check back in a minute.");
+          if (activeItem) activeItem.standardization = { status: "processing" };
+          renderStandardizationUI(activeItem);
+        }).catch(function (err) {
+          btn.disabled = false;
+          showToast(friendlyError(err));
+        });
+      });
 
       function openItem(item) {
         activeItem = item;
@@ -3305,6 +3501,7 @@
         resolveRenderUrl(item, itemPhoto);
         applyPhotoRotation(itemPhoto, photos[0], itemPhoto.dataset.view);
         setupPhotoViewRow(item);
+        renderStandardizationUI(item); // PC-58: AI view chip, status, actions
         renderThumbs();
         var srcNote = document.getElementById("itemSourceNote");
         var cover0 = photos.length ? photos[0] : null;
