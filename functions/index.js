@@ -836,6 +836,157 @@ exports.planPacking = onCall(
   }
 );
 
+// PC-58: Stage 3 — Garment Image Standardization.
+// Callable: standardize a single wardrobe item.
+// Design: docs/sprints/sprint-26/PC-58-DESIGN.md
+const {
+  runFluxStandardization,
+  runQualityGates,
+  isAlreadyClean,
+  MAX_ATTEMPTS,
+  EXPENSE_WARNING_THRESHOLD,
+  STANDARDIZATION_COST_PER_RUN,
+} = require("./standardize");
+
+exports.standardizeItem = onCall(
+  {
+    region: "us-central1",
+    timeoutSeconds: 300,
+    memory: "1GiB",
+    maxInstances: 5,
+    secrets: ["FAL_API_KEY"],
+  },
+  async (request) => {
+    const correlationId = newCorrelationId();
+    const uid = request.auth ? request.auth.uid : null;
+    const start = Date.now();
+    const aiTracker = createAiTracker();
+    const recordUsage = makeUsageRecorder(getFirestore());
+    const usageBase = { correlationId, uid, feature: "standardizeItem", surface: "wardrobe", refId: null };
+    try {
+      if (!request.auth) {
+        fail("NOT_SIGNED_IN");
+      }
+      const data = request.data || {};
+      const itemId = typeof data.itemId === "string" ? data.itemId.trim() : "";
+      const feedback = typeof data.feedback === "string" ? data.feedback.trim().slice(0, 500) : "";
+      const force = data.force === true; // Manual override (CTA or refresh)
+      if (!itemId || itemId.length > 100) {
+        fail("BAD_REQUEST");
+      }
+      usageBase.refId = itemId;
+
+      const db = getFirestore();
+      const itemRef = db.collection("users").doc(uid).collection("items").doc(itemId);
+      const itemSnap = await itemRef.get();
+      if (!itemSnap.exists) {
+        fail("NOT_FOUND");
+      }
+      const item = itemSnap.data();
+      const std = item.standardization || {};
+
+      // Skip if already clean (unless forced via CTA)
+      if (std.status === "already_clean" && !force) {
+        return finish("standardizeItem", correlationId, uid, start, {
+          skipped: true,
+          reason: "already_clean",
+        });
+      }
+
+      // Expense warning check
+      const refreshCount = std.refreshCount || 0;
+      if (refreshCount >= EXPENSE_WARNING_THRESHOLD && !data.acknowledgedWarning) {
+        return finish("standardizeItem", correlationId, uid, start, {
+          needsWarningAck: true,
+          refreshCount,
+          estimatedCost: (refreshCount * STANDARDIZATION_COST_PER_RUN).toFixed(2),
+        });
+      }
+
+      // Check attempt limit
+      const attempts = std.attempts || 0;
+      if (attempts >= MAX_ATTEMPTS && !force) {
+        return finish("standardizeItem", correlationId, uid, start, {
+          failed: true,
+          reason: "max_attempts_reached",
+          attempts,
+        });
+      }
+
+      // Mark as processing
+      await itemRef.update({
+        "standardization.status": "processing",
+        "standardization.attempts": attempts + 1,
+        "standardization.refreshCount": feedback ? refreshCount + 1 : refreshCount,
+        "standardization.lastAttemptAt": new Date().toISOString(),
+      });
+
+      // Get the item's image URL
+      const photos = item.photos || [];
+      if (!photos.length || !photos[0].url) {
+        throw new Error("No photo URL on item");
+      }
+      const imageUrl = photos[0].url;
+      const falApiKey = process.env.FAL_API_KEY;
+      if (!falApiKey) {
+        throw new Error("FAL_API_KEY not configured");
+      }
+
+      // Run FLUX standardization
+      let outputUrl;
+      try {
+        outputUrl = await runFluxStandardization(imageUrl, falApiKey, feedback);
+      } catch (fluxErr) {
+        await itemRef.update({
+          "standardization.status": "failed",
+          "standardization.lastError": `flux_error: ${fluxErr.message.slice(0, 200)}`,
+        });
+        throw fluxErr;
+      }
+
+      // TODO: Download both images and run quality gates
+      // For v1, we trust the output and mark ready.
+      // Gates (Delta-E, geometry) will be wired in once the pixel
+      // analysis helpers are implemented in standardize.js.
+      //
+      // const inputBuffer = await downloadImage(imageUrl);
+      // const outputBuffer = await downloadImage(outputUrl);
+      // const gates = await runQualityGates(inputBuffer, outputBuffer);
+      // if (!gates.pass) { ... retry or mark failed ... }
+
+      // Upload the standardized image to the user's storage
+      const bucket = getStorage().bucket();
+      const outputBuffer = Buffer.from(await (await fetch(outputUrl)).arrayBuffer());
+      const stdPath = `users/${uid}/items/${itemId}/standardized.png`;
+      await bucket.file(stdPath).save(outputBuffer, { contentType: "image/png" });
+      const [stdUrl] = await bucket.file(stdPath).getSignedUrl({
+        action: "read",
+        expires: "2030-01-01",
+      });
+
+      // Mark ready
+      await itemRef.update({
+        "standardization.status": "ready",
+        "standardization.standardizedUrl": stdUrl,
+        "standardization.standardizedStoragePath": stdPath,
+        "standardization.completedAt": new Date().toISOString(),
+        "standardization.lastError": null,
+      });
+
+      await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: true });
+      return finish("standardizeItem", correlationId, uid, start, {
+        ready: true,
+        standardizedUrl: stdUrl,
+        attempts: attempts + 1,
+      });
+    } catch (err) {
+      if (!(err instanceof HttpsError) && !err.key) err.key = "STANDARDIZE_FAILED";
+      await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
+      boundary("standardizeItem", correlationId, uid, err);
+    }
+  }
+);
+
 // SPIKE harness (temporary — see ./spike.js; delete when the
 // image experiments close).
 const { spikeRunHandler } = require("./spike");
