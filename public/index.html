@@ -3423,7 +3423,7 @@
         } else {
           // No standardized photo yet: show Generate (one-time).
           actionsBox.hidden = false;
-          note.textContent = "Get a clean, standardized product shot of this piece.";
+          note.textContent = "Get a clean, standardized product shot of this piece. Takes about a minute — you can close this and come back.";
           note.hidden = false;
           genBtn.hidden = false;
         }
@@ -3442,24 +3442,32 @@
       }
 
       // PC-58: "Generate standardized view" button (first run or already_clean escape hatch)
+      // Bug fix 2026-10-31: show processing state IMMEDIATELY, don't wait for backend.
+      // The backend takes 30-60s (FLUX); the old code waited for .then() before updating UI.
       document.getElementById("stdGenerateBtn").addEventListener("click", function () {
         if (!activeItem || !currentUser) return;
         var btn = this;
-        if (!window.confirm("Generate an AI version of this piece? It costs about $0.03.")) return;
-        btn.disabled = true;
-        callStandardize(activeItem.id, { force: true }).then(function (data) {
-          btn.disabled = false;
+        var itemId = activeItem.id;
+        if (!window.confirm("Generate an AI version of this piece? It costs about $0.03. It takes about a minute — you can close this and come back.")) return;
+        // Show processing state immediately (optimistic)
+        activeItem.standardization = { status: "processing" };
+        renderStandardizationUI(activeItem);
+        showToast("Generating… this takes about a minute. You can close and come back.");
+        // Fire and forget — don't block UI on the backend
+        callStandardize(itemId, { force: true }).then(function (data) {
           if (data.needsWarningAck) {
             openStdRefreshSheet(data);
             return;
           }
-          showToast("Generating… check back in a minute.");
-          // Refresh the item data to show processing state
-          if (activeItem) activeItem.standardization = { status: "processing" };
-          renderStandardizationUI(activeItem);
+          // Backend done; refresh the item to show the result
+          // (The user may have navigated away; that's fine.)
         }).catch(function (err) {
-          btn.disabled = false;
           showToast(friendlyError(err));
+          // Reset to failed so the user can retry
+          if (activeItem && activeItem.id === itemId) {
+            activeItem.standardization = { status: "failed" };
+            renderStandardizationUI(activeItem);
+          }
         });
       });
 
