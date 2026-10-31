@@ -10649,8 +10649,23 @@
         imgEl.style.height = st.fit.h + "px";
         shopCropRenderBox();
       }
-      function openShopCropper(file) {
-        if (!currentUser) return;
+      // Generic crop entry: the same crop UX serves the shop
+      // flow and the outfit-photo flow (founder ask 2026-10-30).
+      // opts: {title, hint, filename, onConfirm(file),
+      // onCancel()}. The shop wrapper below preserves the
+      // original behavior exactly.
+      var cropOnConfirm = null;
+      var cropOnCancel = null;
+      var cropOutName = "crop.jpg";
+      function startCropper(file, opts) {
+        if (!currentUser || !file) return;
+        cropOnConfirm = opts.onConfirm;
+        cropOnCancel = opts.onCancel || function () {};
+        cropOutName = opts.filename || "crop.jpg";
+        document.getElementById("shopCropTitle").textContent = opts.title || "Crop photo";
+        var hintEl = document.getElementById("shopCropHint");
+        if (opts.hint) { hintEl.textContent = opts.hint; hintEl.hidden = false; }
+        else { hintEl.hidden = true; }
         var url = URL.createObjectURL(file);
         var img = new Image();
         img.onload = function () {
@@ -10665,8 +10680,30 @@
           setShopCropMode("preview");
           window.requestAnimationFrame(layoutShopCropStage);
         };
-        img.onerror = function () { URL.revokeObjectURL(url); handleShopCheckFile(file); };
+        img.onerror = function () {
+          URL.revokeObjectURL(url);
+          var cb = cropOnConfirm; cropOnConfirm = null; cropOnCancel = null;
+          if (cb) cb(file);
+        };
         img.src = url;
+      }
+      function openShopCropper(file) {
+        startCropper(file, {
+          title: "Shop check photo",
+          hint: "This photo goes to the check as-is. Crop only if other clothes in the shot could confuse the verdict.",
+          filename: "shop-crop.jpg",
+          onConfirm: handleShopCheckFile,
+          onCancel: function () { pendingShopTripId = null; },
+        });
+      }
+      function openOutfitCropper(file) {
+        startCropper(file, {
+          title: "Outfit photo",
+          hint: "Crop to just the outfit if there's extra background.",
+          filename: "outfit-crop.jpg",
+          onConfirm: handleOutfitParseFile,
+          onCancel: function () {},
+        });
       }
       function closeShopCropper() {
         if (shopCrop && shopCrop.url) URL.revokeObjectURL(shopCrop.url);
@@ -10738,12 +10775,13 @@
         });
         document.getElementById("shopCropUse").addEventListener("click", function () {
           var st = shopCrop; if (!st) return;
+          var cb = cropOnConfirm; cropOnConfirm = null; cropOnCancel = null;
           var r = cropRectPixels(st.box, st.iw, st.ih);
           // Full frame selected: the original file flows untouched.
           if (r.sx <= 0 && r.sy <= 0 && r.sw >= st.iw && r.sh >= st.ih) {
             var f0 = st.file;
             closeShopCropper();
-            handleShopCheckFile(f0);
+            if (cb) cb(f0);
             return;
           }
           var scale = Math.min(1, 1600 / Math.max(r.sw, r.sh));
@@ -10755,25 +10793,27 @@
           fullImg.onload = function () {
             ctx.drawImage(fullImg, r.sx, r.sy, r.sw, r.sh, 0, 0, canvas.width, canvas.height);
             canvas.toBlob(function (blob) {
-              var f = blob ? new File([blob], "shop-crop.jpg", { type: "image/jpeg" }) : st.file;
+              var f = blob ? new File([blob], cropOutName, { type: "image/jpeg" }) : st.file;
               closeShopCropper();
-              handleShopCheckFile(f);
+              if (cb) cb(f);
             }, "image/jpeg", 0.9);
           };
-          fullImg.onerror = function () { var f = st.file; closeShopCropper(); handleShopCheckFile(f); };
+          fullImg.onerror = function () { var f = st.file; closeShopCropper(); if (cb) cb(f); };
           fullImg.src = st.url;
         });
         document.getElementById("shopCropFull").addEventListener("click", function () {
           var st = shopCrop; if (!st) return;
+          var cb = cropOnConfirm; cropOnConfirm = null; cropOnCancel = null;
           var f = st.file;
           closeShopCropper();
-          handleShopCheckFile(f);
+          if (cb) cb(f);
         });
         function abandonCrop() {
           // A cancel is an abandon: the armed trip tag dies
-          // here, same as the sheet's Cancel.
-          pendingShopTripId = null;
+          // here for the shop flow, same as the sheet's Cancel.
+          var cb = cropOnCancel; cropOnConfirm = null; cropOnCancel = null;
           closeShopCropper();
+          if (cb) cb();
         }
         document.getElementById("shopCropClose").addEventListener("click", abandonCrop);
         document.getElementById("shopCropOverlay").addEventListener("click", function (e) {
@@ -11589,12 +11629,14 @@
         discardDraft(outfitParseState.parseId, true);
       });
       document.getElementById("outfitParseInput").addEventListener("change", function () {
-        handleOutfitParseFile(this.files && this.files[0]);
+        var file = this.files && this.files[0];
+        this.value = "";
+        if (file) openOutfitCropper(file);
       });
       document.getElementById("outfitParseInputCamera").addEventListener("change", function () {
         var file = this.files && this.files[0];
         this.value = "";
-        if (file) handleOutfitParseFile(file);
+        if (file) openOutfitCropper(file);
       });
       document.getElementById("builderClose").addEventListener("click", closeBuilder);
       document.getElementById("builderSave").addEventListener("click", function () {
