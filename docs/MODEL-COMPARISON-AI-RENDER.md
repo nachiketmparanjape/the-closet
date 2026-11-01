@@ -44,7 +44,11 @@ FLUX Kontext sees short sleeves in the input cutout but generates long sleeves. 
 2. "Short-sleeve" isn't weighted heavily enough in the prompt
 3. The model needs the instruction repeated or emphasized
 
-**Next steps:** Try stronger prompt phrasing for sleeves before switching models.
+**RESOLVED (2026-11-01):** Tested two stronger phrasings — both worked:
+- V2 (emphatic): "CRITICAL: This shirt has SHORT sleeves ending above the elbow. You MUST preserve the short sleeves. Do NOT generate long sleeves." ✅
+- V3 (repeated): "Short-sleeve shirt. This is a short-sleeve shirt with sleeves ending above the elbow. Keep the short sleeves exactly as shown in the input." ✅
+
+The fix: use CRITICAL/MUST/Do NOT pattern instead of the weak "Sleeves: short-sleeve." Now in `buildFluxPrompt`.
 
 ## Decision (2026-11-01)
 **Stick with FLUX Kontext.** Fix the sleeve issue via prompt engineering, not model switching. Print preservation is non-negotiable.
