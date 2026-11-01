@@ -2825,7 +2825,16 @@
 
       function itemDisplayUrl(item) {
         var photos = itemPhotos(item || {});
-        return photos.length ? photoDisplayUrl(photos[0]) : "";
+        if (!photos.length) return "";
+        // PC-58 (2026-11-01): prefer AI render, then cutout, then original.
+        // The AI standardized view replaces the thumbnail once available.
+        var byType = {};
+        for (var i = 0; i < photos.length; i++) {
+          var t = (photos[i] && photos[i].type) || "unknown";
+          if (!byType[t]) byType[t] = photos[i];
+        }
+        var preferred = byType["standardized"] || byType["cutout"] || photos[0];
+        return photoDisplayUrl(preferred);
       }
 
       // PC-34: ask the server to extract a clean render of one saved

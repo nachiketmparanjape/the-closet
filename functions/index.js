@@ -847,6 +847,12 @@ const {
   EXPENSE_WARNING_THRESHOLD,
   STANDARDIZATION_COST_PER_RUN,
 } = require("./standardize");
+const {
+  createFalSegmentation,
+  getFalSegmentation,
+  fetchMaskBuffer,
+} = require("./sam-fal");
+const { maskToCutout } = require("./sam");
 
 exports.standardizeItem = onCall(
   {
@@ -962,10 +968,56 @@ exports.standardizeItem = onCall(
       // Upload the standardized image to the user's storage.
       // Note: getSignedUrl requires iam.serviceAccounts.signBlob which the
       // function service account lacks. Use public URL instead.
+      //
+      // PC-58 transparent background (2026-11-01): FLUX outputs on white.
+      // Run SAM 3 on the output to cut out the garment → transparent PNG
+      // that blends with the app's dark background. Extra $0.005.
       const bucket = getStorage().bucket();
-      const outputBuffer = Buffer.from(await (await fetch(outputUrl)).arrayBuffer());
+      const fluxBuffer = Buffer.from(await (await fetch(outputUrl)).arrayBuffer());
+      
+      let standardizedBuffer = fluxBuffer;
+      let cutoutNote = "";
+      try {
+        console.log(`[standardizeItem] Running SAM 3 on FLUX output for transparency...`);
+        const seg = await createFalSegmentation({
+          apiKey: falApiKey,
+          imageBuffer: fluxBuffer,
+          filename: "flux-output.png",
+          prompt: "the garment",
+          fetchImpl: fetch,
+        });
+        let maskUrl = null;
+        for (let i = 0; i < 24; i++) { // 24 * 5s = 120s max
+          await new Promise(r => setTimeout(r, 5000));
+          const segRes = await getFalSegmentation({
+            apiKey: falApiKey,
+            predictionId: seg.predictionId,
+            statusUrl: seg.statusUrl,
+            responseUrl: seg.responseUrl,
+            fetchImpl: fetch,
+          });
+          if (segRes.status === "succeeded" && segRes.output?.pred_masks?.[0]) {
+            maskUrl = segRes.output.pred_masks[0].url;
+            break;
+          }
+          if (segRes.status === "failed") throw new Error("SAM 3 failed: " + segRes.error);
+        }
+        if (maskUrl) {
+          const maskBuffer = await fetchMaskBuffer({ url: maskUrl, fetchImpl: fetch });
+          standardizedBuffer = await maskToCutout({ imageBuffer: fluxBuffer, maskBuffer });
+          console.log(`[standardizeItem] SAM 3 cutout done, ${standardizedBuffer.length} bytes`);
+        } else {
+          cutoutNote = " (SAM 3 timed out, using white background)";
+          console.log(`[standardizeItem] SAM 3 timed out, falling back to white background`);
+        }
+      } catch (samErr) {
+        // Non-fatal: fall back to the white-background FLUX output
+        cutoutNote = " (cutout failed, using white background)";
+        console.log(`[standardizeItem] SAM 3 failed: ${samErr.message}, using white background`);
+      }
+      
       const stdPath = `users/${uid}/items/${itemId}/standardized.png`;
-      await bucket.file(stdPath).save(outputBuffer, { contentType: "image/png" });
+      await bucket.file(stdPath).save(standardizedBuffer, { contentType: "image/png" });
       await bucket.file(stdPath).makePublic();
       const stdUrl = `https://storage.googleapis.com/${bucket.name}/${stdPath}`;
 

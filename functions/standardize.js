@@ -12,7 +12,7 @@
  * Design: docs/sprints/sprint-26/PC-58-DESIGN.md
  */
 
-const STANDARDIZATION_COST_PER_RUN = 0.025; // USD, fal-ai/flux-kontext/dev
+const STANDARDIZATION_COST_PER_RUN = 0.03; // USD: FLUX $0.025 + SAM 3 cutout $0.005 (2026-11-01)
 const MAX_ATTEMPTS = 3;
 const DELTA_E_THRESHOLD = 15; // Color fidelity gate
 const EXPENSE_WARNING_THRESHOLD = 10; // Refreshes before warning
