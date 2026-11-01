@@ -3499,6 +3499,11 @@
         var intro = document.getElementById("stdRefreshIntro");
         var goBtn = document.getElementById("stdRefreshGo");
         document.getElementById("stdFeedbackInput").value = "";
+        goBtn.disabled = false; // Reset from any previous stuck state (bug fix 2026-10-31)
+        // Store item ID for robust click handling
+        if (activeItem && activeItem.id) {
+          goBtn.setAttribute("data-item-id", activeItem.id);
+        }
         if (warningData && warningData.needsWarningAck) {
           // Expense warning: 10+ refreshes
           warnBox.hidden = false;
@@ -3522,15 +3527,20 @@
         closeOverlay(stdRefreshSheet);
       });
       document.getElementById("stdRefreshGo").addEventListener("click", function () {
-        if (!activeItem || !currentUser) return;
         var btn = this;
+        // Use data-item-id (set when sheet opens) with activeItem fallback
+        var itemId = btn.getAttribute("data-item-id") || (activeItem && activeItem.id);
+        if (!itemId || !currentUser) {
+          showToast("Couldn't identify this piece. Try closing and reopening it.");
+          return;
+        }
         var feedback = document.getElementById("stdFeedbackInput").value.trim();
         var ackWarning = btn.dataset.warningAck === "true";
         btn.disabled = true;
         var opts = { force: true };
         if (feedback) opts.feedback = feedback;
         if (ackWarning) opts.acknowledgedWarning = true;
-        callStandardize(activeItem.id, opts).then(function (data) {
+        callStandardize(itemId, opts).then(function (data) {
           btn.disabled = false;
           closeOverlay(stdRefreshSheet);
           if (data.needsWarningAck) {
