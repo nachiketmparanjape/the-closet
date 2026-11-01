@@ -21,8 +21,15 @@ const FLUX_PROMPT = 'Transform this garment photo into a professional e-commerce
 
 /**
  * Build the FLUX prompt with garment attributes for better fidelity.
- * The item's known attributes (name, category, colors, etc.) give the model
+ * The item's known attributes (name, category, etc.) give the model
  * semantic context beyond just the image.
+ *
+ * NOTE (2026-10-31, founder feedback): Do NOT pass visual attributes
+ * (colors, pattern) as text. The model is looking at the image — it can
+ * judge colors/patterns more accurately than our text labels. A text label
+ * like "black" can anchor the model and override subtle visual variations.
+ * Only pass semantic attributes (what the thing IS) that the image alone
+ * might not convey clearly.
  *
  * @param {object} item - The Firestore item (plain object from Admin SDK)
  * @param {string} feedback - Optional user feedback
@@ -35,11 +42,9 @@ function buildFluxPrompt(item, feedback = '') {
   const name = item.name || item.shortName || ai.name || '';
   const category = item.category || ai.category || '';
   const subtype = ai.subtype || '';
-  const colors = Array.isArray(ai.colors) ? ai.colors.filter(Boolean) : [];
-  const pattern = ai.pattern || '';
   const description = ai.description || '';
   
-  // Garment identity
+  // Garment identity (semantic — helps the model understand what it's looking at)
   const identity = [];
   if (name) identity.push(name);
   else if (subtype) identity.push(subtype);
@@ -50,17 +55,7 @@ function buildFluxPrompt(item, feedback = '') {
     parts.push(`The garment is: ${identity.join(' ')}.`);
   }
   
-  // Colors (helps with color fidelity)
-  if (colors.length) {
-    parts.push(`Its colors are: ${colors.join(', ')}.`);
-  }
-  
-  // Pattern (if not solid)
-  if (pattern && pattern.toLowerCase() !== 'solid' && pattern.toLowerCase() !== 'unknown') {
-    parts.push(`Pattern: ${pattern}.`);
-  }
-  
-  // Description (truncated)
+  // Description (semantic details — fabric, construction, etc.)
   if (description) {
     parts.push(`Details: ${description.slice(0, 200)}.`);
   }
