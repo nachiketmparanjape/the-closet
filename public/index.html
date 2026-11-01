@@ -3583,12 +3583,10 @@
             };
           }
           actionsBox.hidden = false;
-          // Distinguish AI-generated from already-clean uploads
           var wasAiGenerated = std.status === "ready";
-          note.textContent = wasAiGenerated
-            ? "AI-generated view — colors and details are matched to your photo."
-            : "This one already looked like a clean product shot, so we skipped it.";
-          note.hidden = false;
+          // PC-58 UI declutter (2026-11-01): Badge shows the type ("✨ AI Render",
+          // "Cutout", "Original") — the descriptive note is redundant. Hide it.
+          note.hidden = true;
           // If it was already clean, offer Generate (escape hatch).
           // If AI-generated, offer Refresh.
           if (wasAiGenerated || status === "failed") {
