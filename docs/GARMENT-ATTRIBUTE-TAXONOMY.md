@@ -28,7 +28,7 @@ Color/pattern are judged by the model from the image (never passed as text).
 ### Shirt (button-up)
 | Attribute | Values | Prompt? | Notes |
 |-----------|--------|---------|-------|
-| sleeve_length | short, long, rolled | ✅ YES | |
+| sleeve_length | short, long | ✅ YES | |
 | fit | slim, regular, relaxed, oversized | ✅ YES | |
 | collar | button-down, spread, mandarin, camp | ✅ YES | |
 | formality | casual, formal | ✅ YES | Affects fabric drape |
