@@ -2807,7 +2807,8 @@
         var image = document.createElement("img");
         image.src = itemDisplayUrl(item);
         resolveRenderUrl(item, image);
-        applyPhotoRotation(image, itemPhotos(item)[0], "clean", true);
+        // PC-58 (2026-11-01): Apply rotation from the displayed photo, not photos[0]
+        applyPhotoRotation(image, itemDisplayPhoto(item), "clean", true);
         image.alt = item.name || "Wardrobe item";
         image.loading = "lazy";
         imageWrap.appendChild(image);
@@ -2906,6 +2907,18 @@
         }
         var preferred = byType["standardized"] || byType["cutout"] || photos[0];
         return photoDisplayUrl(preferred);
+      }
+      // PC-58 (2026-11-01): Returns the photo object that itemDisplayUrl uses,
+      // so rotation can be applied to the correct photo (not just photos[0]).
+      function itemDisplayPhoto(item) {
+        var photos = itemPhotos(item || {});
+        if (!photos.length) return null;
+        var byType = {};
+        for (var i = 0; i < photos.length; i++) {
+          var t = (photos[i] && photos[i].type) || "unknown";
+          if (!byType[t]) byType[t] = photos[i];
+        }
+        return byType["standardized"] || byType["cutout"] || photos[0];
       }
 
       // PC-34: ask the server to extract a clean render of one saved
@@ -3826,6 +3839,9 @@
           this.textContent = "Edit photos";
         }
       });
+      // Rotate buttons (moved from setupPhotoViewRow — that fn is deprecated)
+      document.getElementById("rotateLeftBtn").onclick = function () { rotatePhoto(-90); };
+      document.getElementById("rotateRightBtn").onclick = function () { rotatePhoto(90); };
 
       // PC-58: refresh confirmation sheet
       var stdRefreshSheet = document.getElementById("stdRefreshSheet");
@@ -9335,7 +9351,8 @@
             var photos = it ? itemPhotos(it) : [];
             if (photos.length) {
               var img = document.createElement("img");
-              img.src = photoDisplayUrl(photos[0]);
+              // PC-58 (2026-11-01): Outfit cards show AI render by default
+              img.src = itemDisplayUrl(it);
               resolveRenderUrl(it, img);
               applyPhotoRotation(img, itemPhotos(it)[0], "clean");
               img.alt = "";

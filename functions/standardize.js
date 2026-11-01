@@ -17,7 +17,7 @@ const MAX_ATTEMPTS = 3;
 const DELTA_E_THRESHOLD = 15; // Color fidelity gate
 const EXPENSE_WARNING_THRESHOLD = 10; // Refreshes before warning
 
-const FLUX_PROMPT = 'Transform this garment photo into a professional e-commerce product photograph: complete whole garment with proper standardized shape, centered on a pure white background, front-facing, even studio lighting. Preserve the EXACT colors, patterns, prints, graphics, and construction details exactly as shown. Do not redesign the garment. Do not add text, logos, labels, or tags.';
+const FLUX_PROMPT = 'Transform this garment photo into a professional e-commerce product photograph: complete whole garment with proper standardized shape, centered on a pure white background, front-facing, even studio lighting. Preserve the EXACT colors, patterns, prints, graphics, and construction details exactly as shown. Do not redesign the garment. Do not add text, logos, labels, or tags. CRITICAL: Copy any graphic print, logo, or pattern EXACTLY as shown in the input image, pixel-for-pixel. Do NOT redraw, reinterpret, "correct", or redesign the graphic — even if it appears upside down, sideways, faded, or unusual. If the graphic is upside down in the input, keep it upside down. Never invent a new graphic.';
 
 /**
  * Build the FLUX prompt with garment attributes for better fidelity.
