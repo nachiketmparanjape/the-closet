@@ -64,12 +64,17 @@ function buildFluxPrompt(item, feedback = '') {
     parts.push(`The garment is: ${identity.join(' ')}.`);
   }
   
-  // Sleeve length — CRITICAL: model defaults to long if unspecified
+  // Sleeve length — CRITICAL: model defaults to long if unspecified.
+  // Use emphatic phrasing (2026-11-01): "Sleeves: short-sleeve." is too weak,
+  // the model ignores it. The CRITICAL/MUST/Do NOT pattern works.
   if (sleeveLength && sleeveLength.toLowerCase() !== 'unknown') {
-    const sleeveText = sleeveLength === 'short' ? 'short-sleeve'
-      : sleeveLength === 'long' ? 'long-sleeve'
-      : sleeveLength;
-    parts.push(`Sleeves: ${sleeveText}.`);
+    if (sleeveLength === 'short') {
+      parts.push('CRITICAL: This garment has SHORT sleeves ending above the elbow. You MUST preserve the short sleeves. Do NOT generate long sleeves.');
+    } else if (sleeveLength === 'long') {
+      parts.push('This garment has LONG sleeves. Preserve the long sleeves.');
+    } else if (sleeveLength === 'sleeveless') {
+      parts.push('This garment is SLEEVELESS. Do NOT add sleeves.');
+    }
   }
   
   // Fit (v1: pass through ai.fit; proper taxonomy in #132)
