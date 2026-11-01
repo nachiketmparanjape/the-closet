@@ -157,10 +157,19 @@
         max-height: 100% !important;
         border-radius: 0 !important;
         margin: 0 !important;
+        box-sizing: border-box !important;
+        overflow-x: hidden !important;
       }
       #itemOverlay {
         padding: 0 !important;
         align-items: stretch !important;
+        justify-items: stretch !important;
+        overflow-x: hidden !important;
+      }
+      /* Prevent any child from causing horizontal scroll */
+      #itemOverlay .modal * {
+        max-width: 100% !important;
+        box-sizing: border-box !important;
       }
     }
     /* 2026-11-01: No horizontal scroll on hero buttons (stack on narrow screens) */
