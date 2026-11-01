@@ -139,6 +139,15 @@
     .view-chip { border: 1px solid var(--line); background: none; color: var(--muted); border-radius: 999px; padding: 5px 12px; font-size: 12.5px; cursor: pointer; }
     .view-chip.is-active { color: var(--ink); border-color: var(--brass, #a87c1c); font-weight: 600; }
     .view-chip:disabled { opacity: .55; cursor: default; }
+    /* PC-58 UI declutter (2026-11-01): Instagram-style dots replace chips+thumbnails */
+    .photo-dots { display: flex; gap: 8px; justify-content: center; align-items: center; margin: 10px 0 6px; }
+    .photo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line); border: none; padding: 0; cursor: pointer; transition: all 0.2s; }
+    .photo-dot.active { background: var(--brass, #a87c1c); width: 24px; border-radius: 4px; }
+    .swipe-hint { text-align: center; color: var(--muted); font-size: 12px; margin: 0 0 8px; opacity: 0.7; }
+    .photo-badge { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); color: #fff; font-size: 12px; padding: 4px 10px; border-radius: 20px; pointer-events: none; }
+    .photo-badge.ai { background: rgba(168,124,28,0.9); color: #fff; }
+    .ai-badge-btn { position: absolute; top: 10px; right: 10px; background: rgba(168,124,28,0.9); color: #fff; border: none; width: 32px; height: 32px; border-radius: 50%; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .item-photo-wrap { position: relative; }
     /* PC-58: standardization status + actions. Subtle, Warm Editorial. */
     .std-status { font-size: 13px; color: var(--muted); margin: -8px 0 12px; font-style: italic; }
     .std-actions { margin: 0 0 14px; }
@@ -1504,10 +1513,18 @@
       <div class="modal-body">
         <div class="item-photo-wrap">
           <img class="item-photo" id="itemPhoto" alt="Wardrobe piece" />
+          <div class="photo-badge" id="photoBadge" hidden></div>
+          <button class="ai-badge-btn" id="aiBadgeBtn" hidden title="AI render options">✨</button>
           <div class="photo-rotate-overlay">
             <button class="rotate-btn" id="rotateLeftBtn" type="button" title="Rotate left 90 degrees" aria-label="Rotate left 90 degrees">↶</button>
             <button class="rotate-btn" id="rotateRightBtn" type="button" title="Rotate right 90 degrees" aria-label="Rotate right 90 degrees">↷</button>
           </div>
+        </div>
+        <!-- PC-58 UI declutter (2026-11-01): Instagram-style dots replace chips+thumbnails -->
+        <div class="photo-dots" id="photoDots" hidden></div>
+        <p class="swipe-hint" id="swipeHint" hidden>Swipe or tap dots to view all photos</p>
+        <div class="edit-link" style="text-align:center; margin:4px 0 8px;">
+          <button id="editPhotosBtn" type="button" style="background:none; border:none; color:var(--muted); font-size:13px; text-decoration:underline; cursor:pointer;">Edit photos</button>
         </div>
         <div class="photo-view-row" id="itemPhotoViewRow" hidden>
           <button class="view-chip is-active" id="viewCleanBtn" type="button">Clean view</button>
@@ -3308,12 +3325,103 @@
       }
       function syncViewChips(activeView) {
         // activeView: "clean" | "original" | "std"
+        // DEPRECATED (2026-11-01): Chips replaced by dots. Kept for backward compat.
         var c = document.getElementById("viewCleanBtn");
         var o = document.getElementById("viewOriginalBtn");
         var s = document.getElementById("viewStdBtn");
         if (c) c.classList.toggle("is-active", activeView === "clean");
         if (o) o.classList.toggle("is-active", activeView === "original");
         if (s) s.classList.toggle("is-active", activeView === "std");
+      }
+      // PC-58 UI declutter (2026-11-01): Instagram-style dots replace chips+thumbnails
+      var currentPhotoIndex = 0;
+      function getPhotoLabel(photo) {
+        var t = (photo && photo.type) || "";
+        if (t === "standardized") return "✨ AI Render";
+        if (t === "cutout") return "Cutout";
+        if (t === "actual") return "Original";
+        return "Photo";
+      }
+      function showPhotoAtIndex(item, index) {
+        var photos = itemPhotos(item);
+        if (!photos.length) return;
+        index = Math.max(0, Math.min(index, photos.length - 1));
+        currentPhotoIndex = index;
+        var photo = photos[index];
+        itemPhoto.src = photoDisplayUrl(photo);
+        itemPhoto.dataset.view = photo.type || "unknown";
+        itemPhoto.dataset.index = index;
+        applyPhotoRotation(itemPhoto, photo, itemPhoto.dataset.view);
+        // Update dots
+        var dotsWrap = document.getElementById("photoDots");
+        if (dotsWrap) {
+          var dots = dotsWrap.querySelectorAll(".photo-dot");
+          for (var i = 0; i < dots.length; i++) {
+            dots[i].classList.toggle("active", i === index);
+          }
+        }
+        // Update badge
+        var badge = document.getElementById("photoBadge");
+        var aiBtn = document.getElementById("aiBadgeBtn");
+        if (badge) {
+          var label = getPhotoLabel(photo);
+          badge.textContent = label;
+          badge.hidden = false;
+          badge.classList.toggle("ai", photo.type === "standardized");
+        }
+        if (aiBtn) {
+          // Show ✨ button only on AI render, or if no AI render exists yet (to generate one)
+          var hasStandardized = photos.some(function(p) { return p && p.type === "standardized"; });
+          aiBtn.hidden = !(photo.type === "standardized" || !hasStandardized);
+        }
+      }
+      function setupPhotoDots(item) {
+        var dotsWrap = document.getElementById("photoDots");
+        var hint = document.getElementById("swipeHint");
+        if (!dotsWrap) return;
+        var photos = itemPhotos(item);
+        dotsWrap.innerHTML = "";
+        if (photos.length <= 1) {
+          dotsWrap.hidden = true;
+          if (hint) hint.hidden = true;
+          return;
+        }
+        dotsWrap.hidden = false;
+        if (hint) hint.hidden = false;
+        for (var i = 0; i < photos.length; i++) {
+          (function(idx) {
+            var dot = document.createElement("button");
+            dot.className = "photo-dot" + (idx === 0 ? " active" : "");
+            dot.type = "button";
+            dot.setAttribute("aria-label", "View photo " + (idx + 1));
+            dot.onclick = function() {
+              if (activeItem) showPhotoAtIndex(activeItem, idx);
+            };
+            dotsWrap.appendChild(dot);
+          })(i);
+        }
+        currentPhotoIndex = 0;
+        // Swipe support
+        var photoWrap = document.querySelector(".item-photo-wrap");
+        var touchStartX = 0;
+        if (photoWrap) {
+          photoWrap.addEventListener("touchstart", function(e) {
+            touchStartX = e.touches[0].clientX;
+          }, {passive: true});
+          photoWrap.addEventListener("touchend", function(e) {
+            if (!activeItem) return;
+            var touchEndX = e.changedTouches[0].clientX;
+            var diff = touchStartX - touchEndX;
+            var photos = itemPhotos(activeItem);
+            if (Math.abs(diff) > 50) { // swipe threshold
+              if (diff > 0 && currentPhotoIndex < photos.length - 1) {
+                showPhotoAtIndex(activeItem, currentPhotoIndex + 1); // swipe left → next
+              } else if (diff < 0 && currentPhotoIndex > 0) {
+                showPhotoAtIndex(activeItem, currentPhotoIndex - 1); // swipe right → prev
+              }
+            }
+          }, {passive: true});
+        }
       }
       function setupPhotoViewRow(item) {
         var row = document.getElementById("itemPhotoViewRow");
@@ -3499,6 +3607,31 @@
         if (!activeItem) return;
         openStdRefreshSheet(null);
       });
+      // PC-58 UI declutter (2026-11-01): AI badge button opens Generate/Refresh
+      document.getElementById("aiBadgeBtn").addEventListener("click", function () {
+        if (!activeItem) return;
+        var photos = itemPhotos(activeItem);
+        var hasStandardized = photos.some(function(p) { return p && p.type === "standardized"; });
+        if (hasStandardized) {
+          openStdRefreshSheet(null); // Has AI render → offer refresh
+        } else {
+          // No AI render yet → trigger generate (same as stdGenerateBtn)
+          document.getElementById("stdGenerateBtn").click();
+        }
+      });
+      // PC-58 UI declutter: Edit photos toggles thumbnail strip (with delete X)
+      document.getElementById("editPhotosBtn").addEventListener("click", function () {
+        var strip = document.getElementById("thumbStrip");
+        if (!strip) return;
+        if (strip.hidden) {
+          strip.hidden = false;
+          renderThumbs();
+          this.textContent = "Done editing";
+        } else {
+          strip.hidden = true;
+          this.textContent = "Edit photos";
+        }
+      });
 
       // PC-58: refresh confirmation sheet
       var stdRefreshSheet = document.getElementById("stdRefreshSheet");
@@ -3570,14 +3703,34 @@
         activeItem = item;
         itemTitle.textContent = item.shortName || item.name || "Untitled piece";
         var photos = itemPhotos(item);
-        itemPhoto.dataset.view = "clean";
-        itemPhoto.src = photos.length ? photoDisplayUrl(photos[0]) : "";
+        // PC-58 UI declutter (2026-11-01): Use dots instead of chips+thumbnails.
+        // Show the preferred photo (AI > cutout > original) via itemDisplayUrl.
+        itemPhoto.src = itemDisplayUrl(item);
         itemPhoto.alt = item.name || "Wardrobe item";
-        resolveRenderUrl(item, itemPhoto);
-        applyPhotoRotation(itemPhoto, photos[0], itemPhoto.dataset.view);
-        setupPhotoViewRow(item);
-        renderStandardizationUI(item); // PC-58: AI view chip, status, actions
-        renderThumbs();
+        itemPhoto.dataset.view = "dots";
+        itemPhoto.dataset.index = 0;
+        var firstPhoto = photos.length ? photos[0] : null;
+        // Find the preferred photo for rotation
+        var displayPhotos = itemPhotos(item);
+        var prefPhoto = displayPhotos[0];
+        for (var pi = 0; pi < displayPhotos.length; pi++) {
+          if (displayPhotos[pi] && displayPhotos[pi].type === "standardized") { prefPhoto = displayPhotos[pi]; break; }
+        }
+        if (!prefPhoto) {
+          for (var pj = 0; pj < displayPhotos.length; pj++) {
+            if (displayPhotos[pj] && displayPhotos[pj].type === "cutout") { prefPhoto = displayPhotos[pj]; break; }
+          }
+        }
+        applyPhotoRotation(itemPhoto, prefPhoto, "dots");
+        setupPhotoDots(item);
+        // Hide legacy UI (chips, thumbnails) — dots replace them
+        var legacyRow = document.getElementById("itemPhotoViewRow");
+        if (legacyRow) legacyRow.hidden = true;
+        var thumbStrip = document.getElementById("thumbStrip");
+        if (thumbStrip) thumbStrip.hidden = true;
+        // Show the first photo via dots
+        if (photos.length) showPhotoAtIndex(item, 0);
+        renderStandardizationUI(item); // PC-58: AI badge, status, actions
         var srcNote = document.getElementById("itemSourceNote");
         var cover0 = photos.length ? photos[0] : null;
         if (cover0 && cover0.source === "retail") {
