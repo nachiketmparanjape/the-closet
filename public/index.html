@@ -3330,8 +3330,19 @@
         if (!activeItem || !currentUser) return;
         var ps = itemPhotos(activeItem);
         if (!ps.length) return;
-        var cover = ps[0];
-        var view = itemPhoto.dataset.view === "original" ? "original" : "clean";
+        // PC-58 UI declutter (2026-11-01): Use currentPhotoIndex for dots UI,
+        // not ps[0]. The old chips UI always showed ps[0].
+        var idx = (typeof currentPhotoIndex === "number") ? currentPhotoIndex : 0;
+        idx = Math.max(0, Math.min(idx, ps.length - 1));
+        var cover = ps[idx];
+        // Determine view from photo type (dots UI) or dataset.view (legacy)
+        var photoType = cover && cover.type;
+        var view;
+        if (itemPhoto.dataset.view === "dots") {
+          view = (photoType === "actual") ? "original" : "clean";
+        } else {
+          view = itemPhoto.dataset.view === "original" ? "original" : "clean";
+        }
         var field = view === "original" ? "rotation" : "renderRotation";
         var prev = photoRotationDeg(cover, view);
         var next = (prev + dir + 360) % 360;
@@ -3382,9 +3393,11 @@
         currentPhotoIndex = index;
         var photo = photos[index];
         itemPhoto.src = photoDisplayUrl(photo);
-        itemPhoto.dataset.view = photo.type || "unknown";
+        itemPhoto.dataset.view = "dots";
         itemPhoto.dataset.index = index;
-        applyPhotoRotation(itemPhoto, photo, itemPhoto.dataset.view);
+        // Rotation: map photo type to view (actual→original, others→clean)
+        var rotView = (photo && photo.type === "actual") ? "original" : "clean";
+        applyPhotoRotation(itemPhoto, photo, rotView);
         // Update dots
         var dotsWrap = document.getElementById("photoDots");
         if (dotsWrap) {
