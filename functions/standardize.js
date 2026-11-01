@@ -44,6 +44,14 @@ function buildFluxPrompt(item, feedback = '') {
   const subtype = ai.subtype || '';
   const fit = ai.fit || '';
   const description = ai.description || '';
+  // PC-58 taxonomy attributes (2026-11-01): these shape the render
+  const sleeveLength = ai.sleeve_length || '';
+  const neckline = ai.neckline || '';
+  const length = ai.length || '';
+  const collar = ai.collar || '';
+  const closure = ai.closure || '';
+  const rise = ai.rise || '';
+  const cuff = ai.cuff || '';
   
   // Garment identity (semantic — helps the model understand what it's looking at)
   const identity = [];
@@ -56,10 +64,42 @@ function buildFluxPrompt(item, feedback = '') {
     parts.push(`The garment is: ${identity.join(' ')}.`);
   }
   
+  // Sleeve length — CRITICAL: model defaults to long if unspecified
+  if (sleeveLength && sleeveLength.toLowerCase() !== 'unknown') {
+    const sleeveText = sleeveLength === 'short' ? 'short-sleeve'
+      : sleeveLength === 'long' ? 'long-sleeve'
+      : sleeveLength;
+    parts.push(`Sleeves: ${sleeveText}.`);
+  }
+  
   // Fit (v1: pass through ai.fit; proper taxonomy in #132)
   // This matters: an oversized tee should render oversized, not as a regular tee.
   if (fit && fit.toLowerCase() !== 'unknown') {
     parts.push(`Fit: ${fit}.`);
+  }
+  
+  // Neckline / collar
+  if (neckline && neckline.toLowerCase() !== 'unknown') {
+    parts.push(`Neckline: ${neckline}.`);
+  }
+  if (collar && collar.toLowerCase() !== 'unknown') {
+    parts.push(`Collar: ${collar}.`);
+  }
+  
+  // Length (hem for tops, inseam for bottoms)
+  if (length && length.toLowerCase() !== 'unknown') {
+    parts.push(`Length: ${length}.`);
+  }
+  
+  // Bottoms specifics
+  if (rise && rise.toLowerCase() !== 'unknown') {
+    parts.push(`Rise: ${rise}.`);
+  }
+  if (cuff && cuff.toLowerCase() !== 'unknown') {
+    parts.push(`Cuff: ${cuff}.`);
+  }
+  if (closure && closure.toLowerCase() !== 'unknown' && closure !== 'none') {
+    parts.push(`Closure: ${closure}.`);
   }
   
   // Description (semantic details — fabric, construction, etc.)
