@@ -42,6 +42,7 @@ function buildFluxPrompt(item, feedback = '') {
   const name = item.name || item.shortName || ai.name || '';
   const category = item.category || ai.category || '';
   const subtype = ai.subtype || '';
+  const fit = ai.fit || '';
   const description = ai.description || '';
   
   // Garment identity (semantic — helps the model understand what it's looking at)
@@ -53,6 +54,12 @@ function buildFluxPrompt(item, feedback = '') {
   }
   if (identity.length) {
     parts.push(`The garment is: ${identity.join(' ')}.`);
+  }
+  
+  // Fit (v1: pass through ai.fit; proper taxonomy in #132)
+  // This matters: an oversized tee should render oversized, not as a regular tee.
+  if (fit && fit.toLowerCase() !== 'unknown') {
+    parts.push(`Fit: ${fit}.`);
   }
   
   // Description (semantic details — fabric, construction, etc.)
