@@ -937,10 +937,10 @@ exports.standardizeItem = onCall(
         throw new Error("FAL_API_KEY not configured");
       }
 
-      // Run FLUX standardization
+      // Run FLUX standardization (with item attributes for better fidelity)
       let outputUrl;
       try {
-        outputUrl = await runFluxStandardization(imageUrl, falApiKey, feedback);
+        outputUrl = await runFluxStandardization(imageUrl, falApiKey, item, feedback);
       } catch (fluxErr) {
         await itemRef.update({
           "standardization.status": "failed",

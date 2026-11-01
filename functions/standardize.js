@@ -20,6 +20,60 @@ const EXPENSE_WARNING_THRESHOLD = 10; // Refreshes before warning
 const FLUX_PROMPT = 'Transform this garment photo into a professional e-commerce product photograph: complete whole garment with proper standardized shape, centered on a pure white background, front-facing, even studio lighting. Preserve the EXACT colors, patterns, prints, graphics, and construction details exactly as shown. Do not redesign the garment. Do not add text, logos, labels, or tags.';
 
 /**
+ * Build the FLUX prompt with garment attributes for better fidelity.
+ * The item's known attributes (name, category, colors, etc.) give the model
+ * semantic context beyond just the image.
+ *
+ * @param {object} item - The Firestore item (plain object from Admin SDK)
+ * @param {string} feedback - Optional user feedback
+ * @returns {string} - The full prompt
+ */
+function buildFluxPrompt(item, feedback = '') {
+  const parts = [FLUX_PROMPT];
+  
+  const ai = item.ai || {};
+  const name = item.name || item.shortName || ai.name || '';
+  const category = item.category || ai.category || '';
+  const subtype = ai.subtype || '';
+  const colors = Array.isArray(ai.colors) ? ai.colors.filter(Boolean) : [];
+  const pattern = ai.pattern || '';
+  const description = ai.description || '';
+  
+  // Garment identity
+  const identity = [];
+  if (name) identity.push(name);
+  else if (subtype) identity.push(subtype);
+  if (category && !identity.join(' ').toLowerCase().includes(category.toLowerCase())) {
+    identity.push(`(${category})`);
+  }
+  if (identity.length) {
+    parts.push(`The garment is: ${identity.join(' ')}.`);
+  }
+  
+  // Colors (helps with color fidelity)
+  if (colors.length) {
+    parts.push(`Its colors are: ${colors.join(', ')}.`);
+  }
+  
+  // Pattern (if not solid)
+  if (pattern && pattern.toLowerCase() !== 'solid' && pattern.toLowerCase() !== 'unknown') {
+    parts.push(`Pattern: ${pattern}.`);
+  }
+  
+  // Description (truncated)
+  if (description) {
+    parts.push(`Details: ${description.slice(0, 200)}.`);
+  }
+  
+  // User feedback
+  if (feedback) {
+    parts.push(`Additional guidance: ${feedback}`);
+  }
+  
+  return parts.join(' ');
+}
+
+/**
  * Check if an image is "already clean" — a studio product shot that doesn't
  * need standardization. Pure pixel heuristics, zero AI cost.
  *
@@ -40,13 +94,12 @@ function isAlreadyClean(imageBuffer) {
  *
  * @param {string} imageUrl - Public URL of the input image
  * @param {string} falApiKey - fal.ai API key
+ * @param {object} item - The Firestore item (for prompt attributes)
  * @param {string} feedback - Optional user feedback to append to prompt
  * @returns {Promise<string>} - URL of the standardized image
  */
-async function runFluxStandardization(imageUrl, falApiKey, feedback = '') {
-  const prompt = feedback
-    ? `${FLUX_PROMPT} Additional guidance: ${feedback}`
-    : FLUX_PROMPT;
+async function runFluxStandardization(imageUrl, falApiKey, item = {}, feedback = '') {
+  const prompt = buildFluxPrompt(item, feedback);
 
   const submitRes = await fetch('https://queue.fal.run/fal-ai/flux-kontext/dev', {
     method: 'POST',
@@ -150,6 +203,7 @@ module.exports = {
   DELTA_E_THRESHOLD,
   EXPENSE_WARNING_THRESHOLD,
   FLUX_PROMPT,
+  buildFluxPrompt,
   isAlreadyClean,
   runFluxStandardization,
   runQualityGates,
