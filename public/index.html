@@ -148,6 +148,12 @@
     .photo-badge.ai { background: rgba(168,124,28,0.9); color: #fff; }
     .ai-badge-btn { position: absolute; top: 10px; right: 10px; background: rgba(168,124,28,0.9); color: #fff; border: none; width: 32px; height: 32px; border-radius: 50%; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
     .item-photo-wrap { position: relative; }
+    /* PC-58: Just-in-time attribute collection */
+    .attr-field { margin-bottom: 16px; }
+    .attr-field-label { font-size: 14px; font-weight: 600; margin-bottom: 8px; color: var(--ink); }
+    .attr-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .attr-chip { border: 1px solid var(--line); background: none; color: var(--muted); border-radius: 999px; padding: 8px 16px; font-size: 14px; cursor: pointer; }
+    .attr-chip.selected { color: var(--ink); border-color: var(--brass, #a87c1c); background: rgba(168,124,28,0.1); font-weight: 600; }
     /* 2026-11-01: Full-screen item detail on mobile (no bottom-sheet card) */
     @media (max-width: 700px) {
       #itemOverlay .modal {
@@ -1702,6 +1708,21 @@
       </div>
       <button class="primary" id="stdRefreshGo" type="button" style="width:100%;">Generate new version ($0.03)</button>
       <button class="link-button" id="stdRefreshCancel" type="button" style="margin-top:8px;">Cancel</button>
+    </section>
+  </div>
+
+  <!-- PC-58: Just-in-time attribute collection (2026-11-01) -->
+  <!-- Shown before AI generation if required attributes are missing. -->
+  <div class="overlay sheet-overlay" id="attrSheet" hidden role="dialog" aria-modal="true" aria-labelledby="attrSheetTitle">
+    <section class="sheet">
+      <div class="sheet-head">
+        <h2 class="sheet-title" id="attrSheetTitle">A few quick details</h2>
+        <button class="icon-button" id="attrSheetClose" type="button" aria-label="Close">×</button>
+      </div>
+      <p class="sheet-intro">This helps the AI get the shape right. Tap to select.</p>
+      <div id="attrFields"></div>
+      <button class="primary" id="attrSheetGo" type="button" style="width:100%; margin-top:16px;">Continue ($0.03)</button>
+      <button class="link-button" id="attrSheetSkip" type="button" style="margin-top:8px;">Skip — generate without these</button>
     </section>
   </div>
 
@@ -3609,10 +3630,126 @@
           .then(function (res) { return res.data || {}; });
       }
 
-      // PC-58: "Generate standardized view" button (first run or already_clean escape hatch)
-      // Bug fix 2026-10-31: show processing state IMMEDIATELY, don't wait for backend.
-      // The backend takes 30-60s (FLUX); the old code waited for .then() before updating UI.
-      // Bug fix 2026-10-31: store itemId on button to avoid stale activeItem issues.
+      // PC-58: Just-in-time attribute collection (2026-11-01)
+      // Required attributes per subtype (from GARMENT-ATTRIBUTE-TAXONOMY.md).
+      // Only shown if missing from item.ai — "omit rather than guess".
+      var REQUIRED_ATTRS = {
+        "t-shirt": [
+          { field: "sleeve_length", label: "Sleeve length", options: ["short", "long", "sleeveless"] },
+          { field: "fit", label: "Fit", options: ["slim", "regular", "relaxed", "oversized"] },
+          { field: "neckline", label: "Neckline", options: ["crew", "v-neck", "henley"] },
+        ],
+        "shirt": [
+          { field: "sleeve_length", label: "Sleeve length", options: ["short", "long"] },
+          { field: "fit", label: "Fit", options: ["slim", "regular", "relaxed", "oversized"] },
+        ],
+        "polo": [
+          { field: "sleeve_length", label: "Sleeve length", options: ["short", "long"] },
+          { field: "fit", label: "Fit", options: ["slim", "regular", "relaxed"] },
+        ],
+        "hoodie": [
+          { field: "fit", label: "Fit", options: ["slim", "regular", "relaxed", "oversized"] },
+          { field: "zip", label: "Zip", options: ["none", "half", "full"] },
+        ],
+        "sweatshirt": [
+          { field: "fit", label: "Fit", options: ["slim", "regular", "relaxed", "oversized"] },
+        ],
+        "jeans": [
+          { field: "fit", label: "Fit", options: ["skinny", "slim", "straight", "relaxed", "wide"] },
+          { field: "length", label: "Length", options: ["full", "cropped", "ankle"] },
+        ],
+        "chinos": [
+          { field: "fit", label: "Fit", options: ["slim", "straight", "relaxed"] },
+          { field: "length", label: "Length", options: ["full", "cropped", "ankle"] },
+        ],
+        "shorts": [
+          { field: "fit", label: "Fit", options: ["slim", "regular", "relaxed"] },
+          { field: "length", label: "Length", options: ["short", "knee", "long"] },
+        ],
+        "joggers": [
+          { field: "fit", label: "Fit", options: ["slim", "regular", "relaxed"] },
+        ],
+      };
+      function getMissingAttrs(item) {
+        var ai = (item && item.ai) || {};
+        var subtype = ai.subtype || "";
+        var required = REQUIRED_ATTRS[subtype] || [];
+        // Fallback: if no subtype, use category-based defaults
+        if (!required.length) {
+          var cat = (item.category || "").toLowerCase();
+          if (cat.indexOf("top") >= 0) {
+            required = REQUIRED_ATTRS["t-shirt"];
+          } else if (cat.indexOf("bottom") >= 0) {
+            required = [{ field: "fit", label: "Fit", options: ["slim", "regular", "relaxed"] }];
+          }
+        }
+        return required.filter(function (r) {
+          var v = ai[r.field];
+          return !v || v === "unknown" || v === "";
+        });
+      }
+      function showAttrSheet(item, missing, onComplete) {
+        var sheet = document.getElementById("attrSheet");
+        var fieldsDiv = document.getElementById("attrFields");
+        if (!sheet || !fieldsDiv) { onComplete({}); return; }
+        fieldsDiv.innerHTML = "";
+        var selections = {};
+        missing.forEach(function (req) {
+          var fieldDiv = document.createElement("div");
+          fieldDiv.className = "attr-field";
+          var label = document.createElement("div");
+          label.className = "attr-field-label";
+          label.textContent = req.label;
+          fieldDiv.appendChild(label);
+          var chipsDiv = document.createElement("div");
+          chipsDiv.className = "attr-chips";
+          req.options.forEach(function (opt) {
+            var chip = document.createElement("button");
+            chip.type = "button";
+            chip.className = "attr-chip";
+            chip.textContent = opt.charAt(0).toUpperCase() + opt.slice(1);
+            chip.onclick = function () {
+              // Single-select: deselect others
+              var siblings = chipsDiv.querySelectorAll(".attr-chip");
+              for (var i = 0; i < siblings.length; i++) siblings[i].classList.remove("selected");
+              chip.classList.add("selected");
+              selections[req.field] = opt;
+            };
+            chipsDiv.appendChild(chip);
+          });
+          fieldDiv.appendChild(chipsDiv);
+          fieldsDiv.appendChild(fieldDiv);
+        });
+        // Wire buttons
+        document.getElementById("attrSheetGo").onclick = function () {
+          closeOverlay(sheet);
+          onComplete(selections);
+        };
+        document.getElementById("attrSheetSkip").onclick = function () {
+          closeOverlay(sheet);
+          onComplete({});
+        };
+        document.getElementById("attrSheetClose").onclick = function () {
+          closeOverlay(sheet);
+          onComplete(null); // cancelled
+        };
+        openOverlay(sheet);
+      }
+      function saveItemAttrs(itemId, attrs) {
+        if (!currentUser || !Object.keys(attrs).length) return Promise.resolve();
+        var ref = db.collection("users").doc(currentUser.uid).collection("items").doc(itemId);
+        return ref.get().then(function (snap) {
+          if (!snap.exists) return;
+          var data = snap.data() || {};
+          var ai = data.ai || {};
+          Object.keys(attrs).forEach(function (k) { ai[k] = attrs[k]; });
+          return ref.update({ ai: ai }).then(function () {
+            if (activeItem && activeItem.id === itemId) {
+              activeItem.ai = ai;
+            }
+          });
+        });
+      }
       document.getElementById("stdGenerateBtn").addEventListener("click", function () {
         var btn = this;
         // Prefer the button's data-item-id (set at render time), fall back to activeItem
@@ -3621,31 +3758,44 @@
           showToast("Couldn't identify this piece. Try closing and reopening it.");
           return;
         }
-        if (!window.confirm("Generate an AI version of this piece? It costs about $0.03. It takes about a minute — you can close this and come back.")) return;
-        // Show processing state immediately (optimistic)
-        // Update activeItem if it matches, otherwise just show the toast
-        // (the Firestore update from the backend will sync on reopen)
-        if (activeItem && activeItem.id === itemId) {
-          activeItem.standardization = { status: "processing" };
-          renderStandardizationUI(activeItem);
-        }
-        showToast("Generating… this takes about a minute. You can close and come back.");
-        // Fire and forget — don't block UI on the backend
-        callStandardize(itemId, { force: true }).then(function (data) {
-          if (data.needsWarningAck) {
-            openStdRefreshSheet(data);
-            return;
-          }
-          // Backend done; refresh the item to show the result
-          // (The user may have navigated away; that's fine.)
-        }).catch(function (err) {
-          showToast(friendlyError(err));
-          // Reset to failed so the user can retry
+        var item = (activeItem && activeItem.id === itemId) ? activeItem : null;
+        // PC-58 (2026-11-01): Just-in-time attribute collection.
+        // If required attributes are missing, ask now — don't make the user hunt.
+        var proceedWithGenerate = function (extraAttrs) {
+          if (!window.confirm("Generate an AI version of this piece? It costs about $0.03. It takes about a minute — you can close this and come back.")) return;
+          // Show processing state immediately (optimistic)
           if (activeItem && activeItem.id === itemId) {
-            activeItem.standardization = { status: "failed" };
+            activeItem.standardization = { status: "processing" };
             renderStandardizationUI(activeItem);
           }
-        });
+          showToast("Generating… this takes about a minute. You can close and come back.");
+          // Fire and forget — don't block UI on the backend
+          callStandardize(itemId, { force: true }).then(function (data) {
+            if (data.needsWarningAck) {
+              openStdRefreshSheet(data);
+              return;
+            }
+          }).catch(function (err) {
+            showToast(friendlyError(err));
+            if (activeItem && activeItem.id === itemId) {
+              activeItem.standardization = { status: "failed" };
+              renderStandardizationUI(activeItem);
+            }
+          });
+        };
+        if (item) {
+          var missing = getMissingAttrs(item);
+          if (missing.length) {
+            showAttrSheet(item, missing, function (selections) {
+              if (selections === null) return; // user cancelled
+              saveItemAttrs(itemId, selections).then(function () {
+                proceedWithGenerate(selections);
+              });
+            });
+            return;
+          }
+        }
+        proceedWithGenerate({});
       });
 
       // PC-58: Refresh button opens the confirmation sheet (never accidental)
