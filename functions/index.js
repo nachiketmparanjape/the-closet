@@ -70,13 +70,17 @@ async function boundary(where, correlationId, uid, err) {
   logError(where, err, { uid: uid, correlationId: correlationId });
   const key = keyOf(err) || (err && err.key) || "INTERNAL";
   try {
-    await recordErrorEvent({
+    console.log(JSON.stringify({ event: "boundary_debug", stage: "before_write", fn: where, key: key }));
+    const result = await recordErrorEvent({
       kind: "failure", fn: where, key: key,
       category: (CATALOG[key] || {}).category || null,
       correlationId: correlationId, uid: uid,
       detail: err && err.message ? String(err.message).slice(0, 300) : null,
     });
-  } catch (e) { /* never break the error path */ }
+    console.log(JSON.stringify({ event: "boundary_debug", stage: "after_write", fn: where, key: key, result: result }));
+  } catch (e) {
+    console.log(JSON.stringify({ event: "boundary_debug", stage: "write_error", fn: where, err: e && e.message }));
+  }
   if (err instanceof HttpsError) throw err;
   fail(err && err.key ? err.key : "INTERNAL");
 }
