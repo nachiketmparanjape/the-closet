@@ -51,24 +51,32 @@ const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB — phone photos, pre-resize
 // but the recorder factory tolerates a null db by design.
 let _errorEventRecorder = null;
 function recordErrorEvent(fields) {
+  // Returns a promise (resolves true/false). Error-path callers await it;
+  // success-path callers fire-and-forget for latency.
   try {
     if (!_errorEventRecorder) _errorEventRecorder = makeErrorEventRecorder(getFirestore());
-    _errorEventRecorder(fields);
+    return _errorEventRecorder(fields);
   } catch (e) { /* the sink must never break the request path */ }
+  return Promise.resolve(false);
 }
 
 // Callable boundary: HttpsErrors (from fail()) pass through untouched;
 // coded downstream errors map via their key; anything else is INTERNAL.
 // The client never sees raw internals — only catalog messages.
-function boundary(where, correlationId, uid, err) {
+// Async (2026-11-02): awaits the error-event write so the ledger is
+// reliable. Failures are rare; the ~100ms is acceptable. Callers MUST
+// await boundary().
+async function boundary(where, correlationId, uid, err) {
   logError(where, err, { uid: uid, correlationId: correlationId });
   const key = keyOf(err) || (err && err.key) || "INTERNAL";
-  recordErrorEvent({
-    kind: "failure", fn: where, key: key,
-    category: (CATALOG[key] || {}).category || null,
-    correlationId: correlationId, uid: uid,
-    detail: err && err.message ? String(err.message).slice(0, 300) : null,
-  });
+  try {
+    await recordErrorEvent({
+      kind: "failure", fn: where, key: key,
+      category: (CATALOG[key] || {}).category || null,
+      correlationId: correlationId, uid: uid,
+      detail: err && err.message ? String(err.message).slice(0, 300) : null,
+    });
+  } catch (e) { /* never break the error path */ }
   if (err instanceof HttpsError) throw err;
   fail(err && err.key ? err.key : "INTERNAL");
 }
@@ -144,7 +152,7 @@ exports.describeItem = onCall(
       // Any failure inside describeImage is a downstream AI failure.
       if (!(err instanceof HttpsError) && !err.key) err.key = "DESCRIBE_FAILED";
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
-      boundary("describeItem", correlationId, uid, err);
+      await boundary("describeItem", correlationId, uid, err);
     }
   }
 );
@@ -187,7 +195,7 @@ exports.extractGarment = onCall(
       return finish("extractGarment", correlationId, uid, start, result);
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "EXTRACT_FAILED";
-      boundary("extractGarment", correlationId, uid, err);
+      await boundary("extractGarment", correlationId, uid, err);
     }
   }
 );
@@ -317,7 +325,7 @@ exports.askStylist = onCall(
       // Any failure inside askStylist is a downstream AI failure.
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
-      boundary("askStylist", correlationId, uid, err);
+      await boundary("askStylist", correlationId, uid, err);
     }
   }
 );
@@ -357,7 +365,7 @@ exports.reflectOutfit = onCall(
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
-      boundary("reflectOutfit", correlationId, uid, err);
+      await boundary("reflectOutfit", correlationId, uid, err);
     }
   }
 );
@@ -393,7 +401,7 @@ exports.critiqueOutfit = onCall(
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
-      boundary("critiqueOutfit", correlationId, uid, err);
+      await boundary("critiqueOutfit", correlationId, uid, err);
     }
   }
 );
@@ -429,7 +437,7 @@ exports.parseOutfitPhoto = onCall(
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
-      boundary("parseOutfitPhoto", correlationId, uid, err);
+      await boundary("parseOutfitPhoto", correlationId, uid, err);
     }
   }
 );
@@ -480,7 +488,7 @@ exports.startOutfitParse = onCall(
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "SAM_FAILED";
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
-      boundary("startOutfitParse", correlationId, uid, err);
+      await boundary("startOutfitParse", correlationId, uid, err);
     }
   }
 );
@@ -521,7 +529,7 @@ exports.pollOutfitParse = onCall(
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "SAM_FAILED";
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
-      boundary("pollOutfitParse", correlationId, uid, err);
+      await boundary("pollOutfitParse", correlationId, uid, err);
     }
   }
 );
@@ -562,7 +570,7 @@ exports.retryOutfitGarment = onCall(
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "SAM_FAILED";
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
-      boundary("retryOutfitGarment", correlationId, uid, err);
+      await boundary("retryOutfitGarment", correlationId, uid, err);
     }
   }
 );
@@ -589,7 +597,7 @@ exports.listOutfitParses = onCall(
       return finish("listOutfitParses", correlationId, uid, start, result);
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "SAM_FAILED";
-      boundary("listOutfitParses", correlationId, uid, err);
+      await boundary("listOutfitParses", correlationId, uid, err);
     }
   }
 );
@@ -625,7 +633,7 @@ exports.discardOutfitParse = onCall(
       return finish("discardOutfitParse", correlationId, uid, start, result);
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "SAM_FAILED";
-      boundary("discardOutfitParse", correlationId, uid, err);
+      await boundary("discardOutfitParse", correlationId, uid, err);
     }
   }
 );
@@ -659,7 +667,7 @@ exports.finishOutfitParse = onCall(
       return finish("finishOutfitParse", correlationId, uid, start, result);
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "SAM_FAILED";
-      boundary("finishOutfitParse", correlationId, uid, err);
+      await boundary("finishOutfitParse", correlationId, uid, err);
     }
   }
 );
@@ -736,7 +744,7 @@ exports.shopCheck = onCall(
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
-      boundary("shopCheck", correlationId, uid, err);
+      await boundary("shopCheck", correlationId, uid, err);
     }
   }
 );
@@ -775,7 +783,7 @@ exports.fetchLinkItem = onCall(
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "LINK_UNREACHABLE";
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
-      boundary("fetchLinkItem", correlationId, uid, err);
+      await boundary("fetchLinkItem", correlationId, uid, err);
     }
   }
 );
@@ -831,7 +839,7 @@ exports.planPacking = onCall(
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
-      boundary("planPacking", correlationId, uid, err);
+      await boundary("planPacking", correlationId, uid, err);
     }
   }
 );
@@ -1086,7 +1094,7 @@ exports.standardizeItem = onCall(
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "STANDARDIZE_FAILED";
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
-      boundary("standardizeItem", correlationId, uid, err);
+      await boundary("standardizeItem", correlationId, uid, err);
     }
   }
 );
