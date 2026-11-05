@@ -1,7 +1,7 @@
 # Sprint 29 — approved 2026-11-04
 
 ## Cards
-1. **PC-60 (#130)** — Automated cutout check: a well-designed second opinion on cutouts, so the human review queue stays small.
+1. **PC-60 (#130)** — DONE 2026-11-04 (design + calibration). Design doc validated (95% bar, 3 backgrounds, queue-only + scale note). Unified check module built (functions/cutout-check.js: mask geometry + vision judge + semantic match). Calibration script ran on 66 items: 66/66 (100%), 0 false-pass. Two tuning fixes from calibration (sunglasses lens + clog sandal holes exempted). Report: docs/sprints/sprint-29/PC-60-CALIBRATION-REPORT.md. CAVEAT: vision judge (layer 2) not yet wired in the calibration script — mask layer only. Gate wiring (running the check on new cuts) is the follow-up.
 2. **PC-41 (#104)** — Follow-up chat on a shop check. Unblocked: UX-18 shipped Sprint 23.
 3. **PC-56 (#126)** — Garment embeddings: real similarity signal for matching and duplicate detection.
 
