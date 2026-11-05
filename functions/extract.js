@@ -32,6 +32,7 @@ const { codedError } = require("./errors");
 const { segmentImage, MODEL } = require("./birefnet");
 const { normalizeOrientation, alphaStats, judgeMask } = require("./imagenorm");
 const { checkCutout } = require("./extractcheck");
+const { embedImage } = require("./parse");
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // matches describeItem
 
@@ -119,6 +120,24 @@ async function extractGarmentPhoto(uid, storagePath, deps) {
     metadata: { cacheControl: "public, max-age=31536000" },
   });
 
+  // PC-56 (Sprint 29): garment embedding, computed once from the clean
+  // render (background removed = the vector describes the garment, not
+  // the scene). Stored beside the phash; used for duplicate proposals
+  // (same garment, different photo) and PC-36 matching. Soft-fails to
+  // null — pHash-only matching still works.
+  let renderEmbedding = null;
+  try {
+    renderEmbedding = await (deps.embedFn || embedImage)({
+      imageBuffer: png,
+      getAccessToken: deps.getAccessToken,
+      fetchImpl: deps.fetchImpl,
+      project: deps.project,
+      location: deps.location,
+    });
+  } catch (e) {
+    renderEmbedding = null;
+  }
+
   // Step 5, layer 1: mask heuristics + the aspect assertion.
   const stats = await alphaStats(png);
   const mask = judgeMask(stats, { width: normalized.width, height: normalized.height });
@@ -145,6 +164,7 @@ async function extractGarmentPhoto(uid, storagePath, deps) {
       gatePassed: false,
       gate: { stage: "mask", reasons: mask.reasons },
       photoQuality,
+      renderEmbedding,
     };
   }
 
@@ -176,6 +196,7 @@ async function extractGarmentPhoto(uid, storagePath, deps) {
     gatePassed: verdict.ok === true,
     gate: { stage: "vision", problems: verdict.problems || [] },
     photoQuality,
+    renderEmbedding,
   };
 }
 

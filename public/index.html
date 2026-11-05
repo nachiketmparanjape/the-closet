@@ -3047,7 +3047,21 @@
               renderUncertainty: typeof d.uncertainty === "number" ? d.uncertainty : null,
               renderStatus: "passed",
               // PC-59 (Sprint 28): photo quality for the too-small warning.
-              photoQuality: d.photoQuality || null
+              photoQuality: d.photoQuality || null,
+              // PC-56 (Sprint 29): garment embedding for duplicate proposals.
+              renderEmbedding: Array.isArray(d.renderEmbedding) ? d.renderEmbedding : null
+            }).then(function () {
+              // PC-56: after the embedding lands, propose a duplicate if
+              // this garment looks like one already in the wardrobe.
+              // Propose only — never auto-merge. The user confirms or
+              // dismisses from the toast.
+              if (Array.isArray(d.renderEmbedding) && d.renderEmbedding.length) {
+                var dupe = findEmbeddingDupe(d.renderEmbedding, itemId);
+                if (dupe) {
+                  showToast("Looks like your " + dupe.itemName + " — same piece? Open it to compare.");
+                }
+              }
+              return null;
             });
           });
         }).catch(function (err) {
@@ -4615,6 +4629,39 @@
           }
         }
         return null;
+      }
+      // PC-56 (Sprint 29): embedding duplicate proposal. Same garment in a
+      // different photo (re-shot, different angle/light/background) — the
+      // pHash cannot catch this. Cosine similarity >= 0.85 proposes a
+      // side-by-side "looks like your X — same piece?". Never auto-merges;
+      // the user confirms or dismisses. Similar-but-different garments
+      // (two plain white tees) are indistinguishable, so no threshold
+      // earns auto-delete or auto-link.
+      function cosineSimilarity(a, b) {
+        if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length || !a.length) return 0;
+        var dot = 0, na = 0, nb = 0;
+        for (var i = 0; i < a.length; i++) {
+          dot += a[i] * b[i];
+          na += a[i] * a[i];
+          nb += b[i] * b[i];
+        }
+        if (!na || !nb) return 0;
+        return dot / (Math.sqrt(na) * Math.sqrt(nb));
+      }
+      function findEmbeddingDupe(embedding, excludeItemId) {
+        if (!Array.isArray(embedding) || !embedding.length) return null;
+        var best = null;
+        (allItems || []).forEach(function (it) {
+          if (it.id === excludeItemId) return;
+          (it.photos || []).forEach(function (p) {
+            if (!p || !Array.isArray(p.renderEmbedding)) return;
+            var score = cosineSimilarity(embedding, p.renderEmbedding);
+            if (score >= 0.85 && (!best || score > best.score)) {
+              best = { itemId: it.id, itemName: it.name || "an item", score: score };
+            }
+          });
+        });
+        return best;
       }
       function stashPHashes(files) {
         files.forEach(function (file) {
