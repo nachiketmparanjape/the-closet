@@ -317,6 +317,13 @@
     .shop-context { margin: 10px 0 0; font-size: 13px; color: var(--muted-strong); }
     .shop-context .q { font-style: italic; }
     .shop-section-title { margin: 22px 0 8px; font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+    /* PC-41 (Sprint 29): follow-up thread inside the saved check. */
+    .shop-followup-thread { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+    .shop-followup-msg { padding: 10px 12px; border-radius: 12px; font-size: 14px; line-height: 1.45; max-width: 90%; }
+    .shop-followup-user { align-self: flex-end; background: var(--brass, #a87c1c); color: #fff; }
+    .shop-followup-assistant { align-self: flex-start; background: var(--paper-soft); }
+    .shop-followup-row { display: flex; gap: 8px; }
+    .shop-followup-row input { flex: 1; }
     .shop-reasons { margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.65; }
     .shop-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
     .shop-thumb { width: 52px; height: 62px; object-fit: cover; border-radius: 6px; background: var(--paper-soft); flex-shrink: 0; }
@@ -12219,6 +12226,86 @@
         askBtn.addEventListener("click", function () { askStylistAboutShop(r); });
         askRow.appendChild(askBtn);
         body.appendChild(askRow);
+
+        // PC-41 (Sprint 29): follow-up thread inside the saved check.
+        // The thread lives on the check doc (followUps, capped at 20
+        // messages). Each answer reasons over the check's photo/analysis
+        // and the real wardrobe, via the askStylist callable with shopItem.
+        body.appendChild(el("h3", "shop-section-title", "Follow-up"));
+        var threadBox = el("div", "shop-followup-thread");
+        body.appendChild(threadBox);
+        var followInput = document.createElement("input");
+        followInput.type = "text";
+        followInput.placeholder = "Ask about this piece…";
+        followInput.maxLength = 500;
+        var followSend = el("button", "secondary", "Ask");
+        followSend.type = "button";
+        var followRow = el("div", "shop-followup-row");
+        followRow.appendChild(followInput);
+        followRow.appendChild(followSend);
+        body.appendChild(followRow);
+
+        function renderFollowUps() {
+          threadBox.textContent = "";
+          var msgs = Array.isArray(c.followUps) ? c.followUps : [];
+          if (!msgs.length) {
+            threadBox.appendChild(el("p", "hint", "No follow-ups yet — ask about fit, styling, or whether it is worth it."));
+            return;
+          }
+          msgs.forEach(function (m) {
+            var div = el("div", "shop-followup-msg shop-followup-" + (m.role || "user"));
+            div.textContent = m.text || "";
+            threadBox.appendChild(div);
+          });
+        }
+        renderFollowUps();
+
+        followSend.addEventListener("click", function () {
+          var q = followInput.value.trim();
+          if (!q || !currentUser) return;
+          followSend.disabled = true;
+          followInput.value = "";
+          var history = Array.isArray(c.followUps) ? c.followUps.slice(-18) : [];
+          var messages = history.map(function (m) {
+            return { role: m.role === "assistant" ? "assistant" : "user", content: m.text || "" };
+          });
+          messages.push({ role: "user", content: q });
+          var shopItem = shopItemFromCheck(r);
+          // Trip context when the check is trip-tagged (PC-40 plumbing).
+          var tripCtx = null;
+          if (c.tripId) {
+            var t = tripById(c.tripId);
+            tripCtx = t ? { tripId: t.id, tripName: t.name || null } : { tripId: c.tripId };
+          }
+          functions.httpsCallable("askStylist")({
+            items: allItems.map(function (it) {
+              return { id: it.id, name: it.name, category: it.category || null };
+            }),
+            messages: messages,
+            shopItem: shopItem,
+            tripContext: tripCtx
+          }).then(function (res) {
+            var answer = (res.data && (res.data.reply || res.data.text)) || "No answer — try again.";
+            var updated = history.concat([
+              { role: "user", text: q, at: new Date().toISOString() },
+              { role: "assistant", text: answer, at: new Date().toISOString() }
+            ]).slice(-20);
+            return shopCheckDocRef(id).update({
+              followUps: updated,
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }).then(function () {
+              c.followUps = updated;
+              renderFollowUps();
+            });
+          }).catch(function (err) {
+            showToast(friendlyError(err));
+          }).finally(function () {
+            followSend.disabled = false;
+          });
+        });
+        followInput.addEventListener("keydown", function (e) {
+          if (e.key === "Enter") { e.preventDefault(); followSend.click(); }
+        });
 
         // Your details.
         body.appendChild(el("h3", "shop-section-title", "Your details"));

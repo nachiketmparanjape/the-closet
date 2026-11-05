@@ -107,7 +107,12 @@ service cloud.firestore {
       allow update:
         if request.auth != null && request.auth.uid == userId
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(["userNote", "link", "sku", "status", "updatedAt", "addedItemId", "tripId"])
+             .hasOnly(["userNote", "link", "sku", "status", "updatedAt", "addedItemId", "tripId", "followUps"])
+        // PC-41 (Sprint 29): follow-up thread — a list of {role, text, at}
+        // messages, capped at 20 by the client. Each message is short.
+        && (!("followUps" in request.resource.data) || (
+             request.resource.data.followUps is list
+             && request.resource.data.followUps.size() <= 20))
         && request.resource.data.status in ["considering", "bought", "dismissed"]
         && (!("userNote" in request.resource.data) || (request.resource.data.userNote is string && request.resource.data.userNote.size() <= 500))
         && (!("link" in request.resource.data) || (request.resource.data.link is string && request.resource.data.link.size() <= 500))
