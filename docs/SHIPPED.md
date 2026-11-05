@@ -2,6 +2,16 @@
 
 What went live. Momentum you can see.
 
+## Audit closure — 2026-11-01
+
+- **UX-16 — context-handoff audit: PASS / closed.** Manual evidence
+  supplied by the tester covers Today, fresh chat, @ piece and trip
+  context; source inspection accounts for the remaining inventory.
+  [Report](qa/UX-16-CONTEXT-HANDOFF.md) distinguishes coverage and limits.
+  Documentation only; no application change or deployment. Two separate
+  trip-destination follow-ups are drafted in `docs/issues/`; GitHub
+  publication is pending.
+
 ## Sprint 19 (2026-10-24 → )
 
 - **Return divider, de-duplicated + refresh in place** —

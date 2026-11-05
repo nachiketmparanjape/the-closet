@@ -1307,8 +1307,13 @@ email, guest banner + privacy note. Design:
   intentionally context-free, or filed as its own fix;
   results recorded on this card.
 - **Lane:** Stylist. **Effort:** S.
-- **Status:** Filed 2026-10-24. Competes at the next
-  planning walk; the Today instance is already fixed.
+- **Status:** CLOSED — PASS, 2026-11-01. Inventory audited with
+  tester-supplied request/response evidence for Today, fresh general
+  chat, @ piece and trip chat, plus source inspection for remaining
+  entry points. Full per-row results and limits:
+  [UX-16 report](qa/UX-16-CONTEXT-HANDOFF.md). No application change.
+  Separate destination precision and search-suggestion follow-ups
+  are drafted under `docs/issues/`; GitHub publication pending.
 
 ### PC-43 — Unnamed items heal themselves (no permanent "Untitled item")
 
