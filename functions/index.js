@@ -77,8 +77,24 @@ async function boundary(where, correlationId, uid, err) {
       detail: err && err.message ? String(err.message).slice(0, 300) : null,
     });
   } catch (e) { /* never break the error path */ }
-  if (err instanceof HttpsError) throw err;
-  fail(err && err.key ? err.key : "INTERNAL");
+  // #131: Surface the correlation ID to the client as a short ref code.
+  // It's a pointer for support ("Ref: a3f9"), not technical detail —
+  // doesn't violate the one-human-sentence doctrine.
+  const ref = correlationId ? String(correlationId).slice(0, 8) : null;
+  if (err instanceof HttpsError) {
+    if (ref) {
+      try { err.details = Object.assign({}, err.details, { ref: ref }); } catch (e) {}
+    }
+    throw err;
+  }
+  const outErr = new HttpsError(
+    (CATALOG[key] || {}).grpc || "internal",
+    (CATALOG[key] || {}).message || "Something went wrong. Try again."
+  );
+  if (ref) {
+    try { outErr.details = { ref: ref }; } catch (e) {}
+  }
+  throw outErr;
 }
 
 // Success counterpart to boundary(): one structured log line per
