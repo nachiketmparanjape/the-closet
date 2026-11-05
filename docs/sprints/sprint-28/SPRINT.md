@@ -1,4 +1,4 @@
-# Sprint 28 — approved 2026-11-04
+# Sprint 28 — approved 2026-11-04, COMPLETE 2026-11-04
 
 ## Cards
 1. **Full auto-FLUX on item-add** (Sprint 27 caveat) — DONE 2026-11-04. Pipeline extracted to `functions/standardize-pipeline.js` (FLUX -> Delta-E/geometry gates with 3x retry -> SAM cutout -> upload -> photo swap). `standardizeItem` callable and `autoStandardizeItem` trigger both call it. Gates wired into the pipeline (was a TODO). 469/469 tests pass.
