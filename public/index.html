@@ -7777,9 +7777,8 @@
           var photos = itemPhotos(it);
           if (photos.length && photos[0].url) {
             var img = document.createElement("img");
-            img.src = photoDisplayUrl(photos[0]);
-            resolveRenderUrl(it, img);
-            applyPhotoRotation(img, itemPhotos(it)[0], "clean");
+            // #134: central resolver.
+            showDisplayPhoto(img, it, "clean");
             img.alt = it.name || "item photo";
             img.loading = "lazy";
             img.className = "pack-thumb";
@@ -8880,7 +8879,10 @@
         if (wrap && wrap.outfit && wrap.outfit.itemIds) {
           for (var i = 0; i < wrap.outfit.itemIds.length && !imgUrl; i++) {
             var it = itemById(wrap.outfit.itemIds[i]);
-            if (it && it.photos && it.photos.length) imgUrl = photoDisplayUrl(it.photos[0]);
+            if (it && it.photos && it.photos.length) {
+              var resolved = resolveDisplayPhoto(it, "clean");
+              if (resolved) imgUrl = resolved.url;
+            }
           }
         }
         if (imgUrl) {
@@ -9500,9 +9502,8 @@
           var photos = it ? itemPhotos(it) : [];
           if (photos.length) {
             var img = document.createElement("img");
-            img.src = photoDisplayUrl(photos[0]);
-            resolveRenderUrl(it, img);
-            applyPhotoRotation(img, itemPhotos(it)[0], "clean");
+            // #134: central resolver.
+            showDisplayPhoto(img, it, "clean");
             img.alt = "";
             row.appendChild(img);
           }
@@ -10819,9 +10820,8 @@
           var photos = it ? itemPhotos(it) : [];
           if (photos.length) {
             var img = document.createElement("img");
-            img.src = photoDisplayUrl(photos[0]);
-            resolveRenderUrl(it, img);
-            applyPhotoRotation(img, itemPhotos(it)[0], "clean");
+            // #134: central resolver — this was the screenshot bug.
+            showDisplayPhoto(img, it, "clean");
             img.alt = "";
             row.appendChild(img);
           }
@@ -11022,9 +11022,8 @@
         var photos = itemPhotos(it);
         if (photos.length) {
           var img = document.createElement("img");
-          img.src = photoDisplayUrl(photos[0]);
-          resolveRenderUrl(it, img);
-          applyPhotoRotation(img, itemPhotos(it)[0], "clean");
+          // #134: central resolver.
+          showDisplayPhoto(img, it, "clean");
           img.alt = "";
           img.loading = "lazy";
           cell.appendChild(img);
@@ -11749,9 +11748,8 @@
         var photos = itemPhotos(it);
         if (!photos.length) return null;
         var t = document.createElement("img");
-        t.src = photoDisplayUrl(photos[0]);
-        resolveRenderUrl(it, t);
-        applyPhotoRotation(t, itemPhotos(it)[0], "clean");
+        // #134: central resolver.
+        showDisplayPhoto(t, it, "clean");
         t.alt = it.name || "";
         t.className = "shop-thumb";
         return t;
@@ -12883,9 +12881,8 @@
           var photos = it ? itemPhotos(it) : [];
           if (photos.length && photos[0].url) {
             var img = document.createElement("img");
-            img.src = photoDisplayUrl(photos[0]);
-            resolveRenderUrl(it, img);
-            applyPhotoRotation(img, itemPhotos(it)[0], "clean");
+            // #134: central resolver.
+            showDisplayPhoto(img, it, "clean");
             img.alt = it ? it.name : "item photo";
             img.loading = "lazy";
             fig.appendChild(img);
