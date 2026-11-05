@@ -181,3 +181,31 @@ describe("sanitizeShopItem", () => {
     assert.deepEqual(s.reasons, ["ok"]);
   });
 });
+
+// PC-41 (2026-11-05): the follow-up sheet sent {role, content} and the
+// sanitizer only read m.text — every message was dropped and the call
+// failed with empty messages. The sanitizer now accepts "content" as a
+// fallback and normalizes the "assistant" role to "model".
+it("sanitizeMessages accepts content field and assistant role", () => {
+  const out = sanitizeMessages([
+    { role: "user", content: "what would I wear this with?" },
+    { role: "assistant", content: "Try it with your navy blazer." },
+    { role: "model", text: "And the white sneakers." },
+  ]);
+  assert.equal(out.length, 3);
+  assert.equal(out[0].role, "user");
+  assert.equal(out[0].text, "what would I wear this with?");
+  assert.equal(out[1].role, "model");
+  assert.equal(out[1].text, "Try it with your navy blazer.");
+  assert.equal(out[2].role, "model");
+  assert.equal(out[2].text, "And the white sneakers.");
+});
+
+it("sanitizeMessages drops messages with neither text nor content", () => {
+  const out = sanitizeMessages([
+    { role: "user", content: "hello" },
+    { role: "user" },
+    { role: "user", text: "" },
+  ]);
+  assert.equal(out.length, 1);
+});

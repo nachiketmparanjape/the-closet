@@ -12569,9 +12569,9 @@
           input.value = "";
           var history = Array.isArray(c.followUps) ? c.followUps.slice(-18) : [];
           var messages = history.map(function (m) {
-            return { role: m.role === "assistant" ? "assistant" : "user", content: m.text || "" };
+            return { role: m.role === "assistant" ? "model" : "user", text: m.text || "" };
           });
-          messages.push({ role: "user", content: q });
+          messages.push({ role: "user", text: q });
           var shopItem = shopItemFromCheck(r);
           var tripCtx = null;
           if (c.tripId) {

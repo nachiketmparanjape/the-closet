@@ -215,8 +215,17 @@ function sanitizeMessages(messages) {
   const out = [];
   for (const m of messages.slice(-MAX_MESSAGES)) {
     if (!m || typeof m !== "object") continue;
-    const role = m.role === "model" ? "model" : "user";
-    const text = cleanText(m.text, MAX_TEXT);
+    // Role: the server's model role is "model". Clients may send
+    // "assistant" (the OpenAI-style name) — normalize it here so a
+    // client that uses the other name does not silently flip the
+    // assistant's turns into user turns.
+    const role = (m.role === "model" || m.role === "assistant") ? "model" : "user";
+    // Text: "text" is the contract (the main chat sends it). "content"
+    // is accepted as a fallback — a client that sends the other field
+    // name must not silently lose every message (PC-41, 2026-11-05:
+    // the follow-up sheet sent "content" and every message was
+    // dropped, failing the call with an empty-messages error).
+    const text = cleanText(m.text || m.content, MAX_TEXT);
     if (!text) continue;
     out.push({ role, text });
   }
