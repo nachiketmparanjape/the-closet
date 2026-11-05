@@ -3023,30 +3023,15 @@
       // session; failures stay silent (the original keeps
       // showing, exactly as photoDisplayUrl already falls back).
       var renderResolveTried = {};
+      // #134 (2026-11-04): resolveRenderUrl is now a no-op.
+      // Legacy: when renders were stored as renderStoragePath on photos[0],
+      // this lazily fetched the download URL and overwrote img.src.
+      // Now: standardized photos are first-class photo objects with direct URLs,
+      // resolved by resolveDisplayPhoto. This function overwrote the correct
+      // src with photos[0]'s stale render — the "cutout shows when render exists" bug.
+      // Kept as a no-op so existing call sites don't break; remove call sites in cleanup.
       function resolveRenderUrl(item, imgEl) {
-        if (!item || !item.id || !storage || !db || !currentUser) return;
-        var photos = itemPhotos(item);
-        if (!photos.length) return;
-        var photo = photos[0];
-        if (!photo || !photo.renderStoragePath || photo.renderUrl) return;
-        if (renderResolveTried[item.id]) return;
-        renderResolveTried[item.id] = true;
-        storage.ref().child(photo.renderStoragePath).getDownloadURL().then(function (renderUrl) {
-          if (imgEl && !(imgEl.dataset && imgEl.dataset.view === "original")) imgEl.src = renderUrl;
-          var ref = db.collection("users").doc(currentUser.uid).collection("items").doc(item.id);
-          return ref.get().then(function (snap) {
-            if (!snap.exists) return null;
-            var data = snap.data() || {};
-            var updated = itemPhotos(data).map(function (p) {
-              if (p.storagePath !== photo.storagePath) return p;
-              var copy = {};
-              Object.keys(p).forEach(function (k) { copy[k] = p[k]; });
-              copy.renderUrl = renderUrl;
-              return copy;
-            });
-            return ref.update({ photos: updated });
-          });
-        }).catch(function (err) { reportError("resolveRenderUrl", err); });
+        return;
       }
 
       // PC-8: data model v2 — first-class colors array, top-level editable
