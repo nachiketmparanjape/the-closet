@@ -12285,13 +12285,6 @@
         };
         appendShopCheckAnalysis(body, r, c.photoUrl, true);
 
-        var askRow = el("div", "form-actions");
-        var askBtn = el("button", "secondary", "Ask the stylist about this");
-        askBtn.type = "button";
-        askBtn.addEventListener("click", function () { askStylistAboutShop(r); });
-        askRow.appendChild(askBtn);
-        body.appendChild(askRow);
-
         // PC-41 (Sprint 29, Option C): the follow-up thread lives in a
         // bottom sheet. The check detail shows one compact row; tapping
         // it opens the sheet. The thread can grow to 20 messages and
