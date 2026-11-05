@@ -317,13 +317,19 @@
     .shop-context { margin: 10px 0 0; font-size: 13px; color: var(--muted-strong); }
     .shop-context .q { font-style: italic; }
     .shop-section-title { margin: 22px 0 8px; font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
-    /* PC-41 (Sprint 29): follow-up thread inside the saved check. */
-    .shop-followup-thread { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
-    .shop-followup-msg { padding: 10px 12px; border-radius: 12px; font-size: 14px; line-height: 1.45; max-width: 90%; }
+    /* PC-41 (Sprint 29, Option C): follow-up thread as a bottom sheet.
+       The check detail shows one compact row; the thread lives in the sheet. */
+    .shop-followup-row-btn { display: block; width: 100%; text-align: left; padding: 12px 4px; background: none; border: none; border-bottom: 1px solid var(--line, #e5e0d8); font-size: 14px; font-weight: 600; color: var(--text); cursor: pointer; }
+    .shop-followup-thread { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+    .shop-followup-msg-wrap { display: flex; align-items: flex-start; gap: 6px; }
+    .shop-followup-msg { padding: 10px 12px; border-radius: 12px; font-size: 14px; line-height: 1.45; max-width: 88%; flex: 1; }
     .shop-followup-user { align-self: flex-end; background: var(--brass, #a87c1c); color: #fff; }
     .shop-followup-assistant { align-self: flex-start; background: var(--paper-soft); }
-    .shop-followup-row { display: flex; gap: 8px; }
+    .shop-followup-del { background: none; border: none; color: var(--muted); font-size: 18px; line-height: 1; cursor: pointer; padding: 10px 4px; flex-shrink: 0; }
+    .shop-followup-row { display: flex; gap: 8px; margin-bottom: 12px; }
     .shop-followup-row input { flex: 1; }
+    .link-button { display: block; background: none; border: none; color: var(--brass, #a87c1c); font-size: 14px; padding: 8px 0; cursor: pointer; text-align: left; }
+    .danger-text { color: var(--danger, #b3261e); }
     .shop-reasons { margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.65; }
     .shop-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
     .shop-thumb { width: 52px; height: 62px; object-fit: cover; border-radius: 6px; background: var(--paper-soft); flex-shrink: 0; }
@@ -1428,6 +1434,18 @@
         <button class="icon-button" id="shopCheckDetailClose" type="button" aria-label="Close">×</button>
       </div>
       <div class="modal-body" id="shopCheckDetailBody"></div>
+    </section>
+  </div>
+
+  <!-- PC-41 (Sprint 29, Option C): follow-up thread as a bottom sheet.
+       The check detail shows one compact row; the thread lives here. -->
+  <div class="overlay" id="shopFollowupOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="shopFollowupTitle">
+    <section class="modal">
+      <div class="modal-head">
+        <h2 id="shopFollowupTitle">Questions about this piece</h2>
+        <button class="icon-button" id="shopFollowupClose" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body" id="shopFollowupBody"></div>
     </section>
   </div>
 
@@ -12274,85 +12292,18 @@
         askRow.appendChild(askBtn);
         body.appendChild(askRow);
 
-        // PC-41 (Sprint 29): follow-up thread inside the saved check.
-        // The thread lives on the check doc (followUps, capped at 20
-        // messages). Each answer reasons over the check's photo/analysis
-        // and the real wardrobe, via the askStylist callable with shopItem.
-        body.appendChild(el("h3", "shop-section-title", "Follow-up"));
-        var threadBox = el("div", "shop-followup-thread");
-        body.appendChild(threadBox);
-        var followInput = document.createElement("input");
-        followInput.type = "text";
-        followInput.placeholder = "Ask about this piece…";
-        followInput.maxLength = 500;
-        var followSend = el("button", "secondary", "Ask");
-        followSend.type = "button";
-        var followRow = el("div", "shop-followup-row");
-        followRow.appendChild(followInput);
-        followRow.appendChild(followSend);
+        // PC-41 (Sprint 29, Option C): the follow-up thread lives in a
+        // bottom sheet. The check detail shows one compact row; tapping
+        // it opens the sheet. The thread can grow to 20 messages and
+        // the check detail never gets crowded.
+        var followCount = Array.isArray(c.followUps) ? Math.floor(c.followUps.length / 2) : 0;
+        var followRow = el("button", "shop-followup-row-btn",
+          followCount > 0
+            ? followCount + (followCount === 1 ? " question asked" : " questions asked") + "  →"
+            : "Ask about this piece  →");
+        followRow.type = "button";
+        followRow.addEventListener("click", function () { openShopFollowupSheet(c, r); });
         body.appendChild(followRow);
-
-        function renderFollowUps() {
-          threadBox.textContent = "";
-          var msgs = Array.isArray(c.followUps) ? c.followUps : [];
-          if (!msgs.length) {
-            threadBox.appendChild(el("p", "hint", "No follow-ups yet — ask about fit, styling, or whether it is worth it."));
-            return;
-          }
-          msgs.forEach(function (m) {
-            var div = el("div", "shop-followup-msg shop-followup-" + (m.role || "user"));
-            div.textContent = m.text || "";
-            threadBox.appendChild(div);
-          });
-        }
-        renderFollowUps();
-
-        followSend.addEventListener("click", function () {
-          var q = followInput.value.trim();
-          if (!q || !currentUser) return;
-          followSend.disabled = true;
-          followInput.value = "";
-          var history = Array.isArray(c.followUps) ? c.followUps.slice(-18) : [];
-          var messages = history.map(function (m) {
-            return { role: m.role === "assistant" ? "assistant" : "user", content: m.text || "" };
-          });
-          messages.push({ role: "user", content: q });
-          var shopItem = shopItemFromCheck(r);
-          // Trip context when the check is trip-tagged (PC-40 plumbing).
-          var tripCtx = null;
-          if (c.tripId) {
-            var t = tripById(c.tripId);
-            tripCtx = t ? { tripId: t.id, tripName: t.name || null } : { tripId: c.tripId };
-          }
-          functions.httpsCallable("askStylist")({
-            items: allItems.map(function (it) {
-              return { id: it.id, name: it.name, category: it.category || null };
-            }),
-            messages: messages,
-            shopItem: shopItem,
-            tripContext: tripCtx
-          }).then(function (res) {
-            var answer = (res.data && (res.data.reply || res.data.text)) || "No answer — try again.";
-            var updated = history.concat([
-              { role: "user", text: q, at: new Date().toISOString() },
-              { role: "assistant", text: answer, at: new Date().toISOString() }
-            ]).slice(-20);
-            return shopCheckDocRef(id).update({
-              followUps: updated,
-              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            }).then(function () {
-              c.followUps = updated;
-              renderFollowUps();
-            });
-          }).catch(function (err) {
-            showToast(friendlyError(err));
-          }).finally(function () {
-            followSend.disabled = false;
-          });
-        });
-        followInput.addEventListener("keydown", function (e) {
-          if (e.key === "Enter") { e.preventDefault(); followSend.click(); }
-        });
 
         // Your details.
         body.appendChild(el("h3", "shop-section-title", "Your details"));
@@ -12520,6 +12471,155 @@
       }
       document.getElementById("shopCheckDetailClose").addEventListener("click", function () {
         closeOverlay(document.getElementById("shopCheckDetailOverlay"));
+      });
+
+      // PC-41 (Sprint 29, Option C): follow-up thread as a bottom sheet.
+      // The check detail shows one compact row ("N questions asked →");
+      // the thread lives here. Inside: the messages, an input, an
+      // "Open in stylist chat" link (the full stylist experience),
+      // per-message delete, and a "Clear thread" button.
+      function openShopFollowupSheet(c, r) {
+        var body = document.getElementById("shopFollowupBody");
+        body.textContent = "";
+        var threadBox = shopCheckEl("div", "shop-followup-thread");
+        body.appendChild(threadBox);
+
+        function renderThread() {
+          threadBox.textContent = "";
+          var msgs = Array.isArray(c.followUps) ? c.followUps : [];
+          if (!msgs.length) {
+            threadBox.appendChild(shopCheckEl("p", "hint", "No questions yet — ask about fit, styling, or whether it is worth it."));
+            return;
+          }
+          msgs.forEach(function (m, idx) {
+            var wrap = shopCheckEl("div", "shop-followup-msg-wrap");
+            var div = shopCheckEl("div", "shop-followup-msg shop-followup-" + (m.role || "user"));
+            div.textContent = m.text || "";
+            wrap.appendChild(div);
+            // Per-message delete: tap the × on a message to remove it
+            // (and its pair, so Q&A stays matched).
+            var delBtn = shopCheckEl("button", "shop-followup-del", "×");
+            delBtn.type = "button";
+            delBtn.setAttribute("aria-label", "Delete this message");
+            delBtn.addEventListener("click", function () {
+              var updated = msgs.slice();
+              // Remove the message and its pair (user+assistant share an index pair).
+              var pairStart = idx % 2 === 0 ? idx : idx - 1;
+              updated.splice(pairStart, 2);
+              shopCheckDocRef(c.id).update({
+                followUps: updated,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+              }).then(function () {
+                c.followUps = updated;
+                renderThread();
+                updateFollowupRow();
+              }).catch(function (err) { showToast(friendlyError(err)); });
+            });
+            wrap.appendChild(delBtn);
+            threadBox.appendChild(wrap);
+          });
+        }
+        renderThread();
+
+        var input = document.createElement("input");
+        input.type = "text";
+        input.placeholder = "Ask about this piece…";
+        input.maxLength = 500;
+        var sendBtn = shopCheckEl("button", "secondary", "Ask");
+        sendBtn.type = "button";
+        var inputRow = shopCheckEl("div", "shop-followup-row");
+        inputRow.appendChild(input);
+        inputRow.appendChild(sendBtn);
+        body.appendChild(inputRow);
+
+        // Open in stylist chat: the full stylist experience (weather,
+        // trips, outfit building) with this check attached as context.
+        var openStylistBtn = shopCheckEl("button", "link-button", "Open in stylist chat →");
+        openStylistBtn.type = "button";
+        openStylistBtn.addEventListener("click", function () {
+          closeOverlay(document.getElementById("shopFollowupOverlay"));
+          askStylistAboutShop(r);
+        });
+        body.appendChild(openStylistBtn);
+
+        // Clear thread: removes all follow-ups from the check doc.
+        var clearBtn = shopCheckEl("button", "link-button danger-text", "Clear thread");
+        clearBtn.type = "button";
+        clearBtn.addEventListener("click", function () {
+          if (!window.confirm("Clear all questions on this check?")) return;
+          shopCheckDocRef(c.id).update({
+            followUps: [],
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          }).then(function () {
+            c.followUps = [];
+            renderThread();
+            updateFollowupRow();
+          }).catch(function (err) { showToast(friendlyError(err)); });
+        });
+        body.appendChild(clearBtn);
+
+        // Refresh the compact row on the check detail (the count changes).
+        function updateFollowupRow() {
+          var detailBody = document.getElementById("shopCheckDetailBody");
+          var row = detailBody && detailBody.querySelector(".shop-followup-row-btn");
+          if (!row) return;
+          var n = Array.isArray(c.followUps) ? Math.floor(c.followUps.length / 2) : 0;
+          row.textContent = n > 0
+            ? n + (n === 1 ? " question asked" : " questions asked") + "  →"
+            : "Ask about this piece  →";
+        }
+
+        sendBtn.addEventListener("click", function () {
+          var q = input.value.trim();
+          if (!q || !currentUser) return;
+          sendBtn.disabled = true;
+          input.value = "";
+          var history = Array.isArray(c.followUps) ? c.followUps.slice(-18) : [];
+          var messages = history.map(function (m) {
+            return { role: m.role === "assistant" ? "assistant" : "user", content: m.text || "" };
+          });
+          messages.push({ role: "user", content: q });
+          var shopItem = shopItemFromCheck(r);
+          var tripCtx = null;
+          if (c.tripId) {
+            var t = tripById(c.tripId);
+            tripCtx = t ? { tripId: t.id, tripName: t.name || null } : { tripId: c.tripId };
+          }
+          functions.httpsCallable("askStylist")({
+            items: allItems.map(function (it) {
+              return { id: it.id, name: it.name, category: it.category || null };
+            }),
+            messages: messages,
+            shopItem: shopItem,
+            tripContext: tripCtx
+          }).then(function (res) {
+            var answer = (res.data && (res.data.reply || res.data.text)) || "No answer — try again.";
+            var updated = history.concat([
+              { role: "user", text: q, at: new Date().toISOString() },
+              { role: "assistant", text: answer, at: new Date().toISOString() }
+            ]).slice(-20);
+            return shopCheckDocRef(c.id).update({
+              followUps: updated,
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }).then(function () {
+              c.followUps = updated;
+              renderThread();
+              updateFollowupRow();
+            });
+          }).catch(function (err) {
+            showToast(friendlyError(err));
+          }).finally(function () {
+            sendBtn.disabled = false;
+          });
+        });
+        input.addEventListener("keydown", function (e) {
+          if (e.key === "Enter") { e.preventDefault(); sendBtn.click(); }
+        });
+
+        openOverlay(document.getElementById("shopFollowupOverlay"));
+      }
+      document.getElementById("shopFollowupClose").addEventListener("click", function () {
+        closeOverlay(document.getElementById("shopFollowupOverlay"));
       });
       document.getElementById("photoParseInput").addEventListener("change", function () {
         handlePhotoParseFile(this.files && this.files[0]);
