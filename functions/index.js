@@ -864,13 +864,12 @@ exports.planPacking = onCall(
 // Callable: standardize a single wardrobe item.
 // Design: docs/sprints/sprint-26/PC-58-DESIGN.md
 const {
-  runFluxStandardization,
-  runQualityGates,
   isAlreadyClean,
   MAX_ATTEMPTS,
   EXPENSE_WARNING_THRESHOLD,
   STANDARDIZATION_COST_PER_RUN,
 } = require("./standardize");
+const { runStandardizationPipeline } = require("./standardize-pipeline");
 const {
   createFalSegmentation,
   getFalSegmentation,
@@ -956,130 +955,26 @@ exports.standardizeItem = onCall(
       // item stuck in 'processing' forever.
       let processingCompleted = false;
       try {
-      // Get the item's image URL
-      const photos = item.photos || [];
-      if (!photos.length || !photos[0].url) {
-        throw new Error("No photo URL on item");
-      }
-      const imageUrl = photos[0].url;
+      // Sprint 28 Card 1: shared pipeline (FLUX -> gates -> SAM -> upload).
+      // Same code the autoStandardizeItem trigger runs. No duplication.
       const falApiKey = process.env.FAL_API_KEY;
       if (!falApiKey) {
         throw new Error("FAL_API_KEY not configured");
       }
-
-      // Run FLUX standardization (with item attributes for better fidelity)
-      let outputUrl;
+      const bucket = getStorage().bucket();
+      let result;
       try {
-        outputUrl = await runFluxStandardization(imageUrl, falApiKey, item, feedback);
-      } catch (fluxErr) {
+        result = await runStandardizationPipeline({
+          db, bucket, uid, itemId, item, falApiKey, feedback,
+        });
+      } catch (pipeErr) {
         await itemRef.update({
           "standardization.status": "failed",
-          "standardization.lastError": `flux_error: ${fluxErr.message.slice(0, 200)}`,
+          "standardization.lastError": `${pipeErr.message.slice(0, 200)}`,
         });
-        throw fluxErr;
+        throw pipeErr;
       }
-
-      // TODO: Download both images and run quality gates
-      // For v1, we trust the output and mark ready.
-      // Gates (Delta-E, geometry) will be wired in once the pixel
-      // analysis helpers are implemented in standardize.js.
-      //
-      // const inputBuffer = await downloadImage(imageUrl);
-      // const outputBuffer = await downloadImage(outputUrl);
-      // const gates = await runQualityGates(inputBuffer, outputBuffer);
-      // if (!gates.pass) { ... retry or mark failed ... }
-
-      // Upload the standardized image to the user's storage.
-      // Note: getSignedUrl requires iam.serviceAccounts.signBlob which the
-      // function service account lacks. Use public URL instead.
-      //
-      // PC-58 transparent background (2026-11-01): FLUX outputs on white.
-      // Run SAM 3 on the output to cut out the garment → transparent PNG
-      // that blends with the app's dark background. Extra $0.005.
-      const bucket = getStorage().bucket();
-      const fluxBuffer = Buffer.from(await (await fetch(outputUrl)).arrayBuffer());
-      
-      let standardizedBuffer = fluxBuffer;
-      let cutoutNote = "";
-      try {
-        console.log(`[standardizeItem] Running SAM 3 on FLUX output for transparency...`);
-        const seg = await createFalSegmentation({
-          apiKey: falApiKey,
-          imageBuffer: fluxBuffer,
-          filename: "flux-output.png",
-          prompt: "the garment",
-          fetchImpl: fetch,
-        });
-        let maskUrl = null;
-        for (let i = 0; i < 24; i++) { // 24 * 5s = 120s max
-          await new Promise(r => setTimeout(r, 5000));
-          const segRes = await getFalSegmentation({
-            apiKey: falApiKey,
-            predictionId: seg.predictionId,
-            statusUrl: seg.statusUrl,
-            responseUrl: seg.responseUrl,
-            fetchImpl: fetch,
-          });
-          if (segRes.status === "succeeded" && segRes.output?.pred_masks?.[0]) {
-            maskUrl = segRes.output.pred_masks[0].url;
-            break;
-          }
-          if (segRes.status === "failed") throw new Error("SAM 3 failed: " + segRes.error);
-        }
-        if (maskUrl) {
-          const maskBuffer = await fetchMaskBuffer({ url: maskUrl, fetchImpl: fetch });
-          standardizedBuffer = await maskToCutout({ imageBuffer: fluxBuffer, maskBuffer });
-          console.log(`[standardizeItem] SAM 3 cutout done, ${standardizedBuffer.length} bytes`);
-        } else {
-          cutoutNote = " (SAM 3 timed out, using white background)";
-          console.log(`[standardizeItem] SAM 3 timed out, falling back to white background`);
-        }
-      } catch (samErr) {
-        // Non-fatal: fall back to the white-background FLUX output
-        cutoutNote = " (cutout failed, using white background)";
-        console.log(`[standardizeItem] SAM 3 failed: ${samErr.message}, using white background`);
-      }
-      
-      const stdPath = `users/${uid}/items/${itemId}/standardized.png`;
-      await bucket.file(stdPath).save(standardizedBuffer, { contentType: "image/png" });
-      await bucket.file(stdPath).makePublic();
-      const stdUrl = `https://storage.googleapis.com/${bucket.name}/${stdPath}`;
-
-      // PC-58 photo type tags: swap logic (Admin SDK format — plain objects).
-      // - New photo gets type='standardized'
-      // - Any existing photo with type='standardized' gets re-tagged to type='actual'
-      //   (it's the source material; the new AI output takes the standardized slot)
-      // - If the input was an 'actual' photo, it stays as 'actual'
-      // NOTE (2026-10-31 bugfix): The Admin SDK returns plain JS objects, NOT
-      // Firestore REST format. Writing {mapValue:{fields:...}} or
-      // {arrayValue:{values:...}} corrupts the document. Use plain objects/arrays.
-      const existingPhotos = item.photos || [];
-      const updatedPhotos = existingPhotos.map(p => {
-        // p is a plain object like {url, storagePath, type, ...}
-        if (p && p.type === 'standardized') {
-          return { ...p, type: 'actual' };
-        }
-        return p;
-      });
-      // Add the new standardized photo (plain object)
-      updatedPhotos.push({
-        url: stdUrl,
-        storagePath: stdPath,
-        type: 'standardized',
-        createdAt: new Date().toISOString(),
-      });
-
-      // Mark ready (transactional: photos + status together)
-      await db.runTransaction(async (t) => {
-        t.update(itemRef, {
-          photos: updatedPhotos,
-          "standardization.status": "ready",
-          "standardization.standardizedUrl": stdUrl,
-          "standardization.standardizedStoragePath": stdPath,
-          "standardization.completedAt": new Date().toISOString(),
-          "standardization.lastError": null,
-        });
-      });
+      const stdUrl = result.standardizedUrl;
 
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: true });
       processingCompleted = true;
@@ -1169,17 +1064,34 @@ exports.autoStandardizeItem = onDocumentCreated(
     } catch (e) {
       // If the clean check fails, proceed to standardize (conservative).
     }
-    // Trigger standardization: call the same pipeline as standardizeItem.
-    // We do this by writing status=processing and letting the standardizeItem
-    // callable pick it up on next user action, OR by directly running the
-    // pipeline. For now: mark as pending so the UI shows the option, and
-    // the user can tap Generate. Full auto-run requires the pipeline to be
-    // importable — deferred to avoid duplicating the FLUX call path.
-    // NOTE: This trigger currently only tags already-clean items. Full
-    // auto-standardization (running FLUX on create) is intentionally NOT
-    // wired yet — it needs the pipeline extracted into a shared module
-    // first, to avoid duplicating the 200-line standardizeItem body.
-    // The manual Generate button remains the path for non-clean items.
-    return;
+    // Not clean — run the full pipeline (same code as the manual Generate).
+    // Mark processing first so the UI reflects it, then run. On failure,
+    // mark failed with the error (never stuck in processing — the sweeper
+    // also catches anything older than 30 min).
+    const db = getFirestore();
+    const itemRef = db.collection("users").doc(uid).collection("items").doc(itemId);
+    const falApiKey = process.env.FAL_API_KEY;
+    if (!falApiKey) {
+      console.log("[autoStandardizeItem] FAL_API_KEY not configured, skipping");
+      return;
+    }
+    await itemRef.update({
+      "standardization.status": "processing",
+      "standardization.attempts": 1,
+      "standardization.lastAttemptAt": new Date().toISOString(),
+    });
+    try {
+      const bucket = getStorage().bucket();
+      await runStandardizationPipeline({
+        db, bucket, uid, itemId, item, falApiKey, feedback: "",
+      });
+      console.log(`[autoStandardizeItem] Standardized ${itemId} for ${uid}`);
+    } catch (pipeErr) {
+      console.log(`[autoStandardizeItem] Failed ${itemId}: ${pipeErr.message}`);
+      await itemRef.update({
+        "standardization.status": "failed",
+        "standardization.lastError": `${pipeErr.message.slice(0, 200)}`,
+      });
+    }
   }
 );
