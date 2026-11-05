@@ -165,8 +165,22 @@ Steps 2–5 are the build. This card is step 1.
 ## Questions for the founder
 
 1. Is 95% agreement with under 2% false-pass the right bar, or should it be stricter?
+   **Answered 2026-11-04: yes, 95% / <2% is the bar.**
 2. Should the vision judge see three backgrounds (magenta, white, black) or is magenta alone enough?
+   **Answered 2026-11-04: three backgrounds (Bramble's call — catches fringe on dark AND light grounds).**
 3. When the check fails a cut, should the founder get a notification, or is the review queue enough?
+   **Answered 2026-11-04: queue only, no notification.**
+
+## Scale note (founder, 2026-11-04)
+
+"We are building as an app with potentially hundreds of users. Build something that scales appropriately."
+
+This changes how the check is designed:
+- **Review queue is per-user.** Each user sees only their own failed cuts. There is no global queue, no cross-user visibility, no admin view of other users' cuts.
+- **No cross-user notifications, ever.** A failed cut is visible in that user's queue only. No push, no email, no ping.
+- **Calibration set starts with the founder's 69 renders** but must not be tuned to them. Thresholds are set on the founder's set, then validated on a held-out sample before they apply to all users. Founder-specific quirks (one unusual garment, one odd photo style) must not become global rules.
+- **Cost is per-user, tracked per-user.** The ai_usage ledger already records cost per user per feature. The check's $0.001/cut is trivial per user, but the ledger must show it so a heavy user cannot silently run up a bill.
+- **The check is user-agnostic.** No per-user tuning, no per-user thresholds. One check, one bar, for every user. If a user's cuts systematically fail, that is a data problem (their photos), not a tuning problem.
 
 ## History
 
