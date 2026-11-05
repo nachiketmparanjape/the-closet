@@ -1,7 +1,7 @@
 # Sprint 28 — approved 2026-11-04
 
 ## Cards
-1. **Full auto-FLUX on item-add** (Sprint 27 caveat) — Extract the standardization pipeline from `standardizeItem` into a shared module so the `autoStandardizeItem` Firestore trigger actually runs FLUX on create, not just tags clean items. Completes the passive vision. Cost: $0.03/item.
+1. **Full auto-FLUX on item-add** (Sprint 27 caveat) — DONE 2026-11-04. Pipeline extracted to `functions/standardize-pipeline.js` (FLUX -> Delta-E/geometry gates with 3x retry -> SAM cutout -> upload -> photo swap). `standardizeItem` callable and `autoStandardizeItem` trigger both call it. Gates wired into the pipeline (was a TODO). 469/469 tests pass.
 2. **PC-58 review gate (#128)** — AI renders wait for founder approval before showing in the UI. The gates are real now (Delta-E + geometry); this adds the human verdict step.
 3. **PC-59 (#129)** — Uniform display scaling + too-small-in-photo warning. Every garment renders at a consistent size; warn when a photo is too small to work with.
 
