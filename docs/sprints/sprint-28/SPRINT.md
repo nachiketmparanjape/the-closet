@@ -1,0 +1,21 @@
+# Sprint 28 — approved 2026-11-04
+
+## Cards
+1. **Full auto-FLUX on item-add** (Sprint 27 caveat) — Extract the standardization pipeline from `standardizeItem` into a shared module so the `autoStandardizeItem` Firestore trigger actually runs FLUX on create, not just tags clean items. Completes the passive vision. Cost: $0.03/item.
+2. **PC-58 review gate (#128)** — AI renders wait for founder approval before showing in the UI. The gates are real now (Delta-E + geometry); this adds the human verdict step.
+3. **PC-59 (#129)** — Uniform display scaling + too-small-in-photo warning. Every garment renders at a consistent size; warn when a photo is too small to work with.
+
+## Housekeeping done at planning (2026-11-04)
+- #134 CLOSED (done in Sprint 27).
+- #127 (PC-57) CLOSED — Qwen experiment verdict was FAIL (2026-10-28).
+- PR #80 left OPEN with a comment — design docs awaiting founder review. Not merging without it.
+- Sprint 26 Cards 2, 3: KILLED. No SPRINT.md, no issue, no record of what they were — proposed but never approved, content lost to context compaction. If the work matters, re-file as a new issue. (Founder: no context to decide; Bramble made the call per the aging rule.)
+- PR #133 (Pooja, UX-16 audit docs) — still open, mergeable state unknown. Needs review.
+
+## Carried / undecided
+- #129 (PC-59), #130 (PC-60) — #129 is in this sprint; #130 stays backlog.
+- Sprint 26 Cards 2, 3 — killed (see above).
+
+## Planning notes
+- Full inventory walk: 19 open issues, BACKLOG.md, studio inbox. No aging flags beyond already-parked items.
+- Founder approved the 3-card slate as proposed.
