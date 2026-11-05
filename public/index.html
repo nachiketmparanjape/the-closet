@@ -2805,10 +2805,9 @@
         var imageWrap = document.createElement("div");
         imageWrap.className = "item-image";
         var image = document.createElement("img");
-        image.src = itemDisplayUrl(item);
+        // #134: central resolver — one call sets src + rotation from the displayed photo.
+        showDisplayPhoto(image, item, "clean", true);
         resolveRenderUrl(item, image);
-        // PC-58 (2026-11-01): Apply rotation from the displayed photo, not photos[0]
-        applyPhotoRotation(image, itemDisplayPhoto(item), "clean", true);
         image.alt = item.name || "Wardrobe item";
         image.loading = "lazy";
         imageWrap.appendChild(image);
@@ -2885,6 +2884,53 @@
         if (item.photos && item.photos.length) return item.photos;
         if (item.imageUrl) return [{ url: item.imageUrl, storagePath: item.storagePath || null }];
         return [];
+      }
+
+      // #134 (2026-11-04): CENTRAL PHOTO RESOLVER — the one place that decides
+      // which photo an item shows and how it's rotated. Every display surface
+      // (wardrobe grid, item page, outfit cards, category heroes, trips)
+      // MUST call resolveDisplayPhoto and apply what it returns. No surface
+      // reaches into photos[] directly for display.
+      //
+      // Rules (founder-approved):
+      // 1. Photo priority: standardized (AI render) → cutout → photos[0].
+      //    There is always a cutout, so the chain never hits empty.
+      // 2. Rotation comes from the DISPLAYED photo object, never photos[0].
+      //    Each photo carries rotation (original view) and renderRotation
+      //    (clean view); the view is passed in, not owned here.
+      // 3. Per-photo independent rotation: rotating photo A never affects photo B.
+      //
+      // Returns { photo, url, rotationDeg } or null if the item has no photos.
+      function resolveDisplayPhoto(item, view) {
+        var photos = itemPhotos(item || {});
+        if (!photos.length) return null;
+        var byType = {};
+        for (var i = 0; i < photos.length; i++) {
+          var t = (photos[i] && photos[i].type) || "unknown";
+          if (!byType[t]) byType[t] = photos[i];
+        }
+        var photo = byType["standardized"] || byType["cutout"] || photos[0];
+        return {
+          photo: photo,
+          url: photoDisplayUrl(photo),
+          rotationDeg: photoRotationDeg(photo, view || "clean"),
+        };
+      }
+
+      // Apply a resolved display photo to an <img> element in one call.
+      // Replaces the old pattern of setting src + calling applyPhotoRotation
+      // with (sometimes the wrong) photo object.
+      function showDisplayPhoto(imgEl, item, view, fit45) {
+        if (!imgEl) return;
+        var resolved = resolveDisplayPhoto(item, view);
+        if (!resolved) { imgEl.removeAttribute("src"); imgEl.style.transform = ""; return; }
+        imgEl.src = resolved.url;
+        var t = "";
+        if (resolved.rotationDeg) {
+          t = "rotate(" + resolved.rotationDeg + "deg)";
+          if (fit45 && (resolved.rotationDeg === 90 || resolved.rotationDeg === 270)) t += " scale(0.8)";
+        }
+        imgEl.style.transform = t;
       }
 
       // PC-34: display URL for a photo — the extracted clean render
@@ -3511,23 +3557,29 @@
         var hasRender = !!(cover && (cover.renderStoragePath || cover.renderUrl));
         row.hidden = !hasRender;
         syncViewChips("clean");
+        // #134: operate on the current photo (dots index), not always ps[0].
+        // Per-photo independent rotation: each photo's view + rotation is its own.
         document.getElementById("viewCleanBtn").onclick = function () {
           if (!activeItem) return;
           var ps = itemPhotos(activeItem);
           if (!ps.length) return;
+          var idx = (typeof currentPhotoIndex === "number") ? currentPhotoIndex : 0;
+          idx = Math.max(0, Math.min(idx, ps.length - 1));
           itemPhoto.dataset.view = "clean";
-          itemPhoto.src = photoDisplayUrl(ps[0]);
+          itemPhoto.src = photoDisplayUrl(ps[idx]);
           resolveRenderUrl(activeItem, itemPhoto);
-          applyPhotoRotation(itemPhoto, ps[0], itemPhoto.dataset.view);
+          applyPhotoRotation(itemPhoto, ps[idx], itemPhoto.dataset.view);
           syncViewChips("clean");
         };
         document.getElementById("viewOriginalBtn").onclick = function () {
           if (!activeItem) return;
           var ps = itemPhotos(activeItem);
           if (!ps.length) return;
+          var idx = (typeof currentPhotoIndex === "number") ? currentPhotoIndex : 0;
+          idx = Math.max(0, Math.min(idx, ps.length - 1));
           itemPhoto.dataset.view = "original";
-          itemPhoto.src = ps[0].url || photoDisplayUrl(ps[0]);
-          applyPhotoRotation(itemPhoto, ps[0], itemPhoto.dataset.view);
+          itemPhoto.src = ps[idx].url || photoDisplayUrl(ps[idx]);
+          applyPhotoRotation(itemPhoto, ps[idx], itemPhoto.dataset.view);
           syncViewChips("original");
         };
         document.getElementById("rotateLeftBtn").onclick = function () { rotatePhoto(-90); };
@@ -3914,24 +3966,11 @@
         itemTitle.textContent = item.shortName || item.name || "Untitled piece";
         var photos = itemPhotos(item);
         // PC-58 UI declutter (2026-11-01): Use dots instead of chips+thumbnails.
-        // Show the preferred photo (AI > cutout > original) via itemDisplayUrl.
-        itemPhoto.src = itemDisplayUrl(item);
+        // #134: central resolver sets src + rotation from the displayed photo.
+        showDisplayPhoto(itemPhoto, item, "dots");
         itemPhoto.alt = item.name || "Wardrobe item";
         itemPhoto.dataset.view = "dots";
         itemPhoto.dataset.index = 0;
-        var firstPhoto = photos.length ? photos[0] : null;
-        // Find the preferred photo for rotation
-        var displayPhotos = itemPhotos(item);
-        var prefPhoto = displayPhotos[0];
-        for (var pi = 0; pi < displayPhotos.length; pi++) {
-          if (displayPhotos[pi] && displayPhotos[pi].type === "standardized") { prefPhoto = displayPhotos[pi]; break; }
-        }
-        if (!prefPhoto) {
-          for (var pj = 0; pj < displayPhotos.length; pj++) {
-            if (displayPhotos[pj] && displayPhotos[pj].type === "cutout") { prefPhoto = displayPhotos[pj]; break; }
-          }
-        }
-        applyPhotoRotation(itemPhoto, prefPhoto, "dots");
         setupPhotoDots(item);
         // Hide legacy UI (chips, thumbnails) — dots replace them
         var legacyRow = document.getElementById("itemPhotoViewRow");
@@ -4075,9 +4114,9 @@
           var ps = itemPhotos(hero);
           if (ps.length && ps[0].url) {
             var img = document.createElement("img");
-            img.src = photoDisplayUrl(ps[0]);
+            // #134: central resolver.
+            showDisplayPhoto(img, hero, "clean");
             resolveRenderUrl(hero, img);
-            applyPhotoRotation(img, ps[0], "clean");
             img.alt = hero.name || cat;
             img.loading = "lazy";
             fig.appendChild(img);
@@ -8990,9 +9029,9 @@
           var fig = document.createElement("figure");
           if (ps.length && ps[0].url) {
             var img = document.createElement("img");
-            img.src = photoDisplayUrl(ps[0]);
+            // #134: central resolver.
+            showDisplayPhoto(img, it, "clean");
             resolveRenderUrl(it, img);
-            applyPhotoRotation(img, itemPhotos(it)[0], "clean");
             img.alt = it ? it.name : "item photo";
             img.loading = "lazy";
             fig.appendChild(img);
@@ -9351,10 +9390,11 @@
             var photos = it ? itemPhotos(it) : [];
             if (photos.length) {
               var img = document.createElement("img");
-              // PC-58 (2026-11-01): Outfit cards show AI render by default
-              img.src = itemDisplayUrl(it);
+              // #134: central resolver — src + rotation from the displayed photo.
+              // (Was: itemDisplayUrl for src but rotation from photos[0] — the
+              // sideways-in-outfit bug.)
+              showDisplayPhoto(img, it, "clean");
               resolveRenderUrl(it, img);
-              applyPhotoRotation(img, itemPhotos(it)[0], "clean");
               img.alt = "";
               img.loading = "lazy";
               thumbs.appendChild(img);
@@ -9828,10 +9868,9 @@
           var thumb = document.createElement("img");
           thumb.alt = "";
           thumb.loading = "lazy";
-          var url = "";
-          try { url = itemDisplayUrl(item); } catch (e) {}
-          if (url) thumb.src = url;
-          else thumb.style.display = "none";
+          // #134: central resolver (src + rotation).
+          showDisplayPhoto(thumb, item, "clean");
+          if (!thumb.src) thumb.style.display = "none";
           row.appendChild(thumb);
           var label = document.createElement("span");
           label.className = "match-pick-name";
