@@ -24,9 +24,9 @@ describe('PC-58 standardization constants', () => {
   });
 });
 
-describe('isAlreadyClean (placeholder)', () => {
-  it('returns conservative default until heuristics are implemented', () => {
-    const result = isAlreadyClean(Buffer.from('fake'));
+describe('isAlreadyClean (heuristic)', () => {
+  it('returns not-clean on unparseable input (conservative)', async () => {
+    const result = await isAlreadyClean(Buffer.from('fake'));
     assert.equal(result.isClean, false);
     assert.ok(result.reason);
   });

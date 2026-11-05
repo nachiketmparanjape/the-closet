@@ -123,17 +123,49 @@ function buildFluxPrompt(item, feedback = '') {
 /**
  * Check if an image is "already clean" — a studio product shot that doesn't
  * need standardization. Pure pixel heuristics, zero AI cost.
+ * An image is "clean" if: (a) it has meaningful alpha transparency (a cutout),
+ * or (b) its border pixels are >90% near-white (studio shot on white).
  *
  * @param {Buffer} imageBuffer - The image bytes
- * @returns {{isClean: boolean, reason: string}}
+ * @returns {Promise<{isClean: boolean, reason: string}>}
  */
-function isAlreadyClean(imageBuffer) {
-  // TODO: Implement with sharp or jimp
-  // 1. Check for meaningful alpha transparency
-  // 2. Sample border pixels for background uniformity (>90% near-white = clean)
-  // For now, conservative default: not clean (process everything)
-  // The 55 Google imports are already tagged in Firestore via backfill.
-  return { isClean: false, reason: 'heuristic-not-implemented' };
+async function isAlreadyClean(imageBuffer) {
+  try {
+    const sharp = require("sharp");
+    const { data, info } = await sharp(imageBuffer)
+      .resize(64, 64, { fit: "inside" })
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    let transparent = 0;
+    let borderWhite = 0;
+    let borderTotal = 0;
+    for (let y = 0; y < info.height; y++) {
+      for (let x = 0; x < info.width; x++) {
+        const i = (y * info.width + x) * 4;
+        const a = data[i + 3];
+        if (a < 128) transparent++;
+        // Border pixels: outer 2 rows/cols.
+        const isBorder = x < 2 || x >= info.width - 2 || y < 2 || y >= info.height - 2;
+        if (isBorder) {
+          borderTotal++;
+          const r = data[i], g = data[i + 1], b = data[i + 2];
+          if (a >= 128 && r > 240 && g > 240 && b > 240) borderWhite++;
+        }
+      }
+    }
+    const total = info.width * info.height;
+    if (transparent / total > 0.05) {
+      return { isClean: true, reason: "has-transparency" };
+    }
+    if (borderTotal > 0 && borderWhite / borderTotal > 0.90) {
+      return { isClean: true, reason: "white-background" };
+    }
+    return { isClean: false, reason: "not-clean" };
+  } catch (e) {
+    // Conservative: if we can't analyze, process it (don't skip).
+    return { isClean: false, reason: "check-error:" + (e.message || "unknown") };
+  }
 }
 
 /**
@@ -195,32 +227,117 @@ async function runFluxStandardization(imageUrl, falApiKey, item = {}, feedback =
 /**
  * Quality gate: Color fidelity via Delta-E in LAB space.
  * Compares dominant colors of input vs output garment regions.
+ * Uses sharp to extract median RGB of non-background pixels, converts to
+ * CIE LAB, and computes CIE76 Delta-E. Pass if Delta-E < DELTA_E_THRESHOLD.
  *
  * @param {Buffer} inputBuffer - Original garment image
  * @param {Buffer} outputBuffer - Standardized output image
  * @returns {Promise<{pass: boolean, deltaE: number, reason: string}>}
  */
 async function gateColorFidelity(inputBuffer, outputBuffer) {
-  // TODO: Implement with sharp for pixel access
-  // 1. Extract garment region (exclude background)
-  // 2. Compute dominant color (median of foreground pixels)
-  // 3. Convert to LAB, compute Delta-E
-  // 4. Pass if Delta-E < DELTA_E_THRESHOLD
-  //
-  // Proven: teal joggers scored 44.3 = correctly flagged as FAIL.
-  return { pass: true, deltaE: 0, reason: 'not-implemented' };
+  try {
+    const sharp = require("sharp");
+    const dominant = async (buffer) => {
+      // Downscale to 64x64 for speed, get raw RGBA pixels.
+      const { data, info } = await sharp(buffer)
+        .resize(64, 64, { fit: "inside" })
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      // Collect non-background pixels (not near-white, not fully transparent).
+      const pixels = [];
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
+        if (a < 128) continue; // transparent = background
+        if (r > 240 && g > 240 && b > 240) continue; // near-white = background
+        pixels.push([r, g, b]);
+      }
+      if (!pixels.length) return null;
+      // Median per channel (robust to outliers).
+      const med = (arr) => {
+        const s = arr.slice().sort((x, y) => x - y);
+        return s[Math.floor(s.length / 2)];
+      };
+      return [
+        med(pixels.map((p) => p[0])),
+        med(pixels.map((p) => p[1])),
+        med(pixels.map((p) => p[2])),
+      ];
+    };
+    const rgbToLab = (r, g, b) => {
+      // sRGB -> XYZ -> LAB (D65).
+      let [R, G, B] = [r / 255, g / 255, b / 255].map((c) =>
+        c > 0.04045 ? Math.pow((c + 0.055) / 1.055, 2.4) : c / 12.92
+      );
+      const X = (R * 0.4124 + G * 0.3576 + B * 0.1805) / 0.95047;
+      const Y = (R * 0.2126 + G * 0.7152 + B * 0.0722) / 1.0;
+      const Z = (R * 0.0193 + G * 0.1192 + B * 0.9505) / 1.08883;
+      const f = (t) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+      const fx = f(X), fy = f(Y), fz = f(Z);
+      return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
+    };
+    const inRgb = await dominant(inputBuffer);
+    const outRgb = await dominant(outputBuffer);
+    if (!inRgb || !outRgb) {
+      return { pass: false, deltaE: Infinity, reason: "no-garment-pixels" };
+    }
+    const [L1, a1, b1] = rgbToLab(...inRgb);
+    const [L2, a2, b2] = rgbToLab(...outRgb);
+    const deltaE = Math.sqrt((L1 - L2) ** 2 + (a1 - a2) ** 2 + (b1 - b2) ** 2);
+    return {
+      pass: deltaE < DELTA_E_THRESHOLD,
+      deltaE,
+      reason: deltaE < DELTA_E_THRESHOLD ? "color-ok" : `color-shift(ΔE=${deltaE.toFixed(1)})`,
+    };
+  } catch (e) {
+    // Gate failure must not crash the pipeline — fail open with a flag.
+    return { pass: true, deltaE: 0, reason: "gate-error:" + (e.message || "unknown") };
+  }
 }
 
 /**
  * Quality gate: Geometry completeness.
- * Verifies the output contains a complete garment (not truncated, no floaters).
+ * Verifies the output contains a complete garment: non-trivial opaque
+ * area, reasonable aspect ratio, and the garment isn't a thin sliver.
  *
  * @param {Buffer} outputBuffer - Standardized output image
  * @returns {Promise<{pass: boolean, reason: string}>}
  */
 async function gateGeometry(outputBuffer) {
-  // TODO: Implement silhouette analysis
-  return { pass: true, reason: 'not-implemented' };
+  try {
+    const sharp = require("sharp");
+    const { data, info } = await sharp(outputBuffer)
+      .resize(128, 128, { fit: "inside" })
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    let opaque = 0;
+    let minX = info.width, maxX = 0, minY = info.height, maxY = 0;
+    for (let y = 0; y < info.height; y++) {
+      for (let x = 0; x < info.width; x++) {
+        const i = (y * info.width + x) * 4;
+        if (data[i + 3] >= 128) {
+          opaque++;
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    const total = info.width * info.height;
+    const coverage = opaque / total;
+    // Garment should cover 10-95% of the frame (not empty, not full-bleed).
+    if (coverage < 0.10) return { pass: false, reason: "garment-too-small" };
+    if (coverage > 0.95) return { pass: false, reason: "no-background-detected" };
+    // Bounding box should be reasonably proportioned (not a sliver).
+    const bw = maxX - minX + 1, bh = maxY - minY + 1;
+    const aspect = bw / bh;
+    if (aspect < 0.15 || aspect > 6) return { pass: false, reason: "garment-shape-degenerate" };
+    return { pass: true, reason: "geometry-ok" };
+  } catch (e) {
+    return { pass: true, reason: "gate-error:" + (e.message || "unknown") };
+  }
 }
 
 /**

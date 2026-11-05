@@ -96,9 +96,21 @@ function buildPrompt(garment) {
 
 const LIST_PROMPT = `List every distinct garment visible in this photo, one entry per wearable unit: pieces that are worn and stored as a single unit count as one garment (a pair of shoes, gloves, or socks is one garment — never list the left and right separately), while pieces that can be worn on their own are separate garments (a jacket and the tee visible inside it are two garments; a pair of trousers is one garment). Skip people, furniture, and background objects.
 
-Answer with ONLY a JSON object (no markdown, no prose): {"garments": [{"type": "jacket", "colors": ["black"], "detail": "open front, tee visible inside", "pattern": "solid", "fit": "regular", "fabric_guess": "denim", "formality": "casual", "warmth": "medium", "description": "Black denim jacket with an open front"}]}.
+Answer with ONLY a JSON object (no markdown, no prose): {"garments": [{"type": "jacket", "colors": ["black"], "detail": "open front, tee visible inside", "pattern": "solid", "fit": "regular", "fabric_guess": "denim", "formality": "casual", "warmth": "medium", "description": "Black denim jacket with an open front", "subtype": "jacket", "sleeve_length": "long", "neckline": "collar", "collar": "collar", "length": "regular", "rise": "mid", "cuff": "none", "closure": "zip", "zip": false, "hood": false}]}.
 
-type is the garment kind in plain words ("jacket", "trousers", "tee", "dress", "shoes"). colors are plain words, up to 3, the garment's own colors (not the background's). detail is one short distinguishing phrase (a print, a zip, an open front) or "" when nothing distinguishes it. pattern is one of: solid, striped, checked, floral, graphic, other. fit is one of: slim, regular, relaxed, oversized, unknown. fabric_guess is the likely fabric in plain words ("cotton", "denim", "synthetic blend") or "unknown". formality is one of: casual, smart-casual, formal. warmth is one of: light, medium, heavy. description is one short sentence describing the garment.`;
+type is the garment kind in plain words ("jacket", "trousers", "tee", "dress", "shoes"). colors are plain words, up to 3, the garment's own colors (not the background's). detail is one short distinguishing phrase (a print, a zip, an open front) or "" when nothing distinguishes it. pattern is one of: solid, striped, checked, floral, graphic, other. fit is one of: slim, regular, relaxed, oversized, unknown. fabric_guess is the likely fabric in plain words ("cotton", "denim", "synthetic blend") or "unknown". formality is one of: casual, smart-casual, formal. warmth is one of: light, medium, heavy. description is one short sentence describing the garment.
+
+Taxonomy attributes (PC-58, 2026-11-04 — extracted at photo time so the AI render prompt never has to guess). Only fill in what is clearly visible; use "unknown" or omit when unsure — never guess:
+- subtype: the specific garment kind ("t-shirt", "shirt", "polo", "hoodie", "sweatshirt", "tank", "jeans", "trousers", "chinos", "shorts", "joggers", "jacket", "coat", "dress", "shoes"). For a tee, say "t-shirt" not "tee".
+- sleeve_length: for tops — "short", "long", or "sleeveless". Short means ending above the elbow. Omit for bottoms/outerwear without sleeves.
+- neckline: for tops — "crew", "v-neck", "collar", "hood", "scoop", "boat", or "unknown".
+- collar: for shirts — "collar", "mandarin", "none", or "unknown".
+- length: for tops — "cropped", "regular", "long"; for bottoms — "short", "regular", "long", "ankle", "full".
+- rise: for bottoms — "high", "mid", "low", or "unknown".
+- cuff: for bottoms — "elastic", "ribbed", "none", or "unknown".
+- closure: for outerwear/shirts — "zip", "button", "open", "none", or "unknown".
+- zip: true/false — whether the garment has a zip.
+- hood: true/false — whether the garment has a hood.`;
 
 function parseListJson(text) {
   if (typeof text !== "string" || !text.trim()) {
@@ -138,6 +150,19 @@ function parseListJson(text) {
       formality: str(g.formality),
       warmth: str(g.warmth),
       description: str(g.description),
+      // Taxonomy attributes (PC-58, 2026-11-04): extracted at photo time
+      // so the render prompt uses real data, never guesses. Only kept when
+      // the model gave a real value (not "unknown" or empty).
+      subtype: str(g.subtype),
+      sleeve_length: str(g.sleeve_length),
+      neckline: str(g.neckline),
+      collar: str(g.collar),
+      length: str(g.length),
+      rise: str(g.rise),
+      cuff: str(g.cuff),
+      closure: str(g.closure),
+      zip: typeof g.zip === "boolean" ? g.zip : null,
+      hood: typeof g.hood === "boolean" ? g.hood : null,
     });
     if (out.length >= MAX_GARMENTS) break;
   }

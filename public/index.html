@@ -10565,8 +10565,18 @@
                 warmth: g.warmth || "",
                 brand: null,
                 brandKey: null,
-                subtype: null,
-                style_tags: []
+                subtype: g.subtype || null,
+                style_tags: [],
+                // Taxonomy attributes (PC-58, 2026-11-04): extracted at parse time.
+                sleeve_length: g.sleeve_length || null,
+                neckline: g.neckline || null,
+                collar: g.collar || null,
+                length: g.length || null,
+                rise: g.rise || null,
+                cuff: g.cuff || null,
+                closure: g.closure || null,
+                zip: typeof g.zip === "boolean" ? g.zip : null,
+                hood: typeof g.hood === "boolean" ? g.hood : null,
               };
               var v2 = buildV2Fields(aiForV2, null);
               // The outfit flow has no sampled dominant hex yet — keep
@@ -10602,6 +10612,16 @@
                   formality: g.formality || "",
                   warmth: g.warmth || "",
                   description: g.description || "",
+                  subtype: g.subtype || null,
+                  sleeve_length: g.sleeve_length || null,
+                  neckline: g.neckline || null,
+                  collar: g.collar || null,
+                  length: g.length || null,
+                  rise: g.rise || null,
+                  cuff: g.cuff || null,
+                  closure: g.closure || null,
+                  zip: typeof g.zip === "boolean" ? g.zip : null,
+                  hood: typeof g.hood === "boolean" ? g.hood : null,
                   parseId: st.parseId,
                   prompt: g.prompt,
                   score: g.score || null
