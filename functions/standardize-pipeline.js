@@ -38,7 +38,8 @@ const MAX_GATE_RETRIES = 3;
  * @param {object} opts.item - The Firestore item data (photos, ai, etc.)
  * @param {string} opts.falApiKey - fal.ai API key
  * @param {string} [opts.feedback] - Optional user feedback for the prompt
- * @returns {Promise<{ready: boolean, standardizedUrl: string, attempts: number}>}
+ * @returns {Promise<{ready: boolean, pendingReview: boolean, standardizedUrl: string}>}
+ *   ready is always false — the render waits in pending_review (#128).
  * @throws on FLUX failure, gate failure after retries, or upload failure.
  */
 async function runStandardizationPipeline({ db, bucket, uid, itemId, item, falApiKey, feedback = "" }) {
@@ -115,44 +116,28 @@ async function runStandardizationPipeline({ db, bucket, uid, itemId, item, falAp
     console.log(`[standardize-pipeline] SAM 3 failed: ${samErr.message}, using white background`);
   }
 
-  // 4. Upload + photo swap + mark ready (transactional).
-  const stdPath = `users/${uid}/items/${itemId}/standardized.png`;
+  // 4. Upload + mark PENDING REVIEW (Sprint 28 Card 2, #128).
+  // The render does NOT become the item's picture yet — it waits for the
+  // founder's eyes (approve / regenerate / keep original). The original
+  // photo is never replaced. The pending render is stored on the
+  // standardization object; approve swaps it into photos[] as 'standardized'.
+  const stdPath = `users/${uid}/items/${itemId}/standardized-pending.png`;
   await bucket.file(stdPath).save(standardizedBuffer, { contentType: "image/png" });
   await bucket.file(stdPath).makePublic();
   const stdUrl = `https://storage.googleapis.com/${bucket.name}/${stdPath}`;
 
-  // PC-58 photo type tags: swap logic (Admin SDK format — plain objects).
-  // - New photo gets type='standardized'
-  // - Any existing photo with type='standardized' gets re-tagged to type='actual'
-  // NOTE (2026-10-31 bugfix): The Admin SDK returns plain JS objects, NOT
-  // Firestore REST format. Use plain objects/arrays.
-  const existingPhotos = item.photos || [];
-  const updatedPhotos = existingPhotos.map((p) => {
-    if (p && p.type === "standardized") {
-      return { ...p, type: "actual" };
-    }
-    return p;
-  });
-  updatedPhotos.push({
-    url: stdUrl,
-    storagePath: stdPath,
-    type: "standardized",
-    createdAt: new Date().toISOString(),
-  });
-
   await db.runTransaction(async (t) => {
     t.update(itemRef, {
-      photos: updatedPhotos,
-      "standardization.status": "ready",
-      "standardization.standardizedUrl": stdUrl,
-      "standardization.standardizedStoragePath": stdPath,
+      "standardization.status": "pending_review",
+      "standardization.pendingUrl": stdUrl,
+      "standardization.pendingStoragePath": stdPath,
       "standardization.completedAt": new Date().toISOString(),
       "standardization.lastError": null,
       "standardization.cutoutNote": cutoutNote || null,
     });
   });
 
-  return { ready: true, standardizedUrl: stdUrl };
+  return { ready: false, pendingReview: true, standardizedUrl: stdUrl };
 }
 
 module.exports = { runStandardizationPipeline, MAX_GATE_RETRIES };

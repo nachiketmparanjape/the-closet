@@ -979,7 +979,7 @@ exports.standardizeItem = onCall(
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: true });
       processingCompleted = true;
       return finish("standardizeItem", correlationId, uid, start, {
-        ready: true,
+        pendingReview: true,
         standardizedUrl: stdUrl,
         attempts: attempts + 1,
       });
@@ -1006,6 +1006,97 @@ exports.standardizeItem = onCall(
       if (!(err instanceof HttpsError) && !err.key) err.key = "STANDARDIZE_FAILED";
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
       await boundary("standardizeItem", correlationId, uid, err);
+    }
+  }
+);
+
+// Sprint 28 Card 2 (#128): Review gate for AI-made images.
+// approveStandardization: move the pending render into photos[] as
+// 'standardized' (old standardized -> 'actual'), mark status ready.
+// rejectStandardization: discard the pending render, mark status rejected,
+// keep the original photo. The original is never replaced.
+exports.approveStandardization = onCall(
+  { region: "us-central1", timeoutSeconds: 60, memory: "256Mi" },
+  async (request) => {
+    const correlationId = newCorrelationId();
+    const uid = request.auth ? request.auth.uid : null;
+    try {
+      if (!request.auth) fail("NOT_SIGNED_IN");
+      const data = request.data || {};
+      const itemId = typeof data.itemId === "string" ? data.itemId.trim() : "";
+      if (!itemId || itemId.length > 100) fail("BAD_REQUEST");
+      const db = getFirestore();
+      const itemRef = db.collection("users").doc(uid).collection("items").doc(itemId);
+      const snap = await itemRef.get();
+      if (!snap.exists) fail("NOT_FOUND");
+      const item = snap.data();
+      const std = item.standardization || {};
+      if (std.status !== "pending_review" || !std.pendingUrl) {
+        fail("BAD_REQUEST");
+      }
+      // Photo swap (Admin SDK plain objects — see 2026-10-31 bugfix note).
+      const updatedPhotos = (item.photos || []).map((p) => {
+        if (p && p.type === "standardized") return { ...p, type: "actual" };
+        return p;
+      });
+      updatedPhotos.push({
+        url: std.pendingUrl,
+        storagePath: std.pendingStoragePath || null,
+        type: "standardized",
+        createdAt: new Date().toISOString(),
+      });
+      await db.runTransaction(async (t) => {
+        t.update(itemRef, {
+          photos: updatedPhotos,
+          "standardization.status": "ready",
+          "standardization.standardizedUrl": std.pendingUrl,
+          "standardization.standardizedStoragePath": std.pendingStoragePath || null,
+          "standardization.pendingUrl": null,
+          "standardization.pendingStoragePath": null,
+          "standardization.approvedAt": new Date().toISOString(),
+        });
+      });
+      return { ok: true, standardizedUrl: std.pendingUrl };
+    } catch (err) {
+      if (!(err instanceof HttpsError) && !err.key) err.key = "APPROVE_FAILED";
+      await boundary("approveStandardization", correlationId, uid, err);
+    }
+  }
+);
+
+exports.rejectStandardization = onCall(
+  { region: "us-central1", timeoutSeconds: 60, memory: "256Mi" },
+  async (request) => {
+    const correlationId = newCorrelationId();
+    const uid = request.auth ? request.auth.uid : null;
+    try {
+      if (!request.auth) fail("NOT_SIGNED_IN");
+      const data = request.data || {};
+      const itemId = typeof data.itemId === "string" ? data.itemId.trim() : "";
+      if (!itemId || itemId.length > 100) fail("BAD_REQUEST");
+      const db = getFirestore();
+      const itemRef = db.collection("users").doc(uid).collection("items").doc(itemId);
+      const snap = await itemRef.get();
+      if (!snap.exists) fail("NOT_FOUND");
+      const item = snap.data();
+      const std = item.standardization || {};
+      if (std.status !== "pending_review") fail("BAD_REQUEST");
+      // Best-effort: delete the pending render file from Storage.
+      if (std.pendingStoragePath) {
+        try {
+          await getStorage().bucket().file(std.pendingStoragePath).delete();
+        } catch (e) { /* already gone or no permission — ignore */ }
+      }
+      await itemRef.update({
+        "standardization.status": "rejected",
+        "standardization.pendingUrl": null,
+        "standardization.pendingStoragePath": null,
+        "standardization.rejectedAt": new Date().toISOString(),
+      });
+      return { ok: true };
+    } catch (err) {
+      if (!(err instanceof HttpsError) && !err.key) err.key = "REJECT_FAILED";
+      await boundary("rejectStandardization", correlationId, uid, err);
     }
   }
 );

@@ -3,7 +3,7 @@
 ## Cards
 1. **Full auto-FLUX on item-add** (Sprint 27 caveat) — DONE 2026-11-04. Pipeline extracted to `functions/standardize-pipeline.js` (FLUX -> Delta-E/geometry gates with 3x retry -> SAM cutout -> upload -> photo swap). `standardizeItem` callable and `autoStandardizeItem` trigger both call it. Gates wired into the pipeline (was a TODO). 469/469 tests pass.
 2. **PC-58 review gate (#128)** — DONE 2026-11-04 (deploying). Pipeline now marks renders `pending_review` instead of `ready`; `approveStandardization` / `rejectStandardization` callables swap or discard. Item page shows side-by-side Original vs AI render with Approve / Try again / Keep original. Design decisions: generated renders need human eyes, review inline per item, side-by-side always.
-3. **PC-59 (#129)** — Uniform display scaling + too-small-in-photo warning. Every garment renders at a consistent size; warn when a photo is too small to work with.
+3. **PC-59 (#129)** — DONE 2026-11-04. Part 1 (uniform scaling) was already live; outfit-sizing question answered by design delegation: scale by category in compositions (shoes 48px, accessories 36px, garments 56px). Part 2 built: extract.js computes frameShare + sourceLongEdge, flags tooSmall (<25% share or <700px long edge); client stores photoQuality on the photo and shows a persistent warning on the item page (retail photos exempt). 469/469 tests pass.
 
 ## Housekeeping done at planning (2026-11-04)
 - #134 CLOSED (done in Sprint 27).

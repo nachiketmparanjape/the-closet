@@ -192,10 +192,19 @@
     .std-actions { margin: 0 0 14px; }
     .std-note { font-size: 12.5px; color: var(--muted); margin: 0 0 10px; }
     .std-actions .secondary { margin-right: 8px; margin-bottom: 4px; }
+    /* Sprint 28 Card 2 (#128): Review gate — side-by-side compare. */
+    .std-review { margin: 0 0 14px; }
+    .std-review-pair { display: flex; gap: 10px; margin-bottom: 10px; }
+    .std-review-pair figure { flex: 1; margin: 0; }
+    .std-review-pair img { width: 100%; aspect-ratio: 1; object-fit: contain; background: var(--paper-soft); border-radius: var(--r-md); }
+    .std-review-pair figcaption { font-size: 12px; color: var(--muted); text-align: center; margin-top: 4px; }
+    .std-review-actions { display: flex; gap: 8px; flex-wrap: wrap; }
     .std-warning { background: var(--paper-soft); border: 1px solid var(--brass, #a87c1c); border-radius: var(--r-md); padding: 12px 14px; margin-bottom: 14px; }
     .std-warning p { margin: 0 0 6px; font-size: 14px; }
     .std-warning p:last-child { margin-bottom: 0; }
     .item-photo-wrap { position: relative; aspect-ratio: 1; background: var(--paper-soft); border-radius: var(--r-md); overflow: hidden; margin-bottom: 16px; }
+    /* PC-59 (Sprint 28): too-small-in-photo warning. */
+    .photo-quality-note { font-size: 12.5px; color: var(--brass, #a87c1c); margin: 8px 0 0; }
     .photo-rotate-overlay { position: absolute; right: 10px; bottom: 10px; display: flex; gap: 8px; }
     .rotate-btn { width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(242,235,219,.35); background: rgba(22,18,13,.65); color: #f2ebdb; font-size: 20px; line-height: 1; cursor: pointer; }
     .rotate-btn:active { transform: scale(.94); }
@@ -646,8 +655,12 @@
     /* Sprint 18 fix buffer: outfit tiles get a designed collage zone
        (paper-soft stage, consistent thumbs) and a 2-line clamping name —
        auto-generated outfit names are sentences, not labels. */
-    .outfit-thumbs { display: flex; gap: 6px; margin: 0 0 4px; background: var(--paper-soft); border-radius: var(--r-md); padding: 8px; }
+    .outfit-thumbs { display: flex; gap: 6px; margin: 0 0 4px; background: var(--paper-soft); border-radius: var(--r-md); padding: 8px; align-items: center; }
     .outfit-thumbs img { width: 56px; height: 56px; object-fit: cover; border-radius: 10px; }
+    /* PC-59 (Sprint 28): scale by category in outfit compositions — a watch
+       sits smaller than the jacket beside it. */
+    .outfit-thumbs img.thumb-shoes { width: 48px; height: 48px; }
+    .outfit-thumbs img.thumb-accessory { width: 36px; height: 36px; }
     .item-name.outfit-name { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; line-height: 1.35; min-height: 2.7em; }
     .outfit-row { display: flex; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
     .outfit-row img { width: 44px; height: 44px; object-fit: cover; border-radius: 8px; flex: none; }
@@ -1554,6 +1567,8 @@
           <img class="item-photo" id="itemPhoto" alt="Wardrobe piece" />
           <div class="photo-badge" id="photoBadge" hidden></div>
           <button class="ai-badge-btn" id="aiBadgeBtn" hidden title="AI render options">✨</button>
+          <!-- PC-59 (Sprint 28): too-small-in-photo warning -->
+          <p class="photo-quality-note" id="photoQualityNote" hidden>This piece is small in its photo — a closer photo will look sharper.</p>
           <div class="photo-rotate-overlay">
             <button class="rotate-btn" id="rotateLeftBtn" type="button" title="Rotate left 90 degrees" aria-label="Rotate left 90 degrees">↶</button>
             <button class="rotate-btn" id="rotateRightBtn" type="button" title="Rotate right 90 degrees" aria-label="Rotate right 90 degrees">↷</button>
@@ -1585,6 +1600,24 @@
           <p class="std-note" id="stdNote" hidden></p>
           <button class="secondary" id="stdGenerateBtn" type="button" hidden>Generate standardized view</button>
           <button class="secondary" id="stdRefreshBtn" type="button" hidden>Refresh AI view</button>
+        </div>
+        <!-- Sprint 28 Card 2 (#128): Review gate — side-by-side compare -->
+        <div class="std-review" id="stdReviewBox" hidden>
+          <div class="std-review-pair">
+            <figure>
+              <img id="stdReviewOriginal" alt="Original photo" />
+              <figcaption>Original</figcaption>
+            </figure>
+            <figure>
+              <img id="stdReviewRender" alt="AI render" />
+              <figcaption>AI render</figcaption>
+            </figure>
+          </div>
+          <div class="std-review-actions">
+            <button class="primary" id="stdApproveBtn" type="button">Approve this render</button>
+            <button class="secondary" id="stdRegenBtn" type="button">Try again</button>
+            <button class="secondary" id="stdKeepBtn" type="button">Keep original</button>
+          </div>
         </div>
         <p class="hint" id="itemWearStats" hidden></p>
         <div class="field">
@@ -3005,7 +3038,9 @@
               renderUrl: renderUrl,
               renderStoragePath: d.renderStoragePath,
               renderUncertainty: typeof d.uncertainty === "number" ? d.uncertainty : null,
-              renderStatus: "passed"
+              renderStatus: "passed",
+              // PC-59 (Sprint 28): photo quality for the too-small warning.
+              photoQuality: d.photoQuality || null
             });
           });
         }).catch(function (err) {
@@ -3602,6 +3637,8 @@
         note.hidden = true;
         genBtn.hidden = true;
         genBtn.textContent = "Generate standardized view"; // reset from "Try again"
+        var reviewBoxReset = document.getElementById("stdReviewBox");
+        if (reviewBoxReset) reviewBoxReset.hidden = true;
         // Store item ID on buttons for robust click handling (avoids stale activeItem)
         if (item && item.id) {
           genBtn.setAttribute("data-item-id", item.id);
@@ -3614,6 +3651,42 @@
           // Subtle, non-blocking indicator (workflow state)
           statusLine.textContent = "Standardizing…";
           statusLine.hidden = false;
+        } else if (status === "pending_review" && std.pendingUrl) {
+          // Sprint 28 Card 2 (#128): Review gate. The AI render waits for
+          // the founder's eyes — side-by-side with the original, always.
+          actionsBox.hidden = false;
+          note.textContent = "The AI made a clean version of this piece. Compare it with the original, then approve it, try again, or keep the original.";
+          note.hidden = false;
+          var reviewBox = document.getElementById("stdReviewBox");
+          if (reviewBox) {
+            reviewBox.hidden = false;
+            var origImg = document.getElementById("stdReviewOriginal");
+            var renderImg = document.getElementById("stdReviewRender");
+            var origPhoto = photos[0] || null;
+            if (origImg) origImg.src = origPhoto ? (origPhoto.url || "") : "";
+            if (renderImg) renderImg.src = std.pendingUrl;
+            var approveBtn = document.getElementById("stdApproveBtn");
+            var regenBtn = document.getElementById("stdRegenBtn");
+            var keepBtn = document.getElementById("stdKeepBtn");
+            if (approveBtn) approveBtn.onclick = function () {
+              approveBtn.disabled = true;
+              functions.httpsCallable("approveStandardization")({ itemId: item.id })
+                .then(function () { if (activeItem) openItem(activeItem.id); })
+                .catch(function (err) { reportError("approveStandardization", err); approveBtn.disabled = false; });
+            };
+            if (regenBtn) regenBtn.onclick = function () {
+              regenBtn.disabled = true;
+              callStandardize(item.id, { force: true })
+                .then(function () { if (activeItem) openItem(activeItem.id); })
+                .catch(function (err) { reportError("standardizeItem", err); regenBtn.disabled = false; });
+            };
+            if (keepBtn) keepBtn.onclick = function () {
+              keepBtn.disabled = true;
+              functions.httpsCallable("rejectStandardization")({ itemId: item.id })
+                .then(function () { if (activeItem) openItem(activeItem.id); })
+                .catch(function (err) { reportError("rejectStandardization", err); keepBtn.disabled = false; });
+            };
+          }
         } else if (hasStandardized) {
           // A standardized photo exists (by type tag) — show it.
           // This covers: AI-generated, already-clean uploads, and swapped originals.
@@ -3965,6 +4038,17 @@
         // Show the first photo via dots
         if (photos.length) showPhotoAtIndex(item, 0);
         renderStandardizationUI(item); // PC-58: AI badge, status, actions
+        // PC-59 (Sprint 28): too-small warning — show when the displayed
+        // photo's quality record says the garment was small in its photo.
+        // Retail-sourced photos are exempt (remedy is "add your own photo",
+        // already covered by the source note below).
+        var qualityNote = document.getElementById("photoQualityNote");
+        var coverPhoto = photos.length ? photos[0] : null;
+        var pq = coverPhoto ? coverPhoto.photoQuality : null;
+        if (qualityNote) {
+          var isRetail = coverPhoto && coverPhoto.source === "retail";
+          qualityNote.hidden = !(pq && pq.tooSmall && !isRetail);
+        }
         var srcNote = document.getElementById("itemSourceNote");
         var cover0 = photos.length ? photos[0] : null;
         if (cover0 && cover0.source === "retail") {
@@ -9382,6 +9466,10 @@
               // sideways-in-outfit bug.)
               showDisplayPhoto(img, it, "clean");
               resolveRenderUrl(it, img);
+              // PC-59 (Sprint 28): scale by category in outfit compositions.
+              var cat = (it.category || "").toLowerCase();
+              if (cat === "shoes") img.className = "thumb-shoes";
+              else if (cat === "other" || cat === "accessories" || cat === "accessory") img.className = "thumb-accessory";
               img.alt = "";
               img.loading = "lazy";
               thumbs.appendChild(img);

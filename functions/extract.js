@@ -122,6 +122,21 @@ async function extractGarmentPhoto(uid, storagePath, deps) {
   // Step 5, layer 1: mask heuristics + the aspect assertion.
   const stats = await alphaStats(png);
   const mask = judgeMask(stats, { width: normalized.width, height: normalized.height });
+  // PC-59 (Sprint 28): photo quality measurements for the too-small warning.
+  // frameShare = cutout area / original photo area (cutout is trimmed to the
+  // garment's bounding box, so this approximates the garment's share of the
+  // photo). sourceLongEdge = original photo's long edge in pixels.
+  // Warning triggers: frame share under 25% OR long edge under 700px.
+  // Retail-sourced photos are exempt at the UI layer (remedy is different).
+  const origArea = normalized.width * normalized.height;
+  const cutoutArea = stats.width * stats.height;
+  const frameShare = origArea > 0 ? cutoutArea / origArea : 0;
+  const sourceLongEdge = Math.max(normalized.width, normalized.height);
+  const photoQuality = {
+    frameShare: Math.round(frameShare * 1000) / 1000,
+    sourceLongEdge,
+    tooSmall: frameShare < 0.25 || sourceLongEdge < 700,
+  };
   if (!mask.pass) {
     return {
       renderStoragePath,
@@ -129,6 +144,7 @@ async function extractGarmentPhoto(uid, storagePath, deps) {
       provider: "birefnet",
       gatePassed: false,
       gate: { stage: "mask", reasons: mask.reasons },
+      photoQuality,
     };
   }
 
@@ -159,6 +175,7 @@ async function extractGarmentPhoto(uid, storagePath, deps) {
     provider: "birefnet",
     gatePassed: verdict.ok === true,
     gate: { stage: "vision", problems: verdict.problems || [] },
+    photoQuality,
   };
 }
 
