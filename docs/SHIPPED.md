@@ -2,6 +2,38 @@
 
 What went live. Momentum you can see.
 
+## Sprint 29 (2026-11-04) — COMPLETE 2026-11-04
+
+- **PC-60 (#130) — design + calibration.** Unified check module (`functions/cutout-check.js`: mask geometry + vision judge + semantic match). Calibration on 66 items: 66/66 (100%), 0 false-pass; two tuning fixes (sunglasses lens, clog sandal holes exempted). Report: `docs/sprints/sprint-29/PC-60-CALIBRATION-REPORT.md`. Caveat: vision judge (layer 2) not yet wired in the calibration script — mask layer only. Gate wiring (running the check on new cuts) is the follow-up.
+- **PC-41 (#104) — follow-up chat on a shop check.** UX reworked 2026-11-05 (Option C bottom sheet): the check detail shows one compact row; tapping opens the sheet with the full thread, input, "Open in stylist chat →", per-message delete, and "Clear thread". Messages persist on the check doc (`followUps`, capped at 20); answers via `askStylist` with shopItem + trip context. Verified on the founder's phone 2026-11-06.
+- **PC-56 (#126) — garment embeddings.** Embedding computed once from the clean render in `extractGarment` (multimodalembedding@001, 1408 floats), stored on the photo as `renderEmbedding` beside the phash. After the render lands, the client compares against existing items (cosine ≥ 0.85) and proposes "Looks like your X — same piece?" via toast. Never auto-merges; soft-fails to null (pHash-only matching continues).
+
+## Sprint 28 (2026-11-04) — COMPLETE 2026-11-04
+
+- **Full auto-FLUX on item-add** (Sprint 27 caveat). Pipeline extracted to `functions/standardize-pipeline.js` (FLUX → Delta-E/geometry gates with 3× retry → SAM cutout → upload → photo swap). `standardizeItem` callable and `autoStandardizeItem` trigger both call it; gates wired into the pipeline. 469/469 tests pass.
+- **PC-58 review gate (#128).** Renders marked `pending_review` instead of `ready`; `approveStandardization` / `rejectStandardization` callables swap or discard. Item page shows side-by-side Original vs AI render with Approve / Try again / Keep original.
+- **PC-59 (#129).** Part 1 (uniform scaling) was already live; Part 2 built: `extract.js` computes frameShare + sourceLongEdge, flags tooSmall (<25% share or <700px long edge); client stores `photoQuality` on the photo and shows a persistent warning on the item page (retail photos exempt). 469/469 tests pass.
+- **Housekeeping at planning:** #127 (PC-57) closed — Qwen experiment verdict was FAIL (2026-10-28). Sprint 26 Cards 2, 3 killed (no record — proposed but never approved, content lost). PR #80 left open; PR #133 (Pooja, UX-16 audit docs) still open.
+
+## Sprint 27 (2026-11-04) — COMPLETE 2026-11-04
+
+- **#134 — centralize photo display rules.** One function decides which photo + rotation everywhere (`resolveDisplayPhoto` + `showDisplayPhoto`): wardrobe grid, outfit cards/detail, trips, packing, builder, shop thumb, today chip, parse matches, category heroes, item page, match picker. Two follow-up fixes: `resolveRenderUrl` disabled (was overwriting correct src), 7 more surfaces found in global audit.
+- **#131 — maintenance track.** Error taxonomy, stuck-state sweeper, deploy secret check, data quality probes, correlation-ID surfacing, Bug #4 (`match_rejections` Firestore rule — was missing, client writes failed silently), Bug #5 (REST-format lint check). Sweeper + data-quality probe wired into the Monday heartbeat cron.
+- **PC-58 completion.** `parse.js` LIST_PROMPT extracts taxonomy attributes at photo time (subtype/sleeve_length/neckline/collar/length/rise/cuff/closure/zip/hood); flows into the item `ai` map via `saveOutfitParse`. Delta-E (LAB, median foreground color) + geometry (coverage + aspect) gates in `standardize.js`. `isAlreadyClean` heuristic (transparency + white-border). `autoStandardizeItem` trigger tags already-clean items on create. Caveat: full auto-FLUX on create NOT wired — fixed in Sprint 28.
+- **Folded in:** #132 (fit taxonomy research) closed, remaining work folded into PC-58.
+
+## Sprint 25 (2026-10-28 → 2026-11-04)
+
+- **PC-36 built.** Multi-garment flow: Gemini lists the garments → one SAM call per garment → cutout → normalized render → DRAFT item → user confirms or corrects → outfit composed of exactly the confirmed articles. `finishOutfitParse` callable saves outfits from drafts; draft review with match picker ("this is an existing item" / "not a garment"). Design validated by the founder 2026-10-28. Founder phone validation pending.
+- **Deferred at the founder's call (2026-10-29):** the SAM engine swap for flat photos (Card 2 — the flat-photo path stays on BiRefNet for now) and PC-59 part 2 (the too-small warning — built in Sprint 28).
+- Backfilled 2026-11-06 from the sprint plan and git log; no completion record existed.
+
+## 2026-11-06 — Decision 6 backlog hygiene
+
+- **PC-14 (shop compatibility check) — shipped.** First commit 2026-10-17. Scores wardrobe fit 0–10 with reasoning, flags near-duplicates among owned pieces, suggests 2–3 outfits from the real wardrobe (`functions/shopcheck.js`).
+- **Cards removed from `docs/BACKLOG.md` as closed** (the record lives here): PC-13 remainder (photo-parse wear logging, Sprint 14), PC-14, AUTH-1 (Sprint 13), UX-13 (Sprint 18), PC-41, PC-56, PC-57 (failed, closed), PC-58, PC-59, PC-60.
+- **PC-36 status corrected** in the backlog: built (Sprint 25), founder phone validation pending.
+
 ## Sprint 19 (2026-10-24 → )
 
 - **Return divider, de-duplicated + refresh in place** —

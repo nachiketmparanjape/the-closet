@@ -1,5 +1,7 @@
 # Proposal — Today: a stylist-first home
 
+> **Superseded 2026-11-06 (founder Decision 6).** The Today home shipped — the Today tab with the morning pick and the "Dress me today" composer (Sprint 14). This proposal is a record now.
+
 v0.2, 2026-10-21. v0.1 sketched the inversion; the founder
 steered it the same day: build it as a **parallel experience he
 can test on his phone**, with two design questions to answer —

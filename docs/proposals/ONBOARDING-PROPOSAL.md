@@ -1,5 +1,7 @@
 # Onboarding — the catalogue problem — Proposal
 
+> **Status 2026-11-06 (founder Decision 6): KEPT. Revisit trigger: the next planning walk that touches onboarding.**
+
 _Founder 2026-10-20: "How to get people to onboard is a really
 important question — absolutely the biggest hurdle for our
 concept. After someone's wardrobe is already in there, that's

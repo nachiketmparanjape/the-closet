@@ -1,5 +1,7 @@
 # Chat Threads — Proposal
 
+> **Superseded 2026-11-06 (founder Decision 6).** Superseded by the UX-18 context model — one stored thread per key, decided in `docs/sprints/sprint-23/CURRENT-STATE.md` and specified in `docs/CONTEXT-MODEL.md`. This proposal is a record now; the remaining build is the PC-32 card.
+
 _Founder 2026-10-19: "By thread I mean side chats (or any other
 solution) for continuation of context at the right place right time."
 The single shared chat mixes contexts (pins from one place surfacing

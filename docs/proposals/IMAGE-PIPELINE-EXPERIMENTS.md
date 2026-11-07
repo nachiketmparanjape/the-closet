@@ -1,5 +1,7 @@
 # Image pipeline experiments — plan
 
+> **Superseded 2026-11-06 (founder Decision 6).** All three experiments concluded — PC-34 cutouts shipped (SAM/BiRefNet), PC-36 multi-garment built, PC-57 Qwen failed and closed. This proposal is a record now; the render decision lives in `docs/MODEL-COMPARISON-AI-RENDER.md`.
+
 Purpose: the plan for the three image experiments the
 founder listed on 2026-10-27, in his order. Each
 experiment answers one question, with its test set and

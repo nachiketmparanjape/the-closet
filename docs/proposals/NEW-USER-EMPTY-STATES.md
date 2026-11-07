@@ -1,5 +1,7 @@
 # New-user empty states — every tab, two tiers (PC-53)
 
+> **Superseded 2026-11-06 (founder Decision 6).** The empty states shipped — the tier-0/tier-1 system is live on every tab. This proposal is a record now; the remaining work is the PC-53 card.
+
 ## What this is
 
 What a brand-new user sees on each tab, and what a user with a

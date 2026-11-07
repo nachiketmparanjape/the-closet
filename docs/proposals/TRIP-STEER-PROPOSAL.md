@@ -1,5 +1,7 @@
 # Trip Steering + Pin Discipline — Proposal
 
+> **Superseded 2026-11-06 (founder Decision 6).** Trip steering shipped — the trip chat rewrites the packing plan via `updateTripPacking` (Sprint 16), and trip-aware chat is live. This proposal is a record now; the remaining work is the PC-33 card.
+
 _Founder 2026-10-20: asking the general chat for advice about a
 trip next week produced a "Remember as current location?" pin
 proposal for the destination. His direction: for trip questions,

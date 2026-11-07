@@ -1,5 +1,7 @@
 # Visual Redesign + Design System — Proposal
 
+> **Split 2026-11-06 (founder Decision 6).** Visual half → record: the diagnosis and approach live on in `docs/DESIGN.md` (Warm Editorial identity) and the UX-13 card (UX-13 itself shipped 2026-10-23, Sprint 18). Framework half → decision: the client-port question, with its decision point and GO criteria below, goes to the next planning walk — its trigger is met (DESIGN.md validated via PR #80, the Warm Editorial waves live). This file is the record of both halves.
+
 _Founder 2026-10-20: the app "looks extremely rudimentary
 compared to modern apps." It has to feel modern and seamless —
 feeling is directly related to whether someone wants to use an

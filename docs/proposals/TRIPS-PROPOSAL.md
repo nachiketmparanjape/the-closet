@@ -1,5 +1,7 @@
 # Proposal: Trips — travel packing recommendations
 
+> **Superseded 2026-11-06 (founder Decision 6).** Trips shipped — Phase 1 (Sprint 15), Phase 2 (Sprint 16), Phase 3 (Sprint 19, PC-31). This proposal is a record now; the remaining thread (trip-preference curation) stays on the PC-29 card.
+
 **Status:** founder validated 2026-10-18 — answers below. Ready for scoping
 (Sprint 15 candidate).
 **Origin:** founder brain dump 2026-10-18 — packing for travel is stressful;

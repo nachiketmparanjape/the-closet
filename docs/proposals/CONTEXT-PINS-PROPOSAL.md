@@ -1,5 +1,7 @@
 # Context Pins — Proposal
 
+> **Superseded 2026-11-06 (founder Decision 6).** Pins shipped — the `pinContext` callable, surfaced in the context line (CURRENT-STATE decision 4). This proposal is a record now.
+
 _Scoping doc per founder request 2026-10-19. "Persistent but adaptable":
 facts the stylist should remember across chats (location, weather,
 trip context) without becoming stale cruft._
