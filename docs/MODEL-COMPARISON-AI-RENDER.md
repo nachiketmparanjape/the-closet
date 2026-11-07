@@ -1,5 +1,10 @@
 # AI Render Model Comparison
 
+> **Purpose:** DECIDE — a reader knows which render model won (FLUX Kontext) and the evidence: print accuracy beats garment accuracy.
+> **Earns its place if:** a render-model change is decided against this evidence instead of re-litigated.
+> **Owner:** Bramble. **Status:** living.
+> **Last verified:** 2026-11-06, against the 2026-11-01 test case and the deployed `buildFluxPrompt`.
+
 **Date:** 2026-11-01  
 **Test case:** Green white beige shirt (short sleeve, vertical stripes)  
 **Goal:** Find the best model for garment standardization

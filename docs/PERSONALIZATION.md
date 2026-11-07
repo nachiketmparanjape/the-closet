@@ -1,5 +1,10 @@
 # Personalization — how the app learns your taste
 
+> **Purpose:** EXPLAIN — a reader knows how the app learns taste: named styles in chat, and the score it quietly keeps.
+> **Earns its place if:** a learning change is explained here before it ships.
+> **Owner:** Bramble. **Status:** living.
+> **Last verified:** 2026-11-06, against a read of the file.
+
 Written in the studio design-document format
 (standards/design-documents.md). First version 2026-10-18;
 rewritten into this format 2026-10-24. Function names are

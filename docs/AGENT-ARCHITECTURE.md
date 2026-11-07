@@ -1,5 +1,10 @@
 # The AI Stylist — Agent Architecture
 
+> **Purpose:** EXPLAIN — a reader with no knowledge of the codebase finishes knowing how the stylist agent works: its parts, the message flow, what the model is shown, what it may do, and what it remembers.
+> **Earns its place if:** an architecture change rewrites this in the same commit.
+> **Owner:** Bramble. **Status:** living.
+> **Last verified:** 2026-11-06, against a read of the file.
+
 This document describes how the Closet app's AI stylist is built: what
 parts it has, how a message flows through them, what the model is shown,
 what it may do, and what it remembers. It describes the **current state

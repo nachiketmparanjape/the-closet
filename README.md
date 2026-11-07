@@ -1,5 +1,10 @@
 # Closet — AI wardrobe stylist
 
+> **Purpose:** ORIENT — a stranger understands what Closet is, and that it is live, in 60 seconds.
+> **Earns its place if:** a cold reader can tell what the app is and open the live app from here.
+> **Owner:** Bramble. **Status:** living.
+> **Last verified:** 2026-11-06, against the live app URL and the repo state.
+
 **Live app: https://closet-404e9.web.app**
 
 ## The idea

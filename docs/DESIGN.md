@@ -1,5 +1,10 @@
 # Design — How the Closet App Looks, and Why
 
+> **Purpose:** EXPLAIN — a builder knows how the app looks and why, and builds nothing freehand.
+> **Earns its place if:** a new or re-skinned screen is built from the values here, and a deviation is argued here first.
+> **Owner:** Bramble (design decisions delegated by the founder). **Status:** living.
+> **Last verified:** 2026-11-06, against a read of the file.
+
 This document is the design system: the single source for how the app
 looks and behaves visually. New or re-skinned screens are built from the
 values and components defined here — nothing freehand. If a screen needs

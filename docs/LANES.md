@@ -1,5 +1,10 @@
 # Product lanes — the Closet
 
+> **Purpose:** REFERENCE — the work is organized by lane, each with a job to be done, an owner, one health metric, and contracts with the lanes it touches.
+> **Earns its place if:** a cut's lane, owner, and metric are unambiguous from here.
+> **Owner:** Bramble. **Status:** living.
+> **Last verified:** 2026-11-06, against a read of the file.
+
 Per the studio playbook ("product lanes, not product silos"): the work is
 organized by lane, the experience stays seamless. Each lane has a job to be
 done, an owner, one health metric, and a contract with the lanes it touches.

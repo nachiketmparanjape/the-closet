@@ -1,5 +1,10 @@
 # Observability — How the App Watches Itself
 
+> **Purpose:** EXPLAIN — a reader knows how the app records what happened inside itself: what broke, what the AI cost, and what was happening when something failed.
+> **Earns its place if:** a recording-system change lands here in the same commit as the code.
+> **Owner:** Bramble. **Status:** living.
+> **Last verified:** 2026-11-06, against a read of the file.
+
 This document explains how the Closet app records what happened inside
 itself: what broke, what the AI cost, and what you were doing when
 something failed. It is the living design document for that recording

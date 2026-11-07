@@ -1,5 +1,10 @@
 # Operations — Closet (living doc)
 
+> **Purpose:** OPERATE — an agent can take code to live and recover a broken deploy by following this doc alone.
+> **Earns its place if:** a deploy or a recovery is executed from here without digging through session notes.
+> **Owner:** Bramble. **Status:** living.
+> **Last verified:** 2026-11-06, against the restored CI pipeline (Decision 8) and the manual deploy script.
+
 How the app gets from code to live, and how a broken deploy is
 recovered. This pipeline is an important invisible: it is pure
 agent-held knowledge today (hard-won, scattered across session

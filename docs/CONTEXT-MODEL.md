@@ -1,5 +1,10 @@
 # The Context Model — How the Stylist Loads, Shows, and Keeps Context
 
+> **Purpose:** EXPLAIN — a builder knows the target for how context is loaded, displayed, saved, and limited, and which wave builds it.
+> **Earns its place if:** each shipped wave is marked done here and `docs/AGENT-ARCHITECTURE.md` is updated with it in the same commit.
+> **Owner:** Bramble. **Status:** living.
+> **Last verified:** 2026-11-06, against a read of the file.
+
 This document is the build spec for the stylist overhaul (UX-18,
 Sprint 23): the design that comes out of the sit-down of 2026-10-24.
 It states the target — how context is loaded, displayed, saved, and

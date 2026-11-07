@@ -1,5 +1,10 @@
 # Closet — product doc
 
+> **Purpose:** ORIENT — a human or AI picking up the project knows what the product does, grouped by capability, and why each exists.
+> **Earns its place if:** a capability change has exactly one place to land (revised in place, never appended as history).
+> **Owner:** Bramble. **Status:** living.
+> **Last verified:** 2026-11-06, against a read of the file.
+
 Living reference for humans and AIs picking up this project: what the product
 does, grouped by capability, and *why* each exists. Deliberately not verbose.
 

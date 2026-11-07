@@ -1,5 +1,10 @@
 # The Data Model — What the App Stores, and the Rules It Follows
 
+> **Purpose:** REFERENCE — an implementer knows every record the app keeps and the rules each follows.
+> **Earns its place if:** a collection or rule change lands here in the same commit as the code.
+> **Owner:** Bramble. **Status:** living.
+> **Last verified:** 2026-11-06, against the outfit `source` row (`photo`, PC-13 remainder) and the code it describes.
+
 This document is the design for every record the Closet app keeps: your
 pieces, your outfits, what you wore, how you rated it, and what the app
 has learned about your taste. It was designed ahead of need — pieces
