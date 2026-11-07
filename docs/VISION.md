@@ -12,11 +12,17 @@ a closet you ignore into outfits you actually wear.
 
 ## Explicitly not v1
 
-- **Weather API integration** — the user provides weather in conversation.
-  (Decision 2026-09-30: auto-fetching weather is overengineering for v1 —
-  geolocation, API keys, caching, error handling, all to replace three words
-  the user can type. Revisit as a paper cut if manual input proves annoying.)
-- Calendar integration, social features, shopping/commerce.
+- **Weather as its own feature** — no weather screen, no forecast
+  browsing. Weather lives only as context: trip legs fetch their
+  forecast, and the stylist takes local weather the same way
+  (Open-Meteo, no key — WX-1). The 2026-09-30 decision against
+  auto-fetching weather was reversed by what shipped.
+- Calendar integration, social features.
+
+Shopping left this list (amended 2026-11-06, founder Decision 9): shop
+check shipped — the `shopCheck` callable, and a shop item under
+consideration can attach to a stylist conversation. The app still sells
+nothing; shop check is a decision aid, and outfits stay wardrobe-only.
 
 ## Beyond v1
 
