@@ -758,3 +758,13 @@ What went live. Momentum you can see.
   min(92dvh, 100%)). Every window with an input gains it: chat,
   form sheets, capture. A layout invariant guards the
   mechanism's presence. Tests 387/387.
+
+## 2026-11-06 — Tech-debt registry pilot killed (founder Decision 10)
+
+The debt-ops pilot ran 2026-10-15 → 2026-11-06 and is killed. Two entries
+in three weeks, neither turned into action, and the existing paper trail
+(SHIPPED.md, sprint plans, friction.md) was already doing the job — the
+pilot's own kill criteria, and its seed entry's own day-fourteen signal.
+The registry folder is removed; its content stays in git history. The
+Firebase CLI workaround entry lives on where it matters: the deploy
+scripts and the studio operating notes.
