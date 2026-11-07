@@ -213,49 +213,79 @@ evidence is one click away in AUDIT.md.
     in silence. No single rule says how a conversation
     starts.
 
-## Decisions still open
+## Decisions
 
-These are the sit-down's decisions. Each is written as a
-plain question. The document changes when they are made,
-and this section is replaced by the answers.
+The sit-down happened in chat (2026-10-24, two rounds).
+**All nine are decided.** This section is the record; the
+build spec that comes from them is `docs/CONTEXT-MODEL.md`.
 
-1. For each entry point: should today's pick join the
-   conversation by itself (you remove it if you do not
-   want it), or only when you tap to add it? Feel of
-   the first: one tap less, and the stylist sometimes
-   assumes wrong. Feel of the second: the stylist never
-   assumes, and you tap once when you do mean today's
-   outfit.
-2. Should the row of fact labels be the only display
-   of what the stylist knows? That means the top outfit
-   card goes away, or stays only as a picture that is
-   clearly not the context itself.
-3. The rule for "which outfit are we changing" should
-   live in one place. The phone, or the server?
-4. Should every pinned fact show a label at the top of
-   the chat, so the full context is visible — and
-   removable — in one row?
-5. Should the who-wins table in this document become
-   the rule, with the stylist's instructions written to
-   match the table word for word in order?
-6. Should conversations be saved, so a conversation is
-   still there after the app closes — on the phone and
-   across your devices?
-7. When a conversation grows past 20 messages, what
-   should happen? Options: the app tells you the
-   stylist now reads only the recent part; the app
-   sums up the early part into a short note the stylist
-   keeps reading; or the limit rises and we accept the
-   cost.
-8. One rule for how a conversation starts, for every
-   entry point: no entry point sends a message for you;
-   some may type text you can edit and send; context is
-   attached only as the answers to decision 1 say.
-   Does that rule hold?
-9. The morning pick and the outfit composer call the
-   same stylist. Should they follow the same context
-   rules as the chat, or a smaller written set? Either
-   way, the set gets written down.
+1. **Attach is an act, not a default.** Today's pick joins
+   a conversation only when you tap a button that is about
+   the pick (for example, asking the stylist from the
+   Today screen). A general stylist session and a trip
+   session never receive it by default. (Founder
+   confirmed Bramble's reading, round 2.)
+2. **One display, backed by one loader.** There is exactly
+   one display of what the stylist knows -- the context
+   line (decision 4) -- and exactly one way context is
+   loaded: the single assembler (decision 3). The display
+   renders what the assembler actually loaded, so the two
+   can never disagree. The top outfit card stops being a
+   context display; it is a plain pick card with actions.
+3. **One assembler, on the server.** The rule for "which
+   outfit are we changing" -- and every other context
+   rule -- lives in one place: the server's single
+   assembler (principle F1), not split between phone and
+   server.
+4. **Every pinned fact is surfaced, in the context line.**
+   One slim line under the chat header shows the first
+   few facts in play plus a count; tapping it opens a
+   sheet listing every fact, each removable. (Founder:
+   "makes sense.")
+5. **The who-wins table becomes the rule.** The table in
+   this document is the precedence rule; the stylist's
+   instructions are written to match it (principle F5:
+   precedence as a table, not prose). Direction confirmed
+   by the founder's agreement with AGENT-FUNDAMENTALS.md;
+   the table itself stands as written here.
+6. **Conversations are saved -- one stored thread per key
+   we already have** (the general conversation; one per
+   trip), transcripts kept on the account, loaded on
+   open. No thread list, no titles, no new-thread button:
+   the app stops forgetting; it does not become a chat
+   product. The design for making this intuitively clear
+   (a "continuing from" divider on return, a visible
+   Start fresh action, a one-time notice the first time a
+   conversation is saved, the window notice from decision
+   7) is specified in CONTEXT-MODEL.md. The founder will
+   refine it from organic use.
+7. **The reading window is the last 50 messages of the
+   conversation you are in** -- per conversation, not per
+   day and not per app-open. When a conversation grows
+   past 50, the app says plainly, in the conversation,
+   that the stylist now reads only the most recent 50.
+   Summarizing the early part is deliberately not built
+   now: it costs little (one small call, rarely), but at
+   a 50-message window its benefit is narrow, and the
+   honest notice covers the expectation. Revisit when the
+   founder hits the limit in real use.
+8. **Nothing sends on your behalf -- except a button
+   whose own label is the instruction.** Refined by the
+   founder (round 2): actions with a built-in prompt are
+   fine (Surprise me is the case), provided they fire
+   only from their own clearly-named button. Opening a
+   surface never sends anything. Surprise me survives as:
+   tap its button -> it sends its built-in prompt. Per
+   decision 1 it does not attach today's pick -- it is
+   not a pick button; it composes something new.
+9. **One rulebook everywhere.** The morning pick and the
+   outfit composer follow the same context rules as the
+   chat -- the same who-wins table, the same memory --
+   with smaller bundles only because there is no
+   conversation and there are no pointers. One assembler
+   serves them too (decision 3). (Founder: "everything
+   should be one rulebook and similar experience. less
+   things for the user to worry about.")
 
 ## Code pointers (as of commit 2c37032, 2026-10-24)
 
