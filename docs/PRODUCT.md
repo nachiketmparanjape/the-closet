@@ -92,6 +92,46 @@ and non-goals: `VISION.md`.
 
 ## Research
 
+- **SAM 3 / SAM 3D for garment photos (2026-10-25)** — full
+  report `research_notes/closet-sam3-sam3d.md`. SAM 3 (Meta,
+  Nov 19 2025) does promptable concept segmentation: one text
+  prompt per garment type returns every instance mask — it
+  replaces PC-36's planned parser+boxes finding step; the SAM
+  License permits commercial use, hosted at ~$0.0025–0.005 per
+  image (fal; per-concept calls possible). Recommendation:
+  the PC-36 prototype becomes SAM 3 via fal → BiRefNet edge
+  refinement, judged on the founder's real outfit photos as
+  chartered. **Founder verdict (2026-10-25): SAM 3D ruled
+  out.** The flow is adopted in his shape: SAM 3 crops each
+  garment; the crop is normalized to a standard item shape
+  (the Google Wardrobe presentation — isolated, centered,
+  uniformly framed); the same standard view is generated
+  for wardrobe items generally. The render standard is
+  geometry (canvas, centering, margin, fill), not a baked
+  background; PC-34's renders adopt it too. PC-34 stays on
+  BiRefNet — SAM 3 makes masks, not alpha mattes. SAM 3D is
+  mesh reconstruction, not try-on: ruled out above, its
+  watch trigger stays recorded on PC-49.
+  - Virtual try-off (the generative clean-view step the
+    founder asked about next; note research_notes/
+    closet-virtual-tryoff.md): the models exist and are
+    lightweight, but the best one is license-blocked
+    (academic use only), none is hosted, and the method
+    invents hidden garment parts — against this catalog's
+    promise that the picture is the user's own piece.
+    Recommendation filed on PC-36: extraction stays
+    canonical; try-off only as a labeled, opt-in second
+    view behind a license gate and a fidelity test on
+    real garments. **Founder verdict (2026-10-25):
+    adopted as recommended.** The experiment runs as
+    its own card, PC-57, independent of PC-36 and
+    PC-34; its verdict decides whether a feature card
+    is written. Google's "model-like" views are
+  generative imagery (try-on/Doppl); its Photos "Wardrobe"
+  (rolled out Sept 24, 2026) is extraction + generated
+  previews — the two stages are different technologies.
+
+
 Topics we investigate *before* building, so product decisions rest on
 findings — feasibility, cost, overengineering risk — instead of vibes.
 Decided topics stay as compact records; full reports live in `research_notes/`.
@@ -262,3 +302,88 @@ Decided topics stay as compact records; full reports live in `research_notes/`.
   steal), Cladwell. Combina + PutTogether sit below the bar
   as design-only. Teardown queue: Alta → Essembl → Whering →
   Acloset → Indyx → Fits → Stylebook → Outfit Formulas.
+
+### [RESEARCH 2026-10-27] tandpfun/wardrobe — open-source comp check
+
+- **Question (founder):** What is github.com/tandpfun/wardrobe
+  exactly? Is it direct competition? What can we use from it?
+- **Findings:** An MIT-licensed, local-only, self-hosted web app
+  (Vite + plain JS, local JSON database, no accounts, no
+  hosted service). You feed it outfit photos plus your own
+  OpenAI API key; a vision model (Responses API) detects every
+  garment, the Images API (gpt-image) then *generates* clean
+  product cutouts and optional "modeled" editorial photos of a
+  reference person wearing the pieces. The import and outfit
+  generation are packaged as agent skills run by Codex, with a
+  review/regenerate/approve step before anything enters the
+  library. Maturity check (high confidence, repo API): created
+  2026-07-16, every commit landed that same day, zero pushes
+  since; 2,258 stars / 329 forks rode a viral X post; no
+  releases, no product, no users in the distribution sense.
+- **Competition call:** Not direct competition today — no
+  hosted product, no sync, no daily stylist loop, no
+  maintenance since launch day; its user is a technical
+  hobbyist willing to self-host. It is the closest
+  open-source artifact to our concept, and its central bet is
+  the opposite of ours: generative extraction accepted, with
+  fidelity managed by a human/agent review gate, where our
+  PC-34/PC-36 experiments (2026-10-27) chose segmentation
+  (BiRefNet/SAM 3) because generation invents details
+  (labels, removes sleeves) even with typed prompts.
+- **Usable:** (1) The review-gate shape — jobs, originals kept,
+  regeneration, explicit approval before a generated image
+  joins the library — a worked example for PC-57's gating and
+  any PC-49 revival. (2) The modeled-lookbook packaging
+  (curate → generate → verify → save) as a template for PC-49
+  if its triggers fire. (3) Independent validation of our
+  pipeline shape: vision model lists garments first, then
+  per-garment processing — the same Gemini-first flow the
+  founder set for SAM 3. (4) Nothing to take on storage or
+  extraction: local JSON doesn't transfer to a multi-device
+  app, and per-image gpt-image cost is orders above our
+  cents-per-image segmentation.
+- **Status:** UPDATED the same evening — the founder adopted
+  the review gate on sight ("make or break"); it is filed as
+  PC-58 (issue #128), build timing deliberately later. The
+  repo itself stays watch-only. DEEP READ (same night,
+  founder's follow-up: "how are the final images
+  generated, what else can be stolen?"): their cutout
+  trick is chroma-key generation — the image model is
+  told to render the garment on a perfectly flat solid
+  key color chosen to be maximally distant from the
+  garment's own detected color (#00ff00 default,
+  #ff00ff for green), then a local script keys the
+  background out (soft matte + despill) and COUNTS
+  leftover chroma-contaminated pixels, failing the
+  stage if cleanup is dirty. Around it: an
+  anti-invention ruleset (preserve only
+  source-supported details; prefer omission over
+  invented logos, seams, pockets; HOLD items whose
+  construction cannot be recovered without invention),
+  a stage record per image (status, decision,
+  attempts, the failed attempts kept and viewable,
+  cleanup diagnostics, reviewer direction appended
+  to the prompt on regeneration), corrective passes
+  instead of blind re-rolls (attach the failure, name
+  it, preserve what worked), a layered-look prompt
+  clause (never invent a zipper or opening; inner
+  layer visible only at real collar, cuff, or a
+  2-4 cm hem), and content-derived stable IDs so
+  re-imports update instead of duplicating. Filed to
+  PC-58 (gate machinery) and PC-57 (chroma technique
+  + rubric). Not taken: gpt-image at high quality for
+  every garment (cost is orders above our
+  segmentation cents) and the local-JSON store.
+  FOUNDER DIRECTION (2026-10-27, closing the topic):
+  clean images in the catalog are, in his words, one
+  of the most appealing things the app can have — "I
+  am sure we would do it someday" — and the approach
+  gets researched and decided BEFORE anything is
+  built. That is the standing frame for PC-34 /
+  PC-36 / PC-57 / PC-58: evidence first (the SAM 3,
+  BiRefNet, Qwen and template arms), then a decision,
+  then a build. No image-pipeline build jumps this
+  queue.
+  Revisit trigger:
+  the repo resumes activity, ships a hosted product, or PC-49
+  un-parks. Full note also in the studio inbox (2026-10-27).

@@ -21,7 +21,11 @@ const { getClient, logAiFailure, reportUsage, MODEL_VERSION } = require("./descr
 const { codedError, logEvent } = require("./errors");
 
 const MAX_ITEMS = 500;
-const MAX_MESSAGES = 20;
+// UX-18 W5 (decision 7): the reading window is the last 50 messages
+// of the conversation — per conversation, stated honestly in-app when
+// a thread first passes it (the client adds the note; the doc's
+// windowNoted flag keeps it to once).
+const MAX_MESSAGES = 50;
 const MAX_TEXT = 2000;
 const MAX_PREFERENCES = 50;
 
@@ -89,6 +93,18 @@ function describeColors(colors) {
 // it is not a set of rigid rules. An intentional clash can be the right
 // call, but the model must explain why. Bump the version when edited;
 // the benchmark re-runs against every version.
+// UX-18 W5 (decision 5): the who-wins table as ONE stated block in
+// the brief — the same table CURRENT-STATE.md carries and
+// CONTEXT-MODEL.md specifies. Per-feature prose elsewhere in the
+// brief explains mechanics; when anything conflicts, this block is
+// the rule. One rulebook for every caller (decision 9).
+const PRECEDENCE = `WHO WINS — when instructions conflict, the higher line wins:
+1. The user's confirmed style notes (the STYLE PROFILE) beat everything else.
+2. A style word the user named for this conversation beats the learned taste profile.
+3. Pieces or outfits the user pointed at (@-references) beat the previous pick as the outfit being changed.
+4. Weather the user states in this conversation beats a pinned location/weather fact; a pinned fact beats the measured weather.
+5. An attached today's pick is the iteration base only when this conversation has no pick of its own yet.`;
+
 const RUBRIC_VERSION = "2026-10-15-v1";
 const RUBRIC = `STYLING RUBRIC ${RUBRIC_VERSION} — judge every outfit by these dimensions.
 The rubric guides; it does not dictate. An intentional clash, an unexpected
@@ -199,8 +215,17 @@ function sanitizeMessages(messages) {
   const out = [];
   for (const m of messages.slice(-MAX_MESSAGES)) {
     if (!m || typeof m !== "object") continue;
-    const role = m.role === "model" ? "model" : "user";
-    const text = cleanText(m.text, MAX_TEXT);
+    // Role: the server's model role is "model". Clients may send
+    // "assistant" (the OpenAI-style name) — normalize it here so a
+    // client that uses the other name does not silently flip the
+    // assistant's turns into user turns.
+    const role = (m.role === "model" || m.role === "assistant") ? "model" : "user";
+    // Text: "text" is the contract (the main chat sends it). "content"
+    // is accepted as a fallback — a client that sends the other field
+    // name must not silently lose every message (PC-41, 2026-11-05:
+    // the follow-up sheet sent "content" and every message was
+    // dropped, failing the call with an empty-messages error).
+    const text = cleanText(m.text || m.content, MAX_TEXT);
     if (!text) continue;
     out.push({ role, text });
   }
@@ -243,6 +268,46 @@ function sanitizeTodayPick(value) {
     lookName: cleanText(value.lookName, 80) || null,
     reasoning: cleanText(value.reasoning, 400) || null,
   };
+}
+
+// Shop attach (founder, 2026-10-24): a shop-check item the user is
+// deciding about, attached to the conversation explicitly so
+// follow-ups ("would it go with my navy blazer?") have the facts.
+// It is NOT a wardrobe piece — no ids, no handles; the brief marks
+// it as under consideration and outfits stay wardrobe-only.
+function sanitizeShopItem(value) {
+  if (!value || typeof value !== "object") return null;
+  const name = cleanText(value.name, 60);
+  if (!name) return null;
+  return {
+    name: name,
+    category: cleanText(value.category, 40) || null,
+    colors: cleanList(value.colors, 6, 30),
+    note: cleanText(value.note, 200) || null,
+    score: typeof value.score === "number" && isFinite(value.score) ? value.score : null,
+    verdict: cleanText(value.verdict, 300) || null,
+    reasons: cleanList(value.reasons, 6, 160),
+  };
+}
+
+// PC-38: reference PHOTOS attached to a chat message — vision
+// context for that turn only. Distinct from PC-22's references
+// (wardrobe pointers): these are images the user is aiming for,
+// never wardrobe items. Hard caps: at most 4, known image MIME
+// types only, each payload a plausible base64 image (the client
+// downscales to ≤1024px JPEG, ~200KB; the ceiling here is the
+// abuse guard, not the expectation). Malformed → dropped.
+const REF_IMAGE_MIMES = new Set(["image/jpeg", "image/png", "image/webp"]);
+function sanitizeRefImages(value) {
+  if (!Array.isArray(value)) return [];
+  const out = [];
+  for (const v of value.slice(0, 4)) {
+    if (!v || typeof v !== "object") continue;
+    if (!REF_IMAGE_MIMES.has(v.mimeType)) continue;
+    if (typeof v.data !== "string" || v.data.length < 100 || v.data.length > 2000000) continue;
+    out.push({ mimeType: v.mimeType, data: v.data });
+  }
+  return out;
 }
 
 // PC-22: @-mention references. The client sends { articleIds, outfits }
@@ -410,8 +475,39 @@ function parseStylistJson(text, todayStr) {
   }
   // Sprint 17: optional pin proposal — the model may surface one durable
   // fact per message. Sanitized; the client confirms before saving.
-  const proposal = sanitizePinProposal(obj.pinProposal, todayStr);
-  return { reply: reply, outfit: outfit, pinProposal: proposal };
+  let proposal = sanitizePinProposal(obj.pinProposal, todayStr);
+  // PC-52: an attach proposal is a single literal — the model may
+  // propose attaching today's pick, nothing else. Anything else
+  // the model invents in this field drops here.
+  const attachProposal = obj.attachProposal === "todayPick" ? "todayPick" : null;
+  // PC-33: a trip proposal — a destination plus real future
+  // timing, sanitized hard (a steering card with a wrong date is
+  // worse than none). Suppression lives here too: when a reply
+  // carries a trip proposal, a location/weather pin proposal
+  // for the same fact drops — the user never sees two competing
+  // cards for one fact (proposal §3). Preferences survive.
+  const tripProposal = sanitizeTripProposal(obj.tripProposal, todayStr);
+  if (tripProposal && proposal && (proposal.kind === "location" || proposal.kind === "weather")) {
+    proposal = null;
+  }
+  return { reply: reply, outfit: outfit, pinProposal: proposal, attachProposal: attachProposal, tripProposal: tripProposal };
+}
+
+// PC-33: the trip-proposal sanitizer. Destination and a valid
+// future start date are required (the intent threshold is
+// destination + timing); an end date survives only when it is
+// a valid date on/after the start. Name is optional color.
+function sanitizeTripProposal(raw, todayStr) {
+  if (!raw || typeof raw !== "object") return null;
+  const destination = cleanText(raw.destination, 80);
+  if (!destination) return null;
+  const dateOk = (s) => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse(s + "T12:00:00Z"));
+  if (!dateOk(raw.startDate) || raw.startDate < todayStr) return null;
+  const out = { destination: destination, startDate: raw.startDate };
+  if (dateOk(raw.endDate) && raw.endDate >= raw.startDate) out.endDate = raw.endDate;
+  const name = cleanText(raw.name, 60);
+  if (name) out.name = name;
+  return out;
 }
 
 // Sprint 17 (CONTEXT PINS): stored current facts the user confirmed.
@@ -428,6 +524,9 @@ function sanitizePins(raw) {
     if (!label) continue;
     const validUntil = /^\d{4}-\d{2}-\d{2}$/.test(p.validUntil || "") ? p.validUntil : "";
     out.push({
+      // The doc id rides along so per-conversation mutes
+      // (layered remove, 2026-10-24) can name the fact.
+      id: typeof p.id === "string" ? cleanText(p.id, 128) : "",
       kind: kind,
       label: label,
       detail: cleanText(p.detail || "", 200),
@@ -684,10 +783,100 @@ function handleIndex(handle, items) {
 // Build the exact model request askStylist sends. Exported so the
 // benchmark runner (tests/benchmark) exercises the real prompt —
 // prompt changes and benchmark stay in sync by construction.
-function buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, todayPick) {
+// UX-18 W1 (one assembler): the two resolutions every brief depends on,
+// factored out so buildStylistRequest and the manifest (below) can never
+// disagree about them — the manifest must describe the brief as built.
+function resolveIterBase(previousPick, todayPick) {
+  const base = previousPick || (todayPick && todayPick.itemIds && todayPick.itemIds.length ? { itemIds: todayPick.itemIds } : null);
+  return { base: base, isToday: !previousPick && !!base };
+}
+
+function computeActivePins(pins, tripContext, todayStr, mutedIds) {
+  let active = (Array.isArray(pins) ? pins : []).filter(
+    (p) => p && (!p.validUntil || p.validUntil >= todayStr)
+  );
+  // Layered remove (founder, 2026-10-24): facts the user
+  // removed from THIS conversation are left out of the brief —
+  // what the context bar hides, the stylist truly does not
+  // use. The facts themselves are untouched in the account.
+  if (Array.isArray(mutedIds) && mutedIds.length) {
+    active = active.filter((p) => !p.id || mutedIds.indexOf(p.id) < 0);
+  }
+  // Threads scoping (founder 2026-10-19): inside a trip conversation,
+  // global location/weather pins do NOT apply — the trip's own
+  // destination and packing weather are the context there. Preference
+  // pins and pins scoped to this trip still do.
+  if (tripContext) {
+    active = active.filter(
+      (p) => p.kind === "preference" || p.tripId === tripContext.tripId
+    );
+  }
+  return active;
+}
+
+// The manifest: a plain-names list of what the assembler loaded into
+// one brief. Returned with every answer; the client renders the
+// context line from it (CONTEXT-MODEL.md, W1/W3), and one-shot callers
+// keep it with their records. Built from the same resolutions the
+// brief itself used — never a second snapshot.
+function buildManifest(input, activePins) {
+  const items = input.items || [];
+  const messages = input.messages || [];
+  const iter = resolveIterBase(input.previousPick, input.todayPick);
+  const prefs = Array.isArray(input.styleProfile) ? input.styleProfile.filter(Boolean) : [];
+  const vp = input.vibeProfile;
+  const tasteApplied = !input.vibe && !!(vp && vp.confidence >= 0.3 && vp.tags);
+  return {
+    wardrobe: items.length,
+    messagesRead: Math.min(messages.length, MAX_MESSAGES),
+    messagesTotal: messages.length,
+    styleNotes: prefs.length,
+    weather: input.weatherContext || null,
+    todayPick: input.todayPick && input.todayPick.itemIds && input.todayPick.itemIds.length
+      ? { attached: true, lookName: input.todayPick.lookName || null }
+      : { attached: false, lookName: null },
+    shopItem: input.shopItem
+      ? { attached: true, name: input.shopItem.name }
+      : { attached: false, name: null },
+    previousPick: { present: !!iter.base, fromToday: iter.isToday },
+    references: {
+      articles: input.references && Array.isArray(input.references.articles) ? input.references.articles.length : 0,
+      outfits: input.references && Array.isArray(input.references.outfits) ? input.references.outfits.length : 0,
+    },
+    styleWord: input.vibe || null,
+    learnedTaste: {
+      applied: tasteApplied,
+      top: tasteApplied
+        ? Object.keys(vp.tags).map((t) => ({ tag: t, score: vp.tags[t] }))
+            .sort((a, b) => b.score - a.score).slice(0, 3).map((e) => e.tag)
+        : [],
+    },
+    pins: (activePins || []).map((p) => ({ kind: p.kind, label: p.label })),
+    trip: input.tripContext ? { name: input.tripContext.tripName || "Trip" } : null,
+  };
+}
+
+// THE assembler (UX-18 W1): the single place a brief is built, for
+// every caller of the stylist. Input is the sanitized context object;
+// output is the model request plus the manifest of what went into it.
+function assembleContext(input) {
+  const todayStr = /^\d{4}-\d{2}-\d{2}$/.test(input.today || "")
+    ? input.today
+    : new Date().toISOString().slice(0, 10);
+  const req = buildStylistRequest(
+    input.items, input.messages, input.styleProfile, input.previousPick,
+    input.references, input.weatherContext, input.vibe, input.vibeProfile,
+    input.tripContext, input.pins, todayStr, input.todayPick, input.shopItem,
+    input.mutedPinIds, input.attachCtx, input.steerCtx, input.refImages
+  );
+  const manifest = buildManifest(input, computeActivePins(input.pins, input.tripContext, todayStr, input.mutedPinIds));
+  return { model: req.model, contents: req.contents, config: req.config, manifest: manifest };
+}
+
+function buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, todayPick, shopItem, mutedPinIds, attachCtx, steerCtx, refImages) {
   const model = process.env.GEMINI_MODEL || MODEL_VERSION;
   const wardrobe = items.map((it, i) => itemLine(it, i)).join("\n");
-  let system = SYSTEM;
+  let system = SYSTEM + "\n\n" + PRECEDENCE;
   const prefs = Array.isArray(styleProfile) ? styleProfile.filter(Boolean) : [];
   if (prefs.length) {
     system += "\n\nSTYLE PROFILE — the user's confirmed preferences. Honor them when recommending:\n" +
@@ -709,8 +898,9 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
   // chat. It was displayed but never sent, so questions about
   // it arrived context-free. When there is no in-chat pick to
   // iterate on, today's pick IS the iteration base below.
-  const iterBase = previousPick || (todayPick && todayPick.itemIds.length ? { itemIds: todayPick.itemIds } : null);
-  const iterBaseIsToday = !previousPick && !!iterBase;
+  const iterRes = resolveIterBase(previousPick, todayPick);
+  const iterBase = iterRes.base;
+  const iterBaseIsToday = iterRes.isToday;
   if (todayPick && Array.isArray(todayPick.itemIds) && todayPick.itemIds.length) {
     const tpHandles = todayPick.itemIds.map((id) => {
       const idx = items.findIndex((it) => it && it.id === id);
@@ -770,6 +960,26 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
         "- Both present: the outfit is the base, the pieces are must-keeps.";
     }
   }
+  // Shop attach: an item the user is deciding whether to buy,
+  // attached to this conversation on purpose. It is NOT owned and
+  // NOT in the wardrobe list — outfits keep using wardrobe handles
+  // only; this section is for judgement (fit with owned pieces,
+  // duplication, whether the earlier verdict holds up).
+  if (shopItem) {
+    let shop = "\n\nITEM UNDER CONSIDERATION — the user ran a shop check on this piece and attached it to ask follow-ups. They do NOT own it.\n" +
+      "- Item: " + shopItem.name + (shopItem.category ? " (" + shopItem.category + ")" : "") +
+      (shopItem.colors && shopItem.colors.length ? ", colors: " + shopItem.colors.join(", ") : "") + ".\n";
+    if (shopItem.note) shop += "- Seen as: " + shopItem.note + "\n";
+    if (shopItem.score != null) {
+      shop += "- The shop check scored it " + shopItem.score + "/10 for wardrobe fit" +
+        (shopItem.verdict ? ": " + shopItem.verdict : "") + "\n";
+    }
+    if (shopItem.reasons && shopItem.reasons.length) {
+      shop += "- Why that score: " + shopItem.reasons.join("; ") + "\n";
+    }
+    shop += "- Answer questions about THIS item: what it pairs with (name wardrobe pieces by their handles), whether it duplicates something owned, whether it earns its place. If you suggest an outfit to show how it would be worn, build the outfit from wardrobe pieces and describe the shop item's role in prose — never put the shop item in the outfit's items.";
+    system += shop;
+  }
   const contents = [
     { role: "user", parts: [{ text: "WARDROBE (pick only from these items):\n" + wardrobe }] },
   ];
@@ -813,14 +1023,7 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
   // global location/weather pins do NOT apply — the trip's own
   // destination and packing weather are the context there. Preference
   // pins and pins scoped to this trip still do.
-  let activePins = (Array.isArray(pins) ? pins : []).filter(
-    (p) => !p.validUntil || p.validUntil >= todayStr
-  );
-  if (tripContext) {
-    activePins = activePins.filter(
-      (p) => p.kind === "preference" || p.tripId === tripContext.tripId
-    );
-  }
+  const activePins = computeActivePins(pins, tripContext, todayStr, mutedPinIds);
   if (activePins.length) {
     const pinLines = activePins.map((p) => {
       let line = "- [" + p.kind + "] " + p.label;
@@ -849,10 +1052,62 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
       "- Location/weather: where they'll be / what weather they'll be in. Preference: lasting facts " +
       "(runs cold, leans casual, loves earth tones, never suggest X, packing style, owns ski gear).\n" +
       "- Extract end dates from speech (\"until Sunday\" → that date). Skip trivia and one-off requests.\n" +
-      "- Never propose on your own initiative — only when the user states the fact or its end. Propose, never append.";
+      "- Never propose on your own initiative — only when the user states the fact or its end. Propose, never append.\n" +
+      "- TENSE RULE (PC-33): location and weather pins are PRESENT-TENSE ONLY — propose one only for where " +
+      "the user IS now or weather they are in now (\"I'm in Tahoe until Sunday\", \"it's snowing here\"). Never " +
+      "for a place they will travel to later, however clean its end date looks: a saved pin takes effect " +
+      "immediately and would outrank their real weather at home. Future trips belong in a trip proposal " +
+      "(below), not a pin. Preference proposals are unaffected — lasting facts stay proposable.";
+  }
+  // PC-52: attach proposals. Attach is an act (UX-18 decision 1) —
+  // the stylist may PROPOSE the act when the conversation has
+  // turned on the unattached pick, exactly as facts are proposed.
+  // The brief section exists only when a pick is available and
+  // unattached and no proposal was dismissed in this conversation;
+  // the server also drops the field otherwise (askStylist gates).
+  if (!tripContext && attachCtx && attachCtx.available && !attachCtx.dismissed && !todayPick) {
+    system += "\n\nATTACH PROPOSAL — today's pick exists but is NOT attached to this conversation, so you cannot see or change it. " +
+      "If the user's words clearly turn on that pick (\"make it warmer\", \"why did you pick this?\", \"swap the shoes on it\"), " +
+      "you may return \"attachProposal\": \"todayPick\" in the JSON alongside reply/outfit. The user gets an Attach card; " +
+      "nothing attaches unless they tap it. Do not claim to see the pick, and do not propose when the conversation is about anything else.";
+  }
+  // PC-33: trip steering. Pins are the present-tense layer;
+  // trips own the future. When a message carries a future trip,
+  // the durable offer is a trip object, not a pin.
+  if (!tripContext && !(steerCtx && steerCtx.dismissed)) {
+    system += "\n\nTRIP PROPOSAL — if the user's words carry a FUTURE trip (a destination plus future timing: " +
+      "\"next week\", explicit dates, \"my trip to …\"), you may return \"tripProposal\" in the JSON alongside reply/outfit:\n" +
+      "{ \"destination\": \"<place>\", \"startDate\": \"<YYYY-MM-DD>\", \"endDate\": \"<YYYY-MM-DD, omit if same or unknown>\", " +
+      "\"name\": \"<short trip name, optional>\" }.\n" +
+      "Compute real dates from what the user said and today's date. The user gets a card offering to create the trip; " +
+      "answer their question fully either way — the card never replaces advice, and creating the trip is their tap, " +
+      "never your act. Vague travel talk with no timing earns no proposal.";
+  }
+  // PC-38: reference photos ride with the latest user message
+  // as vision context for this turn. They are inspiration, not
+  // inventory — the brief says so in as many words, because a
+  // model that can't tell an inspo photo from an owned piece
+  // will happily dress the user in clothes they don't have.
+  const hasRefImages = !tripContext && Array.isArray(refImages) && refImages.length > 0;
+  if (hasRefImages) {
+    system += "\n\nREFERENCE PHOTOS — the user attached " + refImages.length +
+      " photo(s) to their latest message (they travel with it below). These are INSPIRATION: " +
+      "looks the user is aiming for. They are NOT in the wardrobe — never put them in an outfit, " +
+      "never treat them as owned, never suggest wearing them. Name what you actually see in them " +
+      "(the pieces, colors, silhouette, mood), then answer by building only from the wardrobe above.";
   }
   for (const m of messages) {
     contents.push({ role: m.role, parts: [{ text: m.text }] });
+  }
+  if (hasRefImages) {
+    for (let i = contents.length - 1; i >= 0; i--) {
+      if (contents[i].role === "user") {
+        for (const img of refImages) {
+          contents[i].parts.push({ inlineData: { mimeType: img.mimeType, data: img.data } });
+        }
+        break;
+      }
+    }
   }
   // Sprint 16 (TRIPCHAT-1): trip mode. The model gets the trip + the
   // current packing (as handles) and one tool to rewrite the plan.
@@ -1146,11 +1401,22 @@ function unwrapJsonReply(text) {
 }
 
 // here; the client re-validates on execute.
-async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, hooks, todayPick) {
+async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, hooks, todayPick, shopItem, mutedPinIds, attachCtx, steerCtx, refImages) {
   const todayStr = /^\d{4}-\d{2}-\d{2}$/.test(today || "")
     ? today
     : new Date().toISOString().slice(0, 10);
-  const { model, contents, config } = buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, todayStr, todayPick);
+  // UX-18 W1: every stylist call goes through the one assembler; the
+  // manifest of what was loaded rides back with the answer.
+  const assembled = assembleContext({
+    items: items, messages: messages, styleProfile: styleProfile,
+    previousPick: previousPick, references: references,
+    weatherContext: weatherContext, vibe: vibe, vibeProfile: vibeProfile,
+    tripContext: tripContext, pins: pins, today: todayStr, todayPick: todayPick,
+    shopItem: shopItem, mutedPinIds: mutedPinIds, attachCtx: attachCtx,
+    steerCtx: steerCtx, refImages: refImages,
+  });
+  const { model, contents, config } = assembled;
+  const manifest = assembled.manifest;
   const ai = getClient();
   if (tripContext) {
     // Trip mode: the tools are independent — a packing change and a
@@ -1208,7 +1474,7 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
               ? "I drafted a plan but couldn't apply it cleanly — your packing is unchanged. Mind asking once more?"
               : "Hmm — that came back empty on my end. Try again?");
     }
-    return { reply: text, toolCall: mappedCall, pinProposal: pinProposal, outfitSuggestions: outfitSuggestions };
+    return { reply: text, toolCall: mappedCall, pinProposal: pinProposal, outfitSuggestions: outfitSuggestions, manifest: manifest };
   }
   let parsed = await callStylistModel(ai, model, contents, config, "askStylist", todayStr, hooks);
 
@@ -1233,12 +1499,26 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
     }
   }
 
+  // PC-52: the attach proposal survives only under the exact
+  // conditions its brief section states — general conversation,
+  // a pick available, none attached, none dismissed here. The
+  // prompt asks; this gate decides (a model that proposes out
+  // of turn is dropped, not displayed).
+  const attachProposal = (!tripContext && attachCtx && attachCtx.available &&
+    !attachCtx.dismissed && !todayPick) ? (parsed.attachProposal || null) : null;
+  // PC-33: the trip proposal survives only in general chat and
+  // only when steering has not been dismissed in this
+  // conversation. (Parse already suppressed any competing
+  // location/weather pin proposal.)
+  const tripProposal = (!tripContext && !(steerCtx && steerCtx.dismissed))
+    ? (parsed.tripProposal || null) : null;
   if (!parsed.outfit || !mapped || problem) {
     if (parsed.outfit) emitEvent(hooks, "rejection", "outfit_discarded", { problem: problem || "unmapped" });
-    return { reply: parsed.reply, outfit: null, pinProposal: parsed.pinProposal || null };
+    return { reply: parsed.reply, outfit: null, pinProposal: parsed.pinProposal || null, attachProposal: attachProposal, tripProposal: tripProposal, manifest: manifest };
   }
   return {
     reply: parsed.reply,
+    manifest: manifest,
     outfit: {
       itemIds: mapped.map((m) => m.id),
       itemNames: mapped.map((m) => m.name),
@@ -1250,7 +1530,9 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
       scores: parsed.outfit.scores,
     },
     pinProposal: parsed.pinProposal || null,
+    attachProposal: attachProposal,
+    tripProposal: tripProposal,
   };
 }
 
-module.exports = { askStylist, buildStylistRequest, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeTodayPick, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins, sanitizePinProposal, extractToolCall, extractToolCalls, mapUpdateTripPacking, mapSuggestTripOutfits, handleIndex, unwrapJsonReply, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM, VIBE_TAGS };
+module.exports = { askStylist, buildStylistRequest, assembleContext, buildManifest, resolveIterBase, computeActivePins, PRECEDENCE, MAX_MESSAGES, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeTodayPick, sanitizeShopItem, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins, sanitizePinProposal, sanitizeTripProposal, sanitizeRefImages, extractToolCall, extractToolCalls, mapUpdateTripPacking, mapSuggestTripOutfits, handleIndex, unwrapJsonReply, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM, VIBE_TAGS };

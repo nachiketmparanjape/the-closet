@@ -11,13 +11,19 @@
 // ask Replicate to wait (Prefer: wait) and then poll the prediction
 // URL until it settles. Output is a file URL; we download the PNG.
 //
-// VERIFY-AT-FIRST-LIVE-CALL: MODEL and the "image" input name are
-// the canonical public BiRefNet deployment values, but Replicate's
-// API refuses unauthenticated model lookups, so the pinned model
-// version could not be read before the founder's token existed.
-// The deploy smoke call (one wardrobe photo, by hand) is the check:
-// a wrong model id fails loudly as EXTRACT_FAILED, and the fix is
-// this one constant (plus optionally MODEL_VERSION to pin a hash).
+// ENDPOINT HISTORY: the first pinned id, zhengpeng-7/birefnet,
+// was never verified (Replicate's API refuses unauthenticated
+// model lookups, so it could not be read before the founder's
+// token existed). At the first live check (2026-10-27, the day
+// the token landed) its public model page returned 404 and it
+// appears in no Replicate listing — the id does not resolve.
+// The endpoint is now sprited/birefnet, a maintained community
+// packaging of the same MIT BiRefNet model; its published
+// schema (read 2026-10-27) takes input "image" and an
+// output_format, pinned to "cutout" below so the pipeline
+// always receives an RGBA cutout, never a raw matte.
+// MODEL_VERSION stays null; the founder's first phone add is
+// the live end-to-end verification of this endpoint.
 //
 // This module is the swappable seam: extract.js depends only on the
 // { png, uncertainty } shape. BiRefNet returns no uncertainty score,
@@ -26,11 +32,57 @@
 
 const { codedError } = require("./errors");
 
-const MODEL = "zhengpeng-7/birefnet";
+const MODEL = "sprited/birefnet";
 const MODEL_VERSION = null; // pin a version hash here once verified live
 const API_BASE = "https://api.replicate.com/v1";
 const POLL_INTERVAL_MS = 3000;
 const MAX_WAIT_MS = 90000; // the callable's own timeout is 120s
+
+let resolvedVersion = null;
+
+async function resolveVersion(doFetch, apiKey) {
+  if (resolvedVersion) return resolvedVersion;
+  const res = await doFetch(API_BASE + "/models/" + MODEL, {
+    headers: { Authorization: "Bearer " + apiKey },
+  });
+  if (!res.ok) {
+    throw codedError(
+      "EXTRACT_FAILED",
+      "replicate model lookup status " + res.status
+    );
+  }
+  const j = await res.json();
+  const v = j && j.latest_version && j.latest_version.id;
+  if (!v) {
+    throw codedError(
+      "EXTRACT_FAILED",
+      "replicate model lookup returned no latest_version"
+    );
+  }
+  resolvedVersion = v;
+  return v;
+}
+
+// Replicate throttles accounts without a payment method to a
+// burst of 1 prediction create (429, retry_after ~10s). Wait
+// out the window a few times — the callable's 120s budget
+// absorbs it — rather than failing the extraction.
+async function createWithBackoff(doFetch, sleep, init) {
+  for (let attempt = 0; ; attempt++) {
+    const res = await doFetch(API_BASE + "/predictions", init);
+    if (res.status !== 429 || attempt >= 4) return res;
+    let wait = 12000;
+    try {
+      const j = JSON.parse(await res.text());
+      if (j && j.retry_after) {
+        wait = Math.min(30000, (Number(j.retry_after) + 2) * 1000);
+      }
+    } catch (e) {
+      /* unreadable body — the default wait stands */
+    }
+    await sleep(wait);
+  }
+}
 
 async function segmentImage(buffer, mimeType, apiKey, fetchImpl, opts) {
   if (!apiKey) {
@@ -40,20 +92,22 @@ async function segmentImage(buffer, mimeType, apiKey, fetchImpl, opts) {
   const doFetch = fetchImpl || fetch;
   const sleep =
     options.sleepImpl || ((ms) => new Promise((r) => setTimeout(r, ms)));
-  const version = options.modelVersion || MODEL_VERSION;
   const dataUri =
     "data:" + (mimeType || "image/jpeg") + ";base64," + buffer.toString("base64");
-
-  const createUrl = version
-    ? API_BASE + "/predictions"
-    : API_BASE + "/models/" + MODEL + "/predictions";
-  const createBody = version
-    ? { version, input: { image: dataUri } }
-    : { input: { image: dataUri } };
+  // Community models cannot be created through
+  // /models/{owner}/{name}/predictions (404, learned live
+  // 2026-10-27) — creation is by version hash. Resolve the
+  // latest version once per instance unless one is pinned.
+  const version =
+    options.modelVersion || MODEL_VERSION || (await resolveVersion(doFetch, apiKey));
+  const createBody = {
+    version,
+    input: { image: dataUri, output_format: "cutout" },
+  };
 
   let prediction;
   try {
-    const res = await doFetch(createUrl, {
+    const res = await createWithBackoff(doFetch, sleep, {
       method: "POST",
       headers: {
         Authorization: "Bearer " + apiKey,

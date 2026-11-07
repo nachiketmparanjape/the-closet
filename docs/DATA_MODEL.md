@@ -188,7 +188,7 @@ multi-photo "garment model"; the only concession that idea gets today).
 | `supersedes` | id, or nothing | The previous version's record id; empty on v1 |
 | `itemIds` | id list | The pieces — the stable join key |
 | `itemNames` | text list | The name snapshot, parallel to `itemIds` |
-| `source` | `stylist` or `manual` | Where the outfit came from; kept across versions |
+| `source` | `stylist`, `manual`, or `photo` | Where the outfit came from; kept across versions. `photo` is for outfits composed from a photo (photo-parse save, PC-13 remainder) |
 | `name` | text | Yours to edit |
 | `occasion` | text, optional | The *intent* — what it was assembled for |
 | `weather` | text, optional | As given at recommendation time |

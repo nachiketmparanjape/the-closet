@@ -163,6 +163,10 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
 - **Not yet sized** — parked; candidate for prioritization.
 
 ### UX-12: First-run tutorial / onboarding experience (not yet sized)
+- **Status:** Killed as a separate card at the Sprint 24
+  planning walk (2026-10-24) — the tutorial question folds
+  into UX-14, which subsumes it. This card remains as the
+  record of the idea and its trigger.
 - **Idea (founder 2026-10-17):** a quick tutorial for new users so they can
   figure out what to do on their own.
 - **Why parked:** the app is mid-UX-polish — flows are still changing, and a
@@ -174,10 +178,14 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
 - **Revisit trigger:** a stranger (not a hand-held tester) gets lost in the
   app, or the UX polish sprint settles and the flows stop moving.
 
-### AUTH-1: Privacy-friendlier sign-in — IN SPRINT 13
+### AUTH-1: Privacy-friendlier sign-in
 Anonymous-first auth with Google/email-link upgrade, one account per
-email, guest banner + privacy note. Built 2026-10-18, in founder phone
-validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
+email, guest banner + privacy note. Design:
+`docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
+- **Status:** DONE 2026-10-18 (Sprint 13) — built and founder
+  phone-validated the same day (his testing caught the guest
+  Google-link conflict, fixed in the same pass: linking signs
+  into the real account and offers guest-wardrobe migration).
 
 ### Personalization: exploration vs. exploitation (open modeling question)
 - **Problem:** the vibe profile only learns from what the user wears —
@@ -312,7 +320,9 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   chip). The full cut persists threads
   (`users/{uid}/chat_threads/{threadId}`), resumes them across
   reloads, and cleans up on trip delete.
-- **Status:** Not started (proposal stage). Sprint candidate.
+- **Status:** DONE 2026-10-24 — absorbed into UX-18
+  wave 4 (saved threads per context, shipped as part of
+  UX-18). This card's ask is the shipped behavior.
 
 ### PC-33: Trip steering in chat + pin discipline (M)
 - **Idea (founder 2026-10-20):** asking the general chat about a
@@ -336,8 +346,29 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   rejected in the proposal, with a revisit trigger recorded.
   Principle: pins are the present-tense layer; trips own the
   future. The discipline half can split out as an (S) at planning.
-- **Status:** Not started (proposal stage). Sprint candidate;
-  sits next to PC-32 (threads) and CONTEXT-1 (pins).
+- **Status:** DONE 2026-10-24 (Sprint 24). Correction
+  to the walk's record, found while building: the
+  discipline half had NOT fully landed in UX-18 — the
+  present-tense principle was adopted in the context
+  model, but the prompt rule itself was never written
+  into the brief (the pin section still said "where
+  they'll be"). Both halves shipped here: the TENSE RULE
+  in the pin-proposal brief (present-tense only for
+  location/weather; preferences unaffected), the trip
+  proposal (sanitized: destination + real future dates
+  or nothing), parse-level suppression (a trip proposal
+  drops a same-reply location/weather pin proposal), and
+  the steering card — Create runs the trips flow's own
+  steps, success offers the jump without yanking, "Just
+  advise me here" dismisses for the conversation, and a
+  matching existing trip suppresses the card. The card's
+  education line is Bramble's wording, flagged for the
+  founder's copy verdict. tests/pc33.test.js.
+  COPY VERDICT (2026-10-27, late): the founder
+  approved the education line as written — "a trip
+  gets its own chat, its own weather, and a packing
+  list, kept out of your daily outfits until you go"
+  stands.
 
 ### UX-13: Visual redesign + design system (L)
 - **Idea (founder 2026-10-20):** the app looks extremely
@@ -356,7 +387,11 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   planning walk after the design doc is validated and two screens
   are re-skinned, decided by a timeboxed one-screen spike against
   pre-agreed GO criteria; if GO, strangler-style, never a freeze.
-- **Status:** In Sprint 18 — design foundation batch (plan:
+- **Status:** DONE 2026-10-23 (Sprint 18) — the design
+  foundation batch and all five Warm Editorial waves
+  are live. (Status updated at the Sprint 24 walk; it
+  still read "In Sprint 18".)
+- **Original status:** In Sprint 18 — design foundation batch (plan:
   `docs/sprints/sprint-18/PLAN.md`). DESIGN.md v1 is the first
   card; direction validation happens on the explained doc plus
   the wardrobe-grid reference implementation.
@@ -435,149 +470,546 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   system live on all 17 overlays; browser-smoke verified;
   founder phone validation (the acceptance gate) pending.
 
-### PC-34: Garment extraction & clean rendering (research spike)
-- **Size:** Spike S, then size from findings
-- **Value:** Founder's long-term direction (2026-10-21): user photos
-  are shot on beds and carpets, and no layout survives an ugly
-  source photo — the Sprint 18 tiles read "clunky" partly for
-  this reason. The apps he admires extract the garment itself
-  and render it clean (cutout on a neutral ground). He also
-  reports Google Photos (Android) auto-builds a wardrobe
-  collection from photos of him wearing clothes — if users can
-  export those, importing pre-extracted garments could collapse
-  the cataloguing cost (an attack line for UX-14).
-- **Scope:** Research spike, fixed protocol (TL;DR, findings,
-  options + tradeoffs, recommendation, sources), answering:
-  (1) server-side background-removal / segmentation options —
-  quality on soft garments, per-photo cost at our scale, API
-  vs self-hosted; (2) what Google Photos' clothing collection
-  actually is and whether users can get those images out
-  (founder-reported — verify, don't assume); (3) where
-  extraction slots into the pipeline (upload-time clean render
-  alongside the original — the original is never destroyed).
-  Design keeps the photo honest for now: tiles render best-
-  effort, extraction is a rendering layer, not a data change.
-- **Status:** Not started. Filed 2026-10-21 from the founder's
-  note; research runs on pull. Update same day: question (2) is
-  founder-verified — the collection's images save to the camera
-  roll and upload into Closet cleanly (see PC-35); the spike
-  still owns the feature's name, limits, and platform reach.
-  Founder expansion (2026-10-21, later): seeing the exported
-  cutouts, he set them as the quality benchmark and posed the
-  spike's two charter questions verbatim — (Q1) is it actually
-  possible for us: is there a readymade solution, and if not,
-  can we build it as good from scratch? (Q2) how expensive is
-  it — per photo at our scale, and in build/maintenance if we
-  roll our own? The spike's recommendation must answer both
-  head-on, with the Google output as the bar. PC-36 (worn-photo
-  decomposition) shares this spike — same segmentation core.
-  Research landed same day (studio inbox + PRODUCT.md record);
-  **founder approved Option A 2026-10-21**: Photoroom behind
-  one `extractGarment` callable, provider-swappable, original
-  never destroyed. First step is the evidence step — a
-  ~20-photo trial on the founder's real bed/carpet photos
-  (quality + latency) — then the build pulls through planning.
-  Trial ran 2026-10-22 (10 production calls; quality record in
-  the studio research note). **Build pulled 2026-10-22** —
-  founder's call: implement for sure if costs stay low (Basic
-  is $20/mo covering 1,000 images, inside the floor at our
-  scale). The sandbox rerun on the 13 raw laid-out photos is
-  extra evidence, not a gate. Hard requirements from the
-  founder: the original photo is retained untouched, and the
-  PC-19 pHash — computed on the original at selection time and
-  stored per photo — stays the dedup reference; extraction is
-  a render layer only, never a data change. Build shape:
-  `extractGarment` callable with the provider behind
-  `functions/photoroom.js`; render at
-  `users/{uid}/renders/<sha256(storagePath)>.png`; the photo
-  entry gains renderUrl / renderStoragePath /
-  renderUncertainty; tiles prefer the render and fall back to
-  the original on any failure. Build landed dark 2026-10-22
-  (commit ce5d130; client live, callable awaiting its secret).
-  Provider choice reopened the same day: the founder is
-  weighing Photoroom's $20/mo floor against BiRefNet via
-  Replicate (pay-per-use, ~$0.001/image, no floor, cold
-  starts, no uncertainty score, no trial evidence yet). His
-  call after deliberation; the provider seam makes it a
-  one-module swap, and nothing costs anything while dormant.
-  BiRefNet comparison evidence landed 2026-10-22: the open
-  model (run locally on CPU) over the same 14 raw photos plus
-  the 20 trial originals — quality parity with Photoroom on
-  the 10 head-to-head items (alpha stats within ~0.3pt,
-  visually near-identical), and on the translucent-lens
-  sunglasses (Photoroom's weakest, uncertainty 0.84–1.0) it
-  kept the source's dark lenses where Photoroom washed them
-  translucent. All 14 raw photos extracted cleanly off
-  bed/carpet; only blemishes were slivers of adjacent dark
-  objects on the two most cluttered shots. Full record in
-  the studio research note and `photoroom-trial/results.md`.
-  Bramble's recommendation now: the no-floor route (BiRefNet
-  via Replicate behind the same provider module), giving up
-  the uncertainty score. Founder's call still open; if
-  BiRefNet is chosen, the pending sandbox-key paste is moot
-  and a Replicate token via the same secure-paste pattern
-  takes its place.
-  **Founder chose BiRefNet via Replicate 2026-10-23**, and
-  approved the full package in the same pass: orientation
-  baked into the pixels server-side before the provider call
-  (with an aspect assertion in the gate, so a rotated render
-  can never pass silently); a two-layer quality gate — mask
-  heuristics, then a Gemini vision check on the cutout
-  composited over magenta — where the client only ever
-  points a photo at a passed render and a rejection leaves
-  the original showing; extraction scoped to each item's
-  first photo (the only photo any surface displays); both
-  AI calls emitting ai_usage events (OBS-3a). Built
-  2026-10-23: `functions/birefnet.js` replaces
-  `functions/photoroom.js` behind the seam, the
-  `REPLICATE_API_TOKEN` secret exists with its accessor
-  grant (no version yet — the token value is the founder's
-  laptop step), the client side is deployed, and the suite
-  is green at 256. Remaining before this can run live: the
-  founder adds the token version, Bramble deploys
-  `extractGarment`, one smoke call verifies the model id /
-  input name / hardware rate against the real API, and the
-  founder's phone validation is the final gate.
+### PC-34: Garment extraction & clean rendering
+- **Status:** Built and deployed; the access token is
+  in and verified. One founder step remains before the
+  first live run: add a payment method to the Replicate
+  account (the account refuses every run until then —
+  see History, 2026-10-27). Then the founder's phone
+  check is the ship gate.
+- **In plain words:** When a user adds a photo of a
+  garment — usually the garment lying on a bed or a
+  carpet — the app cuts the garment out of the photo and
+  shows that cutout on a clean background on every screen.
+  The original photo is never changed and never deleted.
+  The feature is built. It cannot run yet, because the
+  outside service that does the cutting needs an access
+  key (a "token") that only the founder can add.
+- **Why it matters:** The background of a photo decides
+  how the whole wardrobe looks. Beds and carpets make
+  every screen look cluttered, however good the layout
+  is. Clean cutouts are also the base for two later
+  cards: PC-36 (a photo of a person wearing an outfit
+  becomes the separate pieces plus the outfit) and PC-56
+  (recognizing the same garment in a different photo).
+- **Key terms:**
+  - *Segmentation* — the step that decides which pixels
+    in a photo belong to the garment and which belong to
+    the background.
+  - *Render* — the cutout image. The app stores the
+    render next to the original photo and displays it
+    when it passes the quality gate.
+  - *Quality gate* — two automatic checks a render must
+    pass before the app displays it. A render that fails
+    is never displayed; the app keeps showing the
+    original photo.
+  - *Provider* — the outside service that runs the
+    segmentation model. The provider today is Replicate
+    (a service that runs models on its own computers and
+    charges per run), running an open-source model named
+    BiRefNet.
+- **What was decided:**
+  - The original photo is retained untouched, always.
+    Extraction is a display layer, not a data change.
+  - Duplicate detection keeps using the PC-19 perceptual
+    hash (a fingerprint of what a photo looks like),
+    computed on the original photo. Renders play no part
+    in it.
+  - Only each item's first photo gets a render in this
+    version. The first photo is the only photo any
+    screen displays.
+  - Provider history: the first choice (2026-10-21) was
+    Photoroom, a managed service with a $20-per-month
+    minimum covering 1,000 images. The founder chose
+    BiRefNet via Replicate on 2026-10-23: pay per use at
+    about $0.001 per image and no monthly minimum. At
+    our volume the minimum costs more than the usage,
+    and the trial (below) showed equal quality.
+- **What was built (2026-10-23):**
+  - A callable function, `extractGarment`, so the
+    provider can be swapped by changing one module
+    (`functions/birefnet.js`) and nothing else.
+  - The steps: read the original photo; fix its
+    orientation in the pixels on the server (a phone
+    photo can carry a rotation flag instead of rotated
+    pixels, and a rotated render must never pass
+    silently); call the provider; run the quality gate;
+    store the render at `users/{uid}/renders/` under a
+    name hashed from the original's path; record the
+    render's location on the photo.
+  - The quality gate, layer 1: measurements on the
+    cutout's mask (which pixels the model kept), plus a
+    shape check that catches a wrongly rotated result.
+    Layer 2: a vision model sees the original and the
+    cutout side by side (the cutout shown on a magenta
+    background) and answers pass or fail, with reasons.
+  - The client displays the render when one exists and
+    has passed, and the original photo otherwise.
+  - Both AI calls (the provider call and the gate's
+    vision check) write usage records, like every AI
+    call in the app.
+- **Evidence:** Trial, 2026-10-22, on the founder's real
+  photos. Photoroom ran on 10 photos. BiRefNet ran
+  locally on the same photos and more: 14 raw photos,
+  20 trial originals. On the items compared head to
+  head, quality was equal. On the hardest item —
+  sunglasses with translucent lenses — Photoroom washed
+  the lenses out and BiRefNet kept them dark, as in the
+  source. All 14 raw photos cut cleanly off beds and
+  carpets; the only flaws were thin slivers of nearby
+  dark objects on the two most cluttered photos. Full
+  record: the studio research note on this spike and
+  `photoroom-trial/results.md` in the studio files.
+- **Costs (measured or quoted, as labelled):** BiRefNet
+  through Replicate costs about $0.001 per image,
+  quoted, pay per use, no monthly minimum. Photoroom's
+  $20-per-month minimum is quoted from its pricing at
+  decision time. Running the model on our own servers
+  was not chosen; the earlier research record says to
+  revisit it only past about 5,000 images per month.
+- **Questions for a reader:**
+  1. The provider call has never run live. The model
+     name (`zhengpeng-7/birefnet`) and the name of its
+     image input are unverified against the real
+     Replicate service; the smoke test below checks
+     them. Do hosted versions of this model differ from
+     the local run in any way we should expect?
+  2. Layer 2 of the gate spends one vision-model call
+     per photo to judge the cutout. Is there a cheaper
+     or more reliable signal for "this cutout is wrong"
+     that we are missing?
+  3. A pay-per-use hosted model can be slow on its
+     first call after idle time (a "cold start"). At
+     one photo at a time, is that a real problem for a
+     consumer app, or a non-issue?
+- **What remains, in order:**
+  1. The founder adds a payment method to the Replicate
+     account (Replicate → Settings → Billing). Until
+     then the account refuses every prediction create,
+     however the calls are spaced.
+  2. Bramble re-runs the pipe tests (SAM 3 and Qwen
+     through the spike harness) to confirm creates go
+     through.
+  3. The founder checks extraction on his phone: add
+     one new item with a photo; the clean cutout, right
+     way up, is the pass. That check is the ship gate.
+- **History:**
+  - 2026-10-21 — The founder sets the direction after
+    seeing Google Photos' auto-built clothing collection
+    and its clean cutouts. The card opens as a research
+    spike with his two questions: is this possible for
+    us, and what does it cost? He approves the readymade
+    route the same day: one provider behind one
+    swappable function, the original never destroyed.
+  - 2026-10-22 — Research and the trial (see Evidence)
+    run. The founder's call: build it, if costs stay
+    low. The build lands the same day, dark: the client
+    side live, the function waiting for its key.
+  - 2026-10-23 — The founder chooses BiRefNet via
+    Replicate over Photoroom. The full package is
+    built: orientation handling, the two-layer quality
+    gate, first-photo scope.
+  - 2026-10-24 — A document check catches this card's
+    status still reading "Not started," three sprints
+    after the build. Status corrected.
+  - 2026-10-25 — This card rewritten in the studio's
+    shareable-card structure (standards/shareable-cards)
+    as the first worked example.
+  - 2026-10-25 — A render standard joins the pipeline
+    (founder's SAM 3 flow for PC-36, adopted the same
+    day): every item view — from a flat photo here, or a
+    worn photo there — is normalized to one shape:
+    fixed canvas, garment centered, standard margin and
+    fill, the cutout transparent over the app's own
+    ground. Normalization joins this pipeline when it
+    goes live, and the quality gate judges the final,
+    normalized render. Deploy note: items already in the
+    wardrobe have no renders (extraction has never run),
+    so standard views for them are a one-time backfill,
+    sized at deploy time.
+  - 2026-10-25 — The standard's canvas is set from
+    measurement: 4:5, the frame the app's item tiles
+    already use; all 69 current photos measured (80%
+    already square, median ~0.5 megapixels). The cutout
+    is centered, its longest side filling a fixed share
+    of the frame, set in the PC-36 prototype.
+  - 2026-10-27 — The founder added the Replicate token
+    (secret version 1, enabled), and extractGarment is
+    deployed: state active, token binding confirmed,
+    unauthenticated calls answered 401 (the healthy
+    sign). The first live check caught a real defect:
+    the pinned model id zhengpeng-7/birefnet does not
+    exist on Replicate (its page returns 404, and it
+    appears in no listing). The endpoint is now
+    sprited/birefnet — a maintained packaging of the
+    same MIT model — with the output format pinned to
+    a cutout; tests updated, suite green. Remaining
+    gate: the founder's phone test (add one new item
+    with a photo; the clean cutout, right way up, is
+    the pass). The three-experiment plan is
+    docs/proposals/IMAGE-PIPELINE-EXPERIMENTS.md.
+  - 2026-10-27 — Correction to the entry above: the
+    token's value is not a Replicate API token. The
+    spike harness's first live calls were refused by
+    Replicate (401), and its safe shape diagnostics
+    (length and prefix only — the value is never read)
+    show what is stored is 238 characters and does not
+    start with r8_; a Replicate token is about 40
+    characters and starts with r8_. Everything else in
+    the chain is ready (function deployed, harness
+    live, gate working). Remaining step, the founder's:
+    add a new secret version whose value is the token
+    from replicate.com/account/api-tokens, then
+    Bramble re-checks the shape and re-runs the tests.
+  - 2026-10-27 — The founder added secret version 2
+    (and disabled version 1). The shape check passes:
+    40 characters, starts with r8_, no whitespace —
+    the token is a real Replicate token, and the spike
+    harness's calls are now accepted as authenticated.
+    The pipe tests then caught two mechanics defects,
+    both fixed the same evening in the harness and in
+    this card's production seam (functions/birefnet.js),
+    tests green throughout: (1) community models cannot
+    be created through the /models/{owner}/{name}
+    endpoint (it returns 404) — creation must name a
+    version hash, so the code resolves the model's
+    latest version first; this would have broken
+    extraction itself on its first live call. (2)
+    Accounts with no payment method are throttled on
+    prediction creates (429, "burst of 1"); the code
+    now waits out the window and retries. Even with
+    the retries, every create across two minutes of
+    spaced attempts was refused — in practice the
+    account creates nothing until a payment method is
+    added. That is the one remaining founder step
+    (see "What remains"). Until then, extraction
+    attempts fail loudly and safely: the original
+    photo stays on display.
+  - 2026-10-27 — The founder added the payment method.
+    The throttle lifted at once; the refusal changed
+    to 402 "insufficient credit": Replicate runs on
+    prepaid credit, so a payment method alone is not
+    enough — credit must also be purchased on the
+    same billing page. That purchase is now the one
+    remaining founder step; the pipe tests re-run the
+    moment it lands (Replicate advises waiting a few
+    minutes after purchase before retrying).
+  - 2026-10-27 — Credit added; the pipe is proven
+    end to end through the spike harness (BiRefNet on
+    the Jujutsu Kaisen photo: pixel-exact cutout in
+    3 seconds). Extraction itself still awaits the
+    founder's first phone adds. Also this evening:
+    the founder adopted the review-gate pattern as
+    PC-58 — this card's renders gain a review state
+    when that card is built (later, if it makes
+    sense; see PC-58).
 
 ### PC-36: Photo of a person → individual articles + the outfit
-- **Size:** Spike shared with PC-34, then size from findings
-- **Value:** Founder (2026-10-21): the endgame of the
-  Google-Photos-clean-view direction. Photograph yourself
-  wearing an outfit — or reuse photos you already have — and
-  the app identifies each worn garment, creates the
-  individual articles (clean renders, per PC-34), and
-  creates the outfit object matching what's being worn.
-  Cataloguing cost per piece drops to ~zero and the outfit
-  arrives free with the pieces: onboarding's front-loaded
-  cost (UX-14's core problem) collapses. It also compounds —
-  every outfit photo a user already owns becomes wardrobe +
-  outfits in one step. Today's parseOutfitPhoto only MATCHES
-  a photo against pieces already catalogued; this CREATES
+- **Status:** IN SPRINT 25 (approved 2026-10-28, headline
+  card). Design doc first for the founder's validation,
+  then build — the 2026-10-28 design sketch on issue #78
+  is the starting point. The prototype precondition is met:
+  PC-34's renders are live (69 normalized renders) and SAM
+  3 is proven on the founder's photos.
+- **In plain words:** Take one photo of a person wearing
+  an outfit — a new photo, or one already on the phone.
+  The app finds each garment in the photo, creates a
+  wardrobe entry for each one with a clean cutout image,
+  and saves the combination as an outfit. The user
+  checks the new entries before anything is kept.
+  Today the app can only recognize, in such a photo,
+  pieces it already knows. This card makes it create
   the pieces.
-- **Scope:** Research first, as one spike with PC-34 (same
-  segmentation core), answering the founder's two charter
-  questions for this capability too: (Q1) feasibility —
-  readymade fashion-parsing / human-parsing solutions vs
-  from scratch, judged honestly against the Google
-  benchmark; (Q2) cost — per photo at our scale, plus
-  build/maintenance if scratch. Any build follows the
-  spike's recommendation only. Shape of the eventual build:
-  one worn photo → draft articles (clean render + AI tags)
-  the user confirms or edits — nothing lands silently — plus
-  one outfit composed of exactly those articles.
-- **Status:** Not started. Filed 2026-10-21 from the
-  founder's message; research pairs with PC-34. Research
-  landed same day; **founder approved Option A 2026-10-21**:
-  prototype on the PC-34 matting core, judged on the
-  founder's real outfit photos before any build is sized.
-
-- **Alta benchmark (teardown P3, 2026-10-24):** Alta's
-  Prettify does this today (selfie → isolated pieces, per
-  their own post and an independent stylist's hands-on). It
-  is the acceptance bar for any PC-36 prototype: match its
-  one-photo-to-pieces-and-outfit shape before calling the
-  shape proven. Not a new card — the teardown point lives
-  here. Still gated on PC-34's token.
+- **Why it matters:** Adding clothes one by one is the
+  app's largest cost to a new user, and it all falls at
+  the start, before the app has given anything back.
+  One photo the user already owns could do the whole
+  job: the pieces enter the wardrobe and the outfit
+  arrives with them. Every old outfit photo a user has
+  becomes wardrobe plus outfits in one step. This is
+  the direct attack on the onboarding problem (UX-14 —
+  the card about getting a new user's wardrobe into the
+  app without a long setup chore).
+- **Key terms:**
+  - *Worn photo* — a photo of a person wearing clothes,
+    as opposed to a photo of one garment lying flat.
+  - *Segmentation* — the step that decides which pixels
+    in a photo belong to which garment. (Same term, same
+    meaning as in PC-34.)
+  - *Render* — a clean cutout image of one garment, as
+    PC-34 produces from a flat photo.
+  - *Draft article* — a wardrobe entry the app proposes
+    from a photo. The user confirms or edits it; a draft
+    is never kept silently.
+  - *Human parsing* — the branch of image software that
+    separates the parts of a person in a photo: each
+    garment, the body, the background. This card needs
+    it, and it is harder than flat-photo segmentation
+    for two reasons: garments overlap each other, and a
+    garment changes shape when a body wears it.
+- **What was decided:**
+  - Prototype before build (founder approved "Option
+    A," 2026-10-21): try the capability on PC-34's
+    extraction core, judge it on the founder's real
+    outfit photos, and size any build only after that
+    evidence exists.
+  - Nothing lands silently. The build's shape is one
+    worn photo → draft articles (clean render plus the
+    app's usual descriptive tags) → the user confirms
+    or edits → one outfit composed of exactly those
+    articles.
+  - The acceptance bar is named in advance: Alta (a
+    competing wardrobe app) ships this feature today
+    under the name Prettify — one selfie in, isolated
+    pieces out. A prototype must match that shape
+    before the shape counts as proven for us.
+- **What exists today:** A function named
+  `parseOutfitPhoto` reads a worn photo and matches it
+  against pieces already in the wardrobe. It creates
+  nothing. The gap between matching and creating is
+  exactly this card.
+- **Evidence:** The capability exists in production
+  elsewhere: Alta's Prettify does it (their own post,
+  plus an independent stylist's hands-on report, both
+  reviewed in the studio's Alta teardown, 2026-10-24).
+  Google Photos also builds a clothing collection on
+  its own from photos of the founder wearing clothes
+  (founder-reported, 2026-10-21 — the sighting that
+  opened this card). What is not yet known: whether a
+  readymade service, or a build of our own, reaches
+  that quality at our cost. The founder's two questions
+  for the shared PC-34/PC-36 research spike stand:
+  (Q1) is it possible for us — a readymade solution, or
+  one we build as good? (Q2) what does it cost, per
+  photo and to maintain?
+- **Questions for a reader:**
+  1. Which route separates garments on a person most
+     reliably today: a dedicated human-parsing model
+     that labels every pixel, or a vision model that
+     first locates each garment and a segmentation
+     model that then cuts each one out?
+  2. How much of a partly hidden garment (a shirt under
+     an open jacket) can any current method recover —
+     and is a partial piece better shown to the user as
+     a draft, or refused?
+  3. One worn photo becomes several model calls (one
+     per garment, plus checks). Is the per-photo cost
+     still sane at consumer scale, or does the shape
+     need batching?
+- **What remains, in order:**
+  1. PC-34 goes live (its own card carries that chain:
+     token → deploy → smoke test → phone check).
+  2. The prototype: run real outfit photos of the
+     founder through the extraction core, extended to
+     several garments on a person.
+  3. The founder judges the prototype against the Alta
+     bar. Only then is a build sized, and it enters
+     work through a planning walk.
+- **History:**
+  - 2026-10-21 — The founder files the direction after
+    seeing Google Photos' auto-built clothing
+    collection and its clean cutouts: parse a worn
+    photo into its garments, create the articles and
+    the outfit. Option A approved the same day
+    (prototype on PC-34's core, judged on his photos).
+  - 2026-10-24 — Alta's Prettify is set as the
+    acceptance bar (Alta teardown, disposition round).
+    At the Sprint 24 planning walk the card is kept;
+    the round's vision-input slot went to the smaller
+    PC-38 (reference photos in chat).
+  - 2026-10-25 — This card rewritten in the studio's
+    shareable-card structure (standards/shareable-cards).
+  - 2026-10-25 — Research amendment (founder's question;
+    report `research_notes/closet-sam3-sam3d.md`): SAM 3
+    (Meta, Nov 2025) does the finding step directly —
+    prompt it per garment type ("shirt", "trousers") and
+    it returns every matching mask in the photo, under a
+    license that permits commercial use, hosted at about
+    $0.0025–0.005 per image. Recommended prototype shape,
+    founder verdict pending: SAM 3 (via fal) finds and
+    separates the garments; BiRefNet refines each cutout.
+    The parser+boxes assembly stays as the fallback. What
+    is unproven: mask quality on layered outfits — the
+    prototype on the founder's real photos settles it, as
+    chartered.
+  - 2026-10-25 — Founder verdict on the SAM research:
+    SAM 3D is ruled out, and the flow is adopted in his
+    shape: (a) SAM 3 crops each garment out of the photo;
+    (b) the crop is mapped to the standard item shape —
+    the presentation Google Wardrobe uses for an item:
+    isolated, centered, uniformly framed; (c) the same
+    standard view is generated for wardrobe items
+    generally, so every item presents the same way. The
+    render standard is geometry, not a baked background
+    (Bramble's design call): fixed canvas shape, garment
+    centered, standard margin and fill; the cutout stays
+    transparent and the app's surfaces provide the
+    ground. This is now the prototype's shape; PC-34's
+    renders adopt the same standard. Carried limit: a
+    worn photo shows only the visible part of a garment,
+    and the render shows what was seen — no silent
+    generative completion.
+  - 2026-10-25 — The standard's shape, measured on the
+    founder's ask: all 69 wardrobe photos measured — 80%
+    are already square, median ~0.5 megapixels — and the
+    app's item tiles already present every piece in a 4:5
+    frame. The standard canvas is therefore 4:5, the
+    cutout centered, its longest side filling a fixed
+    share of the frame; the exact share is set in the
+    prototype. In the same exchange the founder asked why
+    BiRefNet is still in this flow at all: it is not
+    required here — SAM 3's mask may be enough on its own.
+    The prototype tests mask-only against mask-plus-
+    BiRefNet through the quality gate; if mask-only
+    passes, BiRefNet leaves this pipeline. (BiRefNet
+    stays PC-34's engine for flat photos, where it finds
+    and cuts in one call.)
+  - 2026-10-25 — Virtual try-off research (the founder's
+    diffusion question; note research_notes/
+    closet-virtual-tryoff.md): purpose-built lightweight
+    diffusion models do exactly this step — they are
+    called virtual try-off models; TryOffDiff is the best
+    measured — but there is no usable route today. Its
+    weights are academic-only by license (no commercial
+    use), no try-off model has a hosted endpoint on
+    Replicate or fal, and self-hosting is an unmeasured
+    estimate (~$0.003–0.008 per image). The general
+    image-to-image route is the research papers' own
+    losing baseline. The deeper problem: the method works
+    by inventing the hidden parts of a garment, and this
+    catalog's promise is that the picture IS the user's
+    piece; even Google's version reportedly ships with a
+    'regenerate inaccurate render' button.
+    Recommendation (founder verdict pending): extraction
+    stays the canonical view; try-off may enter this
+    prototype only as a labeled, opt-in second view, and
+    only behind two gates — a license-clean model, and a
+    pre-set fidelity test on the founder's real garments,
+    including a printed-logo piece.
+  - 2026-10-25 — Founder verdict: the try-off
+    recommendation is adopted as written. Extraction
+    stays the canonical view; try-off enters this
+    prototype only as a labeled, opt-in second view,
+    behind the license gate and the fidelity gate.
+  - 2026-10-25 — The founder splits the experiment
+    into its own card, PC-57, so it can be tested
+    independently of this card and of PC-34; this
+    card consumes PC-57's verdict when it lands. If
+    the experiment passes, the generated view arrives
+    here as a feature written from PC-57's findings.
+  - 2026-10-26 — SAM 3 hosting for the prototype
+    decided (founder): Replicate, the same API and
+    token as PC-34's BiRefNet and PC-57's Qwen —
+    checked live, there is still no official Meta
+    SAM 3 model there; the community build
+    (yodagg/sam3-image-seg, ~$0.0019 per run) is
+    enough for a prototype whose real question is
+    mask quality on the founder's photos. Caveat:
+    community builds can drift or vanish; if SAM 3
+    graduates to production, hosting is re-decided —
+    the official weights deployed as our own pinned
+    Replicate model, or that one call moved to fal
+    (~$0.0025–0.005 per image there).
+  - 2026-10-27 — This prototype is Experiment 2 in the
+    image pipeline experiments plan
+    (docs/proposals/IMAGE-PIPELINE-EXPERIMENTS.md):
+    test set, steps, and pass bar are written there.
+    It runs after Experiment 1 (PC-34's live
+    verification) passes, because its finishing step
+    is PC-34's pipeline.
+  - 2026-10-25 — Two suggestions arrived via the founder
+    from a friend, checked the same day: (1) Qwen Image
+    Edit for the generated views — it is the first named
+    candidate for the gated try-off slot above (hosted
+    today at ~$0.02–0.04 per image; might clear the
+    license gate through hosted terms — unverified; see
+    the try-off note's addendum) and a candidate engine
+    for on-model views under PC-49. It changes nothing
+    about the canonical extraction view. (2) One-photo
+    'what I wore today' logging — already shipped, as
+    PC-13's 'Save + log worn today' in the Match-a-photo
+    flow (Sprint 14); this card's stronger separation is
+    what improves its matching when it lands.
+  - 2026-10-27 — First live SAM 3 attempts (spike
+    harness, founder's photos). The community build
+    yodagg/sam3-image-seg takes its prompt in a field
+    named `prompt` (its own error named it, after a
+    first attempt sat in "starting" for ~25 minutes
+    and then failed validation). With the right field
+    it booted — and crashed inside the build on a
+    channel mismatch (tensor of 4 channels against 3),
+    on a wardrobe product photo. A retry on a clean
+    3-channel JPEG (IMG_6949, prompt "sweatshirt") is
+    running. If the build fails the same way on a
+    clean input, the Replicate community builds are a
+    dead end for SAM 3 and hosting goes to the
+    graduation options early: our own pinned
+    deployment of the official weights, or fal. The
+    second community build (visionaix/sam3-1) exposes
+    no version to create against through the API.
+  - 2026-10-27 — SAM 3 WORKED. The retry on the clean
+    JPEG resolved after a long boot (~20 minutes;
+    the run itself took 10 seconds, ~$0.002): prompt
+    "sweatshirt" on the fitting-room photo returned
+    one mask, score 0.67, and the polygon (6,500+
+    points) hugs the quarter-zip exactly — collar,
+    both sleeves, hem — excluding phone, hand, watch
+    and trousers. First hard evidence for Experiment
+    2's core question: SAM 3 finds a worn garment.
+    Output shape: boxes, polygon coordinates, scores,
+    RLE mask strings, and a visualization image —
+    polygons are enough to cut with. Five more runs
+    fired the same night (trousers on the same photo;
+    jacket + trousers on the layered outdoor photo;
+    jacket + t-shirt on the noisy store photo). The
+    community build's problem is boot latency and
+    flakiness, not quality — the case for the
+    pre-approved host switch (fal, or our own pinned
+    deployment) is reliability. Founder's pipeline
+    shape (2026-10-27): a Gemini call lists the
+    garments first; SAM runs once per garment type.
+    His guiding hypothesis: SAM 3 serves both use
+    cases — this parsing and PC-34's single-garment
+    cutting — one service instead of three.
+  - 2026-10-27 — Batch evidence complete (overlays in
+    the spikes folder, visually verified): trousers
+    on IMG_6949 (0.96, waistband-to-ankles exact);
+    jacket (0.70) + trousers (0.93) on the layered
+    Fuji photo — the jacket mask respects the fleece
+    collar, excludes the beanie in hand and the top
+    beneath, and stops at its hem where the trousers
+    begin; the noisy store photo — his black jacket
+    and mint tee are both masked tightly (the tee's
+    visible strip inside the open jacket included).
+    Experiment 2's mask question is answered: SAM 3
+    finds worn garments, layered and occluded
+    included. NEW PIPELINE FACT: a concept call
+    returns EVERY instance (14 "jacket" detections in
+    the store photo — racks, mannequin, other
+    shoppers). The pipeline needs an instance-
+    selection step: two levers, both cheap — the
+    Gemini first pass supplies color-attributed
+    prompts ("black zip jacket", not "jacket"), and
+    a center/size preference picks the main subject's
+    instance. OPERATIONS LESSON (paid for once):
+    Replicate prunes a finished prediction's output
+    quickly — batch 2's masks were lost by polling
+    ~90 minutes late; production must persist outputs
+    the moment a job completes. (Batch 3 re-ran with
+    harvest-at-completion; all JSON saved under
+    spikes/sam-results/.)
+  - 2026-10-27 — DECIDED (founder, late): SAM 3 is
+    the parsing foundation. His reasoning: it is
+    good enough on this evidence, and it identifies
+    multiple garments from one photo especially when
+    told what to detect (the Gemini-first,
+    per-garment-prompt shape). The template-method
+    arm of the close-out is CLOSED without a
+    prototype — SAM answered both use cases (this
+    parsing and PC-34's cutting), so the head-to-head
+    is moot. One sub-decision remains for build time:
+    SAM hosting (community build vs our own pinned
+    deployment vs fal).
 
 ### PC-37: Trip chat is a full stylist room — outfit suggestions you can add
 - **Size:** M
@@ -709,9 +1141,30 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   suggests outfits built only from owned pieces; removing a
   thumbnail before send excludes it; no items are created.
 - **Lane:** Stylist. **Effort:** M.
-- **Status:** Filed sprint-ready 2026-10-24 (teardown P3
-  adoption). Competes at the next planning walk — adoption
-  is not scheduling.
+- **Status:** DONE 2026-10-24 (Sprint 24). Built as
+  specced: a 📷 door in the general-chat composer opens
+  the one chooser (upload / camera); up to 4 photos,
+  downscaled once at attach; thumbnails in the composer,
+  removable before send; a photo-only message sends (the
+  wire gives the model one factual line for it). The
+  assembler threads them as inlineData on the last user
+  turn under a REFERENCE PHOTOS brief section: inspiration,
+  never inventory — name what you see, build only from
+  the wardrobe. Context Standard: the duration is "this
+  message," the same class as @ pointers; the composer
+  thumbnails are that duration's shortcut view. The draft
+  follows the attachments' lifecycle (cleared on send,
+  thread switch, Start fresh, sign-out; restored when a
+  send fails). Two recorded choices: (1) the image data
+  never persists — the saved thread keeps only the count
+  (base64 would bloat the thread doc toward the Firestore
+  limit, and the card bars persistence anyway); the
+  bubble shows the photos while their data lives in
+  memory, and a quiet "(not saved)" line after a reload.
+  (2) Trip threads ignore refImages server-side as well
+  as hiding the door. tests/pc38.test.js pins the
+  sanitizer + threading. Founder phone validation
+  pending.
 
 ### PC-39: Trip weather re-check — the pill is the retry (S)
 - **Origin:** Founder, 2026-10-24. The trip page shows a frozen
@@ -803,12 +1256,12 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   the real wardrobe; reopening the check shows the thread;
   a trip-tagged check's answers use the trip context.
 - **Lane:** Stylist. **Effort:** M. **Depends on:** PC-40.
-- **Status:** HELD for UX-18 (founder's call, 2026-10-24).
-  The stylist chat gets one bottom-up redesign, designed
-  completely rather than in stages — a chat feature built on
-  the current architecture is rework by definition. PC-41
-  lands as a designed entry point of the new chat. Its
-  dependency (PC-40, contextual checks) stands shipped.
+- **Status:** HELD — at the Sprint 24 walk (2026-10-24)
+  the founder's decision on this card waits for his phone
+  test of the shop attach built the same day: its core
+  need (follow-up conversation about a check) may already
+  be met there. On his word the remainder re-competes or
+  the card closes.
 
 ### PC-42: Crop the shop-check photo to the garment (M)
 - **Origin:** Founder, 2026-10-24: in a store photo there
@@ -939,12 +1392,13 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   (entry points × attached context × disagreements) so the
   session is decisions, not discovery.
 - **Lane:** Stylist. **Effort:** session + follow-on cuts TBD.
-- **Status:** SPRINT 23 FOCUS (founder, 2026-10-24: "the
-  key remaining big change that makes the app seamless").
-  Bramble brings the audit inventory to the sit-down;
-  the session's output is docs/CONTEXT-MODEL.md, then
-  build waves follow from it. Held behind it: PC-38,
-  PC-41, PC-45, PC-32, PC-33. UX-16 folds in.
+- **Status:** DONE 2026-10-24 (Sprint 23) — all five
+  build waves live the same day, followed by the
+  phone-test fix buffers and the Context Standard.
+  Everything it held is released: PC-38, PC-45 and the
+  PC-33 remainder are in Sprint 24; PC-41 awaits the
+  founder's shop-attach verdict; PC-32 was absorbed by
+  wave 4. UX-16 folded in, as planned.
 
 ### OBS-4: Data-model drift spot-check (S)
 
@@ -1025,9 +1479,28 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   proposed, not applied; confirming it changes later picks;
   dismissing it leaves no trace.
 - **Lane:** Personalization + Stylist. **Effort:** M.
-- **Status:** HELD for UX-18 (founder-saved 2026-10-24, but
-  it extends the chat's learning loop — queues behind the
-  bottom-up redesign like PC-38/PC-41).
+- **Status:** DONE 2026-10-24 (Sprint 24). Built on the
+  Today pick's "Another" — the app's one rejection
+  surface. When "Another" would generate a new pick, a
+  reason sheet opens first (browsing today's existing
+  set stays instant — that isn't rejection). The reason
+  does two jobs, kept apart: it steers the regeneration
+  (one turn, phrased into the generation request) and it
+  may earn a PROPOSED rule. Situational reasons (too
+  warm/cold, colors clash, not my style) steer only —
+  never rules. Durable taste proposes: a named piece →
+  "Skip <piece>"; the user's own words → the words;
+  formality chips → a lean template. The proposal swaps
+  into the sheet while the new pick composes; Save writes
+  a preference fact through the one write path
+  (factConflicts + deleteFacts + the standard doc shape),
+  and a rule that is already a fact is never re-proposed.
+  No thanks writes nothing — dismissing leaves no trace.
+  Because the server reads facts from Firestore itself,
+  a confirmed rule feeds the very next stylist call and
+  shows in Account's facts like any other. Helpers pinned
+  by tests/pc45-client.test.js. Founder phone validation
+  pending.
 
 ### PC-46: Candidate-piece outfit previews inside shop check (M)
 
@@ -1119,6 +1592,15 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
 - **Status:** Parked with a trigger (founder-saved
   2026-10-24): revisit after PC-34 is live AND the PC-36
   prototype has a verdict.
+- **Watch note (2026-10-25, SAM research —
+  `research_notes/closet-sam3-sam3d.md`):** SAM 3D
+  (single photo → a 3D mesh of an object or a body) is
+  the named tool if this spike ever needs a real 3D
+  view of a piece. It does not dress a body — try-on
+  imagery is a generative technology, not this — and its
+  garment quality is unevaluated. Revisit trigger: this
+  spike's design work actually calls for a rotatable 3D
+  view.
 
 ### PC-50: Link intake for shop check (S)
 
@@ -1195,3 +1677,623 @@ validation. Design: `docs/sprints/sprint-13/AUTH-1-DESIGN.md`.
   parked ("advise users to take screenshots / copy images
   and paste them"). Awaiting founder phone/desktop
   validation.
+
+### PC-52: The stylist may propose an attachment (S)
+
+- **Origin:** Founder, 2026-10-24, on the UX-18 build: "can
+  we educate user on attaching during conversation, or in
+  some cases attaching things on our [behalf] based on chat
+  context?" Decision 1 stands — nothing attaches silently,
+  ever. But the app may notice the conversation has turned
+  on something unattached and PROPOSE attaching it, exactly
+  the way pinned facts are proposed today (model proposes,
+  user taps, nothing happens without the tap). Education
+  shipped alongside the question: the context sheet now
+  also attaches (an Attach row for today's pick + the @
+  tip), and the empty state teaches both routes.
+- **In scope:** an `attachProposal` answer field alongside
+  `pinProposal` in the general conversation — the model
+  proposes attaching today's pick when the user's words
+  clearly turn on it ("make it warmer", "why did you pick
+  this?") and no pick is attached and the conversation has
+  no pick of its own. The client renders a proposal card
+  (Attach / Dismiss) mirroring the pin-proposal card;
+  Attach runs attachTodayPick(). The assembler states the
+  rule in the brief (propose only on a clear referent, at
+  most one per conversation unless the subject changes).
+- **Out of scope:** proposing pointers to pieces (the @
+  gesture is the user's; a future card may generalize),
+  any silent or timed auto-attach (barred by decision 1),
+  trip conversations.
+- **Acceptance:** in a fresh general conversation with a
+  pick on Today, "make this warmer" earns an Attach
+  proposal card; tapping Attach puts the pick in the
+  context line and the next message iterates from it;
+  Dismiss leaves the conversation pick-free and the model
+  does not re-propose on the next turn.
+- **Lane:** Stylist. **Effort:** S.
+- **Status:** DONE 2026-10-24 (Sprint 24). Built as
+  specced: an attachProposal field alongside pinProposal
+  (strict literal "todayPick"), the brief section present
+  only under the exact conditions (general chat, pick
+  available and unattached, none dismissed), a server
+  gate that drops out-of-turn proposals, and a client
+  proposal card mirroring the pin card — Attach runs
+  attachTodayPick(); Dismiss silences proposals for the
+  conversation (Start fresh re-arms). Deviation from the
+  brief text, recorded: the "at most once unless the
+  subject changes" nuance is enforced as once per
+  conversation by the client + server together — the
+  pick is the only attachable subject in scope, so a
+  subject change cannot occur. tests/pc52.test.js pins
+  the brief gating and parse strictness. Awaiting the
+  founder's phone validation.
+
+### PC-53: New-user empty states on every tab (S)
+
+- **Origin:** Founder, 2026-10-24, phone-testing as a new
+  user: the Start-here prompt belongs on every screen for
+  users with zero things (the tabs are otherwise empty real
+  estate), and users with few things get a designed "add
+  more" treatment (that tier delegated to Bramble). Full
+  design: `docs/proposals/NEW-USER-EMPTY-STATES.md`.
+- **In scope:** tier 0 (0 pieces) intro cards on Outfits,
+  Shop, Trips + the stylist empty state's extra line (Today
+  and Wardrobe already comply); tier 1 (below the existing
+  `todayThresholdMet()` bar: ≥4 pieces incl. top + bottom)
+  slim gap-naming banner on Wardrobe and Outfits (Today's
+  progress card is the same component); the shop list's
+  stale "tap Save" empty line replaced (checks auto-save).
+- **Out of scope:** banners on Shop/Trips at tier 1, any
+  stored dismissal state (graduation is count-derived),
+  a first-run wizard.
+- **Acceptance:** fresh account sees an intro treatment on
+  all five tabs; 2 tops-only pieces → the missing bottom is
+  named on Today/Wardrobe/Outfits; threshold crossed → no
+  intro UI anywhere.
+- **Lane:** Catalogue (onboarding surface). **Effort:** S.
+- **Status:** DONE 2026-10-24 (Sprint 24). Built to the
+  proposal doc as written: tier-0 intro cards on Outfits,
+  Shop and Trips; the tier-1 gap banner on Wardrobe and
+  Outfits sharing Today's component; the stylist's extra
+  line at zero pieces; the shop empty line's stale "tap
+  Save" copy corrected (checks auto-save). gapCopyFor is
+  pinned by tests/pc53-client.test.js. Awaiting the
+  founder's phone validation (his verdict is the gate).
+
+### PC-54: Paste intake on phones (S)
+
+- **Origin:** Founder, 2026-10-24, mid phone test of PC-51:
+  "how would pasting from clipboard work on a smartphone?"
+  It mostly wouldn't — PC-51 rides the keyboard paste event,
+  which phones don't have. Phones gate the clipboard behind
+  gestures and permissions; iOS Safari is the strictest (no
+  programmatic clipboard read at all).
+- **In scope:** a visible "Paste a photo" button in the shop
+  sheet and the capture screen that tries the async
+  clipboard read where the browser allows it (Android Chrome:
+  works with a permission prompt) and degrades honestly where
+  it doesn't (iOS: one line — "on iPhone, save the photo and
+  upload it, or share it here" once the share target exists).
+  Separately, the real phone answer: a Web Share Target so
+  the system share sheet can send a photo straight into the
+  app (manifest + service worker) — scope it in the walk.
+- **Out of scope:** hijacking long-press paste in text
+  fields (flaky, and text fields are for text).
+- **Acceptance:** on Android Chrome, copy a product photo,
+  tap Paste a photo in the shop sheet, land in the photo
+  step; on iPhone, the same tap gives the honest fallback,
+  never a silent nothing.
+- **Lane:** Catalogue. **Effort:** S (share target may split
+  out as its own card at the walk).
+- **Status:** DONE 2026-10-24 (Sprint 24). Built as specced:
+  a visible Paste a photo button on the capture screen and
+  in the shop sheet; the tap tries the async clipboard read
+  and routes any photo through PC-51's one routing (now a
+  shared routePastedImages) — shop sheet → the cropper,
+  capture → add. Every failure speaks: no read API (iOS)
+  → the save-and-upload line; permission denied → Upload
+  does the same job; clipboard holds no photo → copy one
+  first. The guide's clipboard path carries the phone
+  sentence too. pickClipboardImageType is pinned by
+  tests/pc54-client.test.js. The share target split out
+  as PC-55 during the build. Validation split: the
+  founder's iPhone can verify the honest fallback tap;
+  the Android read path needs an Android device — flagged,
+  not claimed.
+
+### PC-55: Web Share Target — photos from the share sheet (M)
+
+- **Origin:** Split out of PC-54 during its Sprint 24 build
+  (2026-10-24), on the evaluation recorded here.
+- **Problem:** the real phone gesture for "I found a photo"
+  is the system share sheet. PC-54's Paste button covers
+  Android Chrome's clipboard read; iOS offers no clipboard
+  read at all, so on iPhone the only frictionless door is
+  Share → Closet.
+- **Evaluation (2026-10-24):** the app has a manifest but NO
+  service worker. A share target needs the manifest field
+  (POST, multipart) PLUS a service worker to receive the
+  POST, stash the file, and redirect into the app — and a
+  service worker is new infrastructure for this app
+  (update lifecycle, cache versioning, offline behavior),
+  an important invisible that deserves its own design
+  pass, not a bolt-on inside an S card. Platform truth:
+  share targets surface only for installed PWAs, and iOS
+  support is recent and partial — the payoff is real but
+  narrower than the spec's promise.
+- **In scope (when pulled):** a service-worker design note
+  first (what it caches, how updates ship, how it can
+  never serve a stale app), then the share_target field
+  receiving an image into the same routing as paste
+  (chooser: add or check).
+- **Revisit trigger:** service-worker infrastructure gets
+  pulled for any other reason (offline, install polish),
+  or the founder's phone use shows screenshot → Photos →
+  upload is a recurring friction.
+- **Status:** Filed 2026-10-24 from the PC-54 split.
+  Enters work only via a planning walk.
+
+### PC-56: Garment embeddings — same-garment duplicate candidates (not yet sized)
+
+- **Origin:** Founder, 2026-10-25, asking whether image
+  embeddings would catch the duplicates the pHash can't:
+  "would image embedding help identifying the garment
+  duplicate also?" — filed on his "sounds good" the same
+  day.
+- **Problem:** PC-19's perceptual hash recognizes the same
+  PICTURE (same photo re-saved/resized/recompressed —
+  distance ≤5 of 64 bits). It cannot recognize the same
+  GARMENT in a different photo (re-shot, different angle,
+  light, background) — that gap is by design, and it is
+  where real wardrobe duplicates would sneak in.
+- **Shape (from the filing discussion):** a vision-model
+  embedding per photo (a few hundred numbers describing
+  what's depicted — kind, shape, color, pattern), compared
+  by cosine similarity. Layered, never a replacement:
+  pHash stays the only auto-acting layer (certain, free,
+  instant); an embedding match only ever PROPOSES — a
+  side-by-side "looks like your X — same piece?" the user
+  confirms or dismisses, in the bulk-add warn pattern.
+  Similar-but-different garments (two plain white tees)
+  are indistinguishable to any visual system, so no
+  threshold earns auto-delete or auto-link. Best input is
+  the PC-34 clean render (background removed = the vector
+  describes the garment, not the scene), computed once
+  server-side when the render is made and stored beside
+  the phash. The same vectors later serve PC-36's
+  matching problem (recognizing owned pieces in a worn
+  photo).
+- **Costs to size at the walk:** one embedding call per
+  photo at intake (money + latency, OBS-3 tracked) and a
+  small vector stored per photo.
+- **Revisit trigger:** PC-34 extraction live (the clean
+  inputs exist), or garment duplicates become a felt
+  problem in real use — whichever comes first.
+- **Status:** Filed 2026-10-25. Enters work only via a
+  planning walk.
+
+### PC-57: Generated clean view — the Qwen experiment (not yet sized)
+
+- **Status:** Running — first two panel runs done
+  2026-10-27 (see History). The fast Qwen build keeps
+  prints but changes the garment (sleeves removed)
+  and invents details (a Zara neck label): against
+  the bar below that is a fail for this build, and
+  the founder's verdict is the gate. Next actions:
+  finish the panel on this build (navy One Piece
+  tee, black Jujutsu Kaisen tee, the worn cat tee),
+  and run the same panel on the full-size Qwen build
+  before any verdict is treated as final for the
+  model family.
+- **In plain words:** Some photos hide part of a
+  garment — it is being worn, it is wrinkled, another
+  piece covers half of it. Software exists that can
+  generate the missing view: a clean picture of the
+  whole garment, as if it had been photographed flat
+  on its own. This card is an experiment, not a
+  feature. It tests whether that generated picture is
+  faithful enough to show in the app, clearly labeled
+  as generated. Only if the answer is yes does a
+  separate feature card get written.
+- **Why it matters:** The wardrobe's item pictures are
+  extracted cutouts, real by construction, and they
+  stay the canonical view (the picture the catalog
+  stands behind) whatever this experiment finds. A
+  generated view is the only way to offer a complete
+  picture of a piece that was photographed badly —
+  and the only honest way to decide about one is a
+  test with its pass bar written down first, not
+  impressions afterward. The same kind of engine is
+  also a candidate for PC-49 (the card about previewing
+  an outfit on a model of the user).
+- **Key terms:**
+  - *Generated view* — a picture produced by an
+    image-editing model: it is given a photo and a
+    written instruction and returns a new picture.
+    Unlike a cutout, parts of it are invented by
+    construction.
+  - *Fidelity test* — the comparison defined below:
+    generated views judged side by side against the
+    real garments, against criteria written before
+    the test runs.
+  - *License gate* — before any generated picture
+    could ship in the app, the model's terms must
+    allow commercial use of its outputs. The best
+    specialist model failed this gate in research
+    (academic use only).
+- **The experiment (shape):**
+  - Candidate 1: Qwen Image Edit, hosted — an
+    image-editing model from Alibaba, raised by a
+    friend of the founder's on 2026-10-25. Published
+    prices run about $0.02–0.04 per image; the real
+    price is measured on the chosen host during the
+    run.
+  - Test panel: a fixed, small set of the founder's
+    own garments — one printed-logo piece, one
+    patterned piece, one plain piece, and one
+    hard-edge piece (the sunglasses) — each starting
+    from a worn or wrinkled photo, so the hidden-part
+    problem is real.
+  - The bar, set before running: side by side, the
+    generated view must be recognizably the same
+    piece; print and pattern must survive; no
+    invented details (buttons, logos, text) may
+    appear. The founder judges; his verdict is the
+    gate.
+  - License pin: the exact host, model version, and
+    the commercial-use term relied on are recorded
+    here before the run.
+  - Outcomes. PASS → a feature card is written for
+    the labeled, opt-in generated view, for PC-36 to
+    consume (and PC-49 to consider). FAIL → the
+    verdict and the failing examples are recorded
+    here, and the gated slot on PC-36's card closes
+    unless a new candidate earns a re-run.
+- **Questions for a reader:**
+  - Is there published evidence of a generalist
+    editing model, or a specialist try-off model,
+    preserving printed text and logos on garments?
+  - What fidelity bar would you set for a catalog
+    whose promise is "this picture is your garment"?
+- **History:**
+  - 2026-10-25 — Split out of PC-36 on the founder's
+    instruction: experiment separately; add it as a
+    feature only once there is a good answer. Context
+    the same day: the virtual try-off research (note
+    research_notes/closet-virtual-tryoff.md) found the
+    specialist models license-blocked and unhosted;
+    the founder adopted extraction as canonical with a
+    generated view allowed only behind gates; Qwen
+    Image Edit arrived via a friend of the founder's
+    and was checked the same day (addendum in the
+    same note).
+  - 2026-10-26 — Host decided (founder): Replicate,
+    for this experiment and PC-36's SAM 3 alike — one
+    API, and the same Replicate token PC-34's
+    extraction already waits on. Checked live: Qwen
+    Image Edit runs on Replicate as community builds
+    (~$0.029 per run at full settings; ~$0.003–0.007
+    in small, fast configurations). The exact build
+    and version get pinned in the license pin above
+    before the run. Cost note: at experiment scale
+    every candidate host costs pennies in total; the
+    deciding factors were one vendor and one token.
+  - 2026-10-27 — This experiment is Experiment 3 in
+    the image pipeline experiments plan
+    (docs/proposals/IMAGE-PIPELINE-EXPERIMENTS.md),
+    which also records the founder's hypothesis about
+    Google's mechanism (standardized shapes with the
+    cloth's real details laid over them) as the
+    fallback mechanism to scope if the editing-model
+    route fails the fidelity bar.
+  - 2026-10-27 — License pin (recorded after the
+    first runs, which jumped it — noted as a process
+    miss, not repeated): the model family, Alibaba's
+    Qwen Image Edit line (the Aug 2025 20B editor and
+    its 2509 / 2511 successors), is released under
+    Apache 2.0 — commercial use allowed; verified
+    against the release record the day of the run.
+    The build actually run is the community packaging
+    usamaehsan/qwen-image-edit-fastest on Replicate
+    (input: image as an array, plus a prompt); which
+    exact checkpoint it packages is the build
+    author's choice and is NOT verified — a feature
+    decision would pin an exact version first.
+  - 2026-10-27 — First runs (spike harness; the
+    founder's own photos; measured predict times
+    8–19 seconds on the fast build, cents per run):
+    (1) The grey cat graphic tee, from its wardrobe
+    photo — which is itself a clean product shot, so
+    this was the easy case: the output is the same
+    tee, print intact, on a light background; the one
+    deviation is color — the heather grey came back
+    a darker charcoal. (2) The white Jujutsu Kaisen
+    UT tee, from a wrinkled on-the-bed photo with
+    paper tags — the hard case: the artwork survived
+    almost exactly (same composition, same figures),
+    but the garment did not. The output is a
+    SLEEVELESS top — the short sleeves were deleted —
+    and the neck carries an invented "ZARA" label on
+    a Uniqlo shirt. Against the bar set before
+    running (same piece; print survives; no invented
+    details): print passes, the other two fail.
+    Bramble's read: fail for the fast build; the
+    founder's verdict is the gate, and the full-size
+    build gets its own panel run before the family
+    is judged. Side-by-side sheets are in the studio
+    spikes folder.
+  - 2026-10-27 — The founder's micro-test: name the
+    garment type in the prompt. Re-ran the Jujutsu
+    Kaisen photo with "short-sleeved crew-neck
+    t-shirt... not sleeveless... keep the short
+    sleeves" spelled out. It worked on the headline
+    failure: the sleeves are back, the garment is
+    the right category, boxier than the original.
+    It did not cure the invention habit — the
+    invented ZARA neck label is still there — and
+    the print drifted slightly further than the
+    untyped run (punchier colors, small figures
+    softened). Read: type-naming fixes category
+    errors, not hallucination. The same photo through
+    BiRefNet extraction, for contrast, is pixel-exact
+    (real cloth, paper tags and all) in 3 seconds.
+  - 2026-10-27 — From the tandpfun/wardrobe deep read
+    (PRODUCT.md research, same date): two steals for
+    this experiment's remaining runs. (1) Chroma-key
+    generation: prompt the model for the garment on a
+    flat solid key color picked to be maximally
+    distant from the garment's own color, then key
+    the background out locally — transparent PNGs
+    from any edit model, instead of the baked light
+    backgrounds both runs above produced. (2) Their
+    anti-invention rubric as panel criteria: preserve
+    only source-supported details; omission beats
+    invention; HOLD (neither pass nor fail) when the
+    construction cannot be recovered honestly.
+  - 2026-10-27 — VERDICT (founder, late): FAIL. He
+    agreed with Bramble's read — the fast build fails
+    the first bar (sleeves deleted untyped; invented
+    label and print drift even typed). PC-57 closes
+    as a fail for the tested build, and the
+    full-size build's panel run is NOT run: his
+    reasoning — the modeling piece is complex, and
+    good output needs careful engineering under cost
+    discipline, not more one-off runs. Generation is
+    deferred, not condemned: any revival starts from
+    the filed ingredients (typed prompts, the chroma
+    technique, the PC-58 review gate) with a fresh
+    founder call. PC-36's generated-view slot closes
+    with this card.
+
+### PC-58: Review gate for AI-made images (not yet sized)
+- **Status:** Proposed 2026-10-27 — the founder
+  adopted the pattern ("let's steal the review gate,
+  that seems to be make or break"); build timing is
+  deliberately unset ("we can migrate to it later if
+  it makes sense"). Next action: enters a planning
+  walk once PC-34's first real renders exist or
+  PC-57 passes its fidelity bar. Owner: Bramble
+  (design), founder (verdict). GitHub issue #128.
+  2026-10-28 — First alternate at the Sprint 25 walk:
+  the trigger fired (renders exist), but PC-36's
+  draft-confirm covers this gate's core for the
+  multi-photo flow, so it follows rather than leads.
+- **In plain words:** Any picture an AI makes for a
+  wardrobe item — an extracted cutout (PC-34), a
+  generated clean view (PC-57), a modeled photo
+  (PC-49) — waits in a review state first. It becomes
+  the item's picture only after approval: by the
+  automated quality checks we already run, and, for
+  anything generated, by the user's own eyes —
+  approve, regenerate, or keep the original. The
+  original photo is never replaced. The pattern is
+  adopted from the open-source tandpfun/wardrobe
+  project, whose whole library hangs on this gate
+  (research note in PRODUCT.md, 2026-10-27).
+- **The details:**
+  - Applies to: PC-34 extraction renders (which
+    already pass an automated two-layer quality gate
+    — this card adds the review state and the
+    user-facing actions), PC-57 generated views
+    (where the gate is the fidelity bar made
+    visible), PC-49 modeled photos (parked; the gate
+    is a precondition if it revives).
+  - In scope: a pending-review state for renders;
+    approve / regenerate / keep-original actions;
+    the original always one tap away for comparison.
+  - Out of scope: building it now; any change to how
+    originals are stored; applying it to photos the
+    user took (only AI-made images wait).
+- **Questions for a reader:**
+  1. Should borderline extractions also wait for the
+     user's eyes, or is the automated gate enough
+     there?
+  2. One review queue for all pending images, or
+     review inline on each item?
+  3. Must approval always show a side-by-side
+     against the original photo?
+- **History:**
+  - 2026-10-27 — Card created (issue #128) the same
+    evening as the tandpfun/wardrobe research note,
+    on the founder's adoption call.
+  - 2026-10-27 — Deep read of the source repo added
+    the gate's working machinery (steal list):
+    a per-image stage record (status, decision,
+    attempt count, prompt used); failed attempts are
+    KEPT and viewable, never silently discarded;
+    regeneration takes a written direction appended
+    to the prompt ("user regeneration direction"),
+    not a blind re-roll; automated cleanup produces
+    diagnostics and a preview the reviewer sees;
+    and a third verdict besides pass/fail — HOLD,
+    for items whose construction cannot be recovered
+    without inventing details.
+
+### PC-59: Uniform display scaling + too-small-in-photo warning
+
+- **Status:** Part 1 DONE 2026-10-28 (Stage C: every render
+  trimmed and scaled to the same 92% frame box, so photo
+  distance no longer decides display size; founder's
+  sizing call the same day: uniform size everywhere,
+  including outfit compositions). Part 2 IN SPRINT 25
+  (approved 2026-10-28): the too-small warning, measured
+  at extraction time. GitHub issue #129.
+- **In plain words:** Every piece appears at a similar
+  size in the app no matter how big or small it was in
+  its photo — and if a photo is taken from too far away,
+  the app says so and asks for a closer photo, instead of
+  quietly showing a fuzzy piece forever.
+- **Part 2 scope:** at extraction, measure garment frame
+  share (mask pixels / photo pixels) and source long
+  edge. Proposed trigger: frame share under ~25% or long
+  edge under ~700px on a camera photo (retail-sourced
+  photos exempt — the remedy there is "add your own
+  photo"). Surfaces: a note at add time and a small
+  persistent note on the item until a better cover photo
+  replaces it. Non-blocking: the render still ships.
+- **History:**
+  - 2026-10-28 — Filed from the founder's follow-up
+    thought after approving the Stage C renders. Audit
+    the same day: no camera photo in the wardrobe is in
+    the danger zone; the softest renders are three small
+    store images (~450px wide). Outfit-sizing question
+    answered by the founder the same day: uniform size
+    everywhere; category-relative sizing rejected.
+
+### PC-60: Automated cutout check — a well-designed second opinion (not yet sized)
+
+- **Status:** Proposed 2026-10-28 — the founder
+  decided (closing PC-36's Q6) that an automated check
+  is needed at some point, but not inside PC-36 v1:
+  his own review is the gate for drafts, and the
+  automated check gets its own well-designed card
+  instead of being rushed into the sprint. Next action:
+  enters a planning walk when PC-36's review flow is
+  live and draft volume makes manual review the
+  bottleneck, or when the flat-photo swap lands — the
+  check then covers both flows (drafts + flat photos),
+  not one. Owner: Bramble (design), founder (verdicts
+  — his eyes are the calibration set). GitHub issue #130.
+- **In plain words:** One day the app should check its
+  own cuts the way the founder does — whole garment,
+  nothing extra, no holes, clean edges, the right
+  piece, upright — and flag the bad ones before a
+  human has to look. This card designs that check
+  properly instead of bolting on another guess.
+- **Why a separate card:** the current gate is two
+  layers that grew organically (mask heuristics, then
+  a vision-model judge added after a real failure —
+  a bag strap that rode along on a BiRefNet cut).
+  They catch different failures, they were never
+  calibrated against a labeled set, and their
+  fail-direction differs by surface (flat photos fail
+  safe toward the original; drafts have no gate at
+  all). A unified check needs its own design: one
+  checklist, one calibration set, one stated
+  fail-direction per surface.
+- **The checklist (distilled from the founder's own
+  manual checks — this is the spec, not a wish list):**
+  1. Whole garment present — no cut-off sleeves,
+     legs, straps, or edges.
+  2. Nothing extra — no other objects, body parts,
+     furniture, or background remnants (the bag-strap
+     case).
+  3. No holes — no background showing through the
+     garment (the magenta-through-holes test).
+  4. Clean edges — no fringe or halo, checked on dark
+     AND light grounds (one ground hides what the
+     other reveals).
+  5. Right garment — the cut matches the named
+     garment, not a neighboring item (the store-photo
+     failure: a bare concept call returned 14
+     detections).
+  6. Upright — collar / waistband position correct
+     (two of the founder's own first-pass rotation
+     reads were wrong, so even the human check needs
+     care — and the automated check must be judged
+     against verified verdicts, not first passes).
+  7. Judged on final pixels — the normalized render,
+     at full size. Thumbnails misled a rotation read;
+     scores misled twice (a 0.91-scored cleanup was
+     blank; a 0.54 cut was broken). Scores are not
+     verification.
+- **The calibration set (already exists):** the 69
+  verified renders (all pass, with per-item notes in
+  the backfill review) plus the known failures (the
+  broken 0.54 cut, the zero-detection holds, the
+  Qwen inventions). Rule for this card: the check
+  must first agree with the founder's verdicts on
+  this set — agreement rate reported, thresholds
+  tuned on it, never guessed — before it gates
+  anything. Every future review verdict (confirm /
+  reject with reason) extends the set.
+- **Approaches found in research (Oct 2026), with
+  tradeoffs:**
+  1. Model-confidence signals (free): SAM's
+     predicted-IoU and scores. Weak on their own —
+     the literature's model-score protocol trails the
+     oracle, and the 0.91-blank lesson agrees. A
+     signal, never a verdict.
+  2. Mask-geometry heuristics (free, extends today's
+     layer 1 — aspect match, foreground fraction,
+     largest-component share, semi-transparent
+     share): add fringe measurement (alpha gradient
+     at the boundary, composited on black / gray /
+     white), hole detection (enclosed transparent
+     regions inside the mask), and edge-touch as a
+     cropping signal. Cheap, explainable, and every
+     failure names its reason.
+  3. Semantic verification (cheap, reuses PC-36's
+     machinery): CLIP / Vertex-multimodal similarity
+     between the cutout render and the garment
+     description — the same "does this match the
+     named thing" test the literature uses to filter
+     false detections. Catches wrong-object cuts,
+     which geometry cannot see.
+  4. Vision-model judge (today's layer 2, kept):
+     the strict magenta-composite prompt, but with
+     the checklist above written into it and its
+     verdicts logged against the calibration set.
+     Costs one call per piece; occasionally doubts
+     a good cut.
+  5. Self-consistency (expensive): cut with two
+     engines (SAM + BiRefNet) and compare masks;
+     agreement is confidence. 2× cut cost — a
+     spot-check sample, not every cut, unless the
+     stakes justify it.
+  6. Learned quality evaluator (research frontier,
+     later phase): a trained pixel-wise error map
+     without ground truth (MatAnyone 2's MQE —
+     https://arxiv.org/html/2512.11782v1; and the
+     reference-free MLLM auditor MQ-Auditor). Only
+     worth it if heuristics + judge prove
+     insufficient; training it needs labeled errors,
+     which the growing verdict set could become.
+- **Design requirements (to be settled in this
+  card's own design doc, before build):**
+  - One checklist, one verdict shape with named
+    reasons (a flag must say WHY, like the layer-2
+    problems list does).
+  - Flag, never hide: a flagged cut shows with its
+    flag and reason; nothing is silently dropped.
+    The per-surface fail-direction is stated
+    explicitly (flat photos today fail safe toward
+    the original; drafts surface the flag on the
+    review card).
+  - Calibration report first: agreement with the
+    founder's verdicts on the labeled set, per
+    checklist item, before any gating.
+  - Cost per piece, from the studio cost sheet's
+    assumptions (heuristics free; semantic check
+    rides the embedding call; judge call priced).
+  - Boundary: source-quality warnings stay PC-59's
+    job; orientation verdicts stay the pipeline's
+    layer 3. This card judges the CUT, not the
+    photo.
+- **History:**
+  - 2026-10-28 — Proposed from PC-36's Q6. The
+    founder: an automated check will be needed at
+    some point; if not now, plan a separate PC and
+    design it well, researching both the literature
+    and his own manual checks.

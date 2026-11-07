@@ -94,10 +94,10 @@ on its Replicate secret version).
    (`~/.config/configstore` is root-owned). The CLI's own auth
    is unreliable here regardless — the REST scripts above are
    the supported path.
-9. **Firestore REST quirk:** `orderBy=createTime` on a document
-   list silently returns zero documents. Drop the orderBy; sort
-   client-side.
-10. **Storage bucket facts:** new projects use
+10. **Firestore REST quirk:** `orderBy=createTime` on a document
+    list silently returns zero documents. Drop the orderBy; sort
+    client-side.
+11. **Storage bucket facts:** new projects use
     `*.firebasestorage.app` buckets; the Admin SDK must be given
     the bucket explicitly, and buckets ship with **no CORS
     config** — browser `fetch()` of download URLs needs a CORS

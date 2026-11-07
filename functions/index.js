@@ -12,15 +12,18 @@
 // Vertex AI + the function's service account, so no API key exists anywhere
 // in the client or repo.
 
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const { initializeApp } = require("firebase-admin/app");
 const { getStorage } = require("firebase-admin/storage");
 const { getFirestore } = require("firebase-admin/firestore");
 const { describeImage } = require("./describe");
-const { askStylist, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeTodayPick, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins } = require("./stylist");
+const { askStylist, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeTodayPick, sanitizeShopItem, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins, sanitizeRefImages } = require("./stylist");
 const { reflectOutfit } = require("./reflect");
 const { critiqueOutfit } = require("./critique");
 const { parseOutfitPhoto } = require("./photo");
+const { startParse, advanceParse, retryGarment, listParses, finishParse } = require("./parse");
+const { discardParse } = require("./discard");
+const { advanceAllParses } = require("./advance");
 const { shopCheck } = require("./shopcheck");
 const { fetchLinkItem } = require("./linkimport");
 const { extractGarmentPhoto } = require("./extract");
@@ -48,26 +51,50 @@ const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB — phone photos, pre-resize
 // but the recorder factory tolerates a null db by design.
 let _errorEventRecorder = null;
 function recordErrorEvent(fields) {
+  // Returns a promise (resolves true/false). Error-path callers await it;
+  // success-path callers fire-and-forget for latency.
   try {
     if (!_errorEventRecorder) _errorEventRecorder = makeErrorEventRecorder(getFirestore());
-    _errorEventRecorder(fields);
+    return _errorEventRecorder(fields);
   } catch (e) { /* the sink must never break the request path */ }
+  return Promise.resolve(false);
 }
 
 // Callable boundary: HttpsErrors (from fail()) pass through untouched;
 // coded downstream errors map via their key; anything else is INTERNAL.
 // The client never sees raw internals — only catalog messages.
-function boundary(where, correlationId, uid, err) {
+// Async (2026-11-02): awaits the error-event write so the ledger is
+// reliable. Failures are rare; the ~100ms is acceptable. Callers MUST
+// await boundary().
+async function boundary(where, correlationId, uid, err) {
   logError(where, err, { uid: uid, correlationId: correlationId });
   const key = keyOf(err) || (err && err.key) || "INTERNAL";
-  recordErrorEvent({
-    kind: "failure", fn: where, key: key,
-    category: (CATALOG[key] || {}).category || null,
-    correlationId: correlationId, uid: uid,
-    detail: err && err.message ? String(err.message).slice(0, 300) : null,
-  });
-  if (err instanceof HttpsError) throw err;
-  fail(err && err.key ? err.key : "INTERNAL");
+  try {
+    await recordErrorEvent({
+      kind: "failure", fn: where, key: key,
+      category: (CATALOG[key] || {}).category || null,
+      correlationId: correlationId, uid: uid,
+      detail: err && err.message ? String(err.message).slice(0, 300) : null,
+    });
+  } catch (e) { /* never break the error path */ }
+  // #131: Surface the correlation ID to the client as a short ref code.
+  // It's a pointer for support ("Ref: a3f9"), not technical detail —
+  // doesn't violate the one-human-sentence doctrine.
+  const ref = correlationId ? String(correlationId).slice(0, 8) : null;
+  if (err instanceof HttpsError) {
+    if (ref) {
+      try { err.details = Object.assign({}, err.details, { ref: ref }); } catch (e) {}
+    }
+    throw err;
+  }
+  const outErr = new HttpsError(
+    (CATALOG[key] || {}).grpc || "internal",
+    (CATALOG[key] || {}).message || "Something went wrong. Try again."
+  );
+  if (ref) {
+    try { outErr.details = { ref: ref }; } catch (e) {}
+  }
+  throw outErr;
 }
 
 // Success counterpart to boundary(): one structured log line per
@@ -141,7 +168,7 @@ exports.describeItem = onCall(
       // Any failure inside describeImage is a downstream AI failure.
       if (!(err instanceof HttpsError) && !err.key) err.key = "DESCRIBE_FAILED";
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
-      boundary("describeItem", correlationId, uid, err);
+      await boundary("describeItem", correlationId, uid, err);
     }
   }
 );
@@ -184,7 +211,7 @@ exports.extractGarment = onCall(
       return finish("extractGarment", correlationId, uid, start, result);
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "EXTRACT_FAILED";
-      boundary("extractGarment", correlationId, uid, err);
+      await boundary("extractGarment", correlationId, uid, err);
     }
   }
 );
@@ -213,6 +240,7 @@ exports.askStylist = onCall(
       const messages = sanitizeMessages(data.messages);
       const previousPick = sanitizePreviousPick(data.previousPick);
       const todayPick = sanitizeTodayPick(data.todayPick);
+      const shopItem = sanitizeShopItem(data.shopItem);
       const references = sanitizeReferences(data.references, items);
       const weatherContext = sanitizeWeatherContext(data.weatherContext);
       const vibe = sanitizeVibe(data.vibe);
@@ -242,7 +270,9 @@ exports.askStylist = onCall(
       try {
         const pinsSnap = await getFirestore()
           .collection("users").doc(uid).collection("context_pins").limit(20).get();
-        pins = sanitizePins(pinsSnap.docs.map((d) => d.data()));
+        // The doc id rides along: per-conversation mutes
+        // (layered remove) name facts by id.
+        pins = sanitizePins(pinsSnap.docs.map((d) => Object.assign({ id: d.id }, d.data())));
       } catch (e) {
         logError("askStylist.contextPins", e, { uid: uid, correlationId: correlationId });
         logEvent("subcall_degraded", { fn: "askStylist.contextPins", key: keyOf(e) });
@@ -286,14 +316,32 @@ exports.askStylist = onCall(
           });
         },
       });
-      const result = await askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, stylistHooks, todayPick);
+      // Layered remove: facts muted in this conversation.
+      const mutedPinIds = Array.isArray(data.mutedPinIds)
+        ? data.mutedPinIds.filter((x) => typeof x === "string" && x.length > 0 && x.length <= 128).slice(0, 20)
+        : [];
+      // PC-52: attach-proposal context — two strict booleans.
+      // available: a pick exists today (the client knows; the
+      // pick itself rides only when attached). dismissed: a
+      // proposal was already dismissed in this conversation.
+      const attachCtx = {
+        available: data.todayPickAvailable === true,
+        dismissed: data.attachProposalDismissed === true,
+      };
+      // PC-33: trip steering — dismissed in this conversation?
+      const steerCtx = { dismissed: data.tripProposalDismissed === true };
+      // PC-38: reference photos for this turn (vision context,
+      // sanitized hard; general chat only — the assembler
+      // ignores them in trip mode).
+      const refImages = sanitizeRefImages(data.refImages);
+      const result = await askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, stylistHooks, todayPick, shopItem, mutedPinIds, attachCtx, steerCtx, refImages);
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: true });
       return finish("askStylist", correlationId, uid, start, result);
     } catch (err) {
       // Any failure inside askStylist is a downstream AI failure.
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
-      boundary("askStylist", correlationId, uid, err);
+      await boundary("askStylist", correlationId, uid, err);
     }
   }
 );
@@ -333,7 +381,7 @@ exports.reflectOutfit = onCall(
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
-      boundary("reflectOutfit", correlationId, uid, err);
+      await boundary("reflectOutfit", correlationId, uid, err);
     }
   }
 );
@@ -369,7 +417,7 @@ exports.critiqueOutfit = onCall(
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
-      boundary("critiqueOutfit", correlationId, uid, err);
+      await boundary("critiqueOutfit", correlationId, uid, err);
     }
   }
 );
@@ -405,7 +453,270 @@ exports.parseOutfitPhoto = onCall(
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
-      boundary("parseOutfitPhoto", correlationId, uid, err);
+      await boundary("parseOutfitPhoto", correlationId, uid, err);
+    }
+  }
+);
+
+// PC-36: outfit-photo parse. Two callables because SAM
+// boots can run ~20 minutes on the community build:
+// startOutfitParse lists garments and creates one SAM
+// prediction per garment, then returns; the client
+// drives pollOutfitParse every few seconds while the
+// review sheet is open (and again on reopen — a parse
+// left mid-flight resumes, never restarts). Newly
+// terminal predictions are harvested the moment they
+// complete. Both bind REPLICATE_API_TOKEN from Secret
+// Manager, like extractGarment.
+exports.startOutfitParse = onCall(
+  {
+    region: "us-central1",
+    timeoutSeconds: 120,
+    memory: "1GiB",
+    maxInstances: 5,
+    secrets: ["REPLICATE_API_TOKEN"],
+  },
+  async (request) => {
+    const correlationId = newCorrelationId();
+    const uid = request.auth ? request.auth.uid : null;
+    const start = Date.now();
+    const aiTracker = createAiTracker();
+    const recordUsage = makeUsageRecorder(getFirestore());
+    const usageBase = { correlationId, uid, feature: "startOutfitParse", surface: "upload", refId: null };
+    try {
+      if (!request.auth) {
+        fail("NOT_SIGNED_IN");
+      }
+      const data = request.data || {};
+      const storagePath = typeof data.storagePath === "string" ? data.storagePath.trim() : "";
+      if (!storagePath || storagePath.length > 300) {
+        fail("BAD_REQUEST");
+      }
+      usageBase.refId = storagePath;
+      const result = await startParse(uid, storagePath, {
+        db: getFirestore(),
+        bucket: getStorage().bucket(),
+        apiKey: process.env.REPLICATE_API_TOKEN || null,
+        hooks: aiTracker.hooks,
+      });
+      await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: true });
+      return finish("startOutfitParse", correlationId, uid, start, result);
+    } catch (err) {
+      if (!(err instanceof HttpsError) && !err.key) err.key = "SAM_FAILED";
+      await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
+      await boundary("startOutfitParse", correlationId, uid, err);
+    }
+  }
+);
+
+exports.pollOutfitParse = onCall(
+  {
+    region: "us-central1",
+    timeoutSeconds: 120,
+    memory: "1GiB",
+    maxInstances: 5,
+    secrets: ["REPLICATE_API_TOKEN"],
+  },
+  async (request) => {
+    const correlationId = newCorrelationId();
+    const uid = request.auth ? request.auth.uid : null;
+    const start = Date.now();
+    const aiTracker = createAiTracker();
+    const recordUsage = makeUsageRecorder(getFirestore());
+    const usageBase = { correlationId, uid, feature: "pollOutfitParse", surface: "upload", refId: null };
+    try {
+      if (!request.auth) {
+        fail("NOT_SIGNED_IN");
+      }
+      const data = request.data || {};
+      const parseId = typeof data.parseId === "string" ? data.parseId.trim() : "";
+      if (!parseId || parseId.length > 100) {
+        fail("BAD_REQUEST");
+      }
+      usageBase.refId = parseId;
+      const result = await advanceParse(uid, parseId, {
+        db: getFirestore(),
+        bucket: getStorage().bucket(),
+        apiKey: process.env.REPLICATE_API_TOKEN || null,
+        hooks: aiTracker.hooks,
+      });
+      await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: true });
+      return finish("pollOutfitParse", correlationId, uid, start, result);
+    } catch (err) {
+      if (!(err instanceof HttpsError) && !err.key) err.key = "SAM_FAILED";
+      await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
+      await boundary("pollOutfitParse", correlationId, uid, err);
+    }
+  }
+);
+
+exports.retryOutfitGarment = onCall(
+  {
+    region: "us-central1",
+    timeoutSeconds: 120,
+    memory: "1GiB",
+    maxInstances: 5,
+    secrets: ["REPLICATE_API_TOKEN"],
+  },
+  async (request) => {
+    const correlationId = newCorrelationId();
+    const uid = request.auth ? request.auth.uid : null;
+    const start = Date.now();
+    const aiTracker = createAiTracker();
+    const recordUsage = makeUsageRecorder(getFirestore());
+    const usageBase = { correlationId, uid, feature: "retryOutfitGarment", surface: "upload", refId: null };
+    try {
+      if (!request.auth) {
+        fail("NOT_SIGNED_IN");
+      }
+      const data = request.data || {};
+      const parseId = typeof data.parseId === "string" ? data.parseId.trim() : "";
+      const garmentId = typeof data.garmentId === "string" ? data.garmentId.trim() : "";
+      if (!parseId || parseId.length > 100 || !garmentId || garmentId.length > 100) {
+        fail("BAD_REQUEST");
+      }
+      usageBase.refId = parseId;
+      const result = await retryGarment(uid, parseId, garmentId, {
+        db: getFirestore(),
+        bucket: getStorage().bucket(),
+        apiKey: process.env.REPLICATE_API_TOKEN || null,
+      });
+      await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: true });
+      return finish("retryOutfitGarment", correlationId, uid, start, result);
+    } catch (err) {
+      if (!(err instanceof HttpsError) && !err.key) err.key = "SAM_FAILED";
+      await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
+      await boundary("retryOutfitGarment", correlationId, uid, err);
+    }
+  }
+);
+
+// PC-36 resume: list the user's unfinished parses so the
+// Add-an-outfit sheet can offer a way back in. Read-only,
+// so it needs no secret.
+exports.listOutfitParses = onCall(
+  {
+    region: "us-central1",
+    timeoutSeconds: 60,
+    memory: "512MiB",
+    maxInstances: 5,
+  },
+  async (request) => {
+    const correlationId = newCorrelationId();
+    const uid = request.auth ? request.auth.uid : null;
+    const start = Date.now();
+    try {
+      if (!request.auth) {
+        fail("NOT_SIGNED_IN");
+      }
+      const result = await listParses(uid, { db: getFirestore() });
+      return finish("listOutfitParses", correlationId, uid, start, result);
+    } catch (err) {
+      if (!(err instanceof HttpsError) && !err.key) err.key = "SAM_FAILED";
+      await boundary("listOutfitParses", correlationId, uid, err);
+    }
+  }
+);
+
+// Discard a draft parse: confirm-first on the client, then this
+// callable deletes the parse lineage and its files (see
+// functions/discard.js for the scope and guards). No secrets —
+// Firestore + Storage only, same shape as listOutfitParses.
+exports.discardOutfitParse = onCall(
+  {
+    region: "us-central1",
+    timeoutSeconds: 60,
+    memory: "512MiB",
+    maxInstances: 5,
+  },
+  async (request) => {
+    const correlationId = newCorrelationId();
+    const uid = request.auth ? request.auth.uid : null;
+    const start = Date.now();
+    try {
+      if (!request.auth) {
+        fail("NOT_SIGNED_IN");
+      }
+      const data = request.data || {};
+      const parseId = typeof data.parseId === "string" ? data.parseId.trim() : "";
+      if (!parseId || parseId.length > 100) {
+        fail("BAD_REQUEST");
+      }
+      const result = await discardParse(uid, parseId, {
+        db: getFirestore(),
+        bucket: getStorage().bucket(),
+      });
+      return finish("discardOutfitParse", correlationId, uid, start, result);
+    } catch (err) {
+      if (!(err instanceof HttpsError) && !err.key) err.key = "SAM_FAILED";
+      await boundary("discardOutfitParse", correlationId, uid, err);
+    }
+  }
+);
+
+// Mark a parse done after its outfit saved. Firestore + Storage
+// only, same shape as discardOutfitParse — the client cannot
+// write the parses collection directly (no rule, by design).
+exports.finishOutfitParse = onCall(
+  {
+    region: "us-central1",
+    timeoutSeconds: 60,
+    memory: "512MiB",
+    maxInstances: 5,
+  },
+  async (request) => {
+    const correlationId = newCorrelationId();
+    const uid = request.auth ? request.auth.uid : null;
+    const start = Date.now();
+    try {
+      if (!request.auth) {
+        fail("NOT_SIGNED_IN");
+      }
+      const data = request.data || {};
+      const parseId = typeof data.parseId === "string" ? data.parseId.trim() : "";
+      if (!parseId || parseId.length > 100) {
+        fail("BAD_REQUEST");
+      }
+      const result = await finishParse(uid, parseId, {
+        db: getFirestore(),
+      });
+      return finish("finishOutfitParse", correlationId, uid, start, result);
+    } catch (err) {
+      if (!(err instanceof HttpsError) && !err.key) err.key = "SAM_FAILED";
+      await boundary("finishOutfitParse", correlationId, uid, err);
+    }
+  }
+);
+
+// PC-36 background advancer, driven by Cloud Scheduler every 2 min.
+// NOT a callable: Scheduler calls plain HTTPS with a shared secret
+// header (CRON_SECRET). No Firebase Auth here — the secret IS the
+// auth, and the function only advances parses (never items, outfits,
+// or user data). Usage recording is skipped: the tick has no user.
+exports.advanceParsesHttp = onRequest(
+  {
+    region: "us-central1",
+    timeoutSeconds: 540,
+    memory: "1GiB",
+    maxInstances: 5,
+    secrets: ["REPLICATE_API_TOKEN", "CRON_SECRET"],
+  },
+  async (req, res) => {
+    const correlationId = newCorrelationId();
+    try {
+      if (!process.env.CRON_SECRET || req.header("x-closet-cron") !== process.env.CRON_SECRET) {
+        res.status(403).json({ error: "forbidden" });
+        return;
+      }
+      const summary = await advanceAllParses({
+        db: getFirestore(),
+        bucket: getStorage().bucket(),
+        apiKey: process.env.REPLICATE_API_TOKEN || null,
+      });
+      res.json({ ok: true, ...summary });
+    } catch (err) {
+      try { boundary("advanceParsesHttp", correlationId, null, err); } catch (e) {}
+      res.status(500).json({ ok: false, error: (err && err.message) || "internal" });
     }
   }
 );
@@ -449,7 +760,7 @@ exports.shopCheck = onCall(
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
-      boundary("shopCheck", correlationId, uid, err);
+      await boundary("shopCheck", correlationId, uid, err);
     }
   }
 );
@@ -488,7 +799,7 @@ exports.fetchLinkItem = onCall(
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "LINK_UNREACHABLE";
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
-      boundary("fetchLinkItem", correlationId, uid, err);
+      await boundary("fetchLinkItem", correlationId, uid, err);
     }
   }
 );
@@ -544,7 +855,334 @@ exports.planPacking = onCall(
     } catch (err) {
       if (!(err instanceof HttpsError) && !err.key) err.key = "AI_UNAVAILABLE";
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
-      boundary("planPacking", correlationId, uid, err);
+      await boundary("planPacking", correlationId, uid, err);
+    }
+  }
+);
+
+// PC-58: Stage 3 — Garment Image Standardization.
+// Callable: standardize a single wardrobe item.
+// Design: docs/sprints/sprint-26/PC-58-DESIGN.md
+const {
+  isAlreadyClean,
+  MAX_ATTEMPTS,
+  EXPENSE_WARNING_THRESHOLD,
+  STANDARDIZATION_COST_PER_RUN,
+} = require("./standardize");
+const { runStandardizationPipeline } = require("./standardize-pipeline");
+const {
+  createFalSegmentation,
+  getFalSegmentation,
+  fetchMaskBuffer,
+} = require("./sam-fal");
+const { maskToCutout } = require("./sam");
+
+exports.standardizeItem = onCall(
+  {
+    region: "us-central1",
+    timeoutSeconds: 300,
+    memory: "1GiB",
+    maxInstances: 5,
+    secrets: ["FAL_API_KEY"],
+  },
+  async (request) => {
+    const correlationId = newCorrelationId();
+    const uid = request.auth ? request.auth.uid : null;
+    const start = Date.now();
+    const aiTracker = createAiTracker();
+    const recordUsage = makeUsageRecorder(getFirestore());
+    const usageBase = { correlationId, uid, feature: "standardizeItem", surface: "wardrobe", refId: null };
+    try {
+      if (!request.auth) {
+        fail("NOT_SIGNED_IN");
+      }
+      const data = request.data || {};
+      const itemId = typeof data.itemId === "string" ? data.itemId.trim() : "";
+      const feedback = typeof data.feedback === "string" ? data.feedback.trim().slice(0, 500) : "";
+      const force = data.force === true; // Manual override (CTA or refresh)
+      if (!itemId || itemId.length > 100) {
+        fail("BAD_REQUEST");
+      }
+      usageBase.refId = itemId;
+
+      const db = getFirestore();
+      const itemRef = db.collection("users").doc(uid).collection("items").doc(itemId);
+      const itemSnap = await itemRef.get();
+      if (!itemSnap.exists) {
+        fail("NOT_FOUND");
+      }
+      const item = itemSnap.data();
+      const std = item.standardization || {};
+
+      // Skip if already clean (unless forced via CTA)
+      if (std.status === "already_clean" && !force) {
+        return finish("standardizeItem", correlationId, uid, start, {
+          skipped: true,
+          reason: "already_clean",
+        });
+      }
+
+      // Expense warning check
+      const refreshCount = std.refreshCount || 0;
+      if (refreshCount >= EXPENSE_WARNING_THRESHOLD && !data.acknowledgedWarning) {
+        return finish("standardizeItem", correlationId, uid, start, {
+          needsWarningAck: true,
+          refreshCount,
+          estimatedCost: (refreshCount * STANDARDIZATION_COST_PER_RUN).toFixed(2),
+        });
+      }
+
+      // Check attempt limit
+      const attempts = std.attempts || 0;
+      if (attempts >= MAX_ATTEMPTS && !force) {
+        return finish("standardizeItem", correlationId, uid, start, {
+          failed: true,
+          reason: "max_attempts_reached",
+          attempts,
+        });
+      }
+
+      // Mark as processing
+      await itemRef.update({
+        "standardization.status": "processing",
+        "standardization.attempts": attempts + 1,
+        "standardization.refreshCount": feedback ? refreshCount + 1 : refreshCount,
+        "standardization.lastAttemptAt": new Date().toISOString(),
+      });
+
+      // Bug #2 fix (2026-10-31): guarantee the status is updated even on
+      // unexpected crashes. Without this, a throw anywhere below leaves the
+      // item stuck in 'processing' forever.
+      let processingCompleted = false;
+      try {
+      // Sprint 28 Card 1: shared pipeline (FLUX -> gates -> SAM -> upload).
+      // Same code the autoStandardizeItem trigger runs. No duplication.
+      const falApiKey = process.env.FAL_API_KEY;
+      if (!falApiKey) {
+        throw new Error("FAL_API_KEY not configured");
+      }
+      const bucket = getStorage().bucket();
+      let result;
+      try {
+        result = await runStandardizationPipeline({
+          db, bucket, uid, itemId, item, falApiKey, feedback,
+        });
+      } catch (pipeErr) {
+        await itemRef.update({
+          "standardization.status": "failed",
+          "standardization.lastError": `${pipeErr.message.slice(0, 200)}`,
+        });
+        throw pipeErr;
+      }
+      const stdUrl = result.standardizedUrl;
+
+      await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: true });
+      processingCompleted = true;
+      return finish("standardizeItem", correlationId, uid, start, {
+        pendingReview: true,
+        standardizedUrl: stdUrl,
+        attempts: attempts + 1,
+      });
+      } finally {
+        // Guarantee: never leave the item stuck in 'processing'.
+        // Only update if still processing (don't overwrite a specific error
+        // like flux_error: with the generic processing_interrupted).
+        if (!processingCompleted) {
+          try {
+            const checkSnap = await itemRef.get();
+            const checkStd = checkSnap.exists ? (checkSnap.data().standardization || {}) : {};
+            if (checkStd.status === "processing") {
+              await itemRef.update({
+                "standardization.status": "failed",
+                "standardization.lastError": "processing_interrupted",
+              });
+            }
+          } catch (cleanupErr) {
+            // Best-effort; the outer catch will handle the original error.
+          }
+        }
+      }
+    } catch (err) {
+      if (!(err instanceof HttpsError) && !err.key) err.key = "STANDARDIZE_FAILED";
+      await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: false, key: err.key || null });
+      await boundary("standardizeItem", correlationId, uid, err);
+    }
+  }
+);
+
+// Sprint 28 Card 2 (#128): Review gate for AI-made images.
+// approveStandardization: move the pending render into photos[] as
+// 'standardized' (old standardized -> 'actual'), mark status ready.
+// rejectStandardization: discard the pending render, mark status rejected,
+// keep the original photo. The original is never replaced.
+exports.approveStandardization = onCall(
+  { region: "us-central1", timeoutSeconds: 60, memory: "256Mi" },
+  async (request) => {
+    const correlationId = newCorrelationId();
+    const uid = request.auth ? request.auth.uid : null;
+    try {
+      if (!request.auth) fail("NOT_SIGNED_IN");
+      const data = request.data || {};
+      const itemId = typeof data.itemId === "string" ? data.itemId.trim() : "";
+      if (!itemId || itemId.length > 100) fail("BAD_REQUEST");
+      const db = getFirestore();
+      const itemRef = db.collection("users").doc(uid).collection("items").doc(itemId);
+      const snap = await itemRef.get();
+      if (!snap.exists) fail("NOT_FOUND");
+      const item = snap.data();
+      const std = item.standardization || {};
+      if (std.status !== "pending_review" || !std.pendingUrl) {
+        fail("BAD_REQUEST");
+      }
+      // Photo swap (Admin SDK plain objects — see 2026-10-31 bugfix note).
+      const updatedPhotos = (item.photos || []).map((p) => {
+        if (p && p.type === "standardized") return { ...p, type: "actual" };
+        return p;
+      });
+      updatedPhotos.push({
+        url: std.pendingUrl,
+        storagePath: std.pendingStoragePath || null,
+        type: "standardized",
+        createdAt: new Date().toISOString(),
+      });
+      await db.runTransaction(async (t) => {
+        t.update(itemRef, {
+          photos: updatedPhotos,
+          "standardization.status": "ready",
+          "standardization.standardizedUrl": std.pendingUrl,
+          "standardization.standardizedStoragePath": std.pendingStoragePath || null,
+          "standardization.pendingUrl": null,
+          "standardization.pendingStoragePath": null,
+          "standardization.approvedAt": new Date().toISOString(),
+        });
+      });
+      return { ok: true, standardizedUrl: std.pendingUrl };
+    } catch (err) {
+      if (!(err instanceof HttpsError) && !err.key) err.key = "APPROVE_FAILED";
+      await boundary("approveStandardization", correlationId, uid, err);
+    }
+  }
+);
+
+exports.rejectStandardization = onCall(
+  { region: "us-central1", timeoutSeconds: 60, memory: "256Mi" },
+  async (request) => {
+    const correlationId = newCorrelationId();
+    const uid = request.auth ? request.auth.uid : null;
+    try {
+      if (!request.auth) fail("NOT_SIGNED_IN");
+      const data = request.data || {};
+      const itemId = typeof data.itemId === "string" ? data.itemId.trim() : "";
+      if (!itemId || itemId.length > 100) fail("BAD_REQUEST");
+      const db = getFirestore();
+      const itemRef = db.collection("users").doc(uid).collection("items").doc(itemId);
+      const snap = await itemRef.get();
+      if (!snap.exists) fail("NOT_FOUND");
+      const item = snap.data();
+      const std = item.standardization || {};
+      if (std.status !== "pending_review") fail("BAD_REQUEST");
+      // Best-effort: delete the pending render file from Storage.
+      if (std.pendingStoragePath) {
+        try {
+          await getStorage().bucket().file(std.pendingStoragePath).delete();
+        } catch (e) { /* already gone or no permission — ignore */ }
+      }
+      await itemRef.update({
+        "standardization.status": "rejected",
+        "standardization.pendingUrl": null,
+        "standardization.pendingStoragePath": null,
+        "standardization.rejectedAt": new Date().toISOString(),
+      });
+      return { ok: true };
+    } catch (err) {
+      if (!(err instanceof HttpsError) && !err.key) err.key = "REJECT_FAILED";
+      await boundary("rejectStandardization", correlationId, uid, err);
+    }
+  }
+);
+
+// SPIKE harness (temporary — see ./spike.js; delete when the
+// image experiments close).
+const { spikeRunHandler } = require("./spike");
+exports.spikeRun = onRequest(
+  { timeoutSeconds: 300, memory: "512Mi", maxInstances: 2 },
+  spikeRunHandler
+);
+
+// PC-58 completion (2026-11-04): Passive standardization trigger.
+// When an item is created, automatically standardize it in the background
+// unless it's already clean (studio shot or cutout). Fire-and-forget from
+// the user's perspective — item creation never blocks on this.
+// Cost: $0.03/item (FLUX $0.025 + SAM $0.005). Skipped for items that
+// already have a standardization status (backfills, manual triggers).
+const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+exports.autoStandardizeItem = onDocumentCreated(
+  {
+    document: "users/{uid}/items/{itemId}",
+    region: "us-central1",
+    timeoutSeconds: 300,
+    memory: "1GiB",
+    maxInstances: 5,
+    secrets: ["FAL_API_KEY"],
+  },
+  async (event) => {
+    const snap = event.data;
+    if (!snap) return;
+    const item = snap.data() || {};
+    const uid = event.params.uid;
+    const itemId = event.params.itemId;
+    // Skip if already has a standardization status (backfill, manual, retry).
+    if (item.standardization && item.standardization.status) return;
+    // Skip if no photos.
+    const photos = Array.isArray(item.photos) ? item.photos : [];
+    if (!photos.length) return;
+    // Check if the first photo is already clean (studio shot / cutout).
+    try {
+      const firstPhoto = photos[0];
+      const url = firstPhoto.renderUrl || firstPhoto.url;
+      if (!url) return;
+      const res = await fetch(url);
+      if (!res.ok) return;
+      const buf = Buffer.from(await res.arrayBuffer());
+      const clean = await isAlreadyClean(buf);
+      if (clean.isClean) {
+        await getFirestore().collection("users").doc(uid).collection("items").doc(itemId).update({
+          "standardization.status": "already_clean",
+          "standardization.reason": clean.reason,
+        });
+        return;
+      }
+    } catch (e) {
+      // If the clean check fails, proceed to standardize (conservative).
+    }
+    // Not clean — run the full pipeline (same code as the manual Generate).
+    // Mark processing first so the UI reflects it, then run. On failure,
+    // mark failed with the error (never stuck in processing — the sweeper
+    // also catches anything older than 30 min).
+    const db = getFirestore();
+    const itemRef = db.collection("users").doc(uid).collection("items").doc(itemId);
+    const falApiKey = process.env.FAL_API_KEY;
+    if (!falApiKey) {
+      console.log("[autoStandardizeItem] FAL_API_KEY not configured, skipping");
+      return;
+    }
+    await itemRef.update({
+      "standardization.status": "processing",
+      "standardization.attempts": 1,
+      "standardization.lastAttemptAt": new Date().toISOString(),
+    });
+    try {
+      const bucket = getStorage().bucket();
+      await runStandardizationPipeline({
+        db, bucket, uid, itemId, item, falApiKey, feedback: "",
+      });
+      console.log(`[autoStandardizeItem] Standardized ${itemId} for ${uid}`);
+    } catch (pipeErr) {
+      console.log(`[autoStandardizeItem] Failed ${itemId}: ${pipeErr.message}`);
+      await itemRef.update({
+        "standardization.status": "failed",
+        "standardization.lastError": `${pipeErr.message.slice(0, 200)}`,
+      });
     }
   }
 );

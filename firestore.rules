@@ -33,6 +33,13 @@ service cloud.firestore {
       allow read, create, update, delete:
         if request.auth != null && request.auth.uid == userId;
     }
+    // UX-18 W4 (threads): saved stylist conversations — one doc per
+    // thread key ("general", "trip:<id>"), the transcript as a messages
+    // array. Owner-only, same posture as trips.
+    match /users/{userId}/chat_threads/{threadId} {
+      allow read, create, update, delete:
+        if request.auth != null && request.auth.uid == userId;
+    }
     // Sprint 17 (CONTEXT PINS): confirmed current facts — location,
     // weather, preferences. Owner-only CRUD; kind is a fixed enum and
     // the label is short (detail lives in the prose fields).
@@ -64,6 +71,17 @@ service cloud.firestore {
       allow read, create, update, delete:
         if request.auth != null && request.auth.uid == userId;
     }
+    // #131 Bug #4 (2026-11-04): match_rejections — client writes durable
+    // rejections (best-effort, suppresses false matches at >=0.97 similarity).
+    // Was missing entirely, so writes failed silently. Owner can create only;
+    // reads happen server-side (matching logic), never via the app.
+    match /users/{userId}/match_rejections/{rejectionId} {
+      allow create:
+        if request.auth != null && request.auth.uid == userId
+        && request.resource.data.itemId is string
+        && request.resource.data.embedding is list;
+      allow read, update, delete: if false;
+    }
     // PC-28: saved shop checks. Owner-only. The AI analysis (score,
     // verdict, reasons, similarOwned, outfits, item) is written once at
     // save time; updates may only touch the user's own fields
@@ -89,7 +107,12 @@ service cloud.firestore {
       allow update:
         if request.auth != null && request.auth.uid == userId
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(["userNote", "link", "sku", "status", "updatedAt", "addedItemId", "tripId"])
+             .hasOnly(["userNote", "link", "sku", "status", "updatedAt", "addedItemId", "tripId", "followUps"])
+        // PC-41 (Sprint 29): follow-up thread — a list of {role, text, at}
+        // messages, capped at 20 by the client. Each message is short.
+        && (!("followUps" in request.resource.data) || (
+             request.resource.data.followUps is list
+             && request.resource.data.followUps.size() <= 20))
         && request.resource.data.status in ["considering", "bought", "dismissed"]
         && (!("userNote" in request.resource.data) || (request.resource.data.userNote is string && request.resource.data.userNote.size() <= 500))
         && (!("link" in request.resource.data) || (request.resource.data.link is string && request.resource.data.link.size() <= 500))

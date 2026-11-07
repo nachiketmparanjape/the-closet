@@ -4,6 +4,113 @@ What went live. Momentum you can see.
 
 ## Sprint 19 (2026-10-24 → )
 
+- **Return divider, de-duplicated + refresh in place** —
+  founder phone test 2026-10-25: "Continuing from
+  Saturday" printed twice (every return after a gap
+  re-measured from the same last message and stacked
+  another divider). applyReturnDivider now refuses when
+  a divider already trails the last real message, and
+  thread loads collapse saved divider runs to their last
+  row. The trailing divider also carries its own
+  Start fresh action now (two-tap confirm, the sheet's
+  pattern) — refresh context right there, no trip to
+  the context sheet. Founder phone validation pending.
+- **Ask doors start fresh** — founder decision 2026-10-24
+  (phone-test buffer, refining UX-18 decision 6):
+  contextual "Ask the stylist" entries (Today's Ask, a
+  shop check's Ask, Build a look, Surprise me) bring a new
+  subject, so they start a fresh general conversation;
+  with history present, one warning sheet offers Start
+  fresh / Keep chatting first. The Stylist tab remains
+  the resume door, unchanged. Start fresh also clears
+  any @ draft now. Founder phone validation pending.
+- **PC-45: Explain-the-no → a proposed style rule** —
+  shipped 2026-10-24 (Sprint 24): rejecting Today's pick
+  via "Another" asks why first (chips, the pick's own
+  pieces, or the user's words); the reason steers the
+  regeneration for one turn, and durable-taste reasons
+  earn a proposed style rule in the same sheet — saved
+  as a preference fact only on the user's tap, through
+  the one fact write path; dismissing leaves no trace.
+  Situational reasons steer but never propose. Founder
+  phone validation pending.
+- **PC-38: Reference photos in stylist chat** — shipped
+  2026-10-24 (Sprint 24): attach up to 4 inspiration
+  photos to a message in the general chat (📷 door →
+  upload/camera chooser, composer thumbnails, removable
+  before send; photo-only messages send). They ride to
+  the model as vision context on that turn under a brief
+  section that names them inspiration, never inventory.
+  Nothing is created from them; the image data is never
+  saved (the thread keeps the count). Trip chats excluded
+  on both sides of the wire. Founder phone validation
+  pending. (Living-doc note for the PR #80 merge pass:
+  the assembler has gained three inputs since the doc's
+  snapshot — attachCtx (PC-52), steerCtx (PC-33),
+  refImages (PC-38) — fold them in with the Context
+  Standard.)
+- **PC-54: Paste intake on phones** — shipped 2026-10-24
+  (Sprint 24): a Paste a photo button on the capture
+  screen and in the shop sheet; the tap tries the async
+  clipboard read (Android Chrome, behind its permission
+  prompt) and routes through PC-51's one routing; every
+  failure speaks one honest line (iOS: save the photo
+  and upload it). The Web Share Target split out as
+  PC-55 — the app has no service worker, and that
+  infrastructure deserves its own design pass. Founder
+  phone validation pending (iPhone: the fallback tap;
+  the Android read path needs an Android device).
+- **PC-33: Trip steering in general chat** — shipped
+  2026-10-24 (Sprint 24): the pin tense rule (location/
+  weather proposals are present-tense only) plus the
+  steering card — a future trip in general chat earns a
+  Create-this-trip card; advice is never gated; a
+  same-reply pin proposal for the trip's fact is
+  suppressed server-side. Founder phone validation
+  pending (incl. the card's education line).
+- **PC-52: The stylist may propose an attachment** —
+  shipped 2026-10-24 (Sprint 24): when a general
+  conversation turns on the unattached pick, the model
+  may propose attaching it (a card, a tap — decision 1
+  intact); Dismiss silences proposals for the
+  conversation, Start fresh re-arms. Founder phone
+  validation pending.
+- **PC-53: New-user empty states on every tab** — shipped
+  2026-10-24 (Sprint 24): tier-0 intro cards on Outfits,
+  Shop and Trips; a slim gap-naming banner (one shared
+  gapCopyFor) on Wardrobe and Outfits below the pick
+  threshold; Today's progress card speaks the same
+  sentence; the stylist's empty chat gains its zero-
+  pieces line; graduation is count-derived, nothing
+  stored. Founder phone validation pending.
+
+- **OBS-2: Error logging & handling overhaul** — shipped
+  2026-10-24 (Sprint 20).
+- **PC-39: Trip weather re-check** — shipped 2026-10-24
+  (Sprint 20).
+- **PC-40: Contextual shop checks** — shipped 2026-10-24
+  (Sprint 20).
+- **PC-43: Unnamed items heal themselves** — shipped
+  2026-10-24 (Sprint 20).
+- **UX-18: Stylist audit — one experience + architecture
+  pass** — shipped 2026-10-24 (Sprint 23): one server
+  assembler + manifest, attach-as-act, the context bar
+  and sheet, saved threads, the 50-message window, the
+  who-wins precedence block; followed the same day by the
+  Context Standard (one shelf, three durations, one
+  display, layered remove).
+- **PC-37: Trip chat is a full stylist room** — shipped
+  2026-10-21 (trip rooms; entry restored at the Sprint
+  24 walk — the card had only a "built" note in the
+  backlog and no line here).
+- **UX-13: Visual redesign + design system** — shipped
+  2026-10-23 (Sprint 18, the Warm Editorial waves).
+- **OBS-3: AI consumption analytics** — shipped
+  2026-10-23 (the ai_usage ledger and cost report;
+  founder-validated the same day).
+- **PC-32: Chat threads** — shipped 2026-10-24, absorbed
+  into UX-18 wave 4 (one saved thread per context).
+
 - **PC-51 — Paste a photo from the clipboard** (2026-10-24):
   a document-level paste handler snapshots image files off
   the clipboard and routes by what owns the screen — shop
@@ -559,3 +666,95 @@ What went live. Momentum you can see.
 | 2026-10-24 | Sprint 20 card 3: PC-39 | Trip weather re-check (founder's Option 1). The trip page's weather line is now a tappable pill: it shows the live forecast with a ↻ when one is held, "Typical weather · tap to check forecast" when only the climate fallback is held, and "Check forecast" when nothing is known; tapping re-fetches and updates both the trip-level weather fields and (when a plan exists) the plan's snapshot, with an honest "forecast isn't out yet" toast when the dates are beyond Open-Meteo's 16-day window. A silent re-check runs once per trip per session when the snapshot is missing, older than 24h, or the first leg day has arrived and the snapshot is still the fallback. Planning now also stamps the trip-level weather fields so the pill never needs a second fetch after a plan. Weather truth resolves trip-level first, plan snapshot for older trips. 284/284 tests (+4 wiring guards). Live (hosting release 1792860053751000). Note: Hong Kong (Nov 23) is outside the forecast window until ~Nov 7 — the pill will start returning real forecasts then. |
 | 2026-10-24 | Sprint 20 card 4: PC-40 | Contextual shop checks. (a) Trip-aware: when a check starts from a trip (or is tagged to one), the client now sends the tripId and the SERVER reads the trip doc itself — name, leg, dates, the PC-39 weather, notes, and the names of what's already packed — and the model judges the item FOR that trip (weather fit, packing gap vs duplicating a packed piece, combining with packed pieces) alongside the general wardrobe fit, naming the trip in the verdict when it drives the call. A bad trip reference degrades to a plain check, never an error. (b) The wearer's own question: an optional "Anything specific?" field on the check sheet is snapshotted into the check (and cleared, same disarm discipline as the trip tag), sent with the call, and the prompt instructs the model to answer it directly. The server echoes the context it actually used; the result window shows "Judged for: <trip> · You asked: …", and both fields are saved on the check doc and shown on its detail view. 290/290 tests (+6). shopCheck redeployed; hosting live (release 1792860233310000). Founder phone test is the real-world gate: a check from the Hong Kong trip page should now reason about the trip. |
 | 2026-10-24 | Founder phone validation + nit fix | Sprint 20 phone round: PC-40 validated by the founder ("the added context in the shop list seems to work properly" — judged-for line + question present on the saved check and its detail view); PC-39's pill tap returned the expected "forecast isn't out yet" toast (Hong Kong is beyond the 16-day window until ~Nov 7). Nit: the feedback bubble's pencil sat off-center — the button's content was a raw text node ("✎ " plus the word span), so the phone circle centered the text run, not the glyph; the pencil is now its own element and flex centers the glyph itself. Hosting live with the fix. |
+
+- **Phone-test buffer #4 (2026-10-25, founder screenshot): the saved
+  notice directed the user to "the context sheet (tap the line
+  above)" — a place the user cannot identify.** The notice is now
+  one plain sentence ("This conversation is saved — it will be here
+  when you come back.") and carries its own Start fresh: the same
+  two-tap button as the resume divider, and the notice text itself
+  is tappable (founder: refresh by touching the message itself).
+  Threads saved with the old text heal and gain the action too —
+  the recognizer accepts both openings. **"Knows" renamed to
+  "Working from"** in all three places it lived (bar label, bar
+  aria-label, sheet title): weather and place are circumstances the
+  stylist works from, not knowledge about the user, and the label
+  now covers all three context durations honestly. **Education
+  without a manual:** a one-time hint sits under the context bar —
+  "Everything I'm taking into account for this chat — tap to view
+  or change it." — itself a door to the sheet; the first open of
+  the sheet (from any door) retires it permanently
+  (`contextSheetSeen` on the settings doc). Tests 384/384.
+
+- **Phone-test buffer #5 (2026-10-25, founder): the chat chrome
+  ate the conversation.** Four changes. (1) "Working from" is
+  removed — the founder's call: the hint line below the bar
+  explains the bar better than a label word; the bar is now just
+  its entries + chevron, and the sheet title takes the hint's own
+  phrase, "What I'm taking into account." (2) The stylist chat is
+  full-screen on the phone (the universal overlay rule gains its
+  second named exception, after capture) and a flex column at
+  every size: compact header, context bar + hint, scrolling
+  message list, composer — the bar is pinned and always visible,
+  and the message list takes all remaining height (was capped at
+  52vh inside a 92dvh sheet). (3) The header shrank (10px padding,
+  19px title). (4) Today's pick moved into that header as a small
+  chip — the pick's first photo + "Today's pick" (or "Go to
+  Today" before a pick exists); tapping goes to the Today page.
+  The in-thread navigation row retired; the 2026-10-24 ruling
+  stands (no pick card in the thread; the way to Today is always
+  present), now served from the header. Tests 384/384 incl. the
+  layout invariants.
+
+- **Phone-test buffer #6 (2026-10-25, founder: "fix it everywhere
+  it exists"): sideways scroll in the "What I'm taking into
+  account" sheet.** A flex row label that cannot shrink (flex
+  items refuse by default) forced its row — and so the sheet —
+  a few px wider than the screen. Fixed as a class, on every
+  surface: (1) every panel (`.sheet`, `.modal`, and the chat
+  list) now clips horizontal overflow — panels scroll vertically
+  only, by design; (2) context row labels (and the sheet title)
+  may shrink and wrap, and row buttons no longer flex, so
+  content fits instead of being clipped in practice; (3) a new
+  layout-invariant test guards both rules. Tests 385/385.
+
+- **Phone-test buffer #7 (2026-10-25, founder): a thin sliver of
+  content showed above the "What I'm taking into account"
+  header.** Cause, in the sheet construction itself: the panel
+  carried 10px of top padding, and scrolled content paints into
+  that strip; the sticky head can never cover it (a sticky
+  element cannot leave its content box — the old `top: -10px`
+  compensation was unreachable). Fixed the way modals already
+  work: the panel has no top padding, the head (first child of
+  every sheet — verified all 8) carries the spacing and sticks
+  flush at `top: 0`. Every sheet gains it at once; a layout
+  invariant guards the pair. Tests 386/386.
+
+- **Phone-test buffer #8 (2026-10-25, founder screenshot): the
+  sliver was the band above the sheet, not inside it.** Sheets
+  were capped below full height (100dvh − 24px in the base rule,
+  92dvh by the phone overlay rule), so a tall sheet left a strip
+  of the page showing above its header, the page's text
+  half-clipped by the sheet's top edge. Buffer #7's inside
+  sliver (scrolled content in the panel's top padding, above the
+  sticky head) was a real but different defect — both are fixed.
+  Now a sheet whose content needs the height takes 100dvh and
+  sits flush, like the chat and capture; short sheets still
+  anchor to the bottom with the backdrop above them. Modals keep
+  their 92dvh cap. A layout invariant guards the sheet's
+  full-height allowance. Tests 387/387.
+
+- **Phone-test buffer #9 (2026-10-25, founder screenshot): with
+  the keyboard open, the chat's header went off the top of the
+  screen.** iOS Safari does not shrink the layout viewport for
+  the keyboard — it shrinks the visual viewport and scrolls the
+  page — so a bottom-anchored panel of full layout height kept
+  its composer visible and pushed everything above the visible
+  area. The overlay stack manager (the same home as the
+  stacking fix) now fits every open overlay to
+  `window.visualViewport` — height + top offset — and tracks it
+  live on resize/scroll; panel heights resolve against that box
+  (chat and capture at 100%, sheets capped at 100%, modals at
+  min(92dvh, 100%)). Every window with an input gains it: chat,
+  form sheets, capture. A layout invariant guards the
+  mechanism's presence. Tests 387/387.

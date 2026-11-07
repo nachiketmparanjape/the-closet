@@ -18,8 +18,13 @@ const KINDS = ["success", "failure", "rejection", "degraded", "self_heal"];
 
 function makeErrorEventRecorder(db) {
   return function recordErrorEvent(fields) {
+    // Returns a promise that resolves when the write completes (or fails).
+    // Callers on the error path SHOULD await this — a fire-and-forget write
+    // can be silently dropped if the Cloud Function returns first (seen
+    // 2026-11-02: heartbeat probe failed twice, no event in error_events).
+    // Success-path callers may still fire-and-forget for latency.
     try {
-      if (!db || !fields || !fields.fn) return;
+      if (!db || !fields || !fields.fn) return Promise.resolve(false);
       const event = {
         ts: FieldValue.serverTimestamp(),
         kind: KINDS.includes(fields.kind) ? fields.kind : "failure",
@@ -33,11 +38,16 @@ function makeErrorEventRecorder(db) {
         // content. Capped hard.
         detail: fields.detail ? String(fields.detail).slice(0, 300) : null,
       };
-      db.collection("error_events").add(event).catch((err) => {
-        console.error(JSON.stringify({ event: "error_event_write_failed", fn: fields.fn, err: err && err.message }));
-      });
+      return db.collection("error_events").add(event).then(
+        () => true,
+        (err) => {
+          console.error(JSON.stringify({ event: "error_event_write_failed", fn: fields.fn, err: err && err.message }));
+          return false;
+        }
+      );
     } catch (err) {
       console.error(JSON.stringify({ event: "error_event_write_failed", err: err && err.message }));
+      return Promise.resolve(false);
     }
   };
 }

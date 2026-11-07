@@ -100,6 +100,31 @@ const CATALOG = {
     grpc: "internal",
     message: "Photo cleanup had trouble with that one. Your original photo is untouched.",
   },
+  SAM_FAILED: {
+    category: "dependency",
+    grpc: "internal",
+    message: "Cutting that piece had trouble. Your original photo is untouched.",
+  },
+  SAM_NOT_CONFIGURED: {
+    category: "dependency",
+    grpc: "internal",
+    message: "Outfit cutting isn't switched on yet. Your original photo is saved as-is.",
+  },
+  RENDER_FAILED: {
+    category: "dependency",
+    grpc: "internal",
+    message: "That cut couldn't be turned into a clean photo. Your original photo is untouched.",
+  },
+  PARSE_NOT_FOUND: {
+    category: "validation",
+    grpc: "not-found",
+    message: "That outfit photo parse couldn't be found. Try uploading the photo again.",
+  },
+  PARSE_NOT_DISCARDABLE: {
+    category: "validation",
+    grpc: "failed-precondition",
+    message: "That draft is already saved as an outfit, so it can't be discarded.",
+  },
   // internal (our bug — the client message stays generic on purpose)
   INTERNAL: {
     category: "internal",

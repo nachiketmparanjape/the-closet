@@ -83,10 +83,15 @@ function fakeReplicate(cutoutPng, { poll = false, predictSeconds = 2.5 } = {}) {
     if (url.endsWith("/predictions/pred1")) {
       return makeRes({ jsonBody: succeeded });
     }
-    if (url.includes("/models/") && url.endsWith("/predictions")) {
+    if (url === "https://api.replicate.com/v1/models/sprited/birefnet") {
+      return makeRes({ jsonBody: { latest_version: { id: "ver-test-1" } } });
+    }
+    if (url === "https://api.replicate.com/v1/predictions") {
       assert.equal(opts.headers.Authorization, "Bearer test-key");
       const body = JSON.parse(opts.body);
+      assert.equal(body.version, "ver-test-1");
       assert.ok(body.input.image.startsWith("data:image/"), "image sent as data URI");
+      assert.equal(body.input.output_format, "cutout");
       return makeRes({ jsonBody: poll ? { ...succeeded, status: "processing" } : succeeded });
     }
     throw new Error("unexpected fetch: " + url);
@@ -154,7 +159,7 @@ describe("segmentImage (birefnet provider)", () => {
     assert.ok(out.png.equals(cutout));
     assert.equal(out.uncertainty, null);
     assert.equal(out.predictSeconds, 2.5);
-    assert.equal(MODEL, "zhengpeng-7/birefnet");
+    assert.equal(MODEL, "sprited/birefnet");
   });
 
   test("polls a processing prediction until it succeeds", async () => {
@@ -282,13 +287,13 @@ describe("priceEvent", () => {
   });
 
   test("replicate prices predict seconds", () => {
-    const cost = priceEvent({ provider: "replicate", model: "zhengpeng-7/birefnet", predictSeconds: 10 });
+    const cost = priceEvent({ provider: "replicate", model: "sprited/birefnet", predictSeconds: 10 });
     assert.ok(Math.abs(cost - 0.00225) < 1e-9);
   });
 
   test("unknown models and missing units price as null", () => {
     assert.equal(priceEvent({ provider: "vertex", model: "nope", tokensIn: 5 }), null);
-    assert.equal(priceEvent({ provider: "replicate", model: "zhengpeng-7/birefnet" }), null);
+    assert.equal(priceEvent({ provider: "replicate", model: "sprited/birefnet" }), null);
     assert.equal(priceEvent({ provider: "vertex", model: "gemini-3.5-flash" }), null);
     assert.ok(PRICING_VERSION.length > 0);
   });
@@ -364,7 +369,7 @@ describe("extractGarmentPhoto", () => {
 
     // The provider received the orientation-baked image (60x40,
     // not the stored 40x60): decode what was actually sent.
-    const createCall = calls.find((c) => c.url.includes("/models/"));
+    const createCall = calls.find((c) => c.url === "https://api.replicate.com/v1/predictions");
     const sent = JSON.parse(createCall.opts.body).input.image;
     const sentMeta = await sharp(Buffer.from(sent.split(",")[1], "base64")).metadata();
     assert.equal(sentMeta.width, 60);

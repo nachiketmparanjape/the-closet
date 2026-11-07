@@ -32,6 +32,7 @@ const { codedError } = require("./errors");
 const { segmentImage, MODEL } = require("./birefnet");
 const { normalizeOrientation, alphaStats, judgeMask } = require("./imagenorm");
 const { checkCutout } = require("./extractcheck");
+const { embedImage } = require("./parse");
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // matches describeItem
 
@@ -119,9 +120,42 @@ async function extractGarmentPhoto(uid, storagePath, deps) {
     metadata: { cacheControl: "public, max-age=31536000" },
   });
 
+  // PC-56 (Sprint 29): garment embedding, computed once from the clean
+  // render (background removed = the vector describes the garment, not
+  // the scene). Stored beside the phash; used for duplicate proposals
+  // (same garment, different photo) and PC-36 matching. Soft-fails to
+  // null — pHash-only matching still works.
+  let renderEmbedding = null;
+  try {
+    renderEmbedding = await (deps.embedFn || embedImage)({
+      imageBuffer: png,
+      getAccessToken: deps.getAccessToken,
+      fetchImpl: deps.fetchImpl,
+      project: deps.project,
+      location: deps.location,
+    });
+  } catch (e) {
+    renderEmbedding = null;
+  }
+
   // Step 5, layer 1: mask heuristics + the aspect assertion.
   const stats = await alphaStats(png);
   const mask = judgeMask(stats, { width: normalized.width, height: normalized.height });
+  // PC-59 (Sprint 28): photo quality measurements for the too-small warning.
+  // frameShare = cutout area / original photo area (cutout is trimmed to the
+  // garment's bounding box, so this approximates the garment's share of the
+  // photo). sourceLongEdge = original photo's long edge in pixels.
+  // Warning triggers: frame share under 25% OR long edge under 700px.
+  // Retail-sourced photos are exempt at the UI layer (remedy is different).
+  const origArea = normalized.width * normalized.height;
+  const cutoutArea = stats.width * stats.height;
+  const frameShare = origArea > 0 ? cutoutArea / origArea : 0;
+  const sourceLongEdge = Math.max(normalized.width, normalized.height);
+  const photoQuality = {
+    frameShare: Math.round(frameShare * 1000) / 1000,
+    sourceLongEdge,
+    tooSmall: frameShare < 0.25 || sourceLongEdge < 700,
+  };
   if (!mask.pass) {
     return {
       renderStoragePath,
@@ -129,6 +163,8 @@ async function extractGarmentPhoto(uid, storagePath, deps) {
       provider: "birefnet",
       gatePassed: false,
       gate: { stage: "mask", reasons: mask.reasons },
+      photoQuality,
+      renderEmbedding,
     };
   }
 
@@ -159,6 +195,8 @@ async function extractGarmentPhoto(uid, storagePath, deps) {
     provider: "birefnet",
     gatePassed: verdict.ok === true,
     gate: { stage: "vision", problems: verdict.problems || [] },
+    photoQuality,
+    renderEmbedding,
   };
 }
 

@@ -27,7 +27,7 @@ const VERTEX_USD_PER_1M = {
 };
 
 const REPLICATE_USD_PER_SECOND = {
-  "zhengpeng-7/birefnet": 0.000225,
+  "sprited/birefnet": 0.000225,
 };
 
 // fields: { provider, model, tokensIn, tokensOut, tokensThinking,

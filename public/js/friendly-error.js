@@ -53,14 +53,23 @@
     if (typeof code === "string" && code.indexOf("functions/") === 0) {
       code = code.slice("functions/".length);
     }
-    if (typeof code === "string" && CODE_COPY[code]) return CODE_COPY[code];
-    // Some SDKs nest the code or only leave a message.
-    var msg = err.message || String(err);
-    if (NETWORK_RE.test(msg)) return "Couldn't reach the server. Check your connection and try again.";
-    if (typeof navigator !== "undefined" && navigator.onLine === false) {
-      return "You're offline. Reconnect and try again.";
+    var msg;
+    if (typeof code === "string" && CODE_COPY[code]) msg = CODE_COPY[code];
+    else {
+      // Some SDKs nest the code or only leave a message.
+      var rawMsg = err.message || String(err);
+      if (NETWORK_RE.test(rawMsg)) msg = "Couldn't reach the server. Check your connection and try again.";
+      else if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        msg = "You're offline. Reconnect and try again.";
+      } else {
+        msg = "Something went wrong. Try again.";
+      }
     }
-    return "Something went wrong. Try again.";
+    // #131: Append the server's ref code if present (e.g. "Ref: a3f9").
+    // It's a support pointer, not technical detail.
+    var ref = err && err.details && err.details.ref;
+    if (typeof ref === "string" && ref) msg += " (Ref: " + ref + ")";
+    return msg;
   }
 
   global.friendlyError = friendlyError;
