@@ -322,7 +322,9 @@
     .shop-followup-row-btn { display: block; width: 100%; text-align: left; padding: 12px 4px; background: none; border: none; border-bottom: 1px solid var(--line, #e5e0d8); font-size: 14px; font-weight: 600; color: var(--text); cursor: pointer; }
     .shop-followup-thread { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
     .shop-followup-msg-wrap { display: flex; align-items: flex-start; gap: 6px; }
-    .shop-followup-msg { padding: 10px 12px; border-radius: 12px; font-size: 14px; line-height: 1.45; max-width: 88%; flex: 1; }
+    .shop-followup-msg { padding: 10px 12px; border-radius: 12px; font-size: 15px; line-height: 1.5; max-width: 88%; flex: 1; overflow-wrap: break-word; }
+    .shop-followup-msg strong { font-weight: 700; }
+    .shop-followup-msg.thinking { opacity: 0.6; font-style: italic; }
     .shop-followup-user { align-self: flex-end; background: var(--brass, #a87c1c); color: #fff; }
     .shop-followup-assistant { align-self: flex-start; background: var(--paper-soft); }
     .shop-followup-del { background: none; border: none; color: var(--muted); font-size: 18px; line-height: 1; cursor: pointer; padding: 10px 4px; flex-shrink: 0; }
@@ -12477,17 +12479,46 @@
         var threadBox = shopCheckEl("div", "shop-followup-thread");
         body.appendChild(threadBox);
 
+        // The stylist's reply is markdown-ish prose with prompt-local
+        // item handles ([i45] = the 45th item in the server's list).
+        // Those handles are server-internal noise to the user, so they
+        // are stripped; **bold** renders as bold. HTML is escaped
+        // first, then the safe markup is applied — never innerHTML on
+        // raw model text.
+        function renderReplyText(el, text) {
+          var t = String(text || "");
+          // Strip item handles: "**Name [i45]**" -> "**Name**".
+          t = t.replace(/\s*\[i\d+\]/gi, "");
+          // Escape HTML, then apply bold.
+          var esc = t
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
+          var html = esc.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+          el.innerHTML = html;
+        }
+
+        // Pending state: the question the user just asked (shown
+        // immediately, before the server answers) and a thinking
+        // bubble. Cleared when the answer lands or the call fails.
+        var pendingQuestion = null;
+        var pendingThinking = false;
+
         function renderThread() {
           threadBox.textContent = "";
           var msgs = Array.isArray(c.followUps) ? c.followUps : [];
-          if (!msgs.length) {
+          if (!msgs.length && !pendingQuestion && !pendingThinking) {
             threadBox.appendChild(shopCheckEl("p", "hint", "No questions yet — ask about fit, styling, or whether it is worth it."));
             return;
           }
           msgs.forEach(function (m, idx) {
             var wrap = shopCheckEl("div", "shop-followup-msg-wrap");
             var div = shopCheckEl("div", "shop-followup-msg shop-followup-" + (m.role || "user"));
-            div.textContent = m.text || "";
+            if (m.role === "assistant") {
+              renderReplyText(div, m.text || "");
+            } else {
+              div.textContent = m.text || "";
+            }
             wrap.appendChild(div);
             // Per-message delete: tap the × on a message to remove it
             // (and its pair, so Q&A stays matched).
@@ -12511,6 +12542,22 @@
             wrap.appendChild(delBtn);
             threadBox.appendChild(wrap);
           });
+          // Optimistic question: visible the moment the user taps Ask,
+          // so there is no gap where the question disappears.
+          if (pendingQuestion) {
+            var qWrap = shopCheckEl("div", "shop-followup-msg-wrap");
+            var qDiv = shopCheckEl("div", "shop-followup-msg shop-followup-user");
+            qDiv.textContent = pendingQuestion;
+            qWrap.appendChild(qDiv);
+            threadBox.appendChild(qWrap);
+          }
+          if (pendingThinking) {
+            var tWrap = shopCheckEl("div", "shop-followup-msg-wrap");
+            var tDiv = shopCheckEl("div", "shop-followup-msg shop-followup-assistant thinking");
+            tDiv.textContent = "Thinking…";
+            tWrap.appendChild(tDiv);
+            threadBox.appendChild(tWrap);
+          }
         }
         renderThread();
 
@@ -12567,6 +12614,12 @@
           if (!q || !currentUser) return;
           sendBtn.disabled = true;
           input.value = "";
+          // Optimistic: show the question and a thinking bubble
+          // immediately, so there is no gap where the question
+          // disappears while the answer is being generated.
+          pendingQuestion = q;
+          pendingThinking = true;
+          renderThread();
           var history = Array.isArray(c.followUps) ? c.followUps.slice(-18) : [];
           var messages = history.map(function (m) {
             return { role: m.role === "assistant" ? "model" : "user", text: m.text || "" };
@@ -12596,10 +12649,15 @@
               updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             }).then(function () {
               c.followUps = updated;
+              pendingQuestion = null;
+              pendingThinking = false;
               renderThread();
               updateFollowupRow();
             });
           }).catch(function (err) {
+            pendingQuestion = null;
+            pendingThinking = false;
+            renderThread();
             showToast(friendlyError(err));
           }).finally(function () {
             sendBtn.disabled = false;
