@@ -87,7 +87,7 @@
     .app { max-width: 1320px; margin: 0 auto; padding: clamp(22px, 4vw, 56px); padding-bottom: calc(clamp(22px, 4vw, 56px) + 78px + env(safe-area-inset-bottom)); min-height: 100vh; }
     .topline { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-bottom: 30px; border-bottom: 1px solid var(--line); }
     .status { display: inline-flex; align-items: center; gap: 9px; color: var(--muted); font-size: 13px; font-weight: 600; }
-    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #c38a2d; box-shadow: 0 0 0 4px color-mix(in srgb, #c38a2d 17%, transparent); }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 17%, transparent); }
     .status-dot.ready { background: #4f8151; box-shadow: 0 0 0 4px color-mix(in srgb, #4f8151 17%, transparent); }
     .top-actions { display: flex; align-items: center; gap: 14px; }
     .text-button { border: 0; background: transparent; padding: 7px 0; font-weight: 600; font-size: 13px; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
@@ -96,10 +96,10 @@
        (the Google/Spotify pattern — identity IS the button). */
     .auth-button.is-avatar { width: 38px; height: 38px; min-height: 38px; padding: 0; border-radius: 50%; border-color: var(--accent); background: var(--paper-soft); color: var(--ink); font-size: 15px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
     .auth-button:disabled { color: var(--muted); cursor: not-allowed; opacity: .75; }
-    .guest-banner { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 10px; margin: 10px 0 0; padding: 11px 14px; background: #fdf6e3; border: 1px solid #e5cf8a; border-radius: 10px; font-size: 13px; color: #6b5312; box-shadow: 0 2px 10px rgba(120, 90, 20, .08); }
+    .guest-banner { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 10px; margin: 10px 0 0; padding: 11px 14px; background: var(--accent-soft); border: 1px solid var(--line-strong); border-radius: 10px; font-size: 13px; color: var(--accent-dark); box-shadow: 0 2px 10px rgba(120, 90, 20, .08); }
     .guest-banner[hidden] { display: none; }
     .guest-banner .guest-icon { flex: none; width: 22px; height: 22px; }
-    .guest-banner .link-button { color: #6b5312; margin-left: auto; }
+    .guest-banner .link-button { color: var(--accent-dark); margin-left: auto; }
     .link-button { background: none; border: none; padding: 0; color: inherit; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; white-space: nowrap; }
 
     .hero { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(260px, .75fr); gap: clamp(32px, 6vw, 90px); align-items: end; padding: clamp(48px, 8vw, 96px) 0 52px; }
@@ -1200,7 +1200,7 @@
         </div>
         <div class="guide-path">
           <h3>🧺 A whole pile at once</h3>
-          <p>Choose many photos at once and each becomes its own piece, named and tagged by AI in the background. Review them in your wardrobe afterwards. One photo per piece — extra angles can be added later from the piece itself.</p>
+          <p>Choose many photos at once and each becomes its own piece, named and tagged automatically in the background. Review them in your wardrobe afterwards. One photo per piece — extra angles can be added later from the piece itself.</p>
           <button class="secondary" type="button" data-guide-add>Add a pile</button>
         </div>
         <div class="guide-path">
@@ -1593,7 +1593,7 @@
         <div class="item-photo-wrap">
           <img class="item-photo" id="itemPhoto" alt="Wardrobe piece" />
           <div class="photo-badge" id="photoBadge" hidden></div>
-          <button class="ai-badge-btn" id="aiBadgeBtn" hidden title="AI render options">✨</button>
+          <button class="ai-badge-btn" id="aiBadgeBtn" hidden title="AI render options"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2.1 6.9L21 11l-6.9 2.1L12 20l-2.1-6.9L3 11l6.9-2.1z"/></svg></button>
           <!-- PC-59 (Sprint 28): too-small-in-photo warning -->
           <p class="photo-quality-note" id="photoQualityNote" hidden>This piece is small in its photo — a closer photo will look sharper.</p>
           <div class="photo-rotate-overlay">
@@ -1610,7 +1610,7 @@
         <div class="photo-view-row" id="itemPhotoViewRow" hidden>
           <button class="view-chip is-active" id="viewCleanBtn" type="button">Clean view</button>
           <button class="view-chip" id="viewOriginalBtn" type="button">Original photo</button>
-          <button class="view-chip" id="viewStdBtn" type="button" hidden>AI view</button>
+          <button class="view-chip" id="viewStdBtn" type="button" hidden>Standardized view</button>
         </div>
         <p class="std-status" id="stdStatusLine" hidden></p>
         <p class="src-note" id="itemSourceNote" hidden></p>
@@ -1626,7 +1626,7 @@
         <div class="std-actions" id="stdActions" hidden>
           <p class="std-note" id="stdNote" hidden></p>
           <button class="secondary" id="stdGenerateBtn" type="button" hidden>Generate standardized view</button>
-          <button class="secondary" id="stdRefreshBtn" type="button" hidden>Refresh AI view</button>
+          <button class="secondary" id="stdRefreshBtn" type="button" hidden>Refresh standardized view</button>
         </div>
         <!-- Sprint 28 Card 2 (#128): Review gate — side-by-side compare -->
         <div class="std-review" id="stdReviewBox" hidden>
@@ -1754,7 +1754,7 @@
   <div class="overlay sheet-overlay" id="stdRefreshSheet" hidden role="dialog" aria-modal="true" aria-labelledby="stdRefreshTitle">
     <section class="sheet">
       <div class="sheet-head">
-        <h2 class="sheet-title" id="stdRefreshTitle">Refresh the AI view?</h2>
+        <h2 class="sheet-title" id="stdRefreshTitle">Refresh the standardized view?</h2>
         <button class="icon-button" id="stdRefreshClose" type="button" aria-label="Close">×</button>
       </div>
       <div class="std-warning" id="stdExpenseWarning" hidden>
@@ -1826,7 +1826,7 @@
           <input type="date" id="outfitWearDate" aria-label="Wear date" title="When did you wear this?" />
           <button class="secondary" id="outfitFavBtn" type="button">☆ Favorite</button>
           <button class="secondary" id="outfitRenameBtn" type="button">Rename</button>
-          <button class="secondary" id="outfitCritiqueBtn" type="button">AI critique</button>
+          <button class="secondary" id="outfitCritiqueBtn" type="button">Critique this outfit</button>
           <button class="secondary" id="outfitPhotoBtn" type="button">Add photo</button>
           <button class="secondary" id="outfitPhotoCameraBtn" type="button">Take photo</button>
           <input type="file" id="outfitPhotoInput" accept="image/*" hidden>
@@ -2595,8 +2595,8 @@
         if (isGuest()) {
           document.getElementById("accountTitle").textContent = "Keep your wardrobe";
           var hero = el("div", null);
-          hero.style.cssText = "display:flex;align-items:center;justify-content:center;width:56px;height:56px;border-radius:50%;background:#fdf6e3;border:1px solid #e5cf8a;margin:4px 0 12px;";
-          hero.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#6b5312" stroke-width="1.8" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6l7-3z"/></svg>';
+          hero.style.cssText = "display:flex;align-items:center;justify-content:center;width:56px;height:56px;border-radius:50%;background:var(--accent-soft);border:1px solid var(--line-strong);margin:4px 0 12px;color:var(--accent-dark);";
+          hero.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6l7-3z"/></svg>';
           body.appendChild(hero);
           var warn = el("p", "hint", "You're browsing as a guest. Your wardrobe lives in this browser and can disappear if cookies are cleared or you switch devices.");
           warn.style.marginTop = "0";
@@ -2706,7 +2706,7 @@
         // graduation — Today is the default home, 2026-10-21).
         body.appendChild(h("Today home"));
         body.appendChild(el("p", "hint", "Today is your home screen — the stylist's pick first, your catalogue one tap away. Turn it off to go back to opening on the catalogue."));
-        var todayToggleBtn = el("button", todayHomeOn() ? "primary" : "secondary", todayHomeOn() ? "Today home: on — turn off" : "Turn on the Today home");
+        var todayToggleBtn = el("button", todayHomeOn() ? "primary" : "secondary", todayHomeOn() ? "Turn off Today home" : "Turn on Today home");
         todayToggleBtn.type = "button";
         todayToggleBtn.style.marginTop = "10px";
         todayToggleBtn.addEventListener("click", function () {
@@ -3217,7 +3217,7 @@
             if (e.key === "Enter" || e.key === " ") { e.preventDefault(); makePrimary(); }
           });
           var label = document.createElement("span");
-          label.textContent = (c.name || "custom") + (c.source === "ai" ? " ✨" : "");
+          label.textContent = c.name || "custom";
           var x = document.createElement("button");
           x.type = "button";
           x.className = "pal-x";
@@ -3522,7 +3522,7 @@
       var currentPhotoIndex = 0;
       function getPhotoLabel(photo) {
         var t = (photo && photo.type) || "";
-        if (t === "standardized") return "✨ AI Render";
+        if (t === "standardized") return "AI render";
         if (t === "cutout") return "Cutout";
         if (t === "actual") return "Original";
         return "Photo";
@@ -3748,7 +3748,7 @@
           }
           actionsBox.hidden = false;
           var wasAiGenerated = std.status === "ready";
-          // PC-58 UI declutter (2026-11-01): Badge shows the type ("✨ AI Render",
+          // PC-58 UI declutter (2026-11-01): Badge shows the type ("AI render",
           // "Cutout", "Original") — the descriptive note is redundant. Hide it.
           note.hidden = true;
           // If it was already clean, offer Generate (escape hatch).
@@ -4747,7 +4747,7 @@
         if (!s) { box.hidden = true; return; }
         aiRendered = true;
         suggestHint.hidden = true; // the AI box now carries the suggestion narrative
-        document.getElementById("aiDesc").textContent = "✨ " + (s.description || s.name || "");
+        document.getElementById("aiDesc").textContent = (s.description || s.name || "");
         var tags = [s.pattern, s.fit, s.formality, s.warmth, s.fabric_guess, s.brand]
           .filter(function (t) { return t && t !== "unknown" && t !== "other"; });
         document.getElementById("aiTags").textContent = tags.join(" · ");
@@ -4759,7 +4759,7 @@
         aiSuggestion = null;
         if (!functions || !currentUser || !file) { box.hidden = true; return; }
         var myId = ++aiRequestId;
-        document.getElementById("aiDesc").textContent = "✨ Asking AI for a name & details…";
+        document.getElementById("aiDesc").textContent = "Naming this piece…";
         document.getElementById("aiTags").textContent = "";
         box.hidden = false;
         downscaleForAI(file).then(function (img) {
@@ -4863,7 +4863,7 @@
               syncPrimaryHex(uploadPalette, color);
               renderUploadPalette();
               if (!aiRendered) {
-                suggestHint.textContent = "✨ Suggested from your photo — check before uploading.";
+                suggestHint.textContent = "Suggested from your photo — check before uploading.";
                 suggestHint.hidden = false;
               }
             }
@@ -9553,7 +9553,13 @@
           details.className = "item-details";
           var name = document.createElement("p");
           name.className = "item-name outfit-name";
-          name.textContent = (o.favorite ? "★ " : "") + outfitDisplayName(o);
+          name.textContent = outfitDisplayName(o);
+          if (o.favorite) {
+            var favBadge = document.createElement("span");
+            favBadge.className = "ver-badge";
+            favBadge.textContent = "Favorite";
+            name.appendChild(favBadge);
+          }
           if ((o.version || 1) > 1) {
             var badge = document.createElement("span");
             badge.className = "ver-badge";
@@ -11054,18 +11060,18 @@
         // already carry scores; critiquing them would be noise.
         var critiqueBtn = document.getElementById("outfitCritiqueBtn");
         critiqueBtn.style.display = o.source === "stylist" ? "none" : "";
-        critiqueBtn.textContent = "AI critique";
+        critiqueBtn.textContent = "Critique this outfit";
         critiqueBtn.disabled = false;
         critiqueBtn.onclick = function () {
           critiqueBtn.disabled = true;
           critiqueBtn.textContent = "Thinking…";
           functions.httpsCallable("critiqueOutfit")({ outfitId: o.id }).then(function (res) {
             renderCritique(res.data || {});
-            critiqueBtn.textContent = "AI critique";
+            critiqueBtn.textContent = "Critique this outfit";
             critiqueBtn.disabled = false;
           }).catch(function (err) {
             showToast(friendlyError(err));
-            critiqueBtn.textContent = "AI critique";
+            critiqueBtn.textContent = "Critique this outfit";
             critiqueBtn.disabled = false;
           });
         };
@@ -12966,7 +12972,7 @@
         var p = document.createElement("p");
         p.className = "hint";
         p.id = "reflectionStatus";
-        p.textContent = "✨ Reflecting on the outcome…";
+        p.textContent = "Reflecting on the outcome…";
         sec.appendChild(p);
       }
 
