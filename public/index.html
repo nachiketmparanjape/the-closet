@@ -778,6 +778,11 @@
     .modal-head h2 { margin: 0; font-family: "Closet Serif", serif; font-size: 26px; font-weight: 500; }
     .icon-button { width: 44px; height: 44px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: transparent; cursor: pointer; }
     .icon-button:hover { border-color: var(--ink); }
+    /* G1: one SVG icon system — sizing for inline icons. */
+    svg.ic { width: 18px; height: 18px; vertical-align: -3px; flex: none; }
+    svg.ic-sm { width: 15px; height: 15px; vertical-align: -2px; flex: none; }
+    .ic-wrap { display: inline-flex; vertical-align: -3px; flex: none; }
+    .ic-wrap svg { display: block; }
     .modal-body { padding: 26px; }
     .setup-intro { margin: 0 0 26px; color: var(--muted); line-height: 1.65; }
     .steps { margin: 0; padding: 0; list-style: none; counter-reset: setup; }
@@ -932,7 +937,7 @@
       <button class="tab" type="button" data-view="outfits" role="tab" aria-selected="false">Outfits</button>
       <button class="tab" type="button" data-view="shoplist" role="tab" aria-selected="false">Shop list</button>
       <button class="tab" type="button" data-view="trips" role="tab" aria-selected="false">Trips</button>
-      <button class="tab-action" id="tabChat" type="button">✦ Stylist</button>
+      <button class="tab-action" id="tabChat" type="button"><svg class="ic-sm" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2.1 6.9L21 11l-6.9 2.1L12 20l-2.1-6.9L3 11l6.9-2.1z"/></svg> Stylist</button>
     </div>
 
     <section aria-label="Today" id="todayView" hidden>
@@ -1030,7 +1035,7 @@
 
     <!-- Fix buffer 5: a trip is a page, not a floating window. -->
     <section aria-label="Trip detail" id="tripView" hidden>
-      <button class="secondary" id="tripBackBtn" type="button" style="margin-bottom:16px">‹ All trips</button>
+      <button class="secondary" id="tripBackBtn" type="button" style="margin-bottom:16px"><svg class="ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg> All trips</button>
       <h2 class="trip-title" id="tripDetailTitle">Trip</h2>
       <p class="hint" id="tripDetailMeta" style="margin-top:0"></p>
       <p class="hint" id="tripDetailNotes" hidden></p>
@@ -1050,7 +1055,7 @@
     <section class="modal">
       <div class="modal-head">
         <h2 id="photoParseTitle">Matches from your photo</h2>
-        <button class="icon-button" id="photoParseClose" type="button" aria-label="Close">×</button>
+        <button class="icon-button" id="photoParseClose" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <div class="modal-body">
         <div id="photoParseMatches"></div>
@@ -1072,7 +1077,7 @@
     <section class="modal">
       <div class="modal-head">
         <h2 id="outfitParseTitle">Pieces from your photo</h2>
-        <button class="icon-button" id="outfitParseClose" type="button" aria-label="Close">×</button>
+        <button class="icon-button" id="outfitParseClose" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <div class="modal-body">
         <p class="hint" id="outfitParseStatus"></p>
@@ -1100,7 +1105,7 @@
     <section class="modal">
       <div class="modal-head">
         <h2 id="outfitParseMatchTitle">Match to an existing piece</h2>
-        <button class="icon-button" id="outfitParseMatchClose" type="button" aria-label="Close">×</button>
+        <button class="icon-button" id="outfitParseMatchClose" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <div class="modal-body">
         <input id="outfitParseMatchSearch" type="search" placeholder="Search your wardrobe…" autocomplete="off"
@@ -1117,7 +1122,7 @@
     <section class="modal">
       <div class="modal-head">
         <h2 id="composerTitle">Pick today's outfit</h2>
-        <button class="icon-button" id="composerClose" type="button" aria-label="Close">×</button>
+        <button class="icon-button" id="composerClose" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <div class="modal-body">
         <p class="hint" id="composerWeather" style="margin-top:0" hidden></p>
@@ -1135,16 +1140,16 @@
     <section class="sheet">
       <div class="sheet-head">
         <h2 class="sheet-title" id="wearSheetTitle">What should I wear?</h2>
-        <button class="icon-button" id="wearClose" type="button" aria-label="Close">×</button>
+        <button class="icon-button" id="wearClose" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <button class="sheet-option" id="wearDressMe" type="button">
-        <span><span class="opt-title">✨ Pick today's outfit</span><span class="opt-sub">A fresh pick for today's weather and your plans</span></span>
+        <span><span class="opt-title"><svg class="ic-sm" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2.1 6.9L21 11l-6.9 2.1L12 20l-2.1-6.9L3 11l6.9-2.1z"/></svg> Pick today's outfit</span><span class="opt-sub">A fresh pick for today's weather and your plans</span></span>
       </button>
       <button class="sheet-option" id="wearRewear" type="button">
-        <span><span class="opt-title">🎲 Rewear something</span><span class="opt-sub">Something you own but haven't worn in a while</span></span>
+        <span><span class="opt-title"><svg class="ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="3.5"/><circle cx="9" cy="9" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="9" r="1.3" fill="currentColor" stroke="none"/><circle cx="9" cy="15" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="15" r="1.3" fill="currentColor" stroke="none"/></svg> Rewear something</span><span class="opt-sub">Something you own but haven't worn in a while</span></span>
       </button>
       <button class="sheet-option" id="wearSurprise" type="button">
-        <span><span class="opt-title">🌀 Surprise me</span><span class="opt-sub">An unexpected pick, outside your usual vibe</span></span>
+        <span><span class="opt-title"><svg class="ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 3h5v5"/><path d="M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg> Surprise me</span><span class="opt-sub">An unexpected pick, outside your usual vibe</span></span>
       </button>
     </section>
   </div>
@@ -1158,7 +1163,7 @@
     <section class="modal">
       <div class="modal-head">
         <h2 id="captureTitle">Add pieces</h2>
-        <button class="icon-button" id="captureClose" type="button" aria-label="Close">×</button>
+        <button class="icon-button" id="captureClose" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <div class="modal-body form-grid">
         <div class="photo-actions">
@@ -1189,27 +1194,27 @@
     <section class="modal">
       <div class="modal-head">
         <h2 id="guideTitle">Ways to add your clothes</h2>
-        <button class="icon-button" id="guideClose" type="button" aria-label="Close">×</button>
+        <button class="icon-button" id="guideClose" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <div class="modal-body guide-body">
         <p class="guide-intro">Four ways in — pick whichever matches the pile in front of you.</p>
         <div class="guide-path">
-          <h3>📸 One piece at a time</h3>
+          <h3><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> One piece at a time</h3>
           <p>Photograph a piece, add it, done. Best for new buys and one-offs — you confirm its name and details as you go.</p>
           <button class="secondary" type="button" data-guide-add>Add a piece</button>
         </div>
         <div class="guide-path">
-          <h3>🧺 A whole pile at once</h3>
+          <h3><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg> A whole pile at once</h3>
           <p>Choose many photos at once and each becomes its own piece, named and tagged automatically in the background. Review them in your wardrobe afterwards. One photo per piece — extra angles can be added later from the piece itself.</p>
           <button class="secondary" type="button" data-guide-add>Add a pile</button>
         </div>
         <div class="guide-path">
-          <h3>✨ From Google Photos</h3>
+          <h3><svg class="ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2.1 6.9L21 11l-6.9 2.1L12 20l-2.1-6.9L3 11l6.9-2.1z"/></svg> From Google Photos</h3>
           <p>On Android, Google Photos quietly builds a wardrobe collection from photos of you — clean cutouts of your pieces, ready-made. Open Google Photos, find the collection, save the pieces you want to your camera roll, then add them here like any photo. Closet doesn't connect to Google Photos directly — it's a save-then-add path, and the pieces arrive looking clean.</p>
           <button class="secondary" type="button" data-guide-add>Add from your photos</button>
         </div>
         <div class="guide-path">
-          <h3>📋 From your clipboard</h3>
+          <h3><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg> From your clipboard</h3>
           <p>Seeing it online? Copy the product photo — right-click it and choose Copy image — or take a screenshot, then paste it straight in: Ctrl+V on Windows, Cmd+V on a Mac. Works on the Add pieces screen, in a shop check, or anywhere in the app — we'll ask whether it's a new piece or a check. No saving files first. On a phone, the same screens carry a Paste a photo button — on Android it reads the clipboard directly; on iPhone the browser keeps the clipboard private, so save the photo and upload it instead.</p>
           <button class="secondary" type="button" data-guide-add>Add from clipboard</button>
         </div>
@@ -1223,7 +1228,7 @@
     <section class="modal">
       <div class="modal-head">
         <h2 id="tripTitle">New trip</h2>
-        <button class="icon-button" id="tripClose" type="button" aria-label="Close">×</button>
+        <button class="icon-button" id="tripClose" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <div class="modal-body">
         <div class="field">
@@ -1263,7 +1268,7 @@
     <section class="sheet">
       <div class="sheet-head">
         <h2 class="sheet-title" id="addOutfitSheetTitle">Add an outfit</h2>
-        <button class="icon-button" id="addOutfitClose" type="button" aria-label="Close">×</button>
+        <button class="icon-button" id="addOutfitClose" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <button class="sheet-option" id="sheetBuild" type="button">
         <span><span class="opt-title">Build manually</span><span class="opt-sub">Pick pieces from your wardrobe</span></span>
@@ -1279,7 +1284,7 @@
     <section class="sheet">
       <div class="sheet-head">
         <h2 class="sheet-title" id="shopCheckSheetTitle">Check a shop item</h2>
-        <button class="icon-button" id="shopSheetClose" type="button" aria-label="Close">×</button>
+        <button class="icon-button" id="shopSheetClose" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <p class="sheet-intro">Before you buy it, check it against your wardrobe — snap it and I'll give you a straight verdict.</p>
       <div class="field shop-q-field">
@@ -1309,7 +1314,7 @@
     <section class="sheet">
       <div class="sheet-head">
         <h2 class="sheet-title" id="refPhotoTitle">Attach reference photos</h2>
-        <button class="icon-button" id="refPhotoClose" type="button" aria-label="Close">×</button>
+        <button class="icon-button" id="refPhotoClose" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <p class="sheet-intro">Show the stylist what you're aiming for — an inspiration photo, a screenshot of a look. Up to 4; they ride with your next message only.</p>
       <button class="sheet-option" id="refPhotoUpload" type="button">
@@ -1329,7 +1334,7 @@
     <section class="sheet">
       <div class="sheet-head">
         <h2 class="sheet-title" id="rejectTitle">What's off about this pick?</h2>
-        <button class="icon-button" id="rejectClose" type="button" aria-label="Close">×</button>
+        <button class="icon-button" id="rejectClose" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <div id="rejectMain">
         <div id="rejectChips" style="display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 10px;" role="group" aria-label="Reason"></div>
@@ -1363,7 +1368,7 @@
     <section class="sheet">
       <div class="sheet-head">
         <h2 class="sheet-title" id="askFreshTitle">Start a fresh conversation?</h2>
-        <button class="icon-button" id="askFreshClose" type="button" aria-label="Close">×</button>
+        <button class="icon-button" id="askFreshClose" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <p class="sheet-intro">This Ask starts a new stylist conversation, so your question stands on its own. Your current conversation will be cleared — your saved facts stay.</p>
       <button class="sheet-option" id="askFreshStart" type="button">
@@ -1381,7 +1386,7 @@
     <section class="sheet">
       <div class="sheet-head">
         <h2 class="sheet-title" id="pasteChoiceTitle">You pasted a photo</h2>
-        <button class="icon-button" id="pasteChoiceClose" type="button" aria-label="Close">×</button>
+        <button class="icon-button" id="pasteChoiceClose" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <p class="sheet-intro">What should happen to it?</p>
       <button class="sheet-option" id="pasteChoiceAdd" type="button">
@@ -1401,7 +1406,7 @@
     <section class="modal">
       <div class="modal-head">
         <h2 id="shopCropTitle">Shop check photo</h2>
-        <button class="icon-button" id="shopCropClose" type="button" aria-label="Close">×</button>
+        <button class="icon-button" id="shopCropClose" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <div class="modal-body">
         <p class="hint" id="shopCropHint">This photo goes to the check as-is. Crop only if other clothes in the shot could confuse the verdict.</p>
@@ -1422,7 +1427,7 @@
     <section class="modal">
       <div class="modal-head">
         <h2 id="shopCheckTitle">Shop check</h2>
-        <button class="icon-button" id="shopCheckClose" type="button" aria-label="Close">×</button>
+        <button class="icon-button" id="shopCheckClose" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <div class="modal-body" id="shopCheckBody"></div>
     </section>
@@ -1433,7 +1438,7 @@
     <section class="modal">
       <div class="modal-head">
         <h2 id="shopCheckDetailTitle">Saved check</h2>
-        <button class="icon-button" id="shopCheckDetailClose" type="button" aria-label="Close">×</button>
+        <button class="icon-button" id="shopCheckDetailClose" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <div class="modal-body" id="shopCheckDetailBody"></div>
     </section>
@@ -1445,7 +1450,7 @@
     <section class="modal">
       <div class="modal-head">
         <h2 id="shopFollowupTitle">Questions about this piece</h2>
-        <button class="icon-button" id="shopFollowupClose" type="button" aria-label="Close">×</button>
+        <button class="icon-button" id="shopFollowupClose" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <div class="modal-body" id="shopFollowupBody"></div>
     </section>
@@ -1454,7 +1459,7 @@
   <div class="overlay" id="uploadOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="uploadTitle">    <section class="modal">
       <div class="modal-head">
         <h2 id="uploadTitle">Add a piece</h2>
-        <button class="icon-button" id="uploadClose" type="button" aria-label="Close upload form">×</button>
+        <button class="icon-button" id="uploadClose" type="button" aria-label="Close upload form"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <form class="modal-body form-grid" id="uploadForm">
         <div class="field file-drop">
@@ -1513,7 +1518,7 @@
     <section class="modal">
       <div class="modal-head">
         <h2 id="bulkTitle">Bulk add</h2>
-        <button class="icon-button" id="bulkClose" type="button" aria-label="Close bulk add">×</button>
+        <button class="icon-button" id="bulkClose" type="button" aria-label="Close bulk add"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <div class="modal-body form-grid">
         <p class="hint">One photo per piece — each becomes its own item, named and described by AI. Review them in the gallery afterwards.</p>
@@ -1552,7 +1557,7 @@
       <div class="modal-head">
         <h2 id="chatTitle">Stylist</h2>
         <button class="chat-head-pick" id="chatHeadPick" type="button" hidden></button>
-        <button class="icon-button" id="chatClose" type="button" aria-label="Close stylist chat">×</button>
+        <button class="icon-button" id="chatClose" type="button" aria-label="Close stylist chat"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <div class="modal-body">
         <button class="context-line" id="chatContextLine" type="button" hidden aria-label="What I'm taking into account — tap for details"></button>
@@ -1562,7 +1567,7 @@
           <div id="chatPhotoChips" class="chat-photo-chips" hidden></div>
           <div id="chatRefChips" class="chat-ref-chips" hidden></div>
           <div id="chatRefPicker" class="chat-ref-picker" hidden></div>
-          <button class="icon-button" id="chatAttachBtn" type="button" aria-label="Attach reference photos" title="Attach reference photos">📷</button>
+          <button class="icon-button" id="chatAttachBtn" type="button" aria-label="Attach reference photos" title="Attach reference photos"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
           <input id="chatInput" type="text" maxlength="500" placeholder="e.g. casual dinner, 60°F — @ to reference a piece or outfit" autocomplete="off" aria-label="Ask the stylist" />
           <button class="primary" id="chatSend" type="submit">Send</button>
         </form>
@@ -1577,7 +1582,7 @@
     <section class="sheet">
       <div class="sheet-head">
         <h2 class="sheet-title" id="contextSheetTitle">What I'm taking into account</h2>
-        <button class="icon-button" id="contextSheetClose" type="button" aria-label="Close">×</button>
+        <button class="icon-button" id="contextSheetClose" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <div id="contextSheetList"></div>
     </section>
@@ -1587,7 +1592,7 @@
     <section class="modal">
       <div class="modal-head">
         <h2 id="itemTitle">Piece</h2>
-        <button class="icon-button" id="itemClose" type="button" aria-label="Close piece details">×</button>
+        <button class="icon-button" id="itemClose" type="button" aria-label="Close piece details"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <div class="modal-body">
         <div class="item-photo-wrap">
@@ -1597,8 +1602,8 @@
           <!-- PC-59 (Sprint 28): too-small-in-photo warning -->
           <p class="photo-quality-note" id="photoQualityNote" hidden>This piece is small in its photo — a closer photo will look sharper.</p>
           <div class="photo-rotate-overlay">
-            <button class="rotate-btn" id="rotateLeftBtn" type="button" title="Rotate left 90 degrees" aria-label="Rotate left 90 degrees">↶</button>
-            <button class="rotate-btn" id="rotateRightBtn" type="button" title="Rotate right 90 degrees" aria-label="Rotate right 90 degrees">↷</button>
+            <button class="rotate-btn" id="rotateLeftBtn" type="button" title="Rotate left 90 degrees" aria-label="Rotate left 90 degrees"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg></button>
+            <button class="rotate-btn" id="rotateRightBtn" type="button" title="Rotate right 90 degrees" aria-label="Rotate right 90 degrees"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
           </div>
         </div>
         <!-- PC-58 UI declutter (2026-11-01): Instagram-style dots replace chips+thumbnails -->
@@ -1745,8 +1750,8 @@
     </section>
   </div>
 
-  <button class="chat-fab" id="chatFab" type="button"><span aria-hidden="true">✨</span><span>Ask the stylist</span></button>
-  <button class="feedback-fab" id="feedbackFab" type="button" hidden aria-label="Send feedback"><span class="fb-icon" aria-hidden="true">✎</span> <span class="fb-label">Feedback</span></button>
+  <button class="chat-fab" id="chatFab" type="button"><span aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2.1 6.9L21 11l-6.9 2.1L12 20l-2.1-6.9L3 11l6.9-2.1z"/></svg></span><span>Ask the stylist</span></button>
+  <button class="feedback-fab" id="feedbackFab" type="button" hidden aria-label="Send feedback"><span class="fb-icon" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg></span> <span class="fb-label">Feedback</span></button>
 
   <!-- PC-58: refresh confirmation sheet for the AI-generated standardized view.
        Deliberate action only: explicit button + confirmation, cost disclosed.
@@ -1755,7 +1760,7 @@
     <section class="sheet">
       <div class="sheet-head">
         <h2 class="sheet-title" id="stdRefreshTitle">Refresh the standardized view?</h2>
-        <button class="icon-button" id="stdRefreshClose" type="button" aria-label="Close">×</button>
+        <button class="icon-button" id="stdRefreshClose" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <div class="std-warning" id="stdExpenseWarning" hidden>
         <p><strong>Heads up:</strong> <span id="stdExpenseWarningText"></span></p>
@@ -1777,7 +1782,7 @@
     <section class="sheet">
       <div class="sheet-head">
         <h2 class="sheet-title" id="attrSheetTitle">A few quick details</h2>
-        <button class="icon-button" id="attrSheetClose" type="button" aria-label="Close">×</button>
+        <button class="icon-button" id="attrSheetClose" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <p class="sheet-intro">This helps the AI get the shape right. Tap to select.</p>
       <div id="attrFields"></div>
@@ -1790,7 +1795,7 @@
     <section class="modal">
       <div class="modal-head">
         <h2 id="feedbackTitle">Send feedback</h2>
-        <button class="icon-button" id="feedbackClose" type="button" aria-label="Close feedback">×</button>
+        <button class="icon-button" id="feedbackClose" type="button" aria-label="Close feedback"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <div class="modal-body">
         <p class="hint" style="margin-top:0">This experience is built and maintained by a single person. If something's off — a bug, a confusing screen, a feature you wish existed — write it here. Every note gets read. Dictating works too, the keyboard mic is fine.</p>
@@ -1808,7 +1813,7 @@
     <section class="modal">
       <div class="modal-head">
         <h2 id="accountTitle">Your account</h2>
-        <button class="icon-button" id="accountClose" type="button" aria-label="Close account">×</button>
+        <button class="icon-button" id="accountClose" type="button" aria-label="Close account"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <div class="modal-body" id="accountBody"></div>
     </section>
@@ -1817,14 +1822,14 @@
   <div class="overlay" id="outfitOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="outfitTitle">    <section class="modal">
       <div class="modal-head">
         <h2 id="outfitTitle">Outfit</h2>
-        <button class="icon-button" id="outfitClose" type="button" aria-label="Close outfit">×</button>
+        <button class="icon-button" id="outfitClose" type="button" aria-label="Close outfit"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <div class="modal-body">
         <div id="outfitDetailBody"></div>
         <div class="form-actions detail-actions">
           <button class="secondary" id="outfitWearBtn" type="button">I wore this</button>
           <input type="date" id="outfitWearDate" aria-label="Wear date" title="When did you wear this?" />
-          <button class="secondary" id="outfitFavBtn" type="button">☆ Favorite</button>
+          <button class="secondary" id="outfitFavBtn" type="button"><svg class="ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg> Favorite</button>
           <button class="secondary" id="outfitRenameBtn" type="button">Rename</button>
           <button class="secondary" id="outfitCritiqueBtn" type="button">Critique this outfit</button>
           <button class="secondary" id="outfitPhotoBtn" type="button">Add photo</button>
@@ -1842,7 +1847,7 @@
     <section class="modal">
       <div class="modal-head">
         <h2 id="builderTitle">Build an outfit</h2>
-        <button class="icon-button" id="builderClose" type="button" aria-label="Close builder">×</button>
+        <button class="icon-button" id="builderClose" type="button" aria-label="Close builder"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
       <div class="modal-body">
         <p class="hint">Tap pieces to add them — pick at least 2.</p>
@@ -1875,6 +1880,58 @@
   <script>
     (function () {
       "use strict";
+
+      // G1 (unslop): one SVG icon system. Every chrome icon comes from
+      // this table — no emoji, no text glyphs. iconSpan() returns a wrapper
+      // element; labels carrying user data keep textContent for the text
+      // and get the icon prepended as a separate element (never innerHTML
+      // with user text). setIcon() swaps the icon on buttons whose label
+      // is re-set, without stacking icons.
+      var ICONS = {
+        pin: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-5.3-7-11a7 7 0 1 1 14 0c0 5.7-7 11-7 11z"/><circle cx="12" cy="10" r="2.6"/></svg>',
+        sun: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="2.6"/><path d="M7 1.8v1.4M1.8 7h1.4M3.1 3.1l1 1M10.9 3.1l-1 1"/><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>',
+        rain: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/><path d="M8 21.5v1.5M12 21.5v1.5M16 21.5v1.5"/></svg>',
+        gear: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
+        pushpin: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4h6l1 7 3 3v2H5v-2l3-3z"/><path d="M12 16v5"/></svg>',
+        die: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="3.5"/><circle cx="9" cy="9" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="9" r="1.3" fill="currentColor" stroke="none"/><circle cx="9" cy="15" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="15" r="1.3" fill="currentColor" stroke="none"/></svg>',
+        shuffle: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 3h5v5"/><path d="M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>',
+        camera: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>',
+        layers: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>',
+        clipboard: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>',
+        trash: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>',
+        paperclip: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>',
+        suitcase: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="8" width="14" height="12" rx="2"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/><path d="M5 13h14"/></svg>',
+        bag: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2L3 6v14a2 2 0 0 1 2 2h14a2 2 0 0 1 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>',
+        plane: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></svg>',
+        refresh: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>',
+        rotateCcw: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>',
+        rotateCw: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>',
+        external: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>',
+        warning: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+        pencil: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg>',
+        sparkle: '<svg class="ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2.1 6.9L21 11l-6.9 2.1L12 20l-2.1-6.9L3 11l6.9-2.1z"/></svg>',
+        star: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>',
+        starFilled: '<svg class="ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>',
+        tag: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>',
+        link: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
+        chevRight: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>',
+        chevLeft: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>',
+        close: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>'
+      };
+      function iconSpan(name, small) {
+        var w = document.createElement("span");
+        w.className = "ic-wrap";
+        w.setAttribute("aria-hidden", "true");
+        w.innerHTML = ICONS[name].replace('class="ic"', small ? 'class="ic-sm"' : 'class="ic"');
+        return w;
+      }
+      function setIcon(el, name, small) {
+        var kids = el.childNodes;
+        for (var i = kids.length - 1; i >= 0; i--) {
+          if (kids[i].nodeType === 1 && kids[i].className === "ic-wrap") el.removeChild(kids[i]);
+        }
+        el.insertBefore(iconSpan(name, small), el.firstChild);
+      }
 
       // Firebase's public web-app configuration. Access is enforced by Auth,
       // Firestore rules, and Storage rules—not by keeping these values secret.
@@ -2525,7 +2582,7 @@
             "Nothing pinned yet. Add a fact below, or tell the stylist something like " +
             "\"I'm in Tahoe until Sunday\" or \"I run cold\" — it'll ask to remember it."));
         }
-        var icons = { location: "📍", weather: "🌤", preference: "⚙️" };
+        var icons = { location: "pin", weather: "sun", preference: "gear" };
         allPins.forEach(function (p) {
           var row = el("div", null);
           row.style.display = "flex";
@@ -2533,12 +2590,13 @@
           row.style.justifyContent = "space-between";
           row.style.padding = "8px 0";
           row.style.borderBottom = "1px solid var(--line)";
-          var label = el("span", null, (icons[p.kind] || "📌") + " " + p.label);
+          var label = el("span", null, p.label);
           var bits = [];
           if (p.detail) bits.push(p.detail);
           if (p.validUntil) bits.push("until " + p.validUntil);
           if (p.validUntil && p.validUntil < localTodayStr()) bits.push("expired");
           if (bits.length) label.textContent += " — " + bits.join(", ");
+          if (icons[p.kind]) label.insertBefore(iconSpan(icons[p.kind], true), label.firstChild);
           row.appendChild(label);
           var b = el("button", "secondary", "Remove");
           b.type = "button";
@@ -3221,7 +3279,7 @@
           var x = document.createElement("button");
           x.type = "button";
           x.className = "pal-x";
-          x.textContent = "×";
+          x.innerHTML = ICONS.close;
           x.setAttribute("aria-label", "Remove " + (c.name || "color"));
           x.addEventListener("click", function () {
             var i = palette.indexOf(c);
@@ -3272,7 +3330,7 @@
             var del = document.createElement("button");
             del.className = "thumb-del";
             del.type = "button";
-            del.textContent = "×";
+            del.innerHTML = ICONS.close;
             del.setAttribute("aria-label", "Delete photo " + (i + 1));
             del.addEventListener("click", function () { deletePhoto(i); });
             wrap.appendChild(t);
@@ -3557,7 +3615,7 @@
           badge.classList.toggle("ai", photo.type === "standardized");
         }
         if (aiBtn) {
-          // Show ✨ button only on AI render, or if no AI render exists yet (to generate one)
+          // Show sparkle button only on AI render, or if no AI render exists yet (to generate one)
           var hasStandardized = photos.some(function(p) { return p && p.type === "standardized"; });
           aiBtn.hidden = !(photo.type === "standardized" || !hasStandardized);
         }
@@ -5780,7 +5838,8 @@
               nfb.className = "link-button";
               nfb.textContent = noticeFreshArmed
                 ? "Tap again to clear it — your facts stay"
-                : "↻ Start fresh — clear this conversation";
+                : "Start fresh — clear this conversation";
+              if (!noticeFreshArmed) nfb.insertBefore(iconSpan("refresh", true), nfb.firstChild);
               nfb.addEventListener("click", function (ev) {
                 if (ev) ev.stopPropagation();
                 tapSavedNotice();
@@ -5796,7 +5855,8 @@
               fb.className = "link-button";
               fb.textContent = dividerFreshArmed
                 ? "Tap again to clear it — your facts stay"
-                : "↻ Start fresh — clear this conversation";
+                : "Start fresh — clear this conversation";
+              if (!dividerFreshArmed) fb.insertBefore(iconSpan("refresh", true), fb.firstChild);
               fb.addEventListener("click", function () {
                 if (!dividerFreshArmed) {
                   dividerFreshArmed = true;
@@ -5829,7 +5889,8 @@
           } else if (m.role === "user" && m.refPhotoCount) {
             var pc = document.createElement("div");
             pc.className = "chat-msg-photocount";
-            pc.textContent = "📷 " + m.refPhotoCount + " reference photo" + (m.refPhotoCount > 1 ? "s" : "") + " (not saved)";
+            pc.textContent = m.refPhotoCount + " reference photo" + (m.refPhotoCount > 1 ? "s" : "") + " (not saved)";
+            pc.insertBefore(iconSpan("camera", true), pc.firstChild);
             div.appendChild(pc);
           }
           // PC-22: show @-referenced pieces/outfits inside the sent bubble.
@@ -5839,7 +5900,8 @@
             m.refLabels.forEach(function (r) {
               var s = document.createElement("span");
               s.className = "chat-ref-chip static";
-              s.textContent = (r.kind === "article" ? "▸ " : "◈ ") + r.label;
+              s.textContent = r.label;
+              s.insertBefore(iconSpan(r.kind === "article" ? "tag" : "layers", true), s.firstChild);
               refs.appendChild(s);
             });
             div.appendChild(refs);
@@ -5899,7 +5961,7 @@
         var p = m.pinProposal;
         var card = document.createElement("div");
         card.className = "pin-proposal";
-        var icons = { location: "📍", weather: "🌤", preference: "⚙️" };
+        var icons = { location: "pin", weather: "sun", preference: "gear" };
         var head = document.createElement("p");
         head.className = "pin-proposal-head";
         var bits = [p.label];
@@ -5910,11 +5972,13 @@
           // Name the pins that will actually be deleted — matching can
           // fall back to a differently-named pin, so show the true target.
           var targets = matchingPins(allPins, p);
-          head.textContent = "🗑 Forget “" +
+          head.textContent = "Forget “" +
             targets.map(function (t) { return t.label; }).join(", ") + "”?";
+          head.insertBefore(iconSpan("trash", true), head.firstChild);
           bits = ["This fact no longer applies."];
         } else {
-          head.textContent = (icons[p.kind] || "📌") + " Remember this fact?";
+          head.textContent = "Remember this fact?";
+          if (icons[p.kind]) head.insertBefore(iconSpan(icons[p.kind], true), head.firstChild);
         }
         card.appendChild(head);
         var body = document.createElement("p");
@@ -5952,7 +6016,8 @@
         card.className = "pin-proposal";
         var head = document.createElement("p");
         head.className = "pin-proposal-head";
-        head.textContent = "📎 Attach today's pick to this conversation?";
+        head.textContent = "Attach today's pick to this conversation?";
+        head.insertBefore(iconSpan("paperclip", true), head.firstChild);
         card.appendChild(head);
         var body = document.createElement("p");
         body.className = "hint";
@@ -6020,7 +6085,8 @@
         card.className = "pin-proposal";
         var head = document.createElement("p");
         head.className = "pin-proposal-head";
-        head.textContent = "✈️ Make this a trip?";
+        head.textContent = "Make this a trip?";
+        head.insertBefore(iconSpan("plane", true), head.firstChild);
         card.appendChild(head);
         var body = document.createElement("p");
         body.className = "hint";
@@ -6105,7 +6171,8 @@
         card.className = "pin-proposal";
         var head = document.createElement("p");
         head.className = "pin-proposal-head";
-        head.textContent = "✈️ Trip created — " + (m.tripProposal.name || m.tripProposal.destination);
+        head.textContent = "Trip created — " + (m.tripProposal.name || m.tripProposal.destination);
+        head.insertBefore(iconSpan("plane", true), head.firstChild);
         card.appendChild(head);
         var row = document.createElement("div");
         row.className = "pin-proposal-actions";
@@ -6487,10 +6554,10 @@
         var man = threadManifests[activeThreadKey] || null;
         if (tripChat) {
           var t = tripById(tripChat.tripId);
-          entries.push({ type: "trip", label: "🧳 " + ((t && t.name) || "Trip"), action: "leaveTrip" });
+          entries.push({ type: "trip", label: ((t && t.name) || "Trip"), icon: "suitcase", action: "leaveTrip" });
         } else if (currentAttach()) {
           var att = currentAttach();
-          entries.push({ type: "pick", label: "◈ Today's pick" + (att.lookName ? " · " + att.lookName : ""), action: "detachPick" });
+          entries.push({ type: "pick", label: "Today's pick" + (att.lookName ? " · " + att.lookName : ""), icon: "sparkle", action: "detachPick" });
         }
         // THE CONTEXT STANDARD (founder-approved, 2026-10-24):
         // one shelf, three durations — this message (@ pointers),
@@ -6504,24 +6571,25 @@
         // @ outfits, shop item — then weather, then facts, then
         // the memory tail. The bar shows the first three.
         (chatRefs.articles || []).forEach(function (r) {
-          entries.push({ type: "ref", refKind: "article", id: r.id, label: "▸ " + r.label + " · this message", action: "removeRef" });
+          entries.push({ type: "ref", refKind: "article", id: r.id, label: r.label + " · this message", icon: "link", action: "removeRef" });
         });
         (chatRefs.outfits || []).forEach(function (r) {
-          entries.push({ type: "ref", refKind: "outfit", id: r.id, label: "◈ " + r.label + " · this message", action: "removeRef" });
+          entries.push({ type: "ref", refKind: "outfit", id: r.id, label: r.label + " · this message", icon: "link", action: "removeRef" });
         });
         var shopAtt = currentShopAttach();
         if (shopAtt && !tripChat) {
-          entries.push({ type: "shop", label: "🛍 " + shopAtt.name, action: "detachShop" });
+          entries.push({ type: "shop", label: shopAtt.name, icon: "bag", action: "detachShop" });
         }
         var wx = (man && man.weather) || (typeof weatherUiState !== "undefined" && weatherUiState.summary);
         if (wx) entries.push({ type: "weather", label: wx });
         else if (!tripChat && !(typeof weatherUiState !== "undefined" && weatherUiState.denied)) {
-          entries.push({ type: "setloc", label: "📍 Set location", action: "setLocation" });
+          entries.push({ type: "setloc", label: "Set location", icon: "pin", action: "setLocation" });
         }
         scopedPinsForLine().forEach(function (p) {
           entries.push({
             type: "pin", id: p.id, kind: p.kind,
-            label: (p.kind === "location" ? "📍 " : "") + p.label + (p.validUntil ? " · until " + p.validUntil.slice(5) : ""),
+            label: p.label + (p.validUntil ? " · until " + p.validUntil.slice(5) : ""),
+            icon: p.kind === "location" ? "pin" : null,
             action: "removePin"
           });
         });
@@ -6548,7 +6616,7 @@
         el.appendChild(txt);
         var chev = document.createElement("span");
         chev.className = "cl-chev";
-        chev.textContent = "›";
+        chev.innerHTML = ICONS.chevRight;
         el.appendChild(chev);
         el.hidden = false;
         var hintEl = document.getElementById("chatContextHint");
@@ -6568,6 +6636,7 @@
         var label = document.createElement("span");
         label.className = "context-row-label";
         label.textContent = e.label;
+        if (e.icon) label.insertBefore(iconSpan(e.icon, true), label.firstChild);
         row.appendChild(label);
         if (e.action === "detachPick") {
           row.appendChild(sheetActionBtn("Remove", function () {
@@ -6760,7 +6829,8 @@
           mrow.style.opacity = "0.55";
           var ml = document.createElement("span");
           ml.className = "context-row-label";
-          ml.textContent = (p.kind === "location" ? "📍 " : "") + p.label + " · not in this chat";
+          ml.textContent = p.label + " · not in this chat";
+          if (p.kind === "location") ml.insertBefore(iconSpan("pin", true), ml.firstChild);
           mrow.appendChild(ml);
           mrow.appendChild(sheetActionBtn("Add back", function () {
             unmutePinForThread(id);
@@ -6779,7 +6849,8 @@
           addRow.className = "context-row";
           var al = document.createElement("span");
           al.className = "context-row-label";
-          al.textContent = "◈ Today's pick — not attached";
+          al.textContent = "Today's pick — not attached";
+          al.insertBefore(iconSpan("sparkle", true), al.firstChild);
           addRow.appendChild(al);
           addRow.appendChild(sheetActionBtn("Attach", function () {
             if (attachTodayPick()) { renderContextLine(); openContextSheet(); }
@@ -6857,10 +6928,11 @@
         all.forEach(function (r) {
           var chip = document.createElement("span");
           chip.className = "chat-ref-chip";
-          chip.textContent = (r.kind === "article" ? "▸ " : "◈ ") + r.label + " ";
+          chip.textContent = r.label + " ";
+          chip.insertBefore(iconSpan(r.kind === "article" ? "tag" : "layers", true), chip.firstChild);
           var x = document.createElement("button");
           x.type = "button";
-          x.textContent = "×";
+          x.innerHTML = ICONS.close;
           x.setAttribute("aria-label", "Remove reference to " + r.label);
           x.addEventListener("click", function () {
             chatRefs.articles = chatRefs.articles.filter(function (a) { return a.id !== r.id; });
@@ -6900,7 +6972,7 @@
           cell.appendChild(img);
           var x = document.createElement("button");
           x.type = "button";
-          x.textContent = "×";
+          x.innerHTML = ICONS.close;
           x.setAttribute("aria-label", "Remove reference photo " + (idx + 1));
           x.addEventListener("click", function () {
             chatRefPhotos.splice(idx, 1);
@@ -7003,7 +7075,8 @@
             var b = document.createElement("button");
             b.type = "button";
             b.className = "chat-ref-opt";
-            b.textContent = (c.kind === "article" ? "▸ " : "◈ ") + c.label;
+            b.textContent = c.label;
+            b.insertBefore(iconSpan(c.kind === "article" ? "tag" : "layers", true), b.firstChild);
             b.addEventListener("click", function () { pickRef(c); });
             refPickerEl.appendChild(b);
           });
@@ -7346,7 +7419,8 @@
           more.type = "button";
           more.className = "secondary";
           more.style.marginTop = "10px";
-          more.textContent = "↻ Show another option";
+          more.textContent = "Show another option";
+          more.insertBefore(iconSpan("refresh", true), more.firstChild);
           more.addEventListener("click", composerPick);
           res.appendChild(more);
         }
@@ -7643,7 +7717,8 @@
         var el = document.getElementById("tripResolved");
         var dest = document.getElementById("tripDest").value.trim();
         if (tripGeo && tripGeoFor === dest) {
-          el.textContent = "📍 " + tripGeo.name;
+          el.textContent = tripGeo.name;
+          el.insertBefore(iconSpan("pin", true), el.firstChild);
           el.hidden = false;
         } else {
           el.hidden = true;
@@ -7831,10 +7906,11 @@
         var ws = tripWeatherState(trip);
         if (leg.lat != null && leg.lng != null) {
           wEl.hidden = false;
-          if (weatherRefreshing) { wEl.textContent = "🌦 Checking…"; wEl.disabled = true; }
-          else if (ws.summary && ws.forecastAvailable) { wEl.textContent = "🌦 " + ws.summary + " · ↻"; wEl.disabled = false; }
-          else if (ws.summary) { wEl.textContent = "🌦 Typical weather · tap to check forecast"; wEl.disabled = false; }
-          else { wEl.textContent = "🌦 Check forecast"; wEl.disabled = false; }
+          if (weatherRefreshing) { wEl.textContent = "Checking…"; wEl.disabled = true; }
+          else if (ws.summary && ws.forecastAvailable) { wEl.textContent = ws.summary; wEl.disabled = false; }
+          else if (ws.summary) { wEl.textContent = "Typical weather · tap to check forecast"; wEl.disabled = false; }
+          else { wEl.textContent = "Check forecast"; wEl.disabled = false; }
+          setIcon(wEl, "rain");
           maybeAutoRecheckWeather(trip, ws);
         } else wEl.hidden = true;
         // Sprint 16: with a plan in place, iteration is conversational —
@@ -8684,7 +8760,7 @@
         var t = document.createElement("p"); t.className = "tt"; t.textContent = title;
         var s = document.createElement("p"); s.className = "ts"; s.textContent = sub;
         txt.appendChild(t); txt.appendChild(s);
-        var chev = document.createElement("span"); chev.className = "chev"; chev.textContent = "›";
+        var chev = document.createElement("span"); chev.className = "chev"; chev.innerHTML = ICONS.chevRight;
         b.appendChild(txt); b.appendChild(chev);
         b.addEventListener("click", onClick);
         return b;
@@ -9016,7 +9092,7 @@
         });
       }
       // Fix buffer 4: Today leads the stylist sheet when the experiment
-      // is on — the ✦ Stylist pill is the persistent door back to Today
+      // is on — the Stylist pill is the persistent door back to Today
       // (the topline wordmark alone failed the founder's first real use:
       // it reads as a title and scrolls away).
       function renderChatTodayStrip() {
@@ -11088,7 +11164,7 @@
           }).catch(function () { /* critique is optional; stay quiet */ });
 
         var favBtn = document.getElementById("outfitFavBtn");
-        favBtn.textContent = o.favorite ? "★ Favorited" : "☆ Favorite";
+        favBtn.innerHTML = (o.favorite ? ICONS.starFilled : ICONS.star).replace('class="ic"', 'class="ic-sm"') + (o.favorite ? " Favorited" : " Favorite");
         favBtn.onclick = function () {
           db.collection("users").doc(currentUser.uid).collection("outfits").doc(o.id)
             .update({ favorite: !o.favorite })
@@ -11171,7 +11247,8 @@
           var pill = document.createElement("span");
           var dup = counts[c] > 1 && c !== "Accessories";
           pill.className = "slot-pill" + (dup ? " warn" : "");
-          pill.textContent = c + " " + counts[c] + (dup ? " ⚠" : "");
+          pill.textContent = c + " " + counts[c];
+          if (dup) pill.appendChild(iconSpan("warning", true));
           el.appendChild(pill);
         });
         el.hidden = false;
@@ -12261,7 +12338,11 @@
           card.appendChild(el("span", "shop-status " + (c.status || "considering"), STATUS_LABELS[c.status] || "Considering"));
           // PC-31: a tagged check names its trip right on the card.
           var cardTrip = c.tripId ? tripById(c.tripId) : null;
-          if (cardTrip) card.appendChild(el("p", "shop-card-trip", "✈ For the " + (cardTrip.name || "Trip") + " trip"));
+          if (cardTrip) {
+            var tripLine = el("p", "shop-card-trip", "For the " + (cardTrip.name || "Trip") + " trip");
+            tripLine.insertBefore(iconSpan("plane", true), tripLine.firstChild);
+            card.appendChild(tripLine);
+          }
           function open() { openShopCheckDetail(c.id); }
           card.addEventListener("click", open);
           card.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } });
@@ -12348,7 +12429,8 @@
           if (v) {
             var a = document.createElement("a");
             a.href = v; a.target = "_blank"; a.rel = "noopener";
-            a.textContent = "Open link ↗";
+            a.textContent = "Open link ";
+            a.appendChild(iconSpan("external", true));
             linkRow.appendChild(a);
           }
         }
@@ -12528,7 +12610,8 @@
             wrap.appendChild(div);
             // Per-message delete: tap the × on a message to remove it
             // (and its pair, so Q&A stays matched).
-            var delBtn = shopCheckEl("button", "shop-followup-del", "×");
+            var delBtn = shopCheckEl("button", "shop-followup-del", null);
+            delBtn.innerHTML = ICONS.close;
             delBtn.type = "button";
             delBtn.setAttribute("aria-label", "Delete this message");
             delBtn.addEventListener("click", function () {
@@ -13137,7 +13220,7 @@
               var del = document.createElement("button");
               del.type = "button";
               del.className = "wear-del";
-              del.textContent = "×";
+              del.innerHTML = ICONS.close;
               del.setAttribute("aria-label", "Delete this wear entry");
               del.addEventListener("click", function () {
                 if (!confirm("Delete this wear entry?")) return;
