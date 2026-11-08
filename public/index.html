@@ -769,7 +769,7 @@
     @keyframes shimmer { to { background-position-x: -220%; } }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
 
-    .toast { position: fixed; left: 50%; bottom: max(22px, env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(18px); width: min(calc(100vw - 32px), 520px); background: var(--black); color: var(--on-black); padding: 13px 16px; border-radius: var(--r-sm); box-shadow: var(--shadow); opacity: 0; pointer-events: none; transition: opacity .2s ease, transform .2s ease; z-index: 30; font-size: 14px; }
+    .toast { position: fixed; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(18px); width: min(calc(100vw - 32px), 520px); background: var(--black); color: var(--on-black); padding: 13px 16px; border-radius: var(--r-sm); box-shadow: var(--shadow); opacity: 0; pointer-events: none; transition: opacity .2s ease, transform .2s ease; z-index: 30; font-size: 14px; }
     .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
     .overlay { position: fixed; inset: 0; z-index: 20; background: rgba(12, 14, 12, 0); transition: background-color 260ms ease; display: grid; place-items: center; padding: 18px; }
