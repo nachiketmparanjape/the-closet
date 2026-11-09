@@ -70,19 +70,36 @@ function founderToken() {
   }
 
   const tok = await founderToken();
+  // 2026-11-09 fix: the old code listed the first 100 error_events and
+  // searched them client-side. Firestore's list returns documents in
+  // ID order, not by time — once the collection passed 100 docs (568
+  // by Nov 9), the newest event stopped appearing in that page and the
+  // probe failed forever. Query by the probe uid instead (single-field
+  // filter, no composite index needed); the probe account has very few
+  // events, so the page always contains all of them. Filter key/kind/ts
+  // client-side as before.
   for (let attempt = 0; attempt < 6; attempt++) {
-    const list = await fetch("https://firestore.googleapis.com/v1/projects/closet-404e9/databases/(default)/documents/error_events?pageSize=100", {
-      headers: { Authorization: "Bearer " + tok },
+    const q = await fetch("https://firestore.googleapis.com/v1/projects/closet-404e9/databases/(default)/documents:runQuery", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + tok, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: "error_events" }],
+          where: { fieldFilter: { field: { fieldPath: "uid" }, op: "EQUAL", value: { stringValue: uid } } },
+          limit: 100,
+        },
+      }),
     }).then((r) => r.json());
-    const hit = (list.documents || []).find((d) => {
+    const hit = (q || []).find((r) => {
+      const d = r.document;
+      if (!d) return false;
       const f = d.fields || {};
-      return (f.uid || {}).stringValue === uid &&
-        (f.key || {}).stringValue === "EMPTY_WARDROBE" &&
+      return (f.key || {}).stringValue === "EMPTY_WARDROBE" &&
         (f.kind || {}).stringValue === "failure" &&
         (f.ts || {}).timestampValue >= before;
     });
     if (hit) {
-      console.log("HEARTBEAT PASS — probe event in error_events with key EMPTY_WARDROBE at", (hit.fields.ts || {}).timestampValue);
+      console.log("HEARTBEAT PASS — probe event in error_events with key EMPTY_WARDROBE at", (hit.document.fields.ts || {}).timestampValue);
       process.exit(0);
     }
     await new Promise((r) => setTimeout(r, 3000));
