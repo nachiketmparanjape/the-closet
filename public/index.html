@@ -433,12 +433,31 @@
     .chat-msg-photocount { font-size: 12.5px; opacity: .75; margin-bottom: 4px; }
     .chat-ref-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 4px 6px 4px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--ink); border: 1px solid var(--line); }
     .chat-ref-chip button { border: none; background: transparent; color: var(--muted); cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px; }
-    .chat-ref-picker { position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); max-height: 220px; overflow-y: auto; background: var(--paper); border: 1px solid var(--line-strong); border-radius: var(--r-sm); box-shadow: 0 8px 24px rgba(0,0,0,.18); z-index: 30; }
-    .chat-ref-picker .picker-sec { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 8px 12px 2px; }
     .chat-msg-refs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
     .chat-ref-chip.static { cursor: default; }
-    .chat-ref-opt { display: block; width: 100%; text-align: left; border: none; background: transparent; color: var(--ink); padding: 8px 12px; font-size: 14px; cursor: pointer; }
-    .chat-ref-opt:hover, .chat-ref-opt.active { background: var(--accent-soft); }
+    /* Sprint 30 (#141): consolidated "Add to chat" sheet — one picker
+       for wardrobe items + outfits, reached from + and from @. */
+    .chat-ref-chip img { width: 22px; height: 22px; object-fit: cover; border-radius: 50%; display: block; }
+    .attach-search { width: 100%; min-height: 44px; border: 1px solid var(--line-strong); border-radius: var(--r-sm); background: var(--paper); color: var(--ink); padding: 10px 12px; outline: none; font-size: 15px; }
+    .attach-search:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+    .attach-cats { display: flex; gap: 6px; overflow-x: auto; padding: 10px 0 4px; scrollbar-width: none; }
+    .attach-cats::-webkit-scrollbar { display: none; }
+    .attach-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 8px 0; }
+    .attach-cell { position: relative; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; background: var(--paper-soft); cursor: pointer; padding: 0; text-align: left; color: var(--ink); }
+    .attach-cell img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; background: var(--paper-soft); }
+    .attach-cell .attach-name { display: block; font-size: 12px; line-height: 1.3; padding: 6px 8px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .attach-cell .attach-cat { display: block; font-size: 11px; color: var(--muted); padding: 0 8px 7px; }
+    .attach-cell.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+    .attach-cell .attach-check { position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: #fff; display: none; place-items: center; font-size: 14px; line-height: 1; }
+    .attach-cell.selected .attach-check { display: grid; }
+    .attach-sec { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 14px 0 2px; }
+    .attach-outfit { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--paper); color: var(--ink); padding: 10px 12px; font-size: 14px; cursor: pointer; margin-top: 6px; }
+    .attach-outfit.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+    .attach-foot { display: flex; gap: 8px; padding: 12px 0 4px; position: sticky; bottom: 0; background: var(--paper); }
+    .attach-foot .primary { flex: 1; }
+    .attach-empty { color: var(--muted); font-size: 14px; text-align: center; padding: 24px 0; }
+    .style-around-row { margin: 10px 0 2px; }
+    .style-around-row .primary { width: 100%; }
     .chat-input-row input { flex: 1; min-width: 0; min-height: 46px; border: 1px solid var(--line-strong); border-radius: var(--r-sm); background: var(--paper); color: var(--ink); padding: 10px 12px; outline: none; }
     .chat-input-row input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
     .pal-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 8px; min-height: 30px; }
@@ -1566,13 +1585,35 @@
         <form class="chat-input-row" id="chatForm" style="position:relative;">
           <div id="chatPhotoChips" class="chat-photo-chips" hidden></div>
           <div id="chatRefChips" class="chat-ref-chips" hidden></div>
-          <div id="chatRefPicker" class="chat-ref-picker" hidden></div>
+          <button class="icon-button" id="chatAddRefBtn" type="button" aria-label="Add a piece or outfit to the chat" title="Add a piece or outfit"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
           <button class="icon-button" id="chatAttachBtn" type="button" aria-label="Attach reference photos" title="Attach reference photos"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
           <input id="chatInput" type="text" maxlength="500" placeholder="e.g. casual dinner, 60°F — @ to reference a piece or outfit" autocomplete="off" aria-label="Ask the stylist" />
           <button class="primary" id="chatSend" type="submit">Send</button>
         </form>
         <input type="file" id="chatPhotoInput" accept="image/*" multiple hidden />
         <input type="file" id="chatPhotoCameraInput" accept="image/*" capture="environment" hidden />
+      </div>
+    </section>
+  </div>
+
+  <!-- Sprint 30 (#141): consolidated "Add to chat" sheet — one picker
+       for wardrobe items + outfits, reached from + and from @. -->
+  <div class="overlay sheet-overlay" id="chatAttachSheet" hidden role="dialog" aria-modal="true" aria-labelledby="chatAttachTitle">
+    <section class="sheet">
+      <div class="sheet-head">
+        <h2 class="sheet-title" id="chatAttachTitle">Add to chat</h2>
+        <button class="icon-button" id="chatAttachClose" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+      <div class="sheet-body">
+        <input class="attach-search" id="chatAttachSearch" type="text" placeholder="Search your wardrobe…" autocomplete="off" aria-label="Search your wardrobe" />
+        <div class="attach-cats" id="chatAttachCats" role="group" aria-label="Filter by category"></div>
+        <div id="chatAttachGrid" class="attach-grid"></div>
+        <div class="attach-sec" id="chatAttachOutfitSec" hidden>Outfits</div>
+        <div id="chatAttachOutfits"></div>
+        <p class="attach-empty" id="chatAttachEmpty" hidden>No pieces match — try another search.</p>
+        <div class="attach-foot">
+          <button class="primary" id="chatAttachDone" type="button">Add to chat</button>
+        </div>
       </div>
     </section>
   </div>
@@ -1626,6 +1667,10 @@
           <button class="secondary" id="setCoverBtn" type="button">Set as cover</button>
           <input id="addPhotoInput" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden />
           <input id="addPhotoInputCamera" type="file" accept="image/*" capture="environment" hidden />
+        </div>
+        <!-- Sprint 30 (#141): card → chat — open the stylist with this piece attached. -->
+        <div class="style-around-row">
+          <button class="primary" id="itemStyleBtn" type="button">Style around this →</button>
         </div>
         <!-- PC-58: Stage 3 standardization actions -->
         <div class="std-actions" id="stdActions" hidden>
@@ -4193,6 +4238,17 @@
       }
 
       document.getElementById("itemClose").addEventListener("click", closeItem);
+
+      // Sprint 30 (#141): card → chat — open the stylist with this
+      // piece already attached as a chip. One tap, context loaded.
+      document.getElementById("itemStyleBtn").addEventListener("click", function () {
+        if (!activeItem) return;
+        var r = { kind: "article", id: activeItem.id, label: activeItem.shortName || activeItem.name || "Unnamed" };
+        if (!chatRefs.articles.some(function (a) { return a.id === r.id; })) chatRefs.articles.push(r);
+        renderRefChips();
+        closeItem();
+        openChat();
+      });
 
       itemSave.addEventListener("click", function () {
         if (!activeItem || !currentUser) return;
@@ -6913,13 +6969,13 @@
           });
       }
 
-      // PC-22: @-mention references. Typing "@" in the chat input opens a
-      // picker of articles + saved outfits; selections become chips carried
+      // PC-22: @-mention references — selections become chips carried
       // as structured ids in the payload (never parsed from text).
+      // Sprint 30 (#141): the inline text dropdown is gone. @ and the
+      // + button open ONE sheet (openAttachSheet below) — search +
+      // photo grid + category filters + outfits, multi-select, Done.
       var chatRefs = { articles: [], outfits: [] };
-      var refPickerEl = document.getElementById("chatRefPicker");
       var refChipsEl = document.getElementById("chatRefChips");
-      var refQuery = null;
 
       function renderRefChips() {
         refChipsEl.textContent = "";
@@ -6928,8 +6984,23 @@
         all.forEach(function (r) {
           var chip = document.createElement("span");
           chip.className = "chat-ref-chip";
-          chip.textContent = r.label + " ";
-          chip.insertBefore(iconSpan(r.kind === "article" ? "tag" : "layers", true), chip.firstChild);
+          if (r.kind === "article") {
+            // Sprint 30 (#141): chips carry a photo thumbnail, looked
+            // up from allItems — a chip you can see is a chip you trust.
+            var it = null;
+            for (var i = 0; i < allItems.length; i++) { if (allItems[i].id === r.id) { it = allItems[i]; break; } }
+            if (it) {
+              var thumb = document.createElement("img");
+              showDisplayPhoto(thumb, it, "clean");
+              thumb.alt = "";
+              chip.appendChild(thumb);
+            } else {
+              chip.insertBefore(iconSpan("tag", true), chip.firstChild);
+            }
+          } else {
+            chip.insertBefore(iconSpan("layers", true), chip.firstChild);
+          }
+          chip.appendChild(document.createTextNode(r.label + " "));
           var x = document.createElement("button");
           x.type = "button";
           x.innerHTML = ICONS.close;
@@ -7044,83 +7115,152 @@
         addRefPhotoFiles(files);
       });
 
-      function refCandidates(q) {
-        q = (q || "").toLowerCase();
-        var arts = allItems
-          .filter(function (it) { return !q || String(it.name || "").toLowerCase().indexOf(q) !== -1; })
-          .slice(0, 6)
-          .map(function (it) { return { kind: "article", id: it.id, label: it.name || "Unnamed" }; });
+      // Sprint 30 (#141): the consolidated attach sheet. ONE picker,
+      // one selection model — opened from + (empty search) or from @
+      // (query pre-filled). @ is a shortcut into the same sheet, not
+      // a second picker; the old inline dropdown is deleted.
+      var attachSheetEl = document.getElementById("chatAttachSheet");
+      var attachSearchEl = document.getElementById("chatAttachSearch");
+      var attachCatsEl = document.getElementById("chatAttachCats");
+      var attachGridEl = document.getElementById("chatAttachGrid");
+      var attachOutfitsEl = document.getElementById("chatAttachOutfits");
+      var attachOutfitSecEl = document.getElementById("chatAttachOutfitSec");
+      var attachEmptyEl = document.getElementById("chatAttachEmpty");
+      var attachDoneEl = document.getElementById("chatAttachDone");
+      var attachSel = { articles: [], outfits: [] }; // sheet-local selection
+      var attachCat = "All";
+      var attachFromAt = false;
+
+      function attachIsSelected(kind, id) {
+        var list = kind === "article" ? attachSel.articles : attachSel.outfits;
+        for (var i = 0; i < list.length; i++) { if (list[i].id === id) return true; }
+        return false;
+      }
+      function attachToggle(kind, id, label) {
+        var list = kind === "article" ? attachSel.articles : attachSel.outfits;
+        var idx = -1;
+        for (var i = 0; i < list.length; i++) { if (list[i].id === id) { idx = i; break; } }
+        if (idx !== -1) list.splice(idx, 1);
+        else list.push({ kind: kind, id: id, label: label });
+        renderAttachSheet();
+      }
+
+      function renderAttachSheet() {
+        var q = (attachSearchEl.value || "").toLowerCase();
+        // Category chips: All + every category actually in the wardrobe.
+        var cats = ["All"];
+        allItems.forEach(function (it) {
+          var c = it.category || "Other";
+          if (cats.indexOf(c) === -1) cats.push(c);
+        });
+        attachCatsEl.textContent = "";
+        cats.forEach(function (c) {
+          var b = document.createElement("button");
+          b.type = "button";
+          b.className = "view-chip" + (attachCat === c ? " is-active" : "");
+          b.textContent = c;
+          b.addEventListener("click", function () { attachCat = c; renderAttachSheet(); });
+          attachCatsEl.appendChild(b);
+        });
+        // Photo grid: name match + category. No cap — scroll, don't hide.
+        var arts = allItems.filter(function (it) {
+          if (attachCat !== "All" && (it.category || "Other") !== attachCat) return false;
+          return !q || String(it.name || "").toLowerCase().indexOf(q) !== -1;
+        });
+        attachGridEl.textContent = "";
+        arts.forEach(function (it) {
+          var cell = document.createElement("button");
+          cell.type = "button";
+          cell.className = "attach-cell" + (attachIsSelected("article", it.id) ? " selected" : "");
+          var img = document.createElement("img");
+          showDisplayPhoto(img, it, "clean");
+          img.alt = it.name || "Wardrobe item";
+          cell.appendChild(img);
+          var check = document.createElement("span");
+          check.className = "attach-check";
+          check.textContent = "✓";
+          cell.appendChild(check);
+          var nm = document.createElement("span");
+          nm.className = "attach-name";
+          nm.textContent = it.name || "Unnamed";
+          cell.appendChild(nm);
+          var ct = document.createElement("span");
+          ct.className = "attach-cat";
+          ct.textContent = it.category || "Other";
+          cell.appendChild(ct);
+          cell.addEventListener("click", function () { attachToggle("article", it.id, it.name || "Unnamed"); });
+          attachGridEl.appendChild(cell);
+        });
+        // Saved outfits, same sheet, same selection model.
         var outs = (typeof latestOutfits === "function" ? latestOutfits() : [])
-          .filter(function (o) { return !q || String(o.name || "").toLowerCase().indexOf(q) !== -1; })
-          .slice(0, 4)
-          .map(function (o) { return { kind: "outfit", id: (o.versionGroup || o.id), label: o.name || "Outfit" }; });
-        return { articles: arts, outfits: outs };
+          .filter(function (o) { return !q || String(o.name || "").toLowerCase().indexOf(q) !== -1; });
+        attachOutfitsEl.textContent = "";
+        attachOutfitSecEl.hidden = !outs.length;
+        outs.forEach(function (o) {
+          var id = o.versionGroup || o.id;
+          var b = document.createElement("button");
+          b.type = "button";
+          b.className = "attach-outfit" + (attachIsSelected("outfit", id) ? " selected" : "");
+          b.insertBefore(iconSpan("layers", true), b.firstChild);
+          b.appendChild(document.createTextNode(o.name || "Outfit"));
+          b.addEventListener("click", function () { attachToggle("outfit", id, o.name || "Outfit"); });
+          attachOutfitsEl.appendChild(b);
+        });
+        // Empty state: nothing in the wardrobe at all, vs. nothing matching.
+        var anyItems = allItems.length || outs.length || (typeof latestOutfits === "function" ? latestOutfits().length : 0);
+        attachEmptyEl.hidden = !!(arts.length || outs.length);
+        attachEmptyEl.textContent = anyItems
+          ? "No pieces match — try another search."
+          : "No pieces yet — add one first.";
+        var n = attachSel.articles.length + attachSel.outfits.length;
+        attachDoneEl.textContent = n ? "Add " + n + " to chat" : "Add to chat";
       }
 
-      function renderRefPicker() {
-        refPickerEl.textContent = "";
-        if (refQuery === null) { refPickerEl.hidden = true; return; }
-        var cands = refCandidates(refQuery);
-        if (!cands.articles.length && !cands.outfits.length) {
-          refPickerEl.hidden = true;
-          return;
-        }
-        function addSection(title, list) {
-          if (!list.length) return;
-          var sec = document.createElement("div");
-          sec.className = "picker-sec";
-          sec.textContent = title;
-          refPickerEl.appendChild(sec);
-          list.forEach(function (c) {
-            var b = document.createElement("button");
-            b.type = "button";
-            b.className = "chat-ref-opt";
-            b.textContent = c.label;
-            b.insertBefore(iconSpan(c.kind === "article" ? "tag" : "layers", true), b.firstChild);
-            b.addEventListener("click", function () { pickRef(c); });
-            refPickerEl.appendChild(b);
-          });
-        }
-        addSection("Pieces", cands.articles);
-        addSection("Outfits", cands.outfits);
-        refPickerEl.hidden = false;
+      function openAttachSheet(initialQuery, fromAt) {
+        attachSel = { articles: [], outfits: [] };
+        attachCat = "All";
+        attachFromAt = !!fromAt;
+        attachSearchEl.value = initialQuery || "";
+        renderAttachSheet();
+        openOverlay(attachSheetEl);
+        window.setTimeout(function () { attachSearchEl.focus(); }, 80);
       }
+      function closeAttachSheet() { closeOverlay(attachSheetEl); }
 
-      function pickRef(c) {
-        var list = c.kind === "article" ? chatRefs.articles : chatRefs.outfits;
-        if (!list.some(function (r) { return r.id === c.id; })) list.push(c);
-        // Remove the "@query" token from the input text.
-        var v = chatInput.value;
-        var at = v.lastIndexOf("@");
-        if (at !== -1) chatInput.value = (v.slice(0, at) + v.slice(at).replace(/^@[^\s]*/, "")).replace(/\s+$/, " ");
-        refQuery = null;
-        renderRefPicker();
+      attachDoneEl.addEventListener("click", function () {
+        attachSel.articles.forEach(function (r) {
+          if (!chatRefs.articles.some(function (a) { return a.id === r.id; })) chatRefs.articles.push(r);
+        });
+        attachSel.outfits.forEach(function (r) {
+          if (!chatRefs.outfits.some(function (a) { return a.id === r.id; })) chatRefs.outfits.push(r);
+        });
+        // If opened from @, remove the "@query" token from the input.
+        if (attachFromAt) {
+          var v = chatInput.value;
+          var at = v.lastIndexOf("@");
+          if (at !== -1) chatInput.value = (v.slice(0, at) + v.slice(at).replace(/^@[^\s]*/, "")).replace(/\s+$/, " ");
+        }
+        closeAttachSheet();
         renderRefChips();
         chatInput.focus();
-      }
+      });
+      document.getElementById("chatAttachClose").addEventListener("click", closeAttachSheet);
+      attachSheetEl.addEventListener("click", function (event) {
+        if (event.target === attachSheetEl) closeAttachSheet();
+      });
+      attachSearchEl.addEventListener("input", renderAttachSheet);
+      document.getElementById("chatAddRefBtn").addEventListener("click", function () {
+        openAttachSheet("", false);
+      });
 
       chatInput.addEventListener("input", function () {
         var v = chatInput.value;
         var at = v.lastIndexOf("@");
         // Trigger on "@" at start or after whitespace, with no space after it.
+        // Opens the SAME sheet as + — @ is a shortcut, not a second picker.
+        // Focus moves to the sheet's search, so this fires once per @-type.
         if (at !== -1 && (at === 0 || /\s/.test(v[at - 1])) && !/[\s]/.test(v.slice(at + 1))) {
-          refQuery = v.slice(at + 1);
-          renderRefPicker();
-        } else {
-          refQuery = null;
-          renderRefPicker();
-        }
-      });
-      chatInput.addEventListener("keydown", function (e) {
-        if (e.key === "Escape" && refQuery !== null) {
-          refQuery = null;
-          renderRefPicker();
-        }
-      });
-      document.addEventListener("click", function (e) {
-        if (refQuery !== null && !refPickerEl.contains(e.target) && e.target !== chatInput) {
-          refQuery = null;
-          renderRefPicker();
+          openAttachSheet(v.slice(at + 1), true);
         }
       });
 
