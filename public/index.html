@@ -7277,12 +7277,6 @@
         if (!text && !sentPhotos.length) return;
         if (!functions) { showToast("The stylist isn't ready yet — reload and try again."); return; }
         chatInput.value = "";
-        // WX-1: measured local weather rides along as context (cached 30
-        // min; null when location is denied/unavailable — server ignores it).
-        // Sprint 16 fix: in trip mode the default weather is the TRIP's
-        // (already in tripContext) — never the user's current position,
-        // and never a geolocation prompt.
-        var weatherContext = tripChat ? null : await getWeatherSummary();
         // PC-22: keep the referenced labels on the message so the thread
         // shows what was pointed at (the chips above the input clear on send).
         var refLabels = chatRefs.articles.concat(chatRefs.outfits).map(function (r) {
@@ -7329,6 +7323,17 @@
           };
           if (!previousPick) previousPick = { itemIds: attachSnap.itemIds.slice() };
         }
+        // Sprint 30 fix (2026-11-14): the weather lookup used to be
+        // awaited BEFORE the message rendered — a slow geolocation fix
+        // (up to 10s) left the user staring at an empty input with
+        // nothing sent. Weather is payload context only; it is fetched
+        // after the optimistic render, never before it.
+        // WX-1: measured local weather rides along as context (cached 30
+        // min; null when location is denied/unavailable — server ignores it).
+        // Sprint 16 fix: in trip mode the default weather is the TRIP's
+        // (already in tripContext) — never the user's current position,
+        // and never a geolocation prompt.
+        var weatherContext = tripChat ? null : await getWeatherSummary();
         var payload = {
           items: stylistItems(),
           // UX-18 W4/W5: the thread may hold the whole transcript;

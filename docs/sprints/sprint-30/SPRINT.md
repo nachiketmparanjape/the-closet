@@ -23,3 +23,14 @@ Acceptance criteria (from #141):
 4. "Style around this" opens chat with the item attached.
 5. Plain-name mention without @ still works.
 6. Phone-verified by the founder — PENDING. Deployed hosting release 1794719967125000 (2026-11-15 05:19 UTC); client syntax OK; tests 481 passing (471 + 10 cutout-check).
+
+## Follow-up fix (same evening, founder-reported)
+
+Send latency: the founder's messages sat invisible for several
+seconds after Send (both eventually appeared). Root cause: sendChat
+awaited getWeatherSummary() (geolocation, up to 10s) BEFORE pushing
++ rendering the message. Fix: weather await moved to just before the
+payload build — the message renders immediately, weather rides along
+in the background. Regression tests in tests/sprint30-send.test.js
+(render must precede the weather await). Deployed with the #141
+release; phone verification still pending.
