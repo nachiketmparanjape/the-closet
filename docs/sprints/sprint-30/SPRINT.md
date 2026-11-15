@@ -34,3 +34,18 @@ payload build — the message renders immediately, weather rides along
 in the background. Regression tests in tests/sprint30-send.test.js
 (render must precede the weather await). Deployed with the #141
 release; phone verification still pending.
+
+## Follow-up fix 2 (same evening, founder-reported)
+
+Attach card missing on desktop: the reply said "tap the card below"
+but no card rendered, and the desktop had no way to attach the pick.
+Root cause: the pick attach lived only in memory — the phone attach
+never reached the desktop, and the card never came back because its
+stored state was already "accepted". Fix: the attach now rides on the
+thread doc (saveThread/loadThread), a same-day acceptance heals
+itself on load (and again when today's picks land), removing the pick
+from the context sheet persists the detach, and an accepted card
+leaves a plain "Today's pick is attached to this conversation" note
+so the reply text stops dangling. Regression tests in
+tests/sprint30-attach-persist.test.js. Firestore rules already allow
+the field (owner-only chat_threads, no field allowlist).

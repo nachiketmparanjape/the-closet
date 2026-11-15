@@ -5513,6 +5513,12 @@
         return threadRef(key).set({
           messages: serializeMessages(list),
           windowNoted: !!threadWindowNoted[key],
+          // Sprint 30: the pick attach is per-thread state that must
+          // survive a reload and travel across devices — before this
+          // it lived only in memory, so a phone attach vanished on
+          // desktop and the card that would re-attach it never came
+          // back (its stored state was already "accepted").
+          attach: chatAttachByThread[key] || null,
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         }, { merge: true }).catch(function (err) {
           if (typeof reportError === "function") reportError("saveThread", err);
@@ -5536,6 +5542,13 @@
             var d = snap.data() || {};
             msgs = Array.isArray(d.messages) ? d.messages : [];
             noted = !!d.windowNoted;
+            // Sprint 30: restore the pick attach from the thread doc;
+            // heal an attach accepted before the attach was persisted.
+            if (d.attach && d.attach.itemIds && d.attach.itemIds.length) {
+              chatAttachByThread[key] = d.attach;
+            } else {
+              healAcceptedAttach(key, msgs);
+            }
           }
           // Heal: threads saved before the notice guard carry the
           // saved-conversations notice twice — collapse to the
@@ -5998,6 +6011,15 @@
           if (m.attachProposal && m.attachState === "pending" && !currentAttach()) {
             chatList.appendChild(renderAttachProposalCard(m));
           }
+          // Sprint 30: an accepted card is gone (correctly — the pick
+          // is attached) but the reply above still says "tap the card
+          // below". Say so plainly instead of leaving a dangling pointer.
+          if (m.attachProposal && m.attachState === "accepted") {
+            var an = document.createElement("div");
+            an.className = "chat-msg note";
+            an.textContent = "Today's pick is attached to this conversation.";
+            chatList.appendChild(an);
+          }
           // PC-33: the trip steering card — pending offers the
           // create; created shows the way into the trip. A trip
           // that already matches the destination suppresses the
@@ -6458,6 +6480,35 @@
       // Start fresh re-arms). Same attachments lifecycle.
       var chatTripSteerDismissedByThread = {};
       function currentAttach() { return chatAttachByThread[activeThreadKey] || null; }
+      // Sprint 30: an attach accepted before the attach was persisted
+      // (or on a device whose memory is gone) leaves a dangling reply
+      // — "tap the card below" with no card — and a thread whose
+      // context never got the pick. If the acceptance is from today,
+      // re-attach today's pick and persist just the attach (a full
+      // saveThread here could overwrite messages mid-load, so the
+      // write touches the attach field only).
+      function healAcceptedAttach(key, msgs) {
+        if (chatAttachByThread[key]) return;
+        var today = localTodayStr();
+        var acceptedToday = (msgs || []).some(function (m) {
+          if (!m || m.attachState !== "accepted" || !m.at) return false;
+          var dt = new Date(m.at);
+          function p(n) { return (n < 10 ? "0" : "") + n; }
+          return dt.getFullYear() + "-" + p(dt.getMonth() + 1) + "-" + p(dt.getDate()) === today;
+        });
+        if (!acceptedToday) return;
+        var o = todayPickReady();
+        if (!o) return;
+        chatAttachByThread[key] = {
+          itemIds: o.itemIds.slice(),
+          lookName: o.lookName || null,
+          reasoning: o.reasoning || o.tagline || null
+        };
+        if (currentUser && typeof db !== "undefined" && db) {
+          threadRef(key).set({ attach: chatAttachByThread[key] }, { merge: true }).catch(function () {});
+        }
+        renderContextLine();
+      }
       function todayPickReady() {
         if (typeof todayHomeOn !== "function" || !todayHomeOn()) return null;
         restoreToday();
@@ -6697,6 +6748,7 @@
         if (e.action === "detachPick") {
           row.appendChild(sheetActionBtn("Remove", function () {
             detachTodayPick();
+            saveThread(activeThreadKey); // Sprint 30: persist the detach too
             renderContextLine();
             openContextSheet();
           }));
@@ -8787,6 +8839,9 @@
               todayState.waitingSince = 0;
               maybeRenderToday();
               renderChatTodayStrip();
+              // Sprint 30: picks may land after the thread loaded —
+              // retry the accepted-attach heal now that a pick exists.
+              healAcceptedAttach(activeThreadKey, stylistMessages);
             }
           }, function () {});
       }
