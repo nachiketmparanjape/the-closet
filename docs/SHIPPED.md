@@ -800,3 +800,19 @@ pilot's own kill criteria, and its seed entry's own day-fourteen signal.
 The registry folder is removed; its content stays in git history. The
 Firebase CLI workaround entry lives on where it matters: the deploy
 scripts and the studio operating notes.
+
+## 2026-11-20 — PC-61: link-preview metadata for the live app
+
+The app entry HTML now serves a meta description, the full Open
+Graph set (site_name, title, description, type, url, image with
+dimensions), and Twitter card tags. Copy is PRODUCT.md's one-liner
+("An AI wardrobe stylist: catalogue your clothes, get outfit
+picks."); og:title is the manifest's "Closet — your wardrobe,
+styled"; og:image is the app's own hosted 512 icon. Deployed as
+hosting release 1795197718752000 and verified against the LIVE
+site: the fetched page serves all tags, the og:image resolves
+(200, image/png), a LinkedInBot-UA fetch sees the OG set, and an
+independent link-preview parse (Microlink) returns title,
+description, image, and publisher. Guards in
+tests/pc61-meta.test.js. This unblocks the Career thread's
+LinkedIn retry (Closet Project media + Featured).

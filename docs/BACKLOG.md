@@ -1747,3 +1747,38 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
   upload is a recurring friction.
 - **Status:** Filed 2026-10-24 from the PC-54 split.
   Enters work only via a planning walk.
+
+### PC-61: Link-preview metadata (Open Graph) for the live app (S)
+
+- **Origin:** Founder, 2026-11-20 — filed from the Career thread,
+  founder-directed to start right away (not via a planning walk).
+- **Problem:** LinkedIn could not attach
+  https://closet-404e9.web.app anywhere on the founder's profile
+  (Projects media link, Featured) — LinkedIn must generate a link
+  preview before it saves a link, and it failed repeatedly
+  ("We couldn't generate a preview for this link"), 5+ tries.
+  The app itself loads fine; it is JS-rendered and serves no
+  preview metadata, so crawlers see nothing to build a preview
+  from. The same gap likely breaks previews anywhere the app
+  link is shared.
+- **In scope:** add standard link-preview metadata to the app
+  entry HTML — meta description, og:title, og:description,
+  og:type, og:url, og:image (a stable hosted image), and
+  twitter:card — then deploy through the normal hosting path.
+  Copy for title/description comes from PRODUCT.md's one-liner.
+- **Out of scope:** server-side rendering or prerendering;
+  any share-surface redesign.
+- **Acceptance:** the live HTML at closet-404e9.web.app serves
+  the OG/Twitter tags (verified by fetching the live page, not
+  just local source); a link-preview check for the URL
+  succeeds; the Career thread then attaches the URL on
+  LinkedIn (Closet Project media + Featured) and closes the
+  loop with the founder.
+- **Lane:** platform. **Effort:** S.
+- **Status:** SHIPPED 2026-11-20 (hosting release
+  1795197718752000) and verified against the live site: tags
+  served, og:image resolves, LinkedInBot-UA fetch sees the OG
+  set, independent preview parse (Microlink) succeeds. Guards in
+  tests/pc61-meta.test.js; entry in SHIPPED.md. Remaining: the
+  Career thread retries the LinkedIn attach (Project media +
+  Featured) — that closes the loop.
