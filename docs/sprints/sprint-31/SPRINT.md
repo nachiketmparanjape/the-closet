@@ -1,7 +1,7 @@
 # Sprint 31 — The stylist gets hands (chat thread sprint)
 
-- **Status:** PROPOSED 2026-11-21 — awaiting founder approval of
-  the slate below. Nothing builds until he says go.
+- **Status:** APPROVED by the founder 2026-11-21 ("Approve the
+  Sprint 31 slate — start building"). Building in slate order.
 - **Theme:** the founder's own chat thread (reviewed 2026-11-21).
   He used the stylist as an agent — add this, style with that, I
   wore this — and it could only talk. This sprint gives the chat

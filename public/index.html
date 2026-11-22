@@ -413,6 +413,8 @@
     .add-garment-row.skipped { opacity: 0.45; }
     .add-garment-row .link-button { flex: none; }
     .same-outfit-strip { display: flex; align-items: center; gap: 10px; margin-top: 8px; padding: 8px 12px; background: var(--paper-soft); border: 1px dashed rgba(140, 118, 74, 0.4); border-radius: var(--r-sm); font-size: 13px; }
+    .same-outfit-strip .collapsed-thumbs { display: inline-flex; gap: 4px; flex: none; }
+    .collapsed-thumbs img { width: 28px; height: 28px; object-fit: cover; border-radius: 6px; display: block; }
     .same-outfit-strip span { flex: 1; }
     .wear-row { text-align: center; margin-top: 6px; }
     .pin-chip { display: inline-block; font-size: 13px; font-weight: 500; color: var(--ink); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; margin-left: 8px; vertical-align: middle; white-space: nowrap; }
@@ -854,9 +856,13 @@
     .form-grid { display: grid; gap: 18px; }
     .field label { display: block; margin-bottom: 7px; font-size: 13px; font-weight: 600; }
     .pref-evidence { font-size: 12px; color: var(--muted); margin: 4px 0 8px; }
-    .outfit-card .outfit-thumbs { display: flex; gap: 10px; margin: 8px 0; }
+    .outfit-card .outfit-thumbs { display: flex; gap: 10px; margin: 8px 0; align-items: flex-start; }
     .outfit-card .outfit-thumb { margin: 0; flex: 1 1 0; min-width: 0; }
-    .outfit-card .outfit-thumb img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--r-sm); display: block; }
+    /* PC-70: height:auto is load-bearing — the standalone .outfit-thumbs
+       rule sets height:56px, which silently defeats aspect-ratio and
+       leaves the tiles as squashed 56px-tall strips (and ragged
+       natural-aspect tiles on some engines). */
+    .outfit-card .outfit-thumb img { width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border-radius: var(--r-sm); display: block; }
     .outfit-card .outfit-thumb figcaption { font-size: 11px; color: var(--faint); margin-top: 4px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .score-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; }
     .score-chip { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); }
@@ -5965,6 +5971,18 @@
         // thread — later identical sets render as a strip naming
         // the first card, never as a re-skinned new card.
         var seenOutfitSets = {};
+        // PC-70: only the LATEST full outfit card renders open —
+        // older cards collapse to a one-line strip so a long
+        // thread stays scannable. Precompute the last index that
+        // will render a full card (first occurrence of its set).
+        var seenSetsPre = {};
+        var lastCardIdx = -1;
+        stylistMessages.forEach(function (m, i) {
+          if (m.outfit && m.outfit.itemIds && m.outfit.itemIds.length >= 2) {
+            var pk = outfitSetKey(m.outfit.itemIds);
+            if (!seenSetsPre[pk]) { seenSetsPre[pk] = true; lastCardIdx = i; }
+          }
+        });
         if (!stylistMessages.some(isSavedNotice)) noticeFreshArmed = false;
         stylistMessages.forEach(function (m, midx) {
           // UX-18 W4/W5: system rows (return divider, saved/window
@@ -6069,10 +6087,30 @@
               chatList.appendChild(renderSameOutfitStrip(m, firstWithSet));
             } else {
               if (!firstWithSet) seenOutfitSets[setKey] = m.outfit;
-              // PC-68: thread cards carry the Wore-it affordance
-              // (a shallow copy — the outfit object stays shared,
-              // so save/worn state lands on the real message).
-              chatList.appendChild(renderOutfitCard(Object.assign({}, m, { wearLoggable: true })));
+              // PC-70: older cards collapse; the latest stays open.
+              // Expanded state is runtime-only (never serialized).
+              if (midx !== lastCardIdx && !m.cardExpanded) {
+                chatList.appendChild(renderCollapsedOutfitCard(m));
+              } else {
+                // PC-68: thread cards carry the Wore-it affordance
+                // (a shallow copy — the outfit object stays shared,
+                // so save/worn state lands on the real message).
+                chatList.appendChild(renderOutfitCard(Object.assign({}, m, { wearLoggable: true })));
+                if (midx !== lastCardIdx && m.cardExpanded) {
+                  var lessRow = document.createElement("div");
+                  lessRow.className = "chat-divider-action";
+                  var lessBtn = document.createElement("button");
+                  lessBtn.type = "button";
+                  lessBtn.className = "link-button";
+                  lessBtn.textContent = "Show less";
+                  lessBtn.addEventListener("click", function () {
+                    m.cardExpanded = false;
+                    renderChat();
+                  });
+                  lessRow.appendChild(lessBtn);
+                  chatList.appendChild(lessRow);
+                }
+              }
             }
           }
           // PC-37: trip outfit suggestions — one saveable card each.
@@ -14106,6 +14144,10 @@
             } else {
               showToast("This exact outfit is already saved — showing the existing one.");
             }
+            // PC-70: persist the thread so the card's Saved state
+            // survives a reload — savedId lives on the outfit
+            // object, which serializeMessages carries whole.
+            saveThread(activeThreadKey);
             renderChat();
             if (typeof onDone === "function") onDone();
             return;
@@ -14137,6 +14179,7 @@
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
           }).then(function () {
             o.savedId = ref.id;
+            saveThread(activeThreadKey); // PC-70: Saved state persists across reloads
             renderChat();
             showToast("Outfit saved.");
             recordVibeSignal(vibeDeltasForItems(o.itemIds, 0.03)); // Sprint 13: endorsement, weakest signal
@@ -14308,6 +14351,41 @@
           wrap.appendChild(renderOutfitCard({ outfit: firstOutfit, wearLoggable: true }));
         }
         return wrap;
+      }
+
+      // PC-70: an older outfit card collapsed to one line — name,
+      // confidence, mini thumbs — so a long thread stays scannable.
+      // Expand restores the full card (runtime state only).
+      function renderCollapsedOutfitCard(m) {
+        var o = m.outfit;
+        var strip = document.createElement("div");
+        strip.className = "same-outfit-strip collapsed-outfit-strip";
+        var thumbs = document.createElement("span");
+        thumbs.className = "collapsed-thumbs";
+        (o.itemIds || []).slice(0, 4).forEach(function (id) {
+          var it = itemById(id);
+          if (!it) return;
+          var im = document.createElement("img");
+          im.alt = "";
+          showDisplayPhoto(im, it, "clean");
+          thumbs.appendChild(im);
+        });
+        strip.appendChild(thumbs);
+        var label = document.createElement("span");
+        label.textContent = (o.lookName || defaultOutfitName(o.itemIds)) +
+          (o.confidence != null ? " · " + o.confidence + "/10" : "") +
+          (o.savedId ? " · Saved" : "");
+        strip.appendChild(label);
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "link-button";
+        btn.textContent = "Expand";
+        btn.addEventListener("click", function () {
+          m.cardExpanded = true;
+          renderChat();
+        });
+        strip.appendChild(btn);
+        return strip;
       }
 
       function renderOutfitCard(msg, onSaved) {
