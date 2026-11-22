@@ -412,6 +412,8 @@
     .add-garment-match { font-size: 12px; margin: 2px 0 0; opacity: 0.75; }
     .add-garment-row.skipped { opacity: 0.45; }
     .add-garment-row .link-button { flex: none; }
+    .same-outfit-strip { display: flex; align-items: center; gap: 10px; margin-top: 8px; padding: 8px 12px; background: var(--paper-soft); border: 1px dashed rgba(140, 118, 74, 0.4); border-radius: var(--r-sm); font-size: 13px; }
+    .same-outfit-strip span { flex: 1; }
     .pin-chip { display: inline-block; font-size: 13px; font-weight: 500; color: var(--ink); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; margin-left: 8px; vertical-align: middle; white-space: nowrap; }
     /* UX-18 W3: the one context display — a slim line under the chat
        header; tapping opens the context sheet with every fact. */
@@ -5888,6 +5890,12 @@
         return leadHandle ? t.replace(/^\s+/, "") : t;
       }
 
+      // PC-65: an outfit's identity is its item set. Helper for
+      // the render-time dedupe below — order-insensitive.
+      function outfitSetKey(ids) {
+        return (ids || []).slice().sort().join("|");
+      }
+
       function renderChat() {
         chatList.textContent = "";
         if (!stylistMessages.length) {
@@ -5944,6 +5952,10 @@
         });
         var resumeDividerIdx = lastDividerIdx > lastContentIdx ? lastDividerIdx : -1;
         if (resumeDividerIdx === -1) dividerFreshArmed = false;
+        // PC-65: first occurrence of each outfit item-set in this
+        // thread — later identical sets render as a strip naming
+        // the first card, never as a re-skinned new card.
+        var seenOutfitSets = {};
         if (!stylistMessages.some(isSavedNotice)) noticeFreshArmed = false;
         stylistMessages.forEach(function (m, midx) {
           // UX-18 W4/W5: system rows (return divider, saved/window
@@ -6038,8 +6050,18 @@
           div.appendChild(t);
           chatList.appendChild(div);
           // PC-12: structured outfit card under the reply, with a Save action.
+          // PC-65: an identical item set already carded in this
+          // thread renders as a same-outfit strip instead — the
+          // outfit keeps its first name and confidence.
           if (m.outfit && m.outfit.itemIds && m.outfit.itemIds.length >= 2) {
-            chatList.appendChild(renderOutfitCard(m));
+            var setKey = outfitSetKey(m.outfit.itemIds);
+            var firstWithSet = seenOutfitSets[setKey];
+            if (firstWithSet && firstWithSet !== m.outfit) {
+              chatList.appendChild(renderSameOutfitStrip(m, firstWithSet));
+            } else {
+              if (!firstWithSet) seenOutfitSets[setKey] = m.outfit;
+              chatList.appendChild(renderOutfitCard(m));
+            }
           }
           // PC-37: trip outfit suggestions — one saveable card each.
           // The wrap's outfit IS the stored suggestion object, so the
@@ -14020,6 +14042,35 @@
           if (typeof reportError === "function") reportError("saveChatOutfit.dedup", err);
           showToast(friendlyError(err));
         });
+      }
+
+      // PC-65: a repeated outfit set renders as a compact strip
+      // naming the FIRST card — the outfit keeps its original
+      // name and confidence (stable identity). "Show it" expands
+      // the original card inline; saving from there saves (and
+      // marks saved) the original outfit object.
+      function renderSameOutfitStrip(m, firstOutfit) {
+        var wrap = document.createElement("div");
+        var strip = document.createElement("div");
+        strip.className = "same-outfit-strip";
+        var label = document.createElement("span");
+        label.textContent = "Same outfit as “" + (firstOutfit.lookName || "the pick above") + "”" +
+          (firstOutfit.confidence != null ? " · " + firstOutfit.confidence + "/10" : "");
+        strip.appendChild(label);
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "link-button";
+        btn.textContent = m.sameExpanded ? "Hide it" : "Show it";
+        btn.addEventListener("click", function () {
+          m.sameExpanded = !m.sameExpanded;
+          renderChat();
+        });
+        strip.appendChild(btn);
+        wrap.appendChild(strip);
+        if (m.sameExpanded) {
+          wrap.appendChild(renderOutfitCard({ outfit: firstOutfit }));
+        }
+        return wrap;
       }
 
       function renderOutfitCard(msg, onSaved) {
