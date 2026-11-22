@@ -832,3 +832,20 @@ resolves at 1200×630, independent preview parse (Microlink)
 returns the new card. Guards updated in tests/pc61-meta.test.js.
 The fresh /og-card.png URL also sidesteps LinkedIn's cached
 failure of the old preview.
+
+## 2026-11-21 — PC-62: app shell under LinkedIn's scrape limit
+
+PC-61's tags were right but unreachable: LinkedIn's scraper caps
+the page at 3,145,728 bytes and the shell was 3,725,337 — 3.0MB
+of it the four brand fonts base64-inlined into the HTML. The
+fonts now serve as external files from /fonts/ (same TTFs,
+byte-exact) under an immutable year-long cache header, with the
+two primary weights preloaded; the shell is 714,828 bytes as
+fetched with a LinkedInBot user agent, OG tags intact. No
+crawler-specific serving — the same lighter page goes to
+everyone, and repeat visits stop re-downloading the fonts inside
+every page load. scripts/build-og-card.py reads the fonts from
+public/fonts/ and still renders the preview card byte-identically.
+Verified live: LinkedInBot byte count + tag set, all four font
+URLs at exact sizes with the cache header, Microlink parse.
+Byte-budget guard in tests/pc62-shell.test.js (suite 498).

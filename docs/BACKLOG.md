@@ -1787,3 +1787,31 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
   source scripts/build-og-card.py), twitter:card now
   summary_large_image. Deployed (release 1795310458762000) and
   verified live incl. Microlink parse of the new card.
+
+### PC-62: App shell under LinkedIn's 3MB scrape limit (S)
+
+- **Origin:** Founder via Career thread, 2026-11-21 — PC-61's
+  tags were correct, but LinkedIn's Post Inspector refused the
+  URL verbatim: "We did not scrape the content because it's size
+  was larger than our threshold. Maximum size for this input
+  stream is 3145728 bytes." The served page was 3,725,337 bytes.
+- **Problem:** 3,011,538 of those bytes were the four brand fonts
+  base64-inlined into the HTML. Any crawler with a size cap
+  (LinkedIn today, others tomorrow) bails before reading the
+  preview tags.
+- **Fix (shipped):** externalized the fonts — the same TTFs now
+  serve from /fonts/ with an immutable year-long cache header,
+  the two primary weights are preloaded, and the shell dropped
+  to ~713KB. No UA-sniffing, no cloaking: every visitor and every
+  crawler gets the same, lighter page. scripts/build-og-card.py
+  now reads the fonts from public/fonts/.
+- **Acceptance:** a LinkedInBot-UA fetch of the live URL returns
+  < 3,145,728 bytes WITH the full tag set; a link-preview check
+  succeeds. The Career thread then retries the LinkedIn attach.
+- **Lane:** platform. **Effort:** S.
+- **Status:** SHIPPED 2026-11-21 (hosting release
+  1795311120702000) and verified live: LinkedInBot fetch 714,828
+  bytes with all OG tags, fonts serving at exact sizes with the
+  immutable cache header, Microlink parse succeeds. Byte-budget
+  guard in tests/pc62-shell.test.js. Remaining: the Career
+  thread's LinkedIn retry + Post Inspector re-check.

@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
 # PC-61 follow-up (2026-11-21): build the 1200x630 link-preview
 # card (public/og-card.png). Warm Editorial identity (DESIGN.md
-# §10): espresso ground, ivory type, brass accents. Self-contained:
-# the brand fonts are extracted from public/index.html's own
-# @font-face blocks at build time. Run: python3 scripts/build-og-card.py
-import base64
+# §10): espresso ground, ivory type, brass accents. The brand
+# fonts are the app's own, served from public/fonts/ (PC-62
+# externalized them out of the HTML shell). Run:
+#   python3 scripts/build-og-card.py
 import os
-import re
-import tempfile
 
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-HTML = os.path.join(ROOT, "public", "index.html")
+FONTS = os.path.join(ROOT, "public", "fonts")
 OUT = os.path.join(ROOT, "public", "og-card.png")
 
 W, H = 1200, 630
@@ -24,20 +22,6 @@ BRASS = (168, 124, 28)         # #a87c1c
 BRASS_LT = (217, 179, 106)     # brass lightened for small text on dark
 
 
-def extract_fonts():
-    src = open(HTML).read()
-    out = {}
-    tmp = tempfile.mkdtemp(prefix="ogfonts-")
-    for block in re.findall(r"@font-face\s*{([^}]+)}", src):
-        fam = re.search(r'font-family:\s*"([^"]+)"', block).group(1).replace(" ", "")
-        weight = re.search(r"font-weight:\s*(\d+)", block).group(1)
-        m = re.search(r'url\("?data:[^;]+;base64,([^")]+)"?\)', block)
-        path = os.path.join(tmp, f"{fam}-{weight}.ttf")
-        open(path, "wb").write(base64.b64decode(m.group(1)))
-        out[f"{fam}-{weight}"] = path
-    return out
-
-
 def spaced(draw, xy, text, font, fill, tracking):
     x, y = xy
     for ch in text:
@@ -46,11 +30,10 @@ def spaced(draw, xy, text, font, fill, tracking):
 
 
 def main():
-    fonts = extract_fonts()
-    serif600 = fonts["ClosetSerif-600"]
-    serif500 = fonts["ClosetSerif-500"]
-    sans400 = fonts["ClosetSans-400"]
-    sans600 = fonts["ClosetSans-600"]
+    serif600 = os.path.join(FONTS, "ClosetSerif-600.ttf")
+    serif500 = os.path.join(FONTS, "ClosetSerif-500.ttf")
+    sans400 = os.path.join(FONTS, "ClosetSans-400.ttf")
+    sans600 = os.path.join(FONTS, "ClosetSans-600.ttf")
 
     img = Image.new("RGB", (W, H), ESPRESSO)
     d = ImageDraw.Draw(img)
