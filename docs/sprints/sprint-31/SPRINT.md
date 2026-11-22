@@ -1,7 +1,9 @@
 # Sprint 31 — The stylist gets hands (chat thread sprint)
 
 - **Status:** APPROVED by the founder 2026-11-21 ("Approve the
-  Sprint 31 slate — start building"). Building in slate order.
+  Sprint 31 slate — start building"). All six cards built and
+  deployed 2026-11-21; awaiting founder phone verification
+  (see Build results at the end).
 - **Theme:** the founder's own chat thread (reviewed 2026-11-21).
   He used the stylist as an agent — add this, style with that, I
   wore this — and it could only talk. This sprint gives the chat
@@ -85,3 +87,76 @@ sprint that means, per card, the acceptance in its BACKLOG
 entry, with PC-66's being the one that matters: add pieces
 from a chat photo and get an outfit using one of them,
 without leaving the thread.
+
+## Build results (2026-11-21) — all six cards BUILT + DEPLOYED, awaiting founder phone verification
+
+- **PC-63 (#142)** — shared `stripItemHandles` used by the main
+  chat renderer (model messages only) and the follow-up sheet.
+  Commits `72a811f` + `c016ee2`. Honest record: the first deploy
+  went out over one failing test (a leading-handle trim); fixed
+  and redeployed within the same card, and the suite became a
+  hard pre-deploy gate for every later card in this sprint.
+- **PC-66 (#144)** — the flagship. `addProposal: "photoItems"`
+  (gated: general chat + reference photos on the turn); the
+  first attached photo runs the existing outfit-parse pipeline;
+  the confirm card reuses the Drafts decision chain
+  (`applyParseGarmentDecisions`, extracted from the sheet save)
+  so chat adds and sheet adds behave identically; after the
+  add, the stylist is re-asked with the new pieces in context
+  and answers with the outfit. Commit `cbbcb21`, hosting
+  release `1795313311579000`. **Platform note:** Google has
+  retired the nodejs20 functions runtime — `deploy-update.js`
+  and `deploy-create.js` now target nodejs22 and
+  `functions/package.json` declares node 22; askStylist was
+  redeployed on nodejs22 with this card.
+- **PC-65 (#143)** — prompt rule (same item set keeps its
+  first look name + scores) plus a client backstop:
+  `outfitSetKey` + `renderSameOutfitStrip` — a repeat set
+  renders as a one-line strip naming the first card.
+  Commit `1deaf20`.
+- **PC-67 (#145)** — check-only photo parses derive match
+  verdicts (`verdictsFromGarments`); `sanitizePhotoVerdicts`
+  carries them into the stylist's brief with the rule that a
+  lookalike substitute is never described as the pictured
+  piece. Verdicts persist on the photo's message and ground
+  the turns after the parse lands. Commits `c7be7f7`,
+  `704720d`.
+- **PC-68 (#146)** — `wornProposal: "worn"` (gated on an
+  outfit under discussion) + a "Wore it today" row on thread
+  outfit cards; one logging path (`logWearForOutfit`) that
+  saves-or-matches the outfit, checks today's wear_events,
+  and makes a second same-day log a no-op. Commit `bf39667`.
+- **PC-70 (#147)** — saveChatOutfit now persists the thread
+  (Saved survives reloads); older outfit cards collapse to a
+  strip (latest stays open, expand is runtime-only); card
+  tiles are true squares — the standalone `.outfit-thumbs`
+  `height: 56px` was silently defeating the card rule's
+  `aspect-ratio: 1` (proven in a live browser test: tiles
+  rendered 125×56), fixed with `height: auto` + top-aligned
+  figures. Commit `4e5d1f4`, hosting release `1795314346470000`.
+
+Suite at sprint end: **539 passing** (529 in `tests/` + 10 in
+`functions/cutout-check.test.js`). Issues #142–#147 stay open
+until the founder verifies on his phone (the #141 convention).
+
+**V1 limits, recorded honestly:** PC-66 parses only the first
+attached photo and offers only the first match candidate in
+the card (the full matcher lives in the Drafts review sheet;
+a chat parse also appears as a Draft in Outfits while live).
+PC-67's check trigger is keyword-based and its verdicts
+ground the turns after the parse lands (~a minute), not the
+immediate reply.
+
+**Founder phone checks (the verification gate):**
+- PC-66: from a chat photo of an unlogged outfit, add the
+  pieces on the card and receive an outfit using one of
+  them — without leaving the thread.
+- PC-68: report a wear, tap Log, see it in the outfit's
+  history; a second log the same day is a no-op.
+- PC-67: send a photo of a logged item and ask if it's
+  logged — the follow-up answer names the actual match.
+- PC-65: ask for an outfit twice — the second is a strip,
+  not a re-named card.
+- PC-63: no `[iNN]` anywhere in replies.
+- PC-70: save an outfit, reload — still Saved; older cards
+  collapsed; tiles square.

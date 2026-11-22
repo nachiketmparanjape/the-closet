@@ -849,3 +849,39 @@ public/fonts/ and still renders the preview card byte-identically.
 Verified live: LinkedInBot byte count + tag set, all four font
 URLs at exact sizes with the cache header, Microlink parse.
 Byte-budget guard in tests/pc62-shell.test.js (suite 498).
+
+## Sprint 31 (2026-11-21) — The stylist gets hands
+
+Built and deployed 2026-11-21; founder phone verification
+pending (issues #142–#147 stay open until then, the #141
+convention). Record: `docs/sprints/sprint-31/SPRINT.md`.
+Suite at sprint end: 539 passing.
+
+- **PC-63 (#142) — [iNN] handles never render.** One shared
+  `stripItemHandles` for the main chat renderer (model prose
+  only) and the follow-up sheet.
+- **PC-66 (#144) — add items from chat.** The stylist may
+  propose adding the pieces in a photo already in the thread;
+  the confirm card runs the existing outfit-parse pipeline
+  and the same decision chain as the Drafts sheet
+  (`applyParseGarmentDecisions`), then the stylist answers
+  with the outfit using the new pieces. First writes for the
+  chat. Platform: functions runtime moved nodejs20 → nodejs22
+  (Google retired 20); askStylist redeployed on 22.
+- **PC-65 (#143) — same outfit, same card.** Prompt identity
+  rule + client backstop: an identical item set renders as a
+  one-line strip naming the first card, never a re-named,
+  re-scored duplicate.
+- **PC-67 (#145) — verify logged/unlogged claims.** Photo
+  checks derive match verdicts that ride into the stylist's
+  brief; a lookalike substitute is never described as the
+  pictured piece.
+- **PC-68 (#146) — log-as-worn from chat.** Worn proposal
+  card + "Wore it today" on thread outfit cards; one logging
+  path that checks today's wear_events first — a second
+  same-day log is a no-op.
+- **PC-70 (#147) — card hygiene.** Saved state persists
+  across reloads (thread saved after a save); older outfit
+  cards collapse to a strip; tiles are true squares
+  (`height: auto` — the inherited 56px height was silently
+  defeating `aspect-ratio: 1`).

@@ -71,7 +71,7 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
   **Graduated 2026-11-21:** the trigger fired — the founder hit the
   wall live in his own thread (asked the stylist to add an item and
   log a wear; it could only talk). First writes are PC-66 (add
-  items) and PC-68 (log worn), Sprint 31 (proposed).
+  items) and PC-68 (log worn), Sprint 31 (shipped 2026-11-21).
 - **Bulk upload (one photo per article):** select N photos → N items created
   automatically, AI describes each, user reviews/edits afterwards. Matches
   the real cataloguing behavior (photograph 50 things, curate later) instead
@@ -1834,7 +1834,7 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
   raw [iNN] token; regression test covers a reply containing
   handles mid-sentence and at line ends.
 - **Lane:** Stylist. **Effort:** S.
-- **Status:** Filed 2026-11-21. In Sprint 31 (proposed).
+- **Status:** Filed 2026-11-21. In Sprint 31 — SHIPPED 2026-11-21 (built + deployed; awaiting founder phone verification).
 
 ### PC-64: Tappable item chips for item mentions in stylist prose (M)
 
@@ -1872,7 +1872,7 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
   not present the identical set as a new named card, and
   any repeated set carries its original confidence.
 - **Lane:** Stylist. **Effort:** M.
-- **Status:** Filed 2026-11-21. In Sprint 31 (proposed).
+- **Status:** Filed 2026-11-21. In Sprint 31 — SHIPPED 2026-11-21 (built + deployed; awaiting founder phone verification).
 
 ### PC-66: Add items from chat — the stylist gets hands (L)
 
@@ -1902,7 +1902,7 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
   card adds nothing; a parse failure surfaces as one human
   sentence with a retry.
 - **Lane:** Stylist + Catalogue. **Effort:** L.
-- **Status:** Filed 2026-11-21. In Sprint 31 (proposed) —
+- **Status:** Filed 2026-11-21. In Sprint 31 — SHIPPED 2026-11-21 (built + deployed; awaiting founder phone verification) —
   the sprint's flagship.
 
 ### PC-67: The stylist verifies logged/unlogged claims against match results (S)
@@ -1923,7 +1923,7 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
   instead of proposing a substitute. Send a genuinely new
   piece; it says so plainly and offers PC-66's add card.
 - **Lane:** Stylist. **Effort:** S. Pairs with PC-66.
-- **Status:** Filed 2026-11-21. In Sprint 31 (proposed).
+- **Status:** Filed 2026-11-21. In Sprint 31 — SHIPPED 2026-11-21 (built + deployed; awaiting founder phone verification).
 
 ### PC-68: Log-as-worn from chat (M)
 
@@ -1941,7 +1941,7 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
   visible in the outfit's wear history; logging twice for
   the same day is a no-op with a quiet note, not a dupe.
 - **Lane:** Stylist + Outfits. **Effort:** M.
-- **Status:** Filed 2026-11-21. In Sprint 31 (proposed).
+- **Status:** Filed 2026-11-21. In Sprint 31 — SHIPPED 2026-11-21 (built + deployed; awaiting founder phone verification).
 
 ### PC-69: Outfit card actions — tap a piece, swap a piece, refine in one tap (M)
 
@@ -1980,7 +1980,7 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
   card still shows Saved after reload; no tile renders
   narrower than the uniform aspect.
 - **Lane:** Stylist. **Effort:** S.
-- **Status:** Filed 2026-11-21. In Sprint 31 (proposed).
+- **Status:** Filed 2026-11-21. In Sprint 31 — SHIPPED 2026-11-21 (built + deployed; awaiting founder phone verification).
 
 ### PC-71: "Not for me" — a feedback signal on outfit cards (M)
 
