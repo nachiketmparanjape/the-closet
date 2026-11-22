@@ -5536,6 +5536,9 @@
           if (m.addStoragePath) o.addStoragePath = m.addStoragePath;
           if (m.addPhotoUrl) o.addPhotoUrl = m.addPhotoUrl;
           if (m.addedNames) o.addedNames = m.addedNames;
+          // PC-67: photo-check verdicts persist on the photo's
+          // message — they ground later turns in this thread.
+          if (m.photoVerdicts) o.photoVerdicts = m.photoVerdicts;
           if (m.tripProposal) o.tripProposal = m.tripProposal;
           if (m.tripState) o.tripState = m.tripState;
           if (m.createdTripId) o.createdTripId = m.createdTripId;
@@ -6254,47 +6257,89 @@
       var chatAddSessions = {}; // parseId -> session ctx (see startChatAddParse)
       var chatAddResuming = {}; // parseId -> true while a resume is armed
 
-      function startChatAddParse(m, photo, threadKey) {
-        if (!photo || !currentUser) return;
-        m.addState = "parsing";
-        renderChat();
+      // Upload + start for a chat photo, shared by the add card
+      // (PC-66) and the photo check (PC-67). Resolves
+      // { parseId, photoUrl, storagePath }.
+      function beginChatPhotoParse(photo) {
         var bytes;
         try {
           bytes = atob(photo.base64);
         } catch (e) {
-          m.addState = "failed";
-          renderChat();
-          saveThread(threadKey);
-          return;
+          return Promise.reject(new Error("photo data unreadable"));
         }
         var arr = new Uint8Array(bytes.length);
         for (var i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
         var blob = new Blob([arr], { type: photo.mimeType || "image/jpeg" });
         var storagePath = "users/" + currentUser.uid + "/outfit-photos/" + Date.now() + "-chat-add.jpg";
-        m.addStoragePath = storagePath;
         var ref = storage.ref().child(storagePath);
-        ref.put(blob, { contentType: photo.mimeType || "image/jpeg" }).then(function () {
+        var photoUrl = "";
+        return ref.put(blob, { contentType: photo.mimeType || "image/jpeg" }).then(function () {
           return ref.getDownloadURL();
         }).then(function (url) {
-          m.addPhotoUrl = url;
+          photoUrl = url;
           return functions.httpsCallable("startOutfitParse", { timeout: 300000 })({ storagePath: storagePath });
         }).then(function (res) {
           var parseId = res.data && res.data.parseId;
           if (!parseId) throw new Error("startOutfitParse returned no parseId");
-          m.addParseId = parseId;
-          chatAddSessions[parseId] = {
-            parseId: parseId, photoUrl: m.addPhotoUrl, storagePath: storagePath,
+          return { parseId: parseId, photoUrl: photoUrl, storagePath: storagePath };
+        });
+      }
+
+      function startChatAddParse(m, photo, threadKey, verdictMsg) {
+        if (!photo || !currentUser) return;
+        m.addState = "parsing";
+        renderChat();
+        beginChatPhotoParse(photo).then(function (begun) {
+          m.addParseId = begun.parseId;
+          m.addStoragePath = begun.storagePath;
+          m.addPhotoUrl = begun.photoUrl;
+          chatAddSessions[begun.parseId] = {
+            parseId: begun.parseId, photoUrl: begun.photoUrl, storagePath: begun.storagePath,
             garments: [], decisions: {}, renderUrls: {}, renderResolving: {},
             createdItemIds: [], appendedItemIds: [],
-            status: "starting", msg: m, threadKey: threadKey, tries: 0
+            status: "starting", msg: m, verdictMsg: verdictMsg || null,
+            threadKey: threadKey, tries: 0
           };
           saveThread(threadKey);
-          pollChatAddParse(parseId);
+          pollChatAddParse(begun.parseId);
         }).catch(function (err) {
           m.addState = "failed";
           if (typeof reportError === "function") reportError("chat-add.start", err);
           renderChat();
           saveThread(threadKey);
+        });
+      }
+
+      // PC-67: a photo check — the same parse, no card. Triggered
+      // when the user's words turn on what's logged ("is this
+      // logged?", "I wore this"); when the parse lands, its match
+      // verdicts are written onto the user's message and ride
+      // every later turn as grounded context.
+      function startChatPhotoCheck(userMsg, photo, threadKey) {
+        if (!photo || !currentUser || userMsg.photoVerdicts) return;
+        beginChatPhotoParse(photo).then(function (begun) {
+          chatAddSessions[begun.parseId] = {
+            parseId: begun.parseId, photoUrl: begun.photoUrl, storagePath: begun.storagePath,
+            garments: [], decisions: {}, renderUrls: {}, renderResolving: {},
+            createdItemIds: [], appendedItemIds: [],
+            status: "starting", msg: userMsg, verdictMsg: userMsg, checkOnly: true,
+            threadKey: threadKey, tries: 0
+          };
+          pollChatAddParse(begun.parseId);
+        }).catch(function (err) {
+          if (typeof reportError === "function") reportError("chat-check.start", err);
+        });
+      }
+
+      // PC-67: per-garment verdicts from a finished parse — one
+      // candidate is a match, several is a question, none is a no.
+      function verdictsFromGarments(garments) {
+        return (garments || []).map(function (g) {
+          var cands = Array.isArray(g.matchCandidates) ? g.matchCandidates : [];
+          var label = outfitParseDraftName(g.type, g.colors);
+          if (cands.length === 1) return { label: label, status: "matched", matchedName: cands[0].itemName || "" };
+          if (cands.length > 1) return { label: label, status: "ambiguous", matchedName: cands[0].itemName || "", altName: cands[1].itemName || "" };
+          return { label: label, status: "unmatched" };
         });
       }
 
@@ -6313,23 +6358,29 @@
               if (!s.decisions[g.id]) s.decisions[g.id] = { decision: "confirmed-new" };
             });
           }
+          var terminal = s.status === "review" || s.status === "done" || s.status === "failed";
           if (s.status === "review") {
-            m.addState = "ready";
+            // PC-67: verdicts land on the photo's own message,
+            // whichever flow started the parse.
+            if (s.verdictMsg) s.verdictMsg.photoVerdicts = verdictsFromGarments(s.garments);
+            if (!s.checkOnly) m.addState = "ready";
           } else if (s.status === "done") {
             // Finished through the Drafts review instead — the
             // pieces are in; say so and stop.
-            m.addState = "added";
-            if (!m.addedNames) m.addedNames = [];
+            if (!s.checkOnly) {
+              m.addState = "added";
+              if (!m.addedNames) m.addedNames = [];
+            }
           } else if (s.status === "failed") {
-            m.addState = "failed";
+            if (!s.checkOnly) m.addState = "failed";
           }
           renderChat();
           saveThread(s.threadKey);
-          if (m.addState === "parsing" && s.tries < 60) {
+          if (!terminal && s.tries < 60) {
             s.pollTimer = setTimeout(function () { pollChatAddParse(parseId); }, 6000);
           }
         }).catch(function (err) {
-          if (s.tries < 60 && m.addState === "parsing") {
+          if (s.tries < 60) {
             s.pollTimer = setTimeout(function () { pollChatAddParse(parseId); }, 8000);
           }
         });
@@ -6339,11 +6390,19 @@
         var parseId = m.addParseId;
         if (!parseId || chatAddSessions[parseId] || chatAddResuming[parseId]) return;
         chatAddResuming[parseId] = true;
+        // PC-67: verdicts belong on the photo's own message —
+        // the nearest preceding user message that carried one.
+        var vMsg = null;
+        var mi = stylistMessages.indexOf(m);
+        for (var bi = mi - 1; bi >= 0; bi--) {
+          if (stylistMessages[bi].role === "user" && stylistMessages[bi].refPhotoCount) { vMsg = stylistMessages[bi]; break; }
+        }
         chatAddSessions[parseId] = {
           parseId: parseId, photoUrl: m.addPhotoUrl || "", storagePath: m.addStoragePath || "",
           garments: [], decisions: {}, renderUrls: {}, renderResolving: {},
           createdItemIds: [], appendedItemIds: [],
-          status: "starting", msg: m, threadKey: activeThreadKey, tries: 0
+          status: "starting", msg: m, verdictMsg: vMsg,
+          threadKey: activeThreadKey, tries: 0
         };
         // An interrupted "adding" goes back to ready once the
         // poll rebuilds the garment list — the user re-confirms;
@@ -7854,8 +7913,19 @@
         // (already in tripContext) — never the user's current position,
         // and never a geolocation prompt.
         var weatherContext = tripChat ? null : await getWeatherSummary();
+        // PC-67: the latest photo-check verdicts in this thread
+        // ride along — the stylist grounds its logged/unlogged
+        // claims in them instead of assuming.
+        var latestVerdicts = null;
+        for (var vi = stylistMessages.length - 1; vi >= 0; vi--) {
+          if (stylistMessages[vi].photoVerdicts && stylistMessages[vi].photoVerdicts.length) {
+            latestVerdicts = stylistMessages[vi].photoVerdicts;
+            break;
+          }
+        }
         var payload = {
           items: stylistItems(),
+          photoVerdicts: latestVerdicts,
           // UX-18 W4/W5: the thread may hold the whole transcript;
           // the wire carries the reading window plus margin — the
           // server's sanitizer applies the exact window.
@@ -8007,8 +8077,13 @@
           // PC-66: an approved add proposal with a photo in hand
           // starts its parse now — upload, start, poll — bound to
           // the reply message; the card fills in as pieces land.
+          // PC-67: no add proposal but the words turn on what's
+          // logged — run the same parse as a check, so the next
+          // turns speak from verdicts, not assumptions.
           if (thinking.addProposal && thinking.addState === "pending" && sentPhotos.length) {
-            startChatAddParse(thinking, sentPhotos[0], sentThreadKey);
+            startChatAddParse(thinking, sentPhotos[0], sentThreadKey, userMsg);
+          } else if (sentPhotos.length && /\b(log|logged|logging|add|wore|wearing|wardrobe|closet)\b/i.test(text)) {
+            startChatPhotoCheck(userMsg, sentPhotos[0], sentThreadKey);
           }
         });
       }

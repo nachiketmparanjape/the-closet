@@ -311,6 +311,27 @@ function sanitizeRefImages(value) {
   return out;
 }
 
+// PC-67: photo-check verdicts — the client's garment matcher ran
+// on a photo the user sent in chat and reported, per piece,
+// whether it is already in the wardrobe. The stylist grounds its
+// logged/unlogged claims in these instead of assuming. Strict
+// shape; malformed entries drop.
+function sanitizePhotoVerdicts(value) {
+  if (!Array.isArray(value)) return [];
+  const out = [];
+  for (const v of value.slice(0, 8)) {
+    if (!v || typeof v !== "object") continue;
+    if (v.status !== "matched" && v.status !== "unmatched" && v.status !== "ambiguous") continue;
+    out.push({
+      label: cleanText(v.label, 60),
+      status: v.status,
+      matchedName: cleanText(v.matchedName, 60),
+      altName: cleanText(v.altName, 60),
+    });
+  }
+  return out;
+}
+
 // PC-22: @-mention references. The client sends { articleIds, outfits }
 // where outfits carry their itemIds (resolved from its local cache); every
 // id is re-validated against the real wardrobe here, so the model only
@@ -873,13 +894,14 @@ function assembleContext(input) {
     input.items, input.messages, input.styleProfile, input.previousPick,
     input.references, input.weatherContext, input.vibe, input.vibeProfile,
     input.tripContext, input.pins, todayStr, input.todayPick, input.shopItem,
-    input.mutedPinIds, input.attachCtx, input.steerCtx, input.refImages
+    input.mutedPinIds, input.attachCtx, input.steerCtx, input.refImages,
+    input.photoVerdicts
   );
   const manifest = buildManifest(input, computeActivePins(input.pins, input.tripContext, todayStr, input.mutedPinIds));
   return { model: req.model, contents: req.contents, config: req.config, manifest: manifest };
 }
 
-function buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, todayPick, shopItem, mutedPinIds, attachCtx, steerCtx, refImages) {
+function buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, todayPick, shopItem, mutedPinIds, attachCtx, steerCtx, refImages, photoVerdicts) {
   const model = process.env.GEMINI_MODEL || MODEL_VERSION;
   const wardrobe = items.map((it, i) => itemLine(it, i)).join("\n");
   let system = SYSTEM + "\n\n" + PRECEDENCE;
@@ -1100,7 +1122,10 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
       " photo(s) to their latest message (they travel with it below). These are INSPIRATION: " +
       "looks the user is aiming for. They are NOT in the wardrobe — never put them in an outfit, " +
       "never treat them as owned, never suggest wearing them. Name what you actually see in them " +
-      "(the pieces, colors, silhouette, mood), then answer by building only from the wardrobe above.";
+      "(the pieces, colors, silhouette, mood), then answer by building only from the wardrobe above. " +
+      "If the user asks whether a pictured piece is in their wardrobe, do not guess and do not simply " +
+      "take their guess as fact — the app checks the photo against the wardrobe and a PHOTO CHECK " +
+      "section appears below when the result is in; until then, say you are checking.";
     // PC-66: when the user asks for the pictured pieces to BECOME
     // wardrobe, the app can do it — through a confirm card, never
     // silently. The proposal field is the stylist's only role.
@@ -1111,6 +1136,23 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
       "them at the card below — never claim the pieces are already added. If they also asked for an outfit " +
       "built with a new piece, tell them you'll build it the moment it's added (the app will ask you again " +
       "right after) and answer the rest of their message from what they already own.";
+  }
+  // PC-67: photo-check verdicts — computed by the client's
+  // garment matcher from a photo sent earlier in this thread.
+  // They ground every logged/unlogged claim the stylist makes.
+  if (!tripContext && Array.isArray(photoVerdicts) && photoVerdicts.length) {
+    const lines = photoVerdicts.map((v) => {
+      if (v.status === "matched") return "- \"" + v.label + "\": MATCHED — it is their logged \"" + v.matchedName + "\".";
+      if (v.status === "ambiguous") return "- \"" + v.label + "\": POSSIBLE match with \"" + v.matchedName + "\"" +
+        (v.altName ? " or \"" + v.altName + "\"" : "") + " — unconfirmed.";
+      return "- \"" + v.label + "\": NO MATCH — not in the wardrobe.";
+    });
+    system += "\n\nPHOTO CHECK — the app matched the pieces in the photo the user sent against the wardrobe:\n" +
+      lines.join("\n") +
+      "\nGround every claim about what is or is not in the wardrobe in this list. A MATCHED piece IS logged — " +
+      "name it as theirs. NO MATCH means the piece is not in the wardrobe — say so plainly; if they want it " +
+      "in, the add flow can add it. For a POSSIBLE match, ask the user to confirm — never assume either way, " +
+      "and never describe a lookalike substitute as the pictured piece itself.";
   }
   for (const m of messages) {
     contents.push({ role: m.role, parts: [{ text: m.text }] });
@@ -1417,7 +1459,7 @@ function unwrapJsonReply(text) {
 }
 
 // here; the client re-validates on execute.
-async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, hooks, todayPick, shopItem, mutedPinIds, attachCtx, steerCtx, refImages) {
+async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, hooks, todayPick, shopItem, mutedPinIds, attachCtx, steerCtx, refImages, photoVerdicts) {
   const todayStr = /^\d{4}-\d{2}-\d{2}$/.test(today || "")
     ? today
     : new Date().toISOString().slice(0, 10);
@@ -1429,7 +1471,7 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
     weatherContext: weatherContext, vibe: vibe, vibeProfile: vibeProfile,
     tripContext: tripContext, pins: pins, today: todayStr, todayPick: todayPick,
     shopItem: shopItem, mutedPinIds: mutedPinIds, attachCtx: attachCtx,
-    steerCtx: steerCtx, refImages: refImages,
+    steerCtx: steerCtx, refImages: refImages, photoVerdicts: photoVerdicts,
   });
   const { model, contents, config } = assembled;
   const manifest = assembled.manifest;
@@ -1558,4 +1600,4 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
   };
 }
 
-module.exports = { askStylist, buildStylistRequest, assembleContext, buildManifest, resolveIterBase, computeActivePins, PRECEDENCE, MAX_MESSAGES, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeTodayPick, sanitizeShopItem, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins, sanitizePinProposal, sanitizeTripProposal, sanitizeRefImages, extractToolCall, extractToolCalls, mapUpdateTripPacking, mapSuggestTripOutfits, handleIndex, unwrapJsonReply, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM, VIBE_TAGS };
+module.exports = { askStylist, buildStylistRequest, assembleContext, buildManifest, resolveIterBase, computeActivePins, PRECEDENCE, MAX_MESSAGES, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeTodayPick, sanitizeShopItem, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins, sanitizePinProposal, sanitizeTripProposal, sanitizeRefImages, sanitizePhotoVerdicts, extractToolCall, extractToolCalls, mapUpdateTripPacking, mapSuggestTripOutfits, handleIndex, unwrapJsonReply, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM, VIBE_TAGS };
