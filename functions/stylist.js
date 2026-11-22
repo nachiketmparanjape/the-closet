@@ -480,6 +480,11 @@ function parseStylistJson(text, todayStr) {
   // propose attaching today's pick, nothing else. Anything else
   // the model invents in this field drops here.
   const attachProposal = obj.attachProposal === "todayPick" ? "todayPick" : null;
+  // PC-66: an add-to-wardrobe proposal is likewise a single
+  // literal — the model may propose adding the pictured items,
+  // nothing else. The gate in askStylist decides whether it
+  // survives (the turn must have carried reference photos).
+  const addProposal = obj.addProposal === "photoItems" ? "photoItems" : null;
   // PC-33: a trip proposal — a destination plus real future
   // timing, sanitized hard (a steering card with a wrong date is
   // worse than none). Suppression lives here too: when a reply
@@ -490,7 +495,7 @@ function parseStylistJson(text, todayStr) {
   if (tripProposal && proposal && (proposal.kind === "location" || proposal.kind === "weather")) {
     proposal = null;
   }
-  return { reply: reply, outfit: outfit, pinProposal: proposal, attachProposal: attachProposal, tripProposal: tripProposal };
+  return { reply: reply, outfit: outfit, pinProposal: proposal, attachProposal: attachProposal, tripProposal: tripProposal, addProposal: addProposal };
 }
 
 // PC-33: the trip-proposal sanitizer. Destination and a valid
@@ -1095,6 +1100,16 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
       "looks the user is aiming for. They are NOT in the wardrobe — never put them in an outfit, " +
       "never treat them as owned, never suggest wearing them. Name what you actually see in them " +
       "(the pieces, colors, silhouette, mood), then answer by building only from the wardrobe above.";
+    // PC-66: when the user asks for the pictured pieces to BECOME
+    // wardrobe, the app can do it — through a confirm card, never
+    // silently. The proposal field is the stylist's only role.
+    system += "\n\nADD-TO-WARDROBE PROPOSAL — if the user's latest message asks to add, log, or save " +
+      "the pictured clothing to their wardrobe (\"add it to the wardrobe\", \"log these jeans\"), return " +
+      "\"addProposal\": \"photoItems\" in the JSON alongside reply/outfit. The user gets a card listing the " +
+      "pieces found in the photo; nothing is added unless they confirm on that card. In your reply, point " +
+      "them at the card below — never claim the pieces are already added. If they also asked for an outfit " +
+      "built with a new piece, tell them you'll build it the moment it's added (the app will ask you again " +
+      "right after) and answer the rest of their message from what they already own.";
   }
   for (const m of messages) {
     contents.push({ role: m.role, parts: [{ text: m.text }] });
@@ -1512,9 +1527,15 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
   // location/weather pin proposal.)
   const tripProposal = (!tripContext && !(steerCtx && steerCtx.dismissed))
     ? (parsed.tripProposal || null) : null;
+  // PC-66: the add proposal survives only when the turn actually
+  // carried reference photos in general chat — the card lists
+  // pieces parsed from that photo, so without one it would be a
+  // lie. The prompt asks; this gate decides.
+  const addProposal = (!tripContext && Array.isArray(refImages) && refImages.length > 0)
+    ? (parsed.addProposal || null) : null;
   if (!parsed.outfit || !mapped || problem) {
     if (parsed.outfit) emitEvent(hooks, "rejection", "outfit_discarded", { problem: problem || "unmapped" });
-    return { reply: parsed.reply, outfit: null, pinProposal: parsed.pinProposal || null, attachProposal: attachProposal, tripProposal: tripProposal, manifest: manifest };
+    return { reply: parsed.reply, outfit: null, pinProposal: parsed.pinProposal || null, attachProposal: attachProposal, tripProposal: tripProposal, addProposal: addProposal, manifest: manifest };
   }
   return {
     reply: parsed.reply,
@@ -1532,6 +1553,7 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
     pinProposal: parsed.pinProposal || null,
     attachProposal: attachProposal,
     tripProposal: tripProposal,
+    addProposal: addProposal,
   };
 }
 

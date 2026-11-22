@@ -405,6 +405,13 @@
     .pin-proposal .hint { margin: 6px 0 10px; }
     .pin-proposal-actions { display: flex; gap: 8px; }
     .pin-proposal-actions button { flex: 1; }
+    .add-garment-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid rgba(140, 118, 74, 0.25); }
+    .add-garment-row img { width: 44px; height: 44px; object-fit: cover; border-radius: 8px; flex: none; }
+    .add-garment-main { flex: 1; min-width: 0; }
+    .add-garment-name { font-size: 14px; font-weight: 600; margin: 0; }
+    .add-garment-match { font-size: 12px; margin: 2px 0 0; opacity: 0.75; }
+    .add-garment-row.skipped { opacity: 0.45; }
+    .add-garment-row .link-button { flex: none; }
     .pin-chip { display: inline-block; font-size: 13px; font-weight: 500; color: var(--ink); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; margin-left: 8px; vertical-align: middle; white-space: nowrap; }
     /* UX-18 W3: the one context display — a slim line under the chat
        header; tapping opens the context sheet with every fact. */
@@ -5517,6 +5524,16 @@
           if (m.pinState) o.pinState = m.pinState;
           if (m.attachProposal) o.attachProposal = m.attachProposal;
           if (m.attachState) o.attachState = m.attachState;
+          // PC-66: the add-to-wardrobe card's durable state — the
+          // parse id + photo pointers. Garments and decisions are
+          // runtime-only; a reload resumes the parse poll and
+          // rebuilds them (the drafts flow's resume pattern).
+          if (m.addProposal) o.addProposal = m.addProposal;
+          if (m.addState) o.addState = m.addState;
+          if (m.addParseId) o.addParseId = m.addParseId;
+          if (m.addStoragePath) o.addStoragePath = m.addStoragePath;
+          if (m.addPhotoUrl) o.addPhotoUrl = m.addPhotoUrl;
+          if (m.addedNames) o.addedNames = m.addedNames;
           if (m.tripProposal) o.tripProposal = m.tripProposal;
           if (m.tripState) o.tripState = m.tripState;
           if (m.createdTripId) o.createdTripId = m.createdTripId;
@@ -6061,6 +6078,12 @@
             an.textContent = "Today's pick is attached to this conversation.";
             chatList.appendChild(an);
           }
+          // PC-66: the add-to-wardrobe card — renders through its
+          // states (finding pieces → confirm → added) and never
+          // once dismissed.
+          if (m.addProposal && m.addState && m.addState !== "dismissed") {
+            chatList.appendChild(renderAddProposalCard(m));
+          }
           // PC-33: the trip steering card — pending offers the
           // create; created shows the way into the trip. A trip
           // that already matches the destination suppresses the
@@ -6198,6 +6221,388 @@
       // container. Create runs the trips flow's own steps
       // (geocode, then the trip doc); the success state
       // offers the jump into the trip — it never yanks.
+      // PC-66: the add-to-wardrobe card. The stylist proposes
+      // (addProposal on its reply, only when the turn carried a
+      // photo); the client runs the existing outfit-parse
+      // pipeline on that photo and renders this confirm card —
+      // nothing enters the wardrobe until the user taps Add.
+      // Runtime sessions are keyed by parseId; the thread keeps
+      // only parseId + state, so a reload resumes the poll and
+      // rebuilds the session (the drafts flow's resume pattern).
+      var chatAddSessions = {}; // parseId -> session ctx (see startChatAddParse)
+      var chatAddResuming = {}; // parseId -> true while a resume is armed
+
+      function startChatAddParse(m, photo, threadKey) {
+        if (!photo || !currentUser) return;
+        m.addState = "parsing";
+        renderChat();
+        var bytes;
+        try {
+          bytes = atob(photo.base64);
+        } catch (e) {
+          m.addState = "failed";
+          renderChat();
+          saveThread(threadKey);
+          return;
+        }
+        var arr = new Uint8Array(bytes.length);
+        for (var i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+        var blob = new Blob([arr], { type: photo.mimeType || "image/jpeg" });
+        var storagePath = "users/" + currentUser.uid + "/outfit-photos/" + Date.now() + "-chat-add.jpg";
+        m.addStoragePath = storagePath;
+        var ref = storage.ref().child(storagePath);
+        ref.put(blob, { contentType: photo.mimeType || "image/jpeg" }).then(function () {
+          return ref.getDownloadURL();
+        }).then(function (url) {
+          m.addPhotoUrl = url;
+          return functions.httpsCallable("startOutfitParse", { timeout: 300000 })({ storagePath: storagePath });
+        }).then(function (res) {
+          var parseId = res.data && res.data.parseId;
+          if (!parseId) throw new Error("startOutfitParse returned no parseId");
+          m.addParseId = parseId;
+          chatAddSessions[parseId] = {
+            parseId: parseId, photoUrl: m.addPhotoUrl, storagePath: storagePath,
+            garments: [], decisions: {}, renderUrls: {}, renderResolving: {},
+            createdItemIds: [], appendedItemIds: [],
+            status: "starting", msg: m, threadKey: threadKey, tries: 0
+          };
+          saveThread(threadKey);
+          pollChatAddParse(parseId);
+        }).catch(function (err) {
+          m.addState = "failed";
+          if (typeof reportError === "function") reportError("chat-add.start", err);
+          renderChat();
+          saveThread(threadKey);
+        });
+      }
+
+      function pollChatAddParse(parseId) {
+        var s = chatAddSessions[parseId];
+        if (!s) return;
+        var m = s.msg;
+        if (!m || m.addState === "dismissed" || m.addState === "added") return;
+        s.tries++;
+        functions.httpsCallable("pollOutfitParse", { timeout: 180000 })({ parseId: parseId }).then(function (res) {
+          var data = res.data || {};
+          s.status = data.status || s.status;
+          if (Array.isArray(data.garments) && data.garments.length) {
+            s.garments = data.garments;
+            s.garments.forEach(function (g) {
+              if (!s.decisions[g.id]) s.decisions[g.id] = { decision: "confirmed-new" };
+            });
+          }
+          if (s.status === "review") {
+            m.addState = "ready";
+          } else if (s.status === "done") {
+            // Finished through the Drafts review instead — the
+            // pieces are in; say so and stop.
+            m.addState = "added";
+            if (!m.addedNames) m.addedNames = [];
+          } else if (s.status === "failed") {
+            m.addState = "failed";
+          }
+          renderChat();
+          saveThread(s.threadKey);
+          if (m.addState === "parsing" && s.tries < 60) {
+            s.pollTimer = setTimeout(function () { pollChatAddParse(parseId); }, 6000);
+          }
+        }).catch(function (err) {
+          if (s.tries < 60 && m.addState === "parsing") {
+            s.pollTimer = setTimeout(function () { pollChatAddParse(parseId); }, 8000);
+          }
+        });
+      }
+
+      function resumeChatAddParse(m) {
+        var parseId = m.addParseId;
+        if (!parseId || chatAddSessions[parseId] || chatAddResuming[parseId]) return;
+        chatAddResuming[parseId] = true;
+        chatAddSessions[parseId] = {
+          parseId: parseId, photoUrl: m.addPhotoUrl || "", storagePath: m.addStoragePath || "",
+          garments: [], decisions: {}, renderUrls: {}, renderResolving: {},
+          createdItemIds: [], appendedItemIds: [],
+          status: "starting", msg: m, threadKey: activeThreadKey, tries: 0
+        };
+        // An interrupted "adding" goes back to ready once the
+        // poll rebuilds the garment list — the user re-confirms;
+        // the apply chain is retry-safe per garment.
+        if (m.addState === "adding") m.addState = "parsing";
+        pollChatAddParse(parseId);
+      }
+
+      function chatAddKept(s) {
+        return s.garments.filter(function (g) {
+          var d = s.decisions[g.id];
+          return d && (d.decision === "confirmed-new" || d.decision === "matched");
+        });
+      }
+
+      function renderAddProposalCard(m) {
+        if (m.addState === "added") {
+          var note = document.createElement("div");
+          note.className = "chat-msg note";
+          note.textContent = (m.addedNames && m.addedNames.length)
+            ? "Added to your wardrobe: " + m.addedNames.join(", ")
+            : "These pieces were added from the Drafts review in Outfits.";
+          return note;
+        }
+        var card = document.createElement("div");
+        card.className = "pin-proposal";
+        var head = document.createElement("p");
+        head.className = "pin-proposal-head";
+        head.textContent = m.addState === "failed"
+          ? "That photo didn't come through"
+          : "Add these pieces to your wardrobe?";
+        head.insertBefore(iconSpan("tag", true), head.firstChild);
+        card.appendChild(head);
+        var body = document.createElement("p");
+        body.className = "hint";
+        var s = m.addParseId ? chatAddSessions[m.addParseId] : null;
+        if (m.addState === "failed") {
+          body.textContent = "I couldn't read the pieces from that photo. Adding the same photo from the Outfits tab uses the full review flow.";
+          card.appendChild(body);
+          card.appendChild(chatAddDismissRow(m));
+          return card;
+        }
+        if (!s || m.addState === "parsing" || m.addState === "pending" || m.addState === "adding") {
+          if (m.addParseId && !s) resumeChatAddParse(m);
+          body.textContent = m.addState === "adding"
+            ? "Adding your pieces…"
+            : "Finding the pieces in your photo — this takes a minute or so. The card fills in when they're ready.";
+          card.appendChild(body);
+          if (m.addState !== "adding") card.appendChild(chatAddDismissRow(m));
+          return card;
+        }
+        // Ready: the confirm list.
+        body.textContent = "Found " + s.garments.length + " piece" + (s.garments.length === 1 ? "" : "s") +
+          " in your photo. Nothing is added until you tap Add.";
+        card.appendChild(body);
+        s.garments.forEach(function (g) {
+          card.appendChild(renderChatAddGarmentRow(m, s, g));
+        });
+        var row = document.createElement("div");
+        row.className = "pin-proposal-actions";
+        var kept = chatAddKept(s);
+        var add = document.createElement("button");
+        add.className = "primary";
+        add.type = "button";
+        add.textContent = kept.length
+          ? "Add " + kept.length + " piece" + (kept.length === 1 ? "" : "s")
+          : "Add pieces";
+        add.disabled = !kept.length;
+        add.addEventListener("click", function () { confirmChatAdd(m); });
+        var dismiss = document.createElement("button");
+        dismiss.type = "button";
+        dismiss.textContent = "Not now";
+        dismiss.addEventListener("click", function () { dismissChatAdd(m); });
+        row.appendChild(add);
+        row.appendChild(dismiss);
+        card.appendChild(row);
+        return card;
+      }
+
+      function chatAddDismissRow(m) {
+        var row = document.createElement("div");
+        row.className = "pin-proposal-actions";
+        var dismiss = document.createElement("button");
+        dismiss.type = "button";
+        dismiss.textContent = "Dismiss";
+        dismiss.addEventListener("click", function () { dismissChatAdd(m); });
+        row.appendChild(dismiss);
+        return row;
+      }
+
+      function dismissChatAdd(m) {
+        var s = m.addParseId ? chatAddSessions[m.addParseId] : null;
+        if (s && s.pollTimer) { clearTimeout(s.pollTimer); s.pollTimer = null; }
+        m.addState = "dismissed";
+        renderChat();
+        saveThread(activeThreadKey);
+      }
+
+      function renderChatAddGarmentRow(m, s, g) {
+        var d = s.decisions[g.id] || { decision: "confirmed-new" };
+        var row = document.createElement("div");
+        row.className = "add-garment-row" + (d.decision === "skipped" ? " skipped" : "");
+        var img = document.createElement("img");
+        img.alt = "";
+        if (s.renderUrls[g.id]) {
+          img.src = s.renderUrls[g.id];
+        } else if (g.renderStoragePath && !s.renderResolving[g.id]) {
+          s.renderResolving[g.id] = true;
+          img.src = s.photoUrl || "";
+          storage.ref().child(g.renderStoragePath).getDownloadURL().then(function (url) {
+            s.renderUrls[g.id] = url;
+            renderChat();
+          }).catch(function () {});
+        } else {
+          img.src = s.photoUrl || "";
+        }
+        row.appendChild(img);
+        var main = document.createElement("div");
+        main.className = "add-garment-main";
+        var name = document.createElement("p");
+        name.className = "add-garment-name";
+        name.textContent = outfitParseDraftName(g.type, g.colors);
+        main.appendChild(name);
+        var cands = Array.isArray(g.matchCandidates) ? g.matchCandidates : [];
+        if (d.decision === "matched") {
+          var mp = document.createElement("p");
+          mp.className = "add-garment-match";
+          mp.textContent = "Same piece as your " + (d.matchedItemName || "logged piece") + " — the photo joins that piece.";
+          main.appendChild(mp);
+        } else if (cands.length && d.decision !== "skipped") {
+          var qp = document.createElement("p");
+          qp.className = "add-garment-match";
+          qp.textContent = "Looks like your " + (cands[0].itemName || "logged piece") + " — same piece?";
+          main.appendChild(qp);
+        }
+        row.appendChild(main);
+        // Match toggle (first candidate only in v1 — the full
+        // matcher lives in the Drafts review sheet).
+        if (cands.length && d.decision !== "skipped") {
+          var mt = document.createElement("button");
+          mt.type = "button";
+          mt.className = "link-button";
+          if (d.decision === "matched") {
+            mt.textContent = "No — it's new";
+            mt.addEventListener("click", function () {
+              s.decisions[g.id] = { decision: "confirmed-new" };
+              // Saying "it's new" IS rejecting the shown match —
+              // record it so the matcher learns, exactly as the
+              // review sheet does (best-effort, never blocking).
+              if (g.renderEmbedding) {
+                cands.forEach(function (c) {
+                  db.collection("users").doc(currentUser.uid).collection("match_rejections").doc().set({
+                    itemId: c.itemId,
+                    embedding: g.renderEmbedding,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                  }).catch(function () {});
+                });
+              }
+              renderChat();
+            });
+          } else {
+            mt.textContent = "Yes, same piece";
+            mt.addEventListener("click", function () {
+              s.decisions[g.id] = { decision: "matched", matchedItemId: cands[0].itemId, matchedItemName: cands[0].itemName };
+              renderChat();
+            });
+          }
+          row.appendChild(mt);
+        }
+        var skip = document.createElement("button");
+        skip.type = "button";
+        skip.className = "link-button";
+        skip.textContent = d.decision === "skipped" ? "Include" : "Skip";
+        skip.addEventListener("click", function () {
+          s.decisions[g.id] = d.decision === "skipped"
+            ? { decision: "confirmed-new" }
+            : { decision: "skipped" };
+          renderChat();
+        });
+        row.appendChild(skip);
+        return row;
+      }
+
+      function confirmChatAdd(m) {
+        var s = m.addParseId ? chatAddSessions[m.addParseId] : null;
+        if (!s || m.addState !== "ready") return;
+        var kept = chatAddKept(s);
+        if (!kept.length) { showToast("Keep at least one piece to add."); return; }
+        m.addState = "adding";
+        renderChat();
+        applyParseGarmentDecisions(s, kept).then(function (applied) {
+          // Parse bookkeeping — report-only on failure, exactly
+          // as the review sheet treats it.
+          functions.httpsCallable("finishOutfitParse", { timeout: 60000 })({ parseId: m.addParseId }).catch(function () {});
+          m.addState = "added";
+          m.addedNames = applied.names;
+          renderChat();
+          saveThread(s.threadKey);
+          continueChatAfterAdd(applied);
+        }).catch(function (err) {
+          m.addState = "ready";
+          showToast(friendlyError(err));
+          if (typeof reportError === "function") reportError("chat-add.confirm", err);
+          renderChat();
+        });
+      }
+
+      function waitForItems(ids, tries) {
+        var missing = (ids || []).filter(function (id) { return !itemById(id); });
+        if (!missing.length || tries <= 0) return Promise.resolve();
+        return new Promise(function (res) { setTimeout(res, 400); }).then(function () {
+          return waitForItems(ids, tries - 1);
+        });
+      }
+
+      // PC-66: the second half of the founder's sentence — "…and
+      // then create outfit with that." Once the pieces are in,
+      // the stylist is asked again with a wire-only line (the
+      // thread keeps the honest record: his words, the card,
+      // the Added note, then this reply).
+      function continueChatAfterAdd(applied) {
+        if (chatBusy || tripChat || activeThreadKey !== "general") return;
+        waitForItems(applied.sel, 12).then(function () {
+          var thinking = { role: "model", text: "Thinking…", thinking: true, at: Date.now() };
+          stylistMessages.push(thinking);
+          renderChat();
+          chatBusy = true;
+          chatSend.disabled = true;
+          var previousPick = null;
+          for (var i = stylistMessages.length - 1; i >= 0; i--) {
+            var pm = stylistMessages[i];
+            if (pm.outfit && pm.outfit.itemIds && pm.outfit.itemIds.length) {
+              previousPick = { itemIds: pm.outfit.itemIds.slice() };
+              break;
+            }
+          }
+          return getWeatherSummary().then(function (wx) {
+            var msgs = stylistMessages.filter(function (x) { return !x.thinking; }).slice(-55);
+            msgs.push({
+              role: "user",
+              text: "(I just added these pieces to my wardrobe: " + applied.names.join(", ") +
+                ". Now create the outfit with them, like I asked.)"
+            });
+            return callAskStylist({
+              items: stylistItems(),
+              messages: msgs,
+              previousPick: previousPick,
+              todayPick: null,
+              shopItem: currentShopAttach(),
+              mutedPinIds: currentMutedPinIds(),
+              todayPickAvailable: false,
+              attachProposalDismissed: true,
+              tripProposalDismissed: true,
+              refImages: [],
+              vibe: null,
+              weatherContext: wx,
+              today: localTodayStr(),
+              references: { articleIds: [], outfits: [] }
+            });
+          }).then(function (res) {
+            thinking.thinking = false;
+            var d = res.data || {};
+            thinking.text = d.reply || "Added — your new pieces are in the wardrobe.";
+            var outfit = d.outfit;
+            thinking.outfit = (outfit && outfit.itemIds && outfit.itemIds.length >= 2) ? outfit : null;
+            thinking.pinProposal = d.pinProposal || null;
+            thinking.pinState = d.pinProposal ? "pending" : null;
+            thinking.tripProposal = d.tripProposal || null;
+            thinking.tripState = d.tripProposal ? "pending" : null;
+          }).catch(function () {
+            thinking.thinking = false;
+            thinking.text = "Your pieces are added. Ask me to build the outfit with them whenever you're ready.";
+          }).then(function () {
+            chatBusy = false;
+            chatSend.disabled = false;
+            renderChat();
+            saveThread(activeThreadKey);
+          });
+        });
+      }
+
       function renderTripProposalCard(m) {
         var p = m.tripProposal;
         var card = document.createElement("div");
@@ -7553,6 +7958,11 @@
             thinking.pinState = d.pinProposal ? "pending" : null;
             thinking.attachProposal = d.attachProposal || null;
             thinking.attachState = d.attachProposal ? "pending" : null;
+            // PC-66: the add-to-wardrobe proposal — the parse
+            // starts in the final .then, once the thread is saved
+            // with the pending state.
+            thinking.addProposal = d.addProposal || null;
+            thinking.addState = d.addProposal ? "pending" : null;
             thinking.tripProposal = d.tripProposal || null;
             thinking.tripState = d.tripProposal ? "pending" : null;
           }
@@ -7572,6 +7982,12 @@
           renderChat();
           saveThread(sentThreadKey);
           maybeNoteWindow(sentThreadKey);
+          // PC-66: an approved add proposal with a photo in hand
+          // starts its parse now — upload, start, poll — bound to
+          // the reply message; the card fills in as pieces land.
+          if (thinking.addProposal && thinking.addState === "pending" && sentPhotos.length) {
+            startChatAddParse(thinking, sentPhotos[0], sentThreadKey);
+          }
         });
       }
 
@@ -10392,8 +10808,8 @@
         });
       }
 
-      function outfitParsePhotoEntry(garment) {
-        var st = outfitParseState;
+      function outfitParsePhotoEntry(garment, ctx) {
+        var st = ctx || outfitParseState;
         return {
           url: st.photoUrl,
           storagePath: st.storagePath,
@@ -10981,29 +11397,24 @@
         return done.then(function () { refreshDrafts(); });
       }
 
-      function saveOutfitParse(logWear) {        var st = outfitParseState;
-        if (!st) return;
-        // One save at a time: a double-tap used to start two
-        // chains that could duplicate items and outfits.
-        if (st.saving) return;
-        var kept = st.garments.filter(function (g) {
-          var d = st.decisions[g.id];
-          return d && (d.decision === "confirmed-new" || d.decision === "matched");
-        });
-        if (!kept.length) { showToast("Keep at least one piece to save."); return; }
-        st.saving = true;
-        document.getElementById("outfitParseSave").disabled = true;
-        document.getElementById("outfitParseSaveWear").disabled = true;
-        document.getElementById("outfitParseSaveHint").textContent = "Saving your outfit…";
+      // PC-66: the garment-decision chain, shared by the review
+      // sheet's save (saveOutfitParse) and the chat add card.
+      // Turns kept garments + decisions into wardrobe items:
+      // matched garments append the outfit photo to the existing
+      // item; confirmed-new garments create the item. ctx carries
+      // { parseId, photoUrl, storagePath, decisions, createdItemIds,
+      // appendedItemIds } — outfitParseState is one ctx; the chat
+      // card builds its own. Resolves { sel, names, appendErrors }.
+      function applyParseGarmentDecisions(ctx, kept) {
         var sel = [];
         var names = [];
         var chain = Promise.resolve();
         var appendErrors = 0;
         kept.forEach(function (g) {
-          var d = st.decisions[g.id];
+          var d = ctx.decisions[g.id];
           if (d.decision === "matched") {
             chain = chain.then(function () {
-              if (st.appendedItemIds.indexOf(d.matchedItemId) !== -1) {
+              if (ctx.appendedItemIds.indexOf(d.matchedItemId) !== -1) {
                 // Retry after a partial save: this photo is
                 // already on the item, don't append twice.
                 sel.push(d.matchedItemId);
@@ -11013,9 +11424,9 @@
               }
               var ref = db.collection("users").doc(currentUser.uid).collection("items").doc(d.matchedItemId);
               return ref.update({
-                photos: firebase.firestore.FieldValue.arrayUnion(outfitParsePhotoEntry(g))
+                photos: firebase.firestore.FieldValue.arrayUnion(outfitParsePhotoEntry(g, ctx))
               }).then(function () {
-                st.appendedItemIds.push(d.matchedItemId);
+                ctx.appendedItemIds.push(d.matchedItemId);
                 sel.push(d.matchedItemId);
                 var it = itemById(d.matchedItemId);
                 names.push(it ? it.name : (d.matchedItemName || "Unknown item"));
@@ -11073,9 +11484,9 @@
                 name: name,
                 shortName: capShortName(name),
                 category: category,
-                imageUrl: st.photoUrl,
-                storagePath: st.storagePath,
-                photos: [outfitParsePhotoEntry(g)],
+                imageUrl: ctx.photoUrl,
+                storagePath: ctx.storagePath,
+                photos: [outfitParsePhotoEntry(g, ctx)],
                 colors: v2.colors,
                 description: v2.description,
                 pattern: v2.pattern,
@@ -11107,14 +11518,14 @@
                   closure: g.closure || null,
                   zip: typeof g.zip === "boolean" ? g.zip : null,
                   hood: typeof g.hood === "boolean" ? g.hood : null,
-                  parseId: st.parseId,
+                  parseId: ctx.parseId,
                   prompt: g.prompt,
                   score: g.score || null
                 },
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
               };
               return docRef.set(doc).then(function () {
-                st.createdItemIds.push(docRef.id);
+                ctx.createdItemIds.push(docRef.id);
                 d.createdItemId = docRef.id;
                 sel.push(docRef.id);
                 names.push(name);
@@ -11122,7 +11533,32 @@
             });
           }
         });
-        chain.then(function () {
+        return chain.then(function () {
+          return { sel: sel, names: names, appendErrors: appendErrors };
+        });
+      }
+
+      function saveOutfitParse(logWear) {        var st = outfitParseState;
+        if (!st) return;
+        // One save at a time: a double-tap used to start two
+        // chains that could duplicate items and outfits.
+        if (st.saving) return;
+        var kept = st.garments.filter(function (g) {
+          var d = st.decisions[g.id];
+          return d && (d.decision === "confirmed-new" || d.decision === "matched");
+        });
+        if (!kept.length) { showToast("Keep at least one piece to save."); return; }
+        st.saving = true;
+        document.getElementById("outfitParseSave").disabled = true;
+        document.getElementById("outfitParseSaveWear").disabled = true;
+        document.getElementById("outfitParseSaveHint").textContent = "Saving your outfit…";
+        var sel = [];
+        var names = [];
+        var appendErrors = 0;
+        applyParseGarmentDecisions(st, kept).then(function (applied) {
+          sel = applied.sel;
+          names = applied.names;
+          appendErrors = applied.appendErrors;
           // Same dedup check as the photo matcher. A dup
           // can only fire for an all-matched selection —
           // a new item's id is in no existing outfit.
