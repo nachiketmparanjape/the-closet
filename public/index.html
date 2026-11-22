@@ -5862,7 +5862,13 @@
       // 2026-11-21). One shared stripper so every surface that
       // renders model text removes them the same way.
       function stripItemHandles(text) {
-        return String(text || "").replace(/\s*\[i\d+\]/gi, "");
+        var t = String(text || "");
+        // A handle at the very start leaves its trailing space
+        // behind; drop that too. Mid-text the space BEFORE the
+        // handle goes with it, so sentences stay clean.
+        var leadHandle = /^\s*\[i\d+\]/i.test(t);
+        t = t.replace(/\s*\[i\d+\]/gi, "");
+        return leadHandle ? t.replace(/^\s+/, "") : t;
       }
 
       function renderChat() {
