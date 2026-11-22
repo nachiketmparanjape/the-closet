@@ -5856,6 +5856,15 @@
         };
       }
 
+      // PC-63: item handles ([i42]) are prompt-local references the
+      // model uses to point at wardrobe items — server-internal, and
+      // they leaked into main-chat prose (founder screenshots,
+      // 2026-11-21). One shared stripper so every surface that
+      // renders model text removes them the same way.
+      function stripItemHandles(text) {
+        return String(text || "").replace(/\s*\[i\d+\]/gi, "");
+      }
+
       function renderChat() {
         chatList.textContent = "";
         if (!stylistMessages.length) {
@@ -6000,7 +6009,9 @@
             div.appendChild(refs);
           }
           var t = document.createElement("span");
-          t.textContent = m.text;
+          // PC-63: model prose carries [iNN] handles — strip them
+          // (user text is the user's own words, left untouched).
+          t.textContent = m.role === "model" ? stripItemHandles(m.text) : m.text;
           div.appendChild(t);
           chatList.appendChild(div);
           // PC-12: structured outfit card under the reply, with a Save action.
@@ -12799,8 +12810,9 @@
         // raw model text.
         function renderReplyText(el, text) {
           var t = String(text || "");
-          // Strip item handles: "**Name [i45]**" -> "**Name**".
-          t = t.replace(/\s*\[i\d+\]/gi, "");
+          // Strip item handles via the shared PC-63 helper:
+          // "**Name [i45]**" -> "**Name**".
+          t = stripItemHandles(t);
           // Escape HTML, then apply bold.
           var esc = t
             .replace(/&/g, "&amp;")
