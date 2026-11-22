@@ -507,6 +507,11 @@ function parseStylistJson(text, todayStr) {
   // nothing else. The gate in askStylist decides whether it
   // survives (the turn must have carried reference photos).
   const addProposal = obj.addProposal === "photoItems" ? "photoItems" : null;
+  // PC-68: a worn proposal is likewise a single literal — the
+  // model may propose logging the discussed outfit as worn.
+  // The gate in askStylist decides whether it survives (an
+  // outfit must actually be under discussion).
+  const wornProposal = obj.wornProposal === "worn" ? "worn" : null;
   // PC-33: a trip proposal — a destination plus real future
   // timing, sanitized hard (a steering card with a wrong date is
   // worse than none). Suppression lives here too: when a reply
@@ -517,7 +522,7 @@ function parseStylistJson(text, todayStr) {
   if (tripProposal && proposal && (proposal.kind === "location" || proposal.kind === "weather")) {
     proposal = null;
   }
-  return { reply: reply, outfit: outfit, pinProposal: proposal, attachProposal: attachProposal, tripProposal: tripProposal, addProposal: addProposal };
+  return { reply: reply, outfit: outfit, pinProposal: proposal, attachProposal: attachProposal, tripProposal: tripProposal, addProposal: addProposal, wornProposal: wornProposal };
 }
 
 // PC-33: the trip-proposal sanitizer. Destination and a valid
@@ -1099,6 +1104,15 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
       "you may return \"attachProposal\": \"todayPick\" in the JSON alongside reply/outfit. The user gets an Attach card; " +
       "nothing attaches unless they tap it. Do not claim to see the pick, and do not propose when the conversation is about anything else.";
   }
+  // PC-68: logging a wear is an act, proposed like the others.
+  if (!tripContext) {
+    system += "\n\nWORN PROPOSAL — if the user's latest message says they wore (or are wearing) the outfit " +
+      "under discussion — the one you proposed in this conversation, the attached today's pick, or the one " +
+      "you have been iterating on together — return \"wornProposal\": \"worn\" in the JSON alongside " +
+      "reply/outfit. The user gets a one-tap card to log it as worn today; never claim it is logged until " +
+      "they tap. Only when a specific outfit is clearly the one worn — not for a vague \"I wore jeans " +
+      "today\" with no outfit in play.";
+  }
   // PC-33: trip steering. Pins are the present-tense layer;
   // trips own the future. When a message carries a future trip,
   // the durable offer is a trip object, not a pin.
@@ -1576,9 +1590,15 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
   // lie. The prompt asks; this gate decides.
   const addProposal = (!tripContext && Array.isArray(refImages) && refImages.length > 0)
     ? (parsed.addProposal || null) : null;
+  // PC-68: the worn proposal survives only when an outfit is
+  // actually under discussion (a previous pick in the thread or
+  // the attached today's pick) — otherwise there is nothing
+  // definite to log.
+  const wornProposal = (!tripContext && (previousPick || todayPick))
+    ? (parsed.wornProposal || null) : null;
   if (!parsed.outfit || !mapped || problem) {
     if (parsed.outfit) emitEvent(hooks, "rejection", "outfit_discarded", { problem: problem || "unmapped" });
-    return { reply: parsed.reply, outfit: null, pinProposal: parsed.pinProposal || null, attachProposal: attachProposal, tripProposal: tripProposal, addProposal: addProposal, manifest: manifest };
+    return { reply: parsed.reply, outfit: null, pinProposal: parsed.pinProposal || null, attachProposal: attachProposal, tripProposal: tripProposal, addProposal: addProposal, wornProposal: wornProposal, manifest: manifest };
   }
   return {
     reply: parsed.reply,
@@ -1597,6 +1617,7 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
     attachProposal: attachProposal,
     tripProposal: tripProposal,
     addProposal: addProposal,
+    wornProposal: wornProposal,
   };
 }
 

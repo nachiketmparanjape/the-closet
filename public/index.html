@@ -414,6 +414,7 @@
     .add-garment-row .link-button { flex: none; }
     .same-outfit-strip { display: flex; align-items: center; gap: 10px; margin-top: 8px; padding: 8px 12px; background: var(--paper-soft); border: 1px dashed rgba(140, 118, 74, 0.4); border-radius: var(--r-sm); font-size: 13px; }
     .same-outfit-strip span { flex: 1; }
+    .wear-row { text-align: center; margin-top: 6px; }
     .pin-chip { display: inline-block; font-size: 13px; font-weight: 500; color: var(--ink); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; margin-left: 8px; vertical-align: middle; white-space: nowrap; }
     /* UX-18 W3: the one context display — a slim line under the chat
        header; tapping opens the context sheet with every fact. */
@@ -5539,6 +5540,11 @@
           // PC-67: photo-check verdicts persist on the photo's
           // message — they ground later turns in this thread.
           if (m.photoVerdicts) o.photoVerdicts = m.photoVerdicts;
+          // PC-68: the worn proposal + its state — the item set
+          // is bound at proposal time so a reload keeps the card
+          // pointing at the outfit that was under discussion.
+          if (m.wornProposal) o.wornProposal = m.wornProposal;
+          if (m.wornState) o.wornState = m.wornState;
           if (m.tripProposal) o.tripProposal = m.tripProposal;
           if (m.tripState) o.tripState = m.tripState;
           if (m.createdTripId) o.createdTripId = m.createdTripId;
@@ -6063,7 +6069,10 @@
               chatList.appendChild(renderSameOutfitStrip(m, firstWithSet));
             } else {
               if (!firstWithSet) seenOutfitSets[setKey] = m.outfit;
-              chatList.appendChild(renderOutfitCard(m));
+              // PC-68: thread cards carry the Wore-it affordance
+              // (a shallow copy — the outfit object stays shared,
+              // so save/worn state lands on the real message).
+              chatList.appendChild(renderOutfitCard(Object.assign({}, m, { wearLoggable: true })));
             }
           }
           // PC-37: trip outfit suggestions — one saveable card each.
@@ -6076,6 +6085,7 @@
                 outfit: s,
                 title: "Trip outfit idea",
                 reasoningInCard: true,
+                wearLoggable: true,
                 tripSave: m.tripSaveCtx || null
               }));
             });
@@ -6108,6 +6118,10 @@
           // once dismissed.
           if (m.addProposal && m.addState && m.addState !== "dismissed") {
             chatList.appendChild(renderAddProposalCard(m));
+          }
+          // PC-68: the log-as-worn card for a reported wear.
+          if (m.wornProposal && m.wornState && m.wornState !== "dismissed") {
+            chatList.appendChild(renderWornProposalCard(m));
           }
           // PC-33: the trip steering card — pending offers the
           // create; created shows the way into the trip. A trip
@@ -8055,6 +8069,24 @@
             // with the pending state.
             thinking.addProposal = d.addProposal || null;
             thinking.addState = d.addProposal ? "pending" : null;
+            // PC-68: the worn proposal — bind it NOW to the
+            // outfit under discussion (the thread's latest pick,
+            // which already folds in the attached today's pick),
+            // so the card's target survives reloads and the
+            // conversation moving on.
+            thinking.wornProposal = null;
+            thinking.wornState = null;
+            if (d.wornProposal && previousPick && previousPick.itemIds && previousPick.itemIds.length) {
+              var wName = null;
+              var wKey = outfitSetKey(previousPick.itemIds);
+              for (var wi = stylistMessages.length - 1; wi >= 0; wi--) {
+                var wm = stylistMessages[wi];
+                if (wm.outfit && outfitSetKey(wm.outfit.itemIds) === wKey) { wName = wm.outfit.lookName || null; break; }
+              }
+              if (!wName && todayPickCtx) wName = todayPickCtx.lookName || null;
+              thinking.wornProposal = { itemIds: previousPick.itemIds.slice(), lookName: wName };
+              thinking.wornState = "pending";
+            }
             thinking.tripProposal = d.tripProposal || null;
             thinking.tripState = d.tripProposal ? "pending" : null;
           }
@@ -14119,6 +14151,136 @@
         });
       }
 
+      // PC-68: the one wear-logging path for chat — used by the
+      // outfit cards' "Wore it today" and by the worn-proposal
+      // card. Mirrors todayWear's discipline: the outfit is
+      // saved (or matched to its saved twin) first so the event
+      // carries a real outfitId, and today's wear_events are
+      // checked before writing — logging the same outfit twice
+      // in a day is a no-op, never a duplicate.
+      function logWearForOutfit(msg, done) {
+        var o = msg.outfit;
+        if (!o || !currentUser || !o.itemIds || !o.itemIds.length) { if (done) done(false); return; }
+        if (o.wornDate === localTodayStr()) { if (done) done(true); return; }
+        function writeEvent(savedId) {
+          var start = new Date();
+          start.setHours(0, 0, 0, 0);
+          var end = new Date(start.getTime() + 86400000);
+          var guard = savedId
+            ? db.collection("users").doc(currentUser.uid).collection("wear_events")
+                .where("outfitId", "==", savedId)
+                .where("wornAt", ">=", firebase.firestore.Timestamp.fromDate(start))
+                .where("wornAt", "<", firebase.firestore.Timestamp.fromDate(end))
+                .get().then(function (snap) { return !snap.empty; })
+                .catch(function () { return false; })
+            : Promise.resolve(false);
+          guard.then(function (already) {
+            if (already) {
+              o.wornDate = localTodayStr();
+              if (done) done(true);
+              return;
+            }
+            var names = (o.itemIds || []).map(function (id) {
+              var it = itemById(id);
+              return it ? it.name : "Unknown item";
+            });
+            db.collection("users").doc(currentUser.uid).collection("wear_events").doc().set({
+              wornAt: firebase.firestore.FieldValue.serverTimestamp(),
+              articleIds: o.itemIds || [],
+              articleNames: names,
+              outfitId: savedId || null,
+              occasion: null,
+              note: "",
+              createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            }).then(function () {
+              o.wornDate = localTodayStr();
+              recordVibeSignal(vibeDeltasForItems(o.itemIds || [], 0.04));
+              if (done) done(true);
+            }).catch(function (err) {
+              showToast(friendlyError(err));
+              if (done) done(false);
+            });
+          });
+        }
+        if (o.savedId) { writeEvent(o.savedId); return; }
+        findDuplicateOutfit(o.itemIds, "stylist").then(function (dup) {
+          if (dup) {
+            o.savedId = dup.id;
+            writeEvent(dup.id);
+            return;
+          }
+          saveChatOutfit(msg, function () { writeEvent(o.savedId || null); });
+        }).catch(function () { writeEvent(null); });
+      }
+
+      // PC-68: the confirm card for a reported wear ("Ended up
+      // wearing this"). The item set was bound at proposal time;
+      // confirming runs the same logWearForOutfit path the
+      // outfit cards use.
+      function renderWornProposalCard(m) {
+        if (m.wornState === "logged") {
+          var note = document.createElement("div");
+          note.className = "chat-msg note";
+          note.textContent = "Logged as worn today ✓";
+          return note;
+        }
+        var p = m.wornProposal;
+        var card = document.createElement("div");
+        card.className = "pin-proposal";
+        var head = document.createElement("p");
+        head.className = "pin-proposal-head";
+        head.textContent = "Log this as worn today?";
+        head.insertBefore(iconSpan("clipboard", true), head.firstChild);
+        card.appendChild(head);
+        var body = document.createElement("p");
+        body.className = "hint";
+        var names = (p.itemIds || []).map(function (id) {
+          var it = itemById(id);
+          return it ? it.name : "a piece";
+        });
+        body.textContent = (p.lookName ? "“" + p.lookName + "” — " : "") + names.join(", ") + ".";
+        card.appendChild(body);
+        var row = document.createElement("div");
+        row.className = "pin-proposal-actions";
+        var log = document.createElement("button");
+        log.className = "primary";
+        log.type = "button";
+        log.textContent = "Log as worn";
+        log.addEventListener("click", function () {
+          log.disabled = true;
+          log.textContent = "Logging…";
+          var synth = { outfit: { itemIds: p.itemIds.slice(), lookName: p.lookName || null } };
+          // If the thread holds this outfit on a card, log
+          // through THAT object so its savedId/wornDate stay
+          // the single source of truth.
+          var key = outfitSetKey(p.itemIds);
+          for (var i = stylistMessages.length - 1; i >= 0; i--) {
+            var sm = stylistMessages[i];
+            if (sm.outfit && outfitSetKey(sm.outfit.itemIds) === key) { synth = sm; break; }
+          }
+          logWearForOutfit(synth, function (ok) {
+            if (ok) {
+              m.wornState = "logged";
+              showToast("Logged as worn today.");
+            }
+            renderChat();
+            saveThread(activeThreadKey);
+          });
+        });
+        var dismiss = document.createElement("button");
+        dismiss.type = "button";
+        dismiss.textContent = "Not now";
+        dismiss.addEventListener("click", function () {
+          m.wornState = "dismissed";
+          renderChat();
+          saveThread(activeThreadKey);
+        });
+        row.appendChild(log);
+        row.appendChild(dismiss);
+        card.appendChild(row);
+        return card;
+      }
+
       // PC-65: a repeated outfit set renders as a compact strip
       // naming the FIRST card — the outfit keeps its original
       // name and confidence (stable identity). "Show it" expands
@@ -14143,7 +14305,7 @@
         strip.appendChild(btn);
         wrap.appendChild(strip);
         if (m.sameExpanded) {
-          wrap.appendChild(renderOutfitCard({ outfit: firstOutfit }));
+          wrap.appendChild(renderOutfitCard({ outfit: firstOutfit, wearLoggable: true }));
         }
         return wrap;
       }
@@ -14218,6 +14380,33 @@
           });
         }
         card.appendChild(btn);
+        // PC-68: one-tap wear logging on thread cards. The worn
+        // date rides the outfit object (persisted with the
+        // thread), and logWearForOutfit double-checks today's
+        // wear_events before writing — a second log is a no-op.
+        if (msg.wearLoggable && o.itemIds && o.itemIds.length) {
+          var wearRow = document.createElement("div");
+          wearRow.className = "wear-row";
+          var wearBtn = document.createElement("button");
+          wearBtn.type = "button";
+          wearBtn.className = "link-button";
+          if (o.wornDate === localTodayStr()) {
+            wearBtn.textContent = "Worn today ✓";
+            wearBtn.disabled = true;
+          } else {
+            wearBtn.textContent = "Wore it today";
+            wearBtn.addEventListener("click", function () {
+              wearBtn.disabled = true;
+              wearBtn.textContent = "Logging…";
+              logWearForOutfit(msg, function (ok) {
+                if (ok) { showToast("Logged as worn today."); saveThread(activeThreadKey); }
+                renderChat();
+              });
+            });
+          }
+          wearRow.appendChild(wearBtn);
+          card.appendChild(wearRow);
+        }
         return card;
       }
 
