@@ -1782,3 +1782,8 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
   tests/pc61-meta.test.js; entry in SHIPPED.md. Remaining: the
   Career thread retries the LinkedIn attach (Project media +
   Featured) — that closes the loop.
+- **Follow-up (2026-11-21):** og:image upgraded from the 512
+  icon to a designed 1200×630 card (founder-approved sample;
+  source scripts/build-og-card.py), twitter:card now
+  summary_large_image. Deployed (release 1795310458762000) and
+  verified live incl. Microlink parse of the new card.

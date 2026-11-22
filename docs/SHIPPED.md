@@ -816,3 +816,19 @@ independent link-preview parse (Microlink) returns title,
 description, image, and publisher. Guards in
 tests/pc61-meta.test.js. This unblocks the Career thread's
 LinkedIn retry (Closet Project media + Featured).
+
+## 2026-11-21 — PC-61 follow-up: designed preview card
+
+The og:image is now a designed 1200×630 card (Warm Editorial:
+espresso ground, ivory serif wordmark in the app's own fonts,
+brass accents, ghost C watermark) at /og-card.png, replacing the
+square 512 icon PC-61 shipped with. twitter:card upgraded to
+summary_large_image; all other PC-61 tags unchanged. Founder
+approved the sample 2026-11-21. Card source is reproducible:
+scripts/build-og-card.py extracts the brand fonts from the app
+itself and re-renders byte-identically. Deployed as hosting
+release 1795310458762000 and verified live: tags served, image
+resolves at 1200×630, independent preview parse (Microlink)
+returns the new card. Guards updated in tests/pc61-meta.test.js.
+The fresh /og-card.png URL also sidesteps LinkedIn's cached
+failure of the old preview.

@@ -17,16 +17,22 @@ test("Open Graph tags are complete", () => {
   assert.ok(html.includes('<meta property="og:description" content="An AI wardrobe stylist: catalogue your clothes, get outfit picks." />'), "og:description missing");
   assert.ok(html.includes('<meta property="og:type" content="website" />'), "og:type missing");
   assert.ok(html.includes('<meta property="og:url" content="https://closet-404e9.web.app/" />'), "og:url missing");
-  assert.ok(html.includes('<meta property="og:image" content="https://closet-404e9.web.app/icons/icon-512.png" />'), "og:image missing");
+  assert.ok(html.includes('<meta property="og:image" content="https://closet-404e9.web.app/og-card.png" />'), "og:image missing");
+  assert.ok(html.includes('<meta property="og:image:width" content="1200" />'), "og:image:width missing");
+  assert.ok(html.includes('<meta property="og:image:height" content="630" />'), "og:image:height missing");
 });
 
 test("Twitter card tags are present and match the OG copy", () => {
-  assert.ok(html.includes('<meta name="twitter:card" content="summary" />'), "twitter:card missing");
+  assert.ok(html.includes('<meta name="twitter:card" content="summary_large_image" />'), "twitter:card missing");
   assert.ok(html.includes('<meta name="twitter:title" content="Closet — your wardrobe, styled" />'), "twitter:title missing");
-  assert.ok(html.includes('<meta name="twitter:image" content="https://closet-404e9.web.app/icons/icon-512.png" />'), "twitter:image missing");
+  assert.ok(html.includes('<meta name="twitter:image" content="https://closet-404e9.web.app/og-card.png" />'), "twitter:image missing");
 });
 
-test("the og:image asset actually ships in public/", () => {
-  const p = path.join(__dirname, "..", "public", "icons", "icon-512.png");
-  assert.ok(fs.existsSync(p), "icon-512.png missing from public/icons/");
+test("the og:image asset actually ships in public/ at 1200x630", () => {
+  const p = path.join(__dirname, "..", "public", "og-card.png");
+  assert.ok(fs.existsSync(p), "og-card.png missing from public/");
+  // PNG IHDR: width/height are big-endian uint32 at bytes 16-24.
+  const buf = fs.readFileSync(p);
+  assert.equal(buf.readUInt32BE(16), 1200, "og-card.png width is not 1200");
+  assert.equal(buf.readUInt32BE(20), 630, "og-card.png height is not 630");
 });
