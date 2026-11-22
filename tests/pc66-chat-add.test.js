@@ -43,7 +43,7 @@ describe("PC-66 server: the add proposal is a single literal, gated on photos", 
 describe("PC-66 client: proposal → parse → confirm → shared chain", () => {
   it("sendChat captures the proposal and starts the parse with the sent photo", () => {
     assert.ok(html.includes("thinking.addProposal = d.addProposal || null;"), "reply handler drops addProposal");
-    assert.ok(html.includes("startChatAddParse(thinking, sentPhotos[0], sentThreadKey);"), "parse never starts");
+    assert.ok(html.includes("startChatAddParse(thinking, sentPhotos[0], sentThreadKey, userMsg);"), "parse never starts");
   });
 
   it("the card renders for every non-dismissed state", () => {
