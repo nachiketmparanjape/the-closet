@@ -68,6 +68,10 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
   tool calls execute client-side against Firestore rules. Sequencing:
   reads before writes; revisit when the stylist lane is solid. See
   `docs/VISION.md` ("Long-term: the stylist as an agent").
+  **Graduated 2026-11-21:** the trigger fired — the founder hit the
+  wall live in his own thread (asked the stylist to add an item and
+  log a wear; it could only talk). First writes are PC-66 (add
+  items) and PC-68 (log worn), Sprint 31 (proposed).
 - **Bulk upload (one photo per article):** select N photos → N items created
   automatically, AI describes each, user reviews/edits afterwards. Matches
   the real cataloguing behavior (photograph 50 things, curate later) instead
@@ -1815,3 +1819,205 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
   immutable cache header, Microlink parse succeeds. Byte-budget
   guard in tests/pc62-shell.test.js. Remaining: the Career
   thread's LinkedIn retry + Post Inspector re-check.
+
+### PC-63: Raw [iNN] handles never render in chat prose (S)
+
+- **Origin:** Founder thread review, 2026-11-21 — his own
+  screenshots show "[i42]" / "[i32]" (internal prompt handles)
+  sitting in the stylist's reply text in the main chat. The
+  PC-41 follow-up sheet strips them (renderReplyText); the
+  main chat renderer does not.
+- **Fix:** strip handles in main-chat reply rendering, the
+  same treatment the follow-up sheet already gets. This is
+  the floor; PC-64 is the ceiling (handles become chips).
+- **Acceptance:** no stylist reply in any thread renders a
+  raw [iNN] token; regression test covers a reply containing
+  handles mid-sentence and at line ends.
+- **Lane:** Stylist. **Effort:** S.
+- **Status:** Filed 2026-11-21. In Sprint 31 (proposed).
+
+### PC-64: Tappable item chips for item mentions in stylist prose (M)
+
+- **Origin:** Founder thread review, 2026-11-21 — the
+  follow-on to PC-63. The stylist names pieces in prose;
+  those names should be objects, not text.
+- **Scope:** when a reply mentions a wardrobe item via its
+  handle, render a chip (thumbnail + short name) inline;
+  tapping it opens the item page. The client sent the item
+  list the handles index into — verify that ordering
+  contract first; any handle that cannot be mapped with
+  certainty falls back to plain text (never a wrong chip).
+- **Acceptance:** in the general thread, a reply mentioning
+  two pieces renders two chips; each opens the correct
+  item; an unmappable handle renders as clean text.
+- **Lane:** Stylist. **Effort:** M. Depends on PC-63.
+- **Status:** Filed 2026-11-21. Sprint 31 alternate.
+
+### PC-65: Same outfit, same card — dedupe, stable name, stable confidence (M)
+
+- **Origin:** Founder thread review, 2026-11-21 — one
+  thread returned the identical 3-item outfit three times
+  as SLATE & STONE (8/10), OFF-DUTY CLASSIC (9/10) and
+  CLASSIC COOL (8/10). Re-skinning reads as bluffing.
+- **Scope:** an outfit's identity is its item set. When a
+  proposed set matches a card already in the thread, the
+  stylist must not mint a new name/score — it acknowledges
+  ("same core outfit") and offers a variation axis instead
+  (swap a piece, add a layer, change the shoes). Confidence
+  for an item set is computed once and reused verbatim.
+  Server prompt + reply contract; client dedupe as the
+  backstop (identical set renders as the existing card).
+- **Acceptance:** scripted thread — ask for an outfit,
+  then ask again in different words; the second reply does
+  not present the identical set as a new named card, and
+  any repeated set carries its original confidence.
+- **Lane:** Stylist. **Effort:** M.
+- **Status:** Filed 2026-11-21. In Sprint 31 (proposed).
+
+### PC-66: Add items from chat — the stylist gets hands (L)
+
+- **Origin:** Founder thread review, 2026-11-21. He asked
+  twice — "add it to the wardrobe and then create outfit
+  with that" — about a photo already in the thread, and got
+  two refusals. Graduates the untriaged "Stylist as an
+  agent" vision (2026-10-18: reads first, then writes) —
+  this is its first write. Pattern precedent: trip packing
+  (model proposes, client disposes).
+- **Scope:** when the user asks to add something and a
+  photo is in play (attached via PC-38, sent in the thread,
+  or newly captured), run the existing outfit-parse
+  pipeline and present an "Add these pieces" confirm card:
+  each parsed piece with its photo and name, and any piece
+  that matches a logged item flagged "looks like your X —
+  same piece?" (exclude it with one tap). Confirm creates
+  the items through the normal finish-parse path; nothing
+  is added without the tap. The stylist then continues in
+  the same turn — styling with the new piece, which is
+  what the user actually asked for. A blocked intent never
+  returns a bare refusal again: it returns this card, or a
+  button that opens the capture flow.
+- **Acceptance:** from a chat photo of an unlogged outfit,
+  the founder adds the pieces and receives an outfit using
+  one of them, without leaving the thread; declining the
+  card adds nothing; a parse failure surfaces as one human
+  sentence with a retry.
+- **Lane:** Stylist + Catalogue. **Effort:** L.
+- **Status:** Filed 2026-11-21. In Sprint 31 (proposed) —
+  the sprint's flagship.
+
+### PC-67: The stylist verifies logged/unlogged claims against match results (S)
+
+- **Origin:** Founder thread review, 2026-11-21 — he wrote
+  "both are not logged yet I think" and the stylist simply
+  assumed, then silently substituted lookalikes and called
+  it "recreating that exact vibe."
+- **Scope:** when a photo reference rides a chat message,
+  run garment matching and pass the verdicts into the
+  stylist's context: matched pieces are named as logged;
+  unmatched as not found; ambiguous matches are ASKED
+  about (one-line confirm in the reply or the PC-66 card),
+  never silently substituted. Prompt/context change; no
+  new pipeline.
+- **Acceptance:** thread test — send a photo of a logged
+  item; the stylist identifies it as the logged piece
+  instead of proposing a substitute. Send a genuinely new
+  piece; it says so plainly and offers PC-66's add card.
+- **Lane:** Stylist. **Effort:** S. Pairs with PC-66.
+- **Status:** Filed 2026-11-21. In Sprint 31 (proposed).
+
+### PC-68: Log-as-worn from chat (M)
+
+- **Origin:** Founder thread review, 2026-11-21 — "Ended
+  up wearing this" was reported in chat and captured
+  nowhere. Second write of the agent vision (after PC-66).
+- **Scope:** an action card — "Log as worn today" — when
+  the user reports wearing something, and a "Wore it"
+  affordance on outfit cards and on Today's pick inside
+  chat. One tap writes the wear record (outfit if the
+  card is saved, else the item set) through the existing
+  wear-history store. Feeds the data #139 (Today repeats
+  worn outfits) needs to behave.
+- **Acceptance:** one tap from chat creates a wear record
+  visible in the outfit's wear history; logging twice for
+  the same day is a no-op with a quiet note, not a dupe.
+- **Lane:** Stylist + Outfits. **Effort:** M.
+- **Status:** Filed 2026-11-21. In Sprint 31 (proposed).
+
+### PC-69: Outfit card actions — tap a piece, swap a piece, refine in one tap (M)
+
+- **Origin:** Founder thread review, 2026-11-21 — cards
+  are dead ends: tiles don't tap, refining means typing a
+  whole new message.
+- **Scope:** tapping an item tile on a chat outfit card
+  opens that item's page. Under each card, quick chips:
+  one "Swap" chip per piece (Swap the jeans →) and two
+  refinement chips (Warmer, More formal). A chip sends a
+  structured follow-up carrying the card's outfit as
+  context, so the reply is a revision of THIS outfit, not
+  a fresh invention (and PC-65 keeps its identity rules).
+- **Acceptance:** from a card, the founder swaps one piece
+  and gets a revised card in one tap + one reply; tapping
+  a tile opens the correct item.
+- **Lane:** Stylist. **Effort:** M.
+- **Status:** Filed 2026-11-21. Sprint 31 alternate.
+
+### PC-70: Outfit card hygiene — saved state, collapsed history, even tiles (S)
+
+- **Origin:** Founder thread review, 2026-11-21 — three
+  unsaved cards stack three giant Save buttons down the
+  thread (one bleeding in from the previous screen), and
+  item tiles render at ragged heights (jeans as a sliver
+  beside the wide sweater).
+- **Scope:** (a) Save persists its state — a saved card's
+  button reads "Saved" and disables, surviving reload;
+  (b) only the newest card renders expanded — older cards
+  collapse to a compact strip (name + thumbnails + expand
+  tap); (c) card item tiles use one uniform aspect via
+  the display-photo resolver (PC-59's category scaling
+  applies to trips, not chat cards — close that gap).
+- **Acceptance:** a thread with 3+ cards shows one
+  expanded card and compact strips for the rest; a saved
+  card still shows Saved after reload; no tile renders
+  narrower than the uniform aspect.
+- **Lane:** Stylist. **Effort:** S.
+- **Status:** Filed 2026-11-21. In Sprint 31 (proposed).
+
+### PC-71: "Not for me" — a feedback signal on outfit cards (M)
+
+- **Origin:** Founder thread review, 2026-11-21 — he
+  rejected the premise three times and wore something
+  else; the app learned nothing. There is no negative
+  signal anywhere on a card.
+- **Scope:** a quiet "Not for me" action on outfit cards
+  opening reason chips (Too plain / Wrong vibe / Not that
+  piece / Wrong for the weather). The signal stores on the
+  message and rides future stylist context the way the
+  vibe profile does — stated once, applied quietly, never
+  lectured about.
+- **Acceptance:** feedback persists on the thread; a test
+  shows the signal present in the next request's context;
+  the founder can also undo it from the same spot.
+- **Lane:** Stylist. **Effort:** M.
+- **Status:** Filed 2026-11-21. Sprint 31 alternate.
+
+### PC-72: Chat polish bundle — context bar, reply variety, duplicate sends (S)
+
+- **Origin:** Founder thread review, 2026-11-21 — three
+  small thread defects in one bundle:
+  (a) the context bar truncates the preference tail
+  mid-word ("I like ti…") while transient weather takes
+  the prime space — truncate at a word boundary and keep
+  the full text one tap away in the context sheet;
+  (b) stylist prose is long and repeats stock phrases
+  ("effortless, cool-toned") near-verbatim across a
+  thread — prompt guidance: when a card carries the
+  answer, prose stays short and varies its wording;
+  (c) the same user message can land twice in a thread
+  (his "add it" message appears twice) — an identical
+  message re-sent within a short window is caught and
+  confirmed, not double-sent.
+- **Acceptance:** one check per sub-item: bar never cuts
+  mid-word; a 3-reply scripted thread shows no repeated
+  stock phrase; a double-send produces one message.
+- **Lane:** Stylist. **Effort:** S (bundle of three).
+- **Status:** Filed 2026-11-21. Sprint 31 alternate.
