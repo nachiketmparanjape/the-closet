@@ -885,3 +885,29 @@ Suite at sprint end: 539 passing.
   cards collapse to a strip; tiles are true squares
   (`height: auto` — the inherited 56px height was silently
   defeating `aspect-ratio: 1`).
+
+## Sprint 32 (2026-11-23) — Polish the thing people already have
+
+Built and deployed from 2026-11-23; founder phone verification
+pending for all six cards. Record: `docs/sprints/sprint-32/SPRINT.md`.
+Suite at sprint start: 529 passing in `tests/` + 10 in
+`functions/cutout-check.test.js`.
+
+- **UX-14a — demo wardrobe + greatest-hits-first.** A new user can
+  feel a pick before adding anything: a labeled demo wardrobe (10
+  sample pieces, Unsplash photos, every photo verified by viewing;
+  design note `docs/sprints/sprint-32/UX-14A-DESIGN.md`) on its own
+  in-memory-only demo thread (never saved to Firestore), read-only
+  picks (no Save, no Wore-it), labeled Demo in the empty state, the
+  context bar, and on the cards. Doors from the empty chat and the
+  Today zero card. Greatest-hits half: onboarding copy asks for ~10
+  most-worn pieces; the brief says so honestly for partial real
+  wardrobes (<10 items). The 4-item pick threshold does NOT move —
+  the 10-vs-15 question needs the stylist-quality test first.
+  Verified: 9 new tests (server prompt + client shape), suite 538
+  passing in `tests/` + 10 in `functions/`; `node --check` clean on
+  client script + both functions files; `askStylist` redeployed via
+  `deploy-update.js`; CI Hosting deploy success (run 45291641287);
+  live site serves the new code ("Try the demo wardrobe" present).
+  Standards: coding-principles, code-style, testing, error-handling.
+  Founder phone verification pending.

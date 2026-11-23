@@ -124,3 +124,36 @@ Combina A/B fork (Option B recommended); Essembl APK adoption
 candidates; SAM 3 prototype amendment verdict; UX-audit approach;
 dark muted text (one step lighter?); dark primary inversion (keep or
 restyle?). The last two came out of the unslop round-2 findings.
+
+## Build results
+
+- **UX-14a — demo wardrobe + greatest-hits-first.** Commit
+  `22454e7` (2026-11-23). Design note
+  `docs/sprints/sprint-32/UX-14A-DESIGN.md` (written before the cut;
+  the proposal did not settle which items, how labeled, or where it
+  lives). Built + deployed; CI Hosting deploy success (run
+  45291641287); live site serves the new code; `askStylist`
+  redeployed via `deploy-update.js`. Tests: 9 new, suite 538
+  passing in `tests/` + 10 in `functions/`; `node --check` clean;
+  doc-honesty exit 0. Founder phone verification pending — see
+  phone paths below.
+- **PC-64 — tappable item chips.** Not built yet.
+- **PC-69 — outfit card actions.** Not built yet.
+- **PC-71 — "Not for me".** Not built yet.
+- **PC-72 — chat polish bundle.** Not built yet.
+- **UX-16 — context-handoff audit.** Not built yet.
+
+## Phone-test paths (founder — what still needs his phone)
+
+Per card, exact paths to cover. Nothing below is verified until
+his phone does it.
+
+- **UX-14a:** (1) sign out / fresh guest — Today tab shows the
+  "Start here" card with "Try the demo wardrobe first"; tap it —
+  the chat opens labeled Demo with 10 sample pieces in the context
+  bar. (2) Ask "casual dinner, 60°F" — a pick comes back from the
+  sample pieces; the card says "Demo outfit" and has no Save
+  button. (3) Tap "Add your own pieces" — demo exits into the
+  capture flow. (4) With 4–9 real pieces, ask for a pick — the
+  stylist works with what's there and says so honestly. (5) Reload
+  mid-demo — the demo conversation is gone (in-memory only).

@@ -144,6 +144,10 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   planning walk); first-run is designed as part of UX-13.
 - **Status:** Not started (proposal stage). Each attack line
   becomes its own sized cut at a planning walk.
+- **Slice shipped:** UX-14a (demo wardrobe + greatest-hits-first)
+  built + deployed in Sprint 32 (2026-11-23); founder phone
+  verification pending. Design note:
+  `docs/sprints/sprint-32/UX-14A-DESIGN.md`.
 
 ### UX-15: Sheets & popups feel native — motion, swipe, backdrop everywhere (M)
 - **Size:** M
