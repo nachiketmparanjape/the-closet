@@ -911,3 +911,18 @@ Suite at sprint start: 529 passing in `tests/` + 10 in
   live site serves the new code ("Try the demo wardrobe" present).
   Standards: coding-principles, code-style, testing, error-handling.
   Founder phone verification pending.
+- **PC-64 — tappable item chips.** Stylist prose mentions become
+  objects: a handle that maps renders as a chip (thumbnail + short
+  name) inline; tapping opens the item page. The mapping is certain
+  by construction — the reply carries the wardrobe snapshot it was
+  answered from (`wardrobeIds`, persisted on the message), and the
+  server's handle contract was verified first (handles index the
+  `items` array the client sent; `itemLine` in `functions/stylist.js`).
+  Anything unmappable (no snapshot, out of range, deleted item)
+  falls back to the PC-63 strip — never a wrong chip. Demo pieces
+  show a toast instead of an item page. Verified: 8 new tests
+  (`parseHandleSegments`, `itemFromWardrobeHandle`, snapshot
+  persistence), suite 546 passing in `tests/`; `node --check` clean
+  on the client script; no server change, so no function deploy.
+  Standards: coding-principles, code-style, testing. Founder phone
+  verification pending.

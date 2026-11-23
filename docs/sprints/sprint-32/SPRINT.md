@@ -137,7 +137,12 @@ restyle?). The last two came out of the unslop round-2 findings.
   passing in `tests/` + 10 in `functions/`; `node --check` clean;
   doc-honesty exit 0. Founder phone verification pending — see
   phone paths below.
-- **PC-64 — tappable item chips.** Not built yet.
+- **PC-64 — tappable item chips.** Commit `f802323` (2026-11-23).
+  Handles become chips from the reply's wardrobe snapshot; unmapped
+  handles fall back to clean text. Built + deployed; CI Hosting
+  deploy to verify; no server change, no function deploy. Tests: 8
+  new, suite 546 passing in `tests/`; `node --check` clean.
+  Founder phone verification pending — see phone paths below.
 - **PC-69 — outfit card actions.** Not built yet.
 - **PC-71 — "Not for me".** Not built yet.
 - **PC-72 — chat polish bundle.** Not built yet.
@@ -157,3 +162,9 @@ his phone does it.
   capture flow. (4) With 4–9 real pieces, ask for a pick — the
   stylist works with what's there and says so honestly. (5) Reload
   mid-demo — the demo conversation is gone (in-memory only).
+- **PC-64:** (1) in the general thread, ask for an outfit and get a
+  reply naming two pieces — each name renders as a chip with a
+  thumbnail; tap each chip and the correct item page opens. (2) A
+  reply mentioning a piece that was deleted since (or an old thread
+  from before this cut) shows clean text, no chip, no raw [iNN].
+  (3) In demo mode, tapping a chip says plainly it's a demo piece.

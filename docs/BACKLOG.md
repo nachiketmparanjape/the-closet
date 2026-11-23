@@ -1002,7 +1002,11 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   two pieces renders two chips; each opens the correct
   item; an unmappable handle renders as clean text.
 - **Lane:** Stylist. **Effort:** M. Depends on PC-63.
-- **Status:** Filed 2026-11-21. Sprint 31 alternate.
+- **Status:** Filed 2026-11-21. Sprint 31 alternate. In Sprint 32 —
+  SHIPPED 2026-11-23 (built + deployed; awaiting founder phone
+  verification). The ordering contract was verified first (handles
+  index the `items` array the client sent); the reply carries its
+  wardrobe snapshot (`wardrobeIds`) so chips map with certainty.
 
 ### PC-65: Same outfit, same card — dedupe, stable name, stable confidence (M)
 
