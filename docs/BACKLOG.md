@@ -1114,7 +1114,11 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   and gets a revised card in one tap + one reply; tapping
   a tile opens the correct item.
 - **Lane:** Stylist. **Effort:** M.
-- **Status:** Filed 2026-11-21. Sprint 31 alternate.
+- **Status:** Filed 2026-11-21. Sprint 31 alternate. In Sprint 32 —
+  SHIPPED 2026-11-23 (built + deployed; awaiting founder phone
+  verification). Tile taps open the item page everywhere; Swap /
+  Warmer / More formal chips are chat-only and force the card's
+  outfit as the iteration base; no server change needed.
 
 ### PC-70: Outfit card hygiene — saved state, collapsed history, even tiles (S)
 

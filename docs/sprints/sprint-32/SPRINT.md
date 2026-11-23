@@ -143,7 +143,14 @@ restyle?). The last two came out of the unslop round-2 findings.
   deploy to verify; no server change, no function deploy. Tests: 8
   new, suite 546 passing in `tests/`; `node --check` clean.
   Founder phone verification pending — see phone paths below.
-- **PC-69 — outfit card actions.** Not built yet.
+- **PC-69 — outfit card actions.** Commit `87df3b6` (2026-11-23).
+  Tapping a tile opens the item page; under each chat card, one
+  Swap chip per piece plus Warmer / More formal, each sending a
+  follow-up with that card's outfit forced as the iteration base.
+  Built + deployed; CI Hosting deploy to verify; no server change,
+  no function deploy. Tests: 8 new, suite 551 passing in `tests/`
+  + 10 in `functions/cutout-check.test.js`; `node --check` clean.
+  Founder phone verification pending — see phone paths below.
 - **PC-71 — "Not for me".** Not built yet.
 - **PC-72 — chat polish bundle.** Not built yet.
 - **UX-16 — context-handoff audit.** Not built yet.
@@ -168,3 +175,10 @@ his phone does it.
   reply mentioning a piece that was deleted since (or an old thread
   from before this cut) shows clean text, no chip, no raw [iNN].
   (3) In demo mode, tapping a chip says plainly it's a demo piece.
+- **PC-69:** (1) on a chat outfit card, tap a tile — the correct
+  item page opens. (2) Tap "Swap the jeans →" — one reply comes
+  back with the same outfit except the jeans, and the card says so.
+  (3) Tap "Warmer" and "More formal" — each returns a revised card
+  in that direction, not a fresh outfit. (4) On a trip page or in
+  the composer, tiles still tap to the item page but no action chips
+  appear under the card.

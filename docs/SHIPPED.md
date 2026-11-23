@@ -926,3 +926,20 @@ Suite at sprint start: 529 passing in `tests/` + 10 in
   on the client script; no server change, so no function deploy.
   Standards: coding-principles, code-style, testing. Founder phone
   verification pending.
+- **PC-69 — outfit card actions.** Tapping an item tile on a chat
+  outfit card opens that item's page (keyboard: Enter/Space). Under
+  each chat card, quick chips: one "Swap the X →" chip per piece plus
+  "Warmer" and "More formal". A chip sends a follow-up carrying the
+  card's outfit as the iteration base (`forcedPreviousPick`, consumed
+  once by `sendChat`), so the reply revises THIS outfit, not a fresh
+  invention — the server's iteration rules already cover
+  swap/warmer/dressier, so no server change. Chips are chat-only;
+  trip and composer cards keep tile taps. Demo pieces show a toast.
+  Verified: 5 new client tests (`cardActionText`, wiring pins) + 3
+  new server tests (chip texts land in the ITERATION block);
+  suite 551 passing in `tests/` + 10 in
+  `functions/cutout-check.test.js`; `node --check` clean on the
+  client script. One regression caught and fixed in the same pass:
+  the PC-65 source pin on the same-outfit strip's expanded card
+  (updated to the new call). Standards: coding-principles,
+  code-style, testing. Founder phone verification pending.
