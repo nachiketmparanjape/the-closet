@@ -472,6 +472,11 @@
     .chat-item-chip { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 13px; font-weight: 600; padding: 2px 10px 2px 2px; border-radius: 999px; background: var(--paper); color: var(--ink); border: 1px solid var(--line-strong); cursor: pointer; vertical-align: middle; margin: 1px 0; }
     .chat-item-chip img { width: 26px; height: 26px; object-fit: cover; border-radius: 50%; display: block; }
     .chat-item-chip:active { background: var(--accent-soft); }
+    /* PC-69: outfit card actions — quick chips under the card; tiles tap to open. */
+    .outfit-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .outfit-action-chip { font: inherit; font-size: 12.5px; font-weight: 600; padding: 6px 10px; border-radius: 999px; background: var(--paper-soft); color: var(--ink); border: 1px solid var(--line-strong); cursor: pointer; }
+    .outfit-action-chip:active { background: var(--accent-soft); }
+    .outfit-thumb[role="button"] { cursor: pointer; }
     .chat-ref-chip button { border: none; background: transparent; color: var(--muted); cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px; }
     .chat-msg-refs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
     .chat-ref-chip.static { cursor: default; }
@@ -5863,6 +5868,11 @@
         showToast("Fresh conversation — the stylist starts clean here.");
       }
       var chatBusy = false;
+      // PC-69: a card action chip forces THIS card's outfit as the
+      // iteration base for the next send — the reply revises this
+      // outfit, not the thread's latest pick. Consumed once by
+      // sendChat, then cleared.
+      var forcedPreviousPick = null;
       // Sprint 16 (TRIPCHAT-1): trip mode — null, or { tripId } while the
       // chat is scoped to one trip (packing iteration by conversation).
       var tripChat = null;
@@ -6278,7 +6288,7 @@
                 // PC-68: thread cards carry the Wore-it affordance
                 // (a shallow copy — the outfit object stays shared,
                 // so save/worn state lands on the real message).
-                chatList.appendChild(renderOutfitCard(Object.assign({}, m, { wearLoggable: true })));
+                chatList.appendChild(renderOutfitCard(Object.assign({}, m, { wearLoggable: true, chatActions: true })));
                 if (midx !== lastCardIdx && m.cardExpanded) {
                   var lessRow = document.createElement("div");
                   lessRow.className = "chat-divider-action";
@@ -8134,11 +8144,19 @@
         // PC-16: the latest pick rides along so follow-ups iterate
         // ("swap the shorts") instead of starting over.
         var previousPick = null;
-        for (var i = stylistMessages.length - 1; i >= 0; i--) {
-          var pm = stylistMessages[i];
-          if (pm.outfit && pm.outfit.itemIds && pm.outfit.itemIds.length) {
-            previousPick = { itemIds: pm.outfit.itemIds.slice() };
-            break;
+        // PC-69: a card action chip forces THIS card's outfit as the
+        // iteration base — the reply revises that outfit, not the
+        // thread's latest pick. Consumed once, then cleared.
+        if (forcedPreviousPick) {
+          previousPick = forcedPreviousPick;
+          forcedPreviousPick = null;
+        } else {
+          for (var i = stylistMessages.length - 1; i >= 0; i--) {
+            var pm = stylistMessages[i];
+            if (pm.outfit && pm.outfit.itemIds && pm.outfit.itemIds.length) {
+              previousPick = { itemIds: pm.outfit.itemIds.slice() };
+              break;
+            }
           }
         }
         // UX-18 W2: today's pick rides along ONLY when the user
@@ -14569,7 +14587,7 @@
         strip.appendChild(btn);
         wrap.appendChild(strip);
         if (m.sameExpanded) {
-          wrap.appendChild(renderOutfitCard({ outfit: firstOutfit, wearLoggable: true }));
+          wrap.appendChild(renderOutfitCard({ outfit: firstOutfit, wearLoggable: true, chatActions: true }));
         }
         return wrap;
       }
@@ -14609,6 +14627,27 @@
         return strip;
       }
 
+      // PC-69: pure (tested in tests/sprint32-client.test.js) —
+      // the follow-up text a card action sends. Worded for the
+      // server's iteration rules ("swap the X", "warmer", "dressier").
+      function cardActionText(kind, pieceName) {
+        if (kind === "swap") return "Swap the " + (pieceName || "piece") + " for something else";
+        if (kind === "warmer") return "Make this outfit warmer";
+        if (kind === "formal") return "Make this outfit more formal";
+        return "Make this outfit warmer";
+      }
+
+      // PC-69: a card action chip sends a follow-up with THIS card's
+      // outfit forced as the iteration base (via forcedPreviousPick),
+      // so the reply revises this outfit instead of inventing fresh.
+      function sendCardAction(kind, outfit, pieceName) {
+        if (chatBusy) { showToast("The stylist is still thinking — one moment."); return; }
+        if (!outfit || !outfit.itemIds || !outfit.itemIds.length) return;
+        forcedPreviousPick = { itemIds: outfit.itemIds.slice() };
+        chatInput.value = cardActionText(kind, pieceName);
+        sendChat({ preventDefault: function () {} });
+      }
+
       function renderOutfitCard(msg, onSaved) {
         var o = msg.outfit;
         var card = document.createElement("div");
@@ -14646,6 +14685,27 @@
           var cap = document.createElement("figcaption");
           cap.textContent = it ? it.name : "Unknown item";
           fig.appendChild(cap);
+          // PC-69: tapping a piece opens its page (demo pieces
+          // have no page — say so plainly, same as PC-64 chips).
+          if (it) {
+            fig.setAttribute("role", "button");
+            fig.tabIndex = 0;
+            fig.title = "Open " + (it.shortName || it.name);
+            var openTile = function () {
+              if (String(it.id || "").indexOf("demo-") === 0) {
+                showToast("That's a demo piece — add your own to open it.");
+                return;
+              }
+              closeOverlay(chatOverlay);
+              var comp = document.getElementById("composerOverlay");
+              if (comp) closeOverlay(comp);
+              openItem(it);
+            };
+            fig.addEventListener("click", openTile);
+            fig.addEventListener("keydown", function (ev) {
+              if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); openTile(); }
+            });
+          }
           thumbs.appendChild(fig);
         });
         card.appendChild(thumbs);
@@ -14724,6 +14784,37 @@
           }
           wearRow.appendChild(wearBtn);
           card.appendChild(wearRow);
+        }
+        // PC-69: quick actions, chat only — one Swap chip per piece
+        // plus Warmer / More formal. Each sends a follow-up with
+        // THIS card's outfit forced as the iteration base, so the
+        // reply revises this outfit instead of inventing fresh.
+        if (msg.chatActions && o.itemIds && o.itemIds.length) {
+          var acts = document.createElement("div");
+          acts.className = "outfit-actions";
+          o.itemIds.forEach(function (id) {
+            var it = itemById(id);
+            if (!it) return;
+            var swap = document.createElement("button");
+            swap.type = "button";
+            swap.className = "outfit-action-chip";
+            swap.textContent = "Swap the " + (it.shortName || it.name) + " →";
+            swap.addEventListener("click", function () { sendCardAction("swap", o, it.shortName || it.name); });
+            acts.appendChild(swap);
+          });
+          var warmer = document.createElement("button");
+          warmer.type = "button";
+          warmer.className = "outfit-action-chip";
+          warmer.textContent = "Warmer";
+          warmer.addEventListener("click", function () { sendCardAction("warmer", o); });
+          acts.appendChild(warmer);
+          var formal = document.createElement("button");
+          formal.type = "button";
+          formal.className = "outfit-action-chip";
+          formal.textContent = "More formal";
+          formal.addEventListener("click", function () { sendCardAction("formal", o); });
+          acts.appendChild(formal);
+          card.appendChild(acts);
         }
         return card;
       }

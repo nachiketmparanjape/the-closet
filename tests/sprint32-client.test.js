@@ -85,6 +85,32 @@ describe("serializeMessages keeps the wardrobe snapshot (PC-64)", () => {
 });
 
 const parseHandleSegments = extractClientFn("parseHandleSegments", "text");
+const cardActionText = extractClientFn("cardActionText", "kind, pieceName");
+
+describe("cardActionText (PC-69)", () => {
+  test("swap names the piece; warmer and formal read as revisions", () => {
+    assert.strictEqual(cardActionText("swap", "Dark Jeans"), "Swap the Dark Jeans for something else");
+    assert.strictEqual(cardActionText("swap"), "Swap the piece for something else");
+    assert.strictEqual(cardActionText("warmer"), "Make this outfit warmer");
+    assert.strictEqual(cardActionText("formal"), "Make this outfit more formal");
+  });
+});
+
+describe("PC-69 wiring (source pins)", () => {
+  test("outfit tiles are tappable and open the item page", () => {
+    assert.ok(html.includes('fig.setAttribute("role", "button")'), "tile has no button role");
+    assert.ok(html.includes('fig.addEventListener("click", openTile)'), "tile has no tap handler");
+    assert.ok(html.includes("openItem(it);"), "tile tap does not open the item");
+  });
+
+  test("action chips render on chat cards only and force the card's outfit as the base", () => {
+    assert.ok(html.includes('if (msg.chatActions && o.itemIds && o.itemIds.length)'), "actions row is not gated on chatActions");
+    assert.ok(html.includes('swap.textContent = "Swap the " + (it.shortName || it.name) + " →"'), "no per-piece Swap chip");
+    assert.ok(html.includes('forcedPreviousPick = { itemIds: outfit.itemIds.slice() }'), "chip does not force the card's outfit");
+    assert.ok(html.includes('if (forcedPreviousPick) {'), "sendChat does not consume the forced base");
+    assert.ok(html.includes("chatActions: true"), "renderChat does not pass chatActions");
+  });
+});
 const itemFromWardrobeHandle = extractClientFn("itemFromWardrobeHandle", "index, wardrobeIds, byId");
 
 describe("parseHandleSegments (PC-64)", () => {

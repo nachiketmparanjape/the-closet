@@ -40,7 +40,7 @@ test("renderChat dedupes by set and renders the strip for repeats", () => {
 });
 
 test("the strip expands the FIRST outfit object — original name and confidence", () => {
-  assert.ok(html.includes("wrap.appendChild(renderOutfitCard({ outfit: firstOutfit, wearLoggable: true }));"), "strip does not render the first outfit");
+  assert.ok(html.includes("wrap.appendChild(renderOutfitCard({ outfit: firstOutfit, wearLoggable: true, chatActions: true }));"), "strip does not render the first outfit");
   assert.ok(html.includes('"Same outfit as “"'), "strip label missing");
 });
 
