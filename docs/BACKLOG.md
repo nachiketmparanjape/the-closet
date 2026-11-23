@@ -1507,9 +1507,16 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
 - **Acceptance:** the spike returns a go/no-go with the
   honesty labeling designed in.
 - **Lane:** Stylist + Outfits. **Effort:** L.
-- **Status:** Parked with a trigger (founder-saved
-  2026-10-24): revisit after PC-34 is live AND the PC-36
-  prototype has a verdict.
+- **Status:** Parked — SHELVED by founder decision
+  2026-11-23. Essembl shipped "See it on you" (v1.0.3,
+  Nov 19) and the founder's call was still no: it is a
+  complicated feature, the app is reasonably feature-rich,
+  and the focus now is polishing the existing experience —
+  ease of use and feature discoverability. The old trigger
+  (PC-34 live + PC-36 verdict) is superseded. Revisit when
+  the polish/discoverability phase has shipped and the
+  founder re-opens new-feature work, or if on-model preview
+  becomes table stakes in the competitor set.
 - **Watch note (2026-10-25, SAM research —
   `research_notes/closet-sam3-sam3d.md`):** SAM 3D
   (single photo → a 3D mesh of an object or a body) is
