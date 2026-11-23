@@ -45,7 +45,9 @@ describe("PC-68 client: one logging path, duplicate-safe", () => {
   });
 
   it("outfit cards carry the Wore-it affordance only in thread context", () => {
-    assert.ok(html.includes("if (msg.wearLoggable && o.itemIds && o.itemIds.length)"), "wear button not gated on wearLoggable");
+    // UX-14a: demo cards are read-only — the wear gate also excludes
+    // them (a demo outfit can't be worn).
+    assert.ok(html.includes("if (msg.wearLoggable && !msg.demo && o.itemIds && o.itemIds.length)"), "wear button not gated on wearLoggable");
     assert.ok(html.includes('wearBtn.textContent = "Wore it today";'), "wear button missing");
     assert.ok(html.includes('wearBtn.textContent = "Worn today ✓";'), "worn state missing");
     assert.ok(html.includes("wearLoggable: true"), "thread renders do not opt in");

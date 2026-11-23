@@ -900,13 +900,13 @@ function assembleContext(input) {
     input.references, input.weatherContext, input.vibe, input.vibeProfile,
     input.tripContext, input.pins, todayStr, input.todayPick, input.shopItem,
     input.mutedPinIds, input.attachCtx, input.steerCtx, input.refImages,
-    input.photoVerdicts
+    input.photoVerdicts, input.demoWardrobe
   );
   const manifest = buildManifest(input, computeActivePins(input.pins, input.tripContext, todayStr, input.mutedPinIds));
   return { model: req.model, contents: req.contents, config: req.config, manifest: manifest };
 }
 
-function buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, todayPick, shopItem, mutedPinIds, attachCtx, steerCtx, refImages, photoVerdicts) {
+function buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, todayPick, shopItem, mutedPinIds, attachCtx, steerCtx, refImages, photoVerdicts, demoWardrobe) {
   const model = process.env.GEMINI_MODEL || MODEL_VERSION;
   const wardrobe = items.map((it, i) => itemLine(it, i)).join("\n");
   let system = SYSTEM + "\n\n" + PRECEDENCE;
@@ -914,6 +914,14 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
   if (prefs.length) {
     system += "\n\nSTYLE PROFILE — the user's confirmed preferences. Honor them when recommending:\n" +
       prefs.map((p) => "- " + p).join("\n");
+  }
+  // UX-14a: demo wardrobe — the pieces below are samples, not the
+  // user's own. Partial wardrobe — under 10 real pieces: say so
+  // honestly, never pretend pieces exist that don't.
+  if (demoWardrobe) {
+    system += "\n\nDEMO WARDROBE — the pieces in the WARDROBE list below are SAMPLES, not the user's own clothes. The user is trying the app before adding anything. Build outfits only from these samples. Never claim they own any of them; if asked, say plainly these are demo pieces and offer to help them add their own.";
+  } else if (items.length < 10) {
+    system += "\n\nPARTIAL WARDROBE — the user has only " + items.length + " piece" + (items.length === 1 ? "" : "s") + " in so far. Work with what's here and say so honestly (\"with more of your wardrobe I can do more\"); never pretend pieces exist that don't.";
   }
   // WX-1: measured local weather. The user's stated weather always wins;
   // this fills the WEATHER sub-score when they haven't mentioned any.
@@ -1473,7 +1481,7 @@ function unwrapJsonReply(text) {
 }
 
 // here; the client re-validates on execute.
-async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, hooks, todayPick, shopItem, mutedPinIds, attachCtx, steerCtx, refImages, photoVerdicts) {
+async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, hooks, todayPick, shopItem, mutedPinIds, attachCtx, steerCtx, refImages, photoVerdicts, demoWardrobe) {
   const todayStr = /^\d{4}-\d{2}-\d{2}$/.test(today || "")
     ? today
     : new Date().toISOString().slice(0, 10);
@@ -1486,6 +1494,7 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
     tripContext: tripContext, pins: pins, today: todayStr, todayPick: todayPick,
     shopItem: shopItem, mutedPinIds: mutedPinIds, attachCtx: attachCtx,
     steerCtx: steerCtx, refImages: refImages, photoVerdicts: photoVerdicts,
+    demoWardrobe: demoWardrobe,
   });
   const { model, contents, config } = assembled;
   const manifest = assembled.manifest;

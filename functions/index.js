@@ -337,7 +337,10 @@ exports.askStylist = onCall(
       // PC-67: photo-check verdicts from the client's garment
       // matcher (strict shape; grounds logged/unlogged claims).
       const photoVerdicts = sanitizePhotoVerdicts(data.photoVerdicts);
-      const result = await askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, stylistHooks, todayPick, shopItem, mutedPinIds, attachCtx, steerCtx, refImages, photoVerdicts);
+      // UX-14a: demo wardrobe — the client sends 10 sample pieces as
+      // the wardrobe, flagged so the brief says they are samples.
+      const demoWardrobe = data.demoWardrobe === true;
+      const result = await askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, stylistHooks, todayPick, shopItem, mutedPinIds, attachCtx, steerCtx, refImages, photoVerdicts, demoWardrobe);
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: true });
       return finish("askStylist", correlationId, uid, start, result);
     } catch (err) {

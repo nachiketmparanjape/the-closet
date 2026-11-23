@@ -5562,10 +5562,16 @@
           if (m.refPhotoCount) o.refPhotoCount = m.refPhotoCount;
           if (m.tripOutfits) o.tripOutfits = m.tripOutfits;
           if (m.tripSaveCtx) o.tripSaveCtx = m.tripSaveCtx;
+          // UX-14a: a demo reply stays marked demo across reloads,
+          // so its outfit cards keep hiding Save / Wore-it.
+          if (m.demo) o.demo = true;
           return o;
         });
       }
       function saveThread(key) {
+        // UX-14a: the demo conversation is in-memory only — a demo
+        // is not a conversation to keep.
+        if (key === "demo") return Promise.resolve();
         if (!currentUser || typeof db === "undefined" || !db) return Promise.resolve();
         var list = key === activeThreadKey ? stylistMessages : (chatThreads[key] || []);
         return threadRef(key).set({
@@ -5852,6 +5858,52 @@
       // Sprint 16 (TRIPCHAT-1): trip mode — null, or { tripId } while the
       // chat is scoped to one trip (packing iteration by conversation).
       var tripChat = null;
+      // UX-14a: demo mode — the stylist works from 10 sample pieces
+      // (demoWardrobeItems) instead of the user's wardrobe, so a new
+      // user feels a pick before adding anything. Demo lives on its
+      // own "demo" thread key, in memory only (saveThread no-ops for
+      // it), and is labeled Demo everywhere it appears. Design note:
+      // docs/sprints/sprint-32/UX-14A-DESIGN.md.
+      var demoChat = false;
+
+      // Pure (tested in tests/sprint32-client.test.js): the demo
+      // wardrobe — 10 sample pieces, Unsplash photos, every photo
+      // verified by viewing (first three already founder-verified
+      // in the Today sample card, 2026-10-29).
+      function demoWardrobeItems() {
+        var u = function (id) { return "https://images.unsplash.com/" + id + "?auto=format&fit=crop&w=300&q=60"; };
+        return [
+          { id: "demo-1", name: "Rust bomber jacket", shortName: "Rust bomber", category: "Outerwear", colors: [{ name: "rust", family: "rust", primary: true }], pattern: "solid", fit: "regular", fabric: "unknown", formality: "casual", warmth: "warm", description: "Sample piece — rust bomber jacket, zip front.", subtype: "", styleTags: [], photos: [{ url: u("photo-1591047139829-d91aecb6caea"), type: "original" }] },
+          { id: "demo-2", name: "White cotton tee", shortName: "White tee", category: "Tops", colors: [{ name: "white", family: "white", primary: true }], pattern: "solid", fit: "regular", fabric: "cotton", formality: "casual", warmth: "light", description: "Sample piece — plain white cotton tee.", subtype: "", styleTags: [], photos: [{ url: u("photo-1521572163474-6864f9cf17ab"), type: "original" }] },
+          { id: "demo-3", name: "Dark denim jeans", shortName: "Dark jeans", category: "Bottoms", colors: [{ name: "dark blue", family: "blue", primary: true }], pattern: "solid", fit: "regular", fabric: "denim", formality: "casual", warmth: "light", description: "Sample piece — dark denim jeans.", subtype: "", styleTags: [], photos: [{ url: u("photo-1542272604-787c3835535d"), type: "original" }] },
+          { id: "demo-4", name: "Black leather biker jacket", shortName: "Leather jacket", category: "Outerwear", colors: [{ name: "black", family: "black", primary: true }], pattern: "solid", fit: "regular", fabric: "leather", formality: "casual", warmth: "warm", description: "Sample piece — black leather biker jacket.", subtype: "", styleTags: [], photos: [{ url: u("photo-1551028719-00167b16eac5"), type: "original" }] },
+          { id: "demo-5", name: "Tan suede sneakers", shortName: "Tan sneakers", category: "Shoes", colors: [{ name: "tan", family: "brown", primary: true }], pattern: "solid", fit: "regular", fabric: "suede", formality: "casual", warmth: "light", description: "Sample piece — tan suede sneakers.", subtype: "", styleTags: [], photos: [{ url: u("photo-1549298916-b41d501d3772"), type: "original" }] },
+          { id: "demo-6", name: "Black graphic tee", shortName: "Black tee", category: "Tops", colors: [{ name: "black", family: "black", primary: true }], pattern: "graphic", fit: "regular", fabric: "cotton", formality: "casual", warmth: "light", description: "Sample piece — black tee with a small chest print.", subtype: "", styleTags: [], photos: [{ url: u("photo-1618354691373-d851c5c3a990"), type: "original" }] },
+          { id: "demo-7", name: "Grey hoodie", shortName: "Grey hoodie", category: "Tops", colors: [{ name: "grey", family: "grey", primary: true }], pattern: "solid", fit: "regular", fabric: "cotton", formality: "casual", warmth: "medium", description: "Sample piece — grey pullover hoodie.", subtype: "hoodie", styleTags: [], photos: [{ url: u("photo-1556821840-3a63f95609a7"), type: "original" }] },
+          { id: "demo-8", name: "Blue check blazer", shortName: "Blue blazer", category: "Outerwear", colors: [{ name: "blue", family: "blue", primary: true }], pattern: "check", fit: "regular", fabric: "wool", formality: "formal", warmth: "light", description: "Sample piece — blue check blazer (photo shows the full suit; the blazer is the piece).", subtype: "", styleTags: [], photos: [{ url: u("photo-1594938298603-c8148c4dae35"), type: "original" }] },
+          { id: "demo-9", name: "Dusty pink joggers", shortName: "Pink joggers", category: "Bottoms", colors: [{ name: "dusty pink", family: "pink", primary: true }], pattern: "solid", fit: "relaxed", fabric: "unknown", formality: "casual", warmth: "light", description: "Sample piece — dusty pink jogger pants.", subtype: "", styleTags: [], photos: [{ url: u("photo-1594633312681-425c7b97ccd1"), type: "original" }] },
+          { id: "demo-10", name: "Cream graphic tee", shortName: "Cream tee", category: "Tops", colors: [{ name: "cream", family: "cream", primary: true }], pattern: "graphic", fit: "regular", fabric: "cotton", formality: "casual", warmth: "light", description: "Sample piece — cream tee with a blue graphic print.", subtype: "", styleTags: [], photos: [{ url: u("photo-1576566588028-4147f3842f27"), type: "original" }] }
+        ];
+      }
+
+      // UX-14a: enter/exit demo mode. Entering starts a fresh
+      // conversation on the "demo" thread key; exiting returns to
+      // the real general thread. The demo thread is never saved.
+      function enterDemoChat() {
+        if (!currentUser) { signIn(); return; }
+        if (tripChat) exitTripChat();
+        demoChat = true;
+        switchThread("demo");
+        openChat();
+        renderChat();
+        renderContextLine();
+      }
+      function exitDemoChat() {
+        demoChat = false;
+        switchThread("general");
+        renderChat();
+        renderContextLine();
+      }
 
       // Pure (tested in tests/tripchat-client.test.js): validate a
       // updateTripPacking tool call before executing it. Unknown ids and
@@ -5920,14 +5972,39 @@
           empty.className = "chat-empty";
           var title = document.createElement("p");
           title.className = "chat-empty-title";
-          title.appendChild(document.createTextNode("Tell me the occasion — I'll dress you "));
-          var em = document.createElement("em");
-          em.textContent = "beautifully.";
-          title.appendChild(em);
-          empty.appendChild(title);
-          empty.appendChild(shopCheckEl("p", "chat-empty-hint",
-            (allItems.length === 0 ? "I dress you from your wardrobe; add a few pieces and I can start. " : "") +
-            "Built entirely from what's already in your closet. Try “casual dinner, 60°F” — tap @ to build around a specific piece, or tap the line above to attach today's pick and talk about it."));
+          if (demoChat) {
+            // UX-14a: the demo empty state says what the demo IS —
+            // sample pieces, nothing saved — before the first word.
+            title.appendChild(document.createTextNode("Demo wardrobe — try the stylist on "));
+            var em = document.createElement("em");
+            em.textContent = "sample pieces.";
+            title.appendChild(em);
+            empty.appendChild(title);
+            empty.appendChild(shopCheckEl("p", "chat-empty-hint",
+              "These 10 pieces aren't yours — they're samples, so you can feel what a pick feels like before adding a single piece of your own. Nothing here is saved. Try “casual dinner, 60°F”."));
+            var demoActs = document.createElement("div");
+            demoActs.className = "chat-divider-action";
+            var demoAdd = document.createElement("button");
+            demoAdd.type = "button";
+            demoAdd.className = "primary";
+            demoAdd.textContent = "Add your own pieces";
+            demoAdd.addEventListener("click", function () {
+              exitDemoChat();
+              closeOverlay(chatOverlay);
+              document.getElementById("addButton").click();
+            });
+            demoActs.appendChild(demoAdd);
+            empty.appendChild(demoActs);
+          } else {
+            title.appendChild(document.createTextNode("Tell me the occasion — I'll dress you "));
+            var em2 = document.createElement("em");
+            em2.textContent = "beautifully.";
+            title.appendChild(em2);
+            empty.appendChild(title);
+            empty.appendChild(shopCheckEl("p", "chat-empty-hint",
+              (allItems.length === 0 ? "I dress you from your wardrobe; add a few pieces and I can start. " : "") +
+              "Built entirely from what's already in your closet. Try “casual dinner, 60°F” — tap @ to build around a specific piece, or tap the line above to attach today's pick and talk about it."));
+          }
           chatList.appendChild(empty);
         }
         // PC-53 follow-up (founder phone test, 2026-10-24): a
@@ -5936,12 +6013,12 @@
         // said something here, the chat itself explains how
         // pieces get in and carries the one Add door. Render-
         // time only; nothing is saved to the thread.
-        if (!todayThresholdMet() &&
+        if (!demoChat && !todayThresholdMet() &&
             !stylistMessages.some(function (m) { return m.role === "user"; })) {
           var addInfo = document.createElement("div");
           addInfo.className = "chat-addinfo";
           addInfo.appendChild(shopCheckEl("p", "",
-            "New here? Pieces get in with a photo each — one photo per piece, or several at once. About a minute a piece, and then I can start dressing you."));
+            "New here? Start with your ~10 most-worn pieces — one photo per piece, or several at once. About a minute a piece, and then I can start dressing you."));
           var addBtn = document.createElement("button");
           addBtn.type = "button";
           addBtn.className = "primary";
@@ -5951,6 +6028,16 @@
             document.getElementById("addButton").click();
           });
           addInfo.appendChild(addBtn);
+          // UX-14a: the demo door lives here while the wardrobe is
+          // empty — feel a pick before paying the cost of adding.
+          if (allItems.length === 0) {
+            var demoBtn = document.createElement("button");
+            demoBtn.type = "button";
+            demoBtn.className = "secondary";
+            demoBtn.textContent = "Try the demo wardrobe";
+            demoBtn.addEventListener("click", function () { enterDemoChat(); });
+            addInfo.appendChild(demoBtn);
+          }
           chatList.appendChild(addInfo);
         }
         // Refresh right there (founder, 2026-10-25): the
@@ -6938,7 +7025,10 @@
       // Sprint 5: colors go as rich objects {name, family, primary} — the
       // server renders "navy (primary), cream" for the rubric.
       function stylistItems() {
-        return allItems.map(function (it) {
+        // UX-14a: in demo mode the stylist works from the 10 sample
+        // pieces, mapped through the same shape as real items.
+        var src = demoChat ? demoWardrobeItems() : allItems;
+        return src.map(function (it) {
           var richColors = itemColors(it).map(function (c) {
             var family = c.family || null;
             if (!family && window.Palette) family = window.Palette.canonicalName(c.name);
@@ -7238,6 +7328,11 @@
       function contextEntries() {
         var entries = [];
         var man = threadManifests[activeThreadKey] || null;
+        // UX-14a: demo mode leads with the demo wardrobe — the bar
+        // must never present sample pieces as the user's wardrobe.
+        if (demoChat) {
+          entries.push({ type: "demo", label: "Demo wardrobe · 10 sample pieces", icon: "sparkle", action: "exitDemo" });
+        }
         if (tripChat) {
           var t = tripById(tripChat.tripId);
           entries.push({ type: "trip", label: ((t && t.name) || "Trip"), icon: "suitcase", action: "leaveTrip" });
@@ -7284,7 +7379,9 @@
         if (man && man.learnedTaste && man.learnedTaste.applied && man.learnedTaste.top.length) {
           tail.push("Taste: " + man.learnedTaste.top.join(", "));
         }
-        entries.push({ type: "memory", label: tail.join(" · ") });
+        // UX-14a: in demo mode the demo entry above IS the wardrobe
+        // line — the memory tail would restate it as real pieces.
+        if (!demoChat) entries.push({ type: "memory", label: tail.join(" · ") });
         return entries;
       }
       function renderContextLine() {
@@ -7330,6 +7427,13 @@
             saveThread(activeThreadKey); // Sprint 30: persist the detach too
             renderContextLine();
             openContextSheet();
+          }));
+        } else if (e.action === "exitDemo") {
+          // UX-14a: leave the demo from the context sheet — back to
+          // the real general thread, demo conversation discarded.
+          row.appendChild(sheetActionBtn("Exit demo", function () {
+            closeOverlay(document.getElementById("contextSheet"));
+            exitDemoChat();
           }));
         } else if (e.action === "removeRef") {
           row.appendChild(sheetActionBtn("Remove", function () {
@@ -7923,6 +8027,9 @@
         }
         stylistMessages.push(userMsg);
         var thinking = { role: "model", text: "Thinking…", thinking: true, at: Date.now() };
+        // UX-14a: a reply to a demo turn stays marked demo, so its
+        // outfit cards keep hiding Save / Wore-it after reload.
+        if (demoChat) thinking.demo = true;
         stylistMessages.push(thinking);
         saveThread(activeThreadKey);
         renderChat();
@@ -7993,6 +8100,9 @@
           }),
           previousPick: previousPick,
           todayPick: todayPickCtx,
+          // UX-14a: demo mode — the items above are the 10 sample
+          // pieces, and the brief must say so.
+          demoWardrobe: demoChat === true,
           // Shop attach: the item under consideration, when the
           // user attached one in this conversation.
           shopItem: tripChat ? null : currentShopAttach(),
@@ -10113,11 +10223,13 @@
         var card = document.createElement("div");
         card.className = "today-card";
         card.appendChild(shopCheckEl("p", "today-eyebrow", "Start here"));
-        card.appendChild(shopCheckEl("p", "today-why", "Photograph a few pieces you own, and every morning starts with an outfit already picked. It takes about a minute a piece."));
+        card.appendChild(shopCheckEl("p", "today-why", "Photograph your ~10 most-worn pieces, and every morning starts with an outfit already picked. About a minute a piece."));
         var acts = document.createElement("div");
         acts.className = "today-actions";
         acts.appendChild(mkBtn("primary", "+ Add your first pieces", function () { document.getElementById("addButton").click(); }));
         acts.appendChild(mkBtn("link-button", "Ways to add your clothes →", function () { openGuide(); }));
+        // UX-14a: feel a pick before paying the cost of adding.
+        acts.appendChild(mkBtn("link-button", "Try the demo wardrobe first →", function () { enterDemoChat(); }));
         // No separate Bulk button here (founder, 2026-10-23): the
         // capture screen IS the single door on every surface — its
         // photo-count routing reaches bulk. Consistency, always.
@@ -10312,6 +10424,11 @@
       function itemById(id) {
         for (var i = 0; i < allItems.length; i++) {
           if (allItems[i].id === id) return allItems[i];
+        }
+        // UX-14a: demo pieces live outside the wardrobe.
+        var demo = demoWardrobeItems();
+        for (var j = 0; j < demo.length; j++) {
+          if (demo[j].id === id) return demo[j];
         }
         return null;
       }
@@ -14442,27 +14559,46 @@
           reasonEl.textContent = o.reasoning;
           card.appendChild(reasonEl);
         }
-        var btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = o.savedId ? "secondary" : "primary";
-        btn.textContent = o.savedId ? "Saved ✓ — view in Outfits" : "Save outfit";
-        if (!o.savedId) {
-          btn.addEventListener("click", function () { saveChatOutfit(msg, onSaved); });
-        } else {
-          btn.addEventListener("click", function () {
+        // UX-14a: demo outfits are read-only — no Save, no Wore-it,
+        // one line saying so and the door to the user's own pieces.
+        if (msg.demo) {
+          var demoNote = document.createElement("p");
+          demoNote.className = "hint";
+          demoNote.textContent = "Demo outfit — add your own pieces to save it.";
+          card.appendChild(demoNote);
+          var demoAddBtn = document.createElement("button");
+          demoAddBtn.type = "button";
+          demoAddBtn.className = "secondary";
+          demoAddBtn.textContent = "Add your own pieces";
+          demoAddBtn.addEventListener("click", function () {
+            exitDemoChat();
             closeOverlay(chatOverlay);
-            var comp = document.getElementById("composerOverlay");
-            if (comp) closeOverlay(comp); // Sprint 14: same card reused by the composer
-            switchView("outfits");
-            openOutfit(o.savedId); // v1: versionGroup == doc id
+            document.getElementById("addButton").click();
           });
+          card.appendChild(demoAddBtn);
+        } else {
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = o.savedId ? "secondary" : "primary";
+          btn.textContent = o.savedId ? "Saved ✓ — view in Outfits" : "Save outfit";
+          if (!o.savedId) {
+            btn.addEventListener("click", function () { saveChatOutfit(msg, onSaved); });
+          } else {
+            btn.addEventListener("click", function () {
+              closeOverlay(chatOverlay);
+              var comp = document.getElementById("composerOverlay");
+              if (comp) closeOverlay(comp); // Sprint 14: same card reused by the composer
+              switchView("outfits");
+              openOutfit(o.savedId); // v1: versionGroup == doc id
+            });
+          }
+          card.appendChild(btn);
         }
-        card.appendChild(btn);
         // PC-68: one-tap wear logging on thread cards. The worn
         // date rides the outfit object (persisted with the
         // thread), and logWearForOutfit double-checks today's
         // wear_events before writing — a second log is a no-op.
-        if (msg.wearLoggable && o.itemIds && o.itemIds.length) {
+        if (msg.wearLoggable && !msg.demo && o.itemIds && o.itemIds.length) {
           var wearRow = document.createElement("div");
           wearRow.className = "wear-row";
           var wearBtn = document.createElement("button");
