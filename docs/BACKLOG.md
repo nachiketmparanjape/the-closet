@@ -21,16 +21,6 @@ plus the most-frequent-color fix — all shipped and founder-tested
 Full cards in `sprints/sprint-02/PLAN.md`. Blaze approved by founder
 2026-10-11 — PC-6/PC-7 unblocked. BUG-1 parked (see below).
 
-### PC-6: Backend proxy for AI calls (M) — DONE 2026-10-14
-Callable Cloud Function (`describeItem`) holding the vision API key
-server-side. Nothing else can use AI until this exists. Blaze approved
-2026-10-11.
-
-### PC-7: AI description + name suggestion at upload (M) — depends on PC-6
-One vision call on the cover photo → name, description,
-{pattern, fit, fabric_guess, formality, warmth}, cached in Firestore.
-Decided 2026-10-06 (research in `PRODUCT.md`).
-
 ### BUG-1: Diagnose the upload bounce (S — diagnosis only) — KILLED 2026-10-24
 2 of 8 uploads bounced to the home screen on 2026-10-05; cause unknown.
 Parked 2026-10-11 at the founder's call — it hasn't recurred. KILLED at
@@ -41,23 +31,6 @@ as a new card with real data.
 ## Sprint 3 (2026-10-29 → 2026-11-11) — APPROVED 2026-10-14
 
 Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
-
-### PC-9: Bulk upload (M)
-"Bulk add" mode: N photos → N items, one `describeItem` call each
-(bounded concurrency, progress UI, ~$0.05 for 50 photos). Per-item
-failures isolated with retry; newest-first landing for review.
-Single-photo per item; extra photos via PC-5's add-photos.
-
-### PC-10: Chat stylist (M)
-Conversational outfit picks over the cached descriptions + attributes
-(text-only reasoning, per the decided research), occasion/weather/
-preferences from conversation — no integrations. Reuses the PC-6 backend
-pattern. The v1 loop's second half.
-
-**Founder's call 2026-10-14:** PM proposed PC-8 (data model + editable
-fields) + PC-9 first, stylist in Sprint 4; founder chose bulk upload +
-stylist now, editable descriptions slide to Sprint 4. Known limitation:
-AI-written descriptions/attributes stay read-only through Sprint 3.
 
 ## Ideas (untriaged)
 
@@ -143,22 +116,6 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
   Includes a copy audit of prompts and UI for gendered assumptions.
 - **Not yet sized** — parked; candidate for prioritization.
 
-### UX-12: First-run tutorial / onboarding experience (not yet sized)
-- **Status:** Killed as a separate card at the Sprint 24
-  planning walk (2026-10-24) — the tutorial question folds
-  into UX-14, which subsumes it. This card remains as the
-  record of the idea and its trigger.
-- **Idea (founder 2026-10-17):** a quick tutorial for new users so they can
-  figure out what to do on their own.
-- **Why parked:** the app is mid-UX-polish — flows are still changing, and a
-  tutorial built now rots with every change. The empty states already teach
-  (wardrobe empty state explains the loop; outfits hint names the three
-  paths), and the labeled "Ask the stylist" button closed the biggest
-  discoverability gap. If onboarding is needed, lightest touch first:
-  coach marks on first run, not a carousel.
-- **Revisit trigger:** a stranger (not a hand-held tester) gets lost in the
-  app, or the UX polish sprint settles and the flows stop moving.
-
 ### Personalization: exploration vs. exploitation (open modeling question)
 - **Problem:** the vibe profile only learns from what the user wears —
   untried vibes score ~0, so the stylist never suggests them, so they're
@@ -167,180 +124,6 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
   logging, or an explicit "surprise me" handle. Deliberately un-designed
   for v1 — parked until the profile has real data.
 - **Spec:** `docs/PERSONALIZATION.md` ("Open: exploration vs. exploitation").
-
-### PC-29: Trips — travel packing recommendations (L)
-- **Idea (founder 2026-10-18):** packing for travel is stressful; it needs
-  weather × personal taste × local culture. Trips tab; trip objects
-  (destinations + dates + notes, multi-leg in the model); packing list
-  from the wardrobe scored per leg against forecasts; outfits per leg;
-  trip-aware chat and trip-aware shop check ("will this earn a place *for
-  this trip*?").
-- **Proposal:** `docs/proposals/TRIPS-PROPOSAL.md` — founder decisions
-  recorded 2026-10-18 (articles + outfits lists, day-by-day optional,
-  simple UI; chat mode; single destination v1; trip-tagged shop items).
-  Open thread: trip preference curation (bloat-aware design).
-- **Status:** Phase 1 shipped in Sprint 15 and Phase 2 shipped in
-  Sprint 16 (both founder-validated 2026-10-19). Packing iteration is
-  conversational: the trip detail CTA "💬 Talk to me for changes" opens
-  trip chat, which rewrites the plan via the `updateTripPacking` tool
-  call; the blind Re-plan button is gone. Remaining work split out:
-  Phase 3 → PC-31; trip-preference curation stays an open thread here.
-  Designs: `docs/sprints/sprint-15/TRIPS-PHASE1-DESIGN.md`,
-  `docs/sprints/sprint-16/PHASE2-TRIP-CHAT-DESIGN.md`.
-
-### PC-31: Trips Phase 3 — trip-tagged shop items + unified trip view (M)
-- **Idea (founder 2026-10-18, PC-29 decision 4):** shop-list items can
-  be tagged to a trip ("will this earn a place *for this trip*?"); they
-  show in the generic Shop list AND in a unified trip view (packing +
-  tagged shop items in one place).
-- **Status:** In Sprint 19 (card 2). BUILT 2026-10-24 — tagging UI in
-  the check detail, tag-at-birth from trip chat, trip name on
-  Shop cards, "Shopping for this trip" section on the trip
-  page. Founder phone validation pending.
-
-### OBS-2: Error logging & handling overhaul (M)
-- **Idea (founder 2026-10-19):** treat error data as *system quality
-  data* — available for debugging now and for monitoring in the long
-  run, not just ad-hoc log dives. Tonight's session is the evidence:
-  the packing bug hid for two turns because a rejected tool call was
-  silently dropped, and the "not signed in" flake surfaced in metrics
-  as `(uncoded)`.
-- **Scope (to be refined at sprint planning):**
-  - **Taxonomy audit:** every callable throws coded errors only; fix
-    the key-loss where HttpsError-carried codes log as `(uncoded)`
-    (logError reads `.key`; make it read `.code`/catalog consistently).
-    Client copy exists for every code (friendlyError coverage check).
-  - **Rejections are events:** every dropped/invalid tool call,
-    malformed model response, and self-heal retry is logged
-    structured (args shape, no user content) — generalizing
-    `trip_tool_args_rejected`. Nothing fails silently server-side.
-  - **Quality report:** extend the OBS-1 metrics into a durable
-    report — per-function success rate, top error keys, client error
-    counts, latency percentiles, self-heal rate — runnable on demand
-    and summarizable on a cadence. Decide where it lives (local
-    script vs. scheduled digest) at planning.
-  - **Alerting:** a cheap threshold signal when a function's failure
-    rate spikes (mirrors the $50 budget-alert pattern; notify-only).
-  - **Client side:** reportError already persists to `client_errors`;
-    add session correlation so a user report ("it broke at 9:28")
-    can be matched to the exact server call.
-- **Status:** SHIPPED 2026-10-24 (Sprint 20). Live-smoke
-  verified: failure events land in error_events with their
-  catalog keys; the quality report reads them back.
-
-### OBS-3: AI consumption analytics — cost attribution (M)
-- **Idea (founder 2026-10-23):** know exactly where AI spend
-  comes from — per feature, per model, per outcome — so
-  optimize / cut-back decisions are made on data, not on a
-  provider bill total. Raised alongside PC-34, which adds two
-  new AI consumers (Replicate extraction + a Gemini gate check)
-  to the existing seven Gemini callables. Design spec:
-  `docs/OBSERVABILITY.md` (proposal v1, 2026-10-23).
-- **Scope:**
-  - One append-only Firestore event per AI call (`ai_usage`):
-    correlationId, feature, provider, model, surface, token
-    counts / predict seconds, latency, outcome, USD estimate
-    stamped with its pricing version, raw units kept so any
-    window can be re-priced. Metadata only — no prompts, no
-    photo bytes. Written via one helper (`functions/usage.js`),
-    fire-and-forget so analytics can never break a user call.
-  - Pricing table in code (`functions/pricing.js`, versioned):
-    Vertex per-1M-token rates per model; Replicate per-second
-    hardware rate × predict_time.
-  - Report (`usage-report.js`, extending the metrics.js
-    pattern): spend by feature × provider × model, trend,
-    success/error rates beside cost (cost per successful
-    outcome is the headline), unit economics (per item
-    catalogued, per stylist turn), top drivers named.
-  - Offline analysis: JSONL/CSV export → DuckDB locally.
-    Graduation path only if volume demands: Firestore →
-    BigQuery export, same schema (BigQuery plays the
-    Hive/Presto role in this stack; nothing fancier is
-    warranted at hundreds–thousands of calls a month).
-- **Slices:** 3a instrument extractGarment's two calls (rides
-  the PC-34 build); 3b retrofit the seven existing callables;
-  3c the report. Sibling to OBS-2 (error quality) — same
-  events philosophy, cost lens instead of failure lens.
-- **Status:** Validated by the founder 2026-10-23 with the
-  widest sequencing: all three slices in one pass alongside
-  PC-34. Built 2026-10-23 — `functions/usage.js` +
-  `functions/pricing.js` (PRICING_VERSION 2026-10-23.v1;
-  gemini-3.5-flash at the corroborated $1.50/$9.00 per 1M,
-  BiRefNet at the T4 per-second rate), events on extract's
-  two calls plus all seven existing callables (per-call
-  tracker threaded through each module; one event per model
-  call, so multi-call stylist turns attribute honestly), and
-  `usage-report.js` (local, gitignored like metrics.js):
-  spend by feature × provider × model, success/error rates
-  beside cost, unit economics per catalogued item / stylist
-  turn / passed extraction, month-to-date vs a --budget
-  figure. Firestore rules deny client access to `ai_usage`
-  (admin-side reads only). Suite green at 256. Data starts
-  accumulating with the first AI call after the redeploys.
-
-### PC-32: Chat threads — side chats per context (M)
-- **Idea (founder 2026-10-19):** one chat for everything mixes
-  contexts (a New York pin surfacing inside the Vancouver trip chat)
-  and breaks continuity (reopening a trip chat re-anchored a fresh
-  conversation). Threads = side chats: a general thread plus one
-  persistent thread per trip, each with its own history and its own
-  context scope — continuation of context at the right place, right
-  time.
-- **Design:** `docs/proposals/THREADS-PROPOSAL.md`. An interim
-  threads-lite went live 2026-10-19 (session-scoped per-context
-  message lists, anchor-once, trip-mode pin scoping server +
-  chip). The full cut persists threads
-  (`users/{uid}/chat_threads/{threadId}`), resumes them across
-  reloads, and cleans up on trip delete.
-- **Status:** DONE 2026-10-24 — absorbed into UX-18
-  wave 4 (saved threads per context, shipped as part of
-  UX-18). This card's ask is the shipped behavior.
-
-### PC-33: Trip steering in chat + pin discipline (M)
-- **Idea (founder 2026-10-20):** asking the general chat about a
-  trip *next week* produced a "Remember as current location?" pin
-  proposal for the destination. Verified problem: pins carry an
-  end date but no start date, so a saved pin would have taken
-  effect immediately and outranked measured weather — and no trip
-  object existed, because the chat never suggested one. His
-  direction: trip questions should steer toward creating a trip
-  object, with a one-line education on why working inside it is
-  better; one-off advice stays available.
-- **Design:** `docs/proposals/TRIP-STEER-PROPOSAL.md`. Three
-  parts: (1) a trip-intent confirm card in general chat (prefilled
-  destination/dates, create-or-dismiss, at most once per
-  conversation, advice never gated); (2) the one-off path stays
-  write-free — conversation-stated context already outranks
-  everything; (3) pin discipline — location/weather pins are
-  proposed only for facts true now; preference pins are unaffected;
-  a steering card suppresses a pin proposal for the same fact.
-  Future-dated pins (a `validFrom` field) were considered and
-  rejected in the proposal, with a revisit trigger recorded.
-  Principle: pins are the present-tense layer; trips own the
-  future. The discipline half can split out as an (S) at planning.
-- **Status:** DONE 2026-10-24 (Sprint 24). Correction
-  to the walk's record, found while building: the
-  discipline half had NOT fully landed in UX-18 — the
-  present-tense principle was adopted in the context
-  model, but the prompt rule itself was never written
-  into the brief (the pin section still said "where
-  they'll be"). Both halves shipped here: the TENSE RULE
-  in the pin-proposal brief (present-tense only for
-  location/weather; preferences unaffected), the trip
-  proposal (sanitized: destination + real future dates
-  or nothing), parse-level suppression (a trip proposal
-  drops a same-reply location/weather pin proposal), and
-  the steering card — Create runs the trips flow's own
-  steps, success offers the jump without yanking, "Just
-  advise me here" dismisses for the conversation, and a
-  matching existing trip suppresses the card. The card's
-  education line is Bramble's wording, flagged for the
-  founder's copy verdict. tests/pc33.test.js.
-  COPY VERDICT (2026-10-27, late): the founder
-  approved the education line as written — "a trip
-  gets its own chat, its own weather, and a packing
-  list, kept out of your daily outfits until you go"
-  stands.
 
 ### UX-14: Onboarding — cut time-to-first-value (L)
 - **Idea (founder 2026-10-20):** onboarding is the biggest
@@ -1062,148 +845,6 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
   server + client, minted at every creation path, backfill
   applied (72 docs). Founder phone spot-check pending.
 
-### PC-38: Stylist chat — attach reference photos (M)
-- **Origin:** Essembl teardown P3, adopted by the founder
-  2026-10-24. Evidence: `research_notes/essembl-apk-pilot.md`
-  (their stylist chat takes up to 4 attachable references).
-- **Problem:** the stylist can only reason over pieces already
-  in the wardrobe. There is no way to show it what you're
-  aiming for — an inspo photo, a screenshot of a look, a
-  friend's outfit — and ask "more like this, with what I own."
-- **In scope:** attach up to 4 reference images to a message
-  in the general stylist chat (photo picker + camera, same
-  single-door pattern as Add); thumbnails in the composer,
-  removable before send; references ride to `askStylist` as
-  vision context for that turn; the reply may name elements
-  it sees in the references.
-- **Out of scope:** references never create wardrobe items
-  (that is PC-36's worn-photo path); no reference persistence
-  beyond the conversation; trip-chat parity (general chat
-  first; trip rooms get it only if the pattern proves out);
-  no outfit generation bypass — suggestions are outfit cards
-  built only from owned pieces, as today.
-- **Acceptance:** in general chat, attach 2 inspo photos and
-  ask "more like this with what I own" → the reply visibly
-  reasons over the references (names elements from them) and
-  suggests outfits built only from owned pieces; removing a
-  thumbnail before send excludes it; no items are created.
-- **Lane:** Stylist. **Effort:** M.
-- **Status:** DONE 2026-10-24 (Sprint 24). Built as
-  specced: a 📷 door in the general-chat composer opens
-  the one chooser (upload / camera); up to 4 photos,
-  downscaled once at attach; thumbnails in the composer,
-  removable before send; a photo-only message sends (the
-  wire gives the model one factual line for it). The
-  assembler threads them as inlineData on the last user
-  turn under a REFERENCE PHOTOS brief section: inspiration,
-  never inventory — name what you see, build only from
-  the wardrobe. Context Standard: the duration is "this
-  message," the same class as @ pointers; the composer
-  thumbnails are that duration's shortcut view. The draft
-  follows the attachments' lifecycle (cleared on send,
-  thread switch, Start fresh, sign-out; restored when a
-  send fails). Two recorded choices: (1) the image data
-  never persists — the saved thread keeps only the count
-  (base64 would bloat the thread doc toward the Firestore
-  limit, and the card bars persistence anyway); the
-  bubble shows the photos while their data lives in
-  memory, and a quiet "(not saved)" line after a reload.
-  (2) Trip threads ignore refImages server-side as well
-  as hiding the door. tests/pc38.test.js pins the
-  sanitizer + threading. Founder phone validation
-  pending.
-
-### PC-39: Trip weather re-check — the pill is the retry (S)
-- **Origin:** Founder, 2026-10-24. The trip page shows a frozen
-  `packing.weatherSnapshot` from plan time; if the forecast
-  wasn't available then (trip beyond Open-Meteo's 16-day
-  window) or has since changed, nothing ever refreshes it.
-- **Design (founder-approved 2026-10-24, "Option 1"):** no new
-  button. The weather pill under the trip dates becomes the
-  retry: tappable, shows "Checking weather…" during a fetch,
-  then the fresh forecast or "Forecast not available yet —
-  tap to check again". Plus a silent assist: opening a trip
-  whose forecast is missing or >3h old re-checks in the
-  background. A successful refresh updates the stored
-  snapshot (and therefore the packing summary's weather line).
-- **In scope:** tappable pill states (snapshot / checking /
-  unavailable), staleness guard so watcher re-renders never
-  spam the API (per-trip checked-at, 3h for hits, 30min for
-  misses), geocode fallback via `geocodeDestination` when the
-  leg has no coords, snapshot write-back (`packing.
-  weatherSnapshot` when a plan exists; a trip-level field
-  when it doesn't).
-- **Out of scope:** silently rebuilding the packing plan on a
-  weather change (re-planning stays the explicit Plan button /
-  trip chat); hourly forecasts; multi-leg weather.
-- **Acceptance:** open a trip planned >16 days out once its
-  dates enter the window → the pill fills in without any
-  re-plan; tap the pill on a planned trip → it re-fetches and
-  the shown forecast updates; with no forecast available the
-  pill says so and stays tappable.
-- **Lane:** Loop. **Effort:** S.
-- **Status:** IN SPRINT 20 (pulled at the 2026-10-24 walk,
-  ranked #3). Filed sprint-ready 2026-10-24 with the design
-  already chosen.
-
-### PC-40: Contextual shop checks — trip-aware by default, plus your own question (M)
-- **Origin:** Founder, 2026-10-24: "The shop check should not
-  be generic. It should be specific to the context of that
-  trip by default, and people should be able to ask specific
-  questions."
-- **Problem:** `shopCheck` judges a photo against the
-  wardrobe only. A check started for a trip knows nothing
-  about the trip, and the user has no way to steer the
-  judgment ("warm enough for evenings there?", "too formal
-  for a beach wedding?").
-- **In scope:** (1) When a check is trip-tagged, the server
-  reads the trip doc itself (never client-supplied context)
-  and the prompt judges FOR the trip first: destination,
-  dates, stored forecast, trip notes, what's already packed.
-  (2) An optional one-line question field on the check sheet
-  ("Anything specific?"), available for generic checks too,
-  folded into the prompt with an instruction to answer it
-  directly; the sheet shows a "Checking for the {trip} trip"
-  line when a trip context is armed. (3) The question is
-  saved on the check doc and shown in its detail view.
-- **Out of scope:** follow-up conversation on a check (that
-  is PC-41); outfit suggestions re-ranked by trip (the
-  verdict and reasons carry the trip judgment); price talk
-  (existing ban stands).
-- **Acceptance:** start a check from a trip page, ask "warm
-  enough for evenings there?" → the verdict/reasons visibly
-  judge against the trip's weather and destination AND
-  answer the question; the saved check shows the question in
-  its detail; a generic check with a question also answers
-  it; a check with neither behaves exactly as today.
-- **Lane:** Stylist. **Effort:** M.
-- **Status:** IN SPRINT 20 (pulled at the 2026-10-24 walk,
-  ranked #4). Filed sprint-ready 2026-10-24 (founder
-  direction).
-
-### PC-42: Crop the shop-check photo to the garment (M)
-- **Origin:** Founder, 2026-10-24: in a store photo there
-  are other clothes around — "users just want to make sure
-  the right cloth is getting scanned."
-- **Problem:** the check analyzes the whole frame; a rack
-  photo can describe (and judge) the wrong garment.
-- **In scope:** after picking a photo, a crop step inside
-  the check flow before upload/analysis: fixed frame, drag
-  to pan, zoom slider (+ wheel on desktop); "Use this crop"
-  renders the region via canvas (long edge capped at
-  1600px, JPEG) and that image is what uploads; "Use full
-  photo" escape hatch; the cropped photo is also what gets
-  saved on the check (it is the subject of record).
-- **Out of scope:** wardrobe-add cropping (v2 if the pattern
-  proves out — the component should be reusable); free-form
-  corner dragging / rotation; multi-subject selection.
-- **Acceptance:** check a rack photo, crop to one jacket →
-  the analysis describes and judges the jacket only; "Use
-  full photo" reproduces today's behavior exactly; the
-  saved check's photo is the cropped one.
-- **Lane:** Stylist. **Effort:** M.
-- **Status:** DONE 2026-10-24 (Sprint 21).
-
 ### UX-16: Context-handoff audit — a chat opened from a surface carries that surface's subject (S)
 - **Origin:** Founder bug, 2026-10-24: asking the stylist
   about Today's pick went in context-free (the pick was
@@ -1227,239 +868,6 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
 - **Lane:** Stylist. **Effort:** S.
 - **Status:** Filed 2026-10-24. Competes at the next
   planning walk; the Today instance is already fixed.
-
-### PC-43 — Unnamed items heal themselves (no permanent "Untitled item")
-
-- **Problem (founder-found, 2026-10-24):** when the AI
-  describe step fails during an add (bulk especially), the
-  item saves with the literal placeholder name "Untitled
-  item", no ai block, category Other — and nothing ever
-  retries. 8 of the founder's 69 items were zombies of this
-  kind, surfacing in pickers, picks and lists. The 8 were
-  repaired by hand (re-describe from photo); this card makes
-  it structural so it never needs a hand.
-- **In scope:** at save time, an item whose describe failed
-  is flagged (e.g. `needsAi: true`); on app load, flagged
-  items are quietly re-described (existing describeItem
-  callable, capped per session, only on the owner's own
-  items) and the flag clears on success; the wardrobe grid
-  shows flagged items with a subtle "naming…" state rather
-  than the placeholder. Manual rename already exists as the
-  escape hatch.
-- **Out of scope:** re-describing healthy items; bulk
-  re-cataloguing.
-- **Acceptance:** kill the network mid-bulk-add → items
-  land flagged, none displays "Untitled item" as its name
-  after the next successful load; ai_usage shows the retry
-  calls; a permanently unidentifiable photo ends as
-  "Unidentified item" per the describe prompt's own rule,
-  with the flag cleared.
-- **Lane:** Catalogue. **Effort:** S–M.
-- **Status:** SHIPPED 2026-10-24 (Sprint 20). Prevention
-  live: needsAi flags at both save paths, capped on-load
-  healer, "Naming…" grid state.
-
-### UX-17 — Manual theme choice in Account (System / Light / Dark)
-
-- **Origin:** founder curiosity, 2026-10-24 — explicitly NOT
-  a priority ("the way we are right now looks pretty good").
-- **Now:** theme follows the phone's system setting only
-  (light base tokens, dark via prefers-color-scheme). No
-  in-app control, no stored preference.
-- **In scope (when pulled):** a three-way choice in Account
-  (System / Light / Dark), stored per device, applied via a
-  data-theme attribute that overrides the media query both
-  ways; default stays System.
-- **Why it might matter:** app-light on a dark phone for
-  bright-sunlight readability; comparing the two looks
-  without flipping the whole phone.
-- **Revisit trigger:** first user request for it, or the
-  next time Account is opened up for other work.
-- **Lane:** Loop (settings/shell). **Effort:** S.
-- **Status:** DONE 2026-10-24 (Sprint 21).
-
-### UX-18: Stylist audit: one experience + architecture pass, founder session
-
-- **Origin:** founder, 2026-10-24 — "the AI stylist feature
-  has a lot of inconsistencies and we need to sit together
-  and sort it out experience-wise and also architecture-wise
-  at some point." NOT a patch queue: a sit-together design
-  session. Patching entry-point semantics piecemeal is the
-  process that produced the inconsistencies.
-- **Exhibit #1 (headline):** today's pick attaches as chat
-  context by default on EVERY general chat open — including
-  a cold open from the Stylist tab, where the founder did
-  not choose it ("not expected"). Entry-aware seeding was
-  never designed; the context fix seeded unconditionally.
-  The pin makes it visible and removable, but the DEFAULT
-  is the open question.
-- **Experience agenda:** every chat entry point and what
-  context it attaches by default (Today ask, Stylist tab,
-  trip page, outfit/item cards, @-refs); what "a fresh chat"
-  means; pin visibility rules (UX-16 folds in here as the
-  audit workstream); the strip vs pin duplication; thread
-  restore semantics.
-- **Architecture agenda:** the context assembly has grown
-  five mechanisms (todayPick, previousPick, @-references,
-  context pins, tripContext) with no single model of
-  precedence or lifetime. Session outcome: one context
-  model — what exists, who wins, when it expires — written
-  into a living design doc (per the complex-systems rule)
-  before any code moves.
-- **Session shape:** Bramble brings the full inventory
-  (entry points × attached context × disagreements) so the
-  session is decisions, not discovery.
-- **Lane:** Stylist. **Effort:** session + follow-on cuts TBD.
-- **Status:** DONE 2026-10-24 (Sprint 23) — all five
-  build waves live the same day, followed by the
-  phone-test fix buffers and the Context Standard.
-  Everything it held is released: PC-38, PC-45 and the
-  PC-33 remainder are in Sprint 24; PC-41 awaits the
-  founder's shop-attach verdict; PC-32 was absorbed by
-  wave 4. UX-16 folded in, as planned.
-
-### OBS-4: Data-model drift spot-check (S)
-
-- **Origin:** the important-invisibles register (2026-10-24):
-  the catalog data model (`docs/DATA_MODEL.md`, v2) has a
-  design doc but no proof surface — nothing checks the live
-  documents against it, so drift is discovered by accident
-  (the Untitled-item incident was drift of exactly this kind).
-- **In scope:** a drift section in `scripts/quality-report.js`
-  — sample the founder's items, trips, and shop checks;
-  verify the required v2 fields per DATA_MODEL.md and the
-  NAMING-1 standard (shortName present, within budget, not the
-  placeholder); report drift counts by kind with example ids.
-  Read-only; no auto-repair.
-- **Out of scope:** repair/migration (drift findings become
-  their own cuts), other users' data.
-- **Acceptance:** the report prints a drift section with sane
-  numbers on live data; a deliberately corrupted test doc is
-  flagged.
-- **Lane:** platform/observability. **Effort:** S.
-- **Status:** DONE 2026-10-24 (Sprint 21).
-
-### PC-44: Non-photo catalogue intake — link & lookup first (L)
-
-- **Origin:** Alta teardown P3, saved by the founder
-  2026-10-24. Alta offers receipt forwarding, a product
-  database, pasted links, and photo→original-image lookup;
-  reviewers confirm they work.
-- **Problem:** our intake is photo-only, and cataloguing
-  cost is the product's core hurdle (UX-14). A piece you
-  just bought online already has a perfect product photo —
-  making the user re-photograph it is pure friction.
-- **In scope (first slice):** paste a product link (or pick
-  from a small lookup) at add-time → the app fetches the
-  retail image + name/details as the draft; the source is
-  labeled on the item ("retail photo — not yours") and the
-  user can replace it with their own photo anytime.
-- **Out of scope:** receipt forwarding (a later slice),
-  scraping retailers that block it, price/affiliate data,
-  silently substituting a found image for the user's photo
-  (PC-34 doctrine: originals always retained, labeled).
-- **Acceptance:** paste a link for a real product → a draft
-  piece appears with the retail photo + suggested fields,
-  source-labeled; saving works; swapping in your own photo
-  later keeps everything else.
-- **Lane:** Catalogue. **Effort:** L.
-- **Status:** DONE 2026-10-24 (Sprint 22) — then the link
-  slice was REMOVED + PARKED the same day (founder call):
-  plain fetching only works for Open-Graph-friendly
-  stores (Uniqlo yes; Amazon/Patagonia/REI no), and
-  offering users a door that fails most of the time is
-  worse than not offering it. UI removed from Add pieces;
-  the `fetchLinkItem` function stays deployed but
-  unreferenced, and the retail-label plumbing stays for
-  pieces saved during its life. **Revisit trigger:** a
-  fetch approach measured at 90%+ success across a fixed
-  representative store panel (incl. Amazon) — e.g.
-  headless-browser rendering or a product-data API.
-  Screenshot / copy + paste (PC-51) is the sanctioned
-  path meanwhile.
-
-### PC-45: Explain-the-no → a proposed, confirmable style rule (M)
-
-- **Origin:** Alta teardown P3, saved by the founder
-  2026-10-24 (evidence second-hand: a hands-on review
-  describes thumbs-down + reason → style rules at Alta).
-- **Problem:** our learning hears only post-wear ratings
-  and reflection. The earlier signal — "not this, because…"
-  at suggestion time — evaporates.
-- **In scope:** when the user rejects a pick with a reason,
-  the app may PROPOSE a style rule ("skip wide-leg trousers")
-  as a visible, confirmable pin — never learned silently
-  (context-pin discipline); confirmed rules feed the
-  stylist prompt and show in the profile.
-- **Out of scope:** free-text rule editing v1, learning
-  from unconfirmed rejections.
-- **Acceptance:** reject a pick with a reason → a rule is
-  proposed, not applied; confirming it changes later picks;
-  dismissing it leaves no trace.
-- **Lane:** Personalization + Stylist. **Effort:** M.
-- **Status:** DONE 2026-10-24 (Sprint 24). Built on the
-  Today pick's "Another" — the app's one rejection
-  surface. When "Another" would generate a new pick, a
-  reason sheet opens first (browsing today's existing
-  set stays instant — that isn't rejection). The reason
-  does two jobs, kept apart: it steers the regeneration
-  (one turn, phrased into the generation request) and it
-  may earn a PROPOSED rule. Situational reasons (too
-  warm/cold, colors clash, not my style) steer only —
-  never rules. Durable taste proposes: a named piece →
-  "Skip <piece>"; the user's own words → the words;
-  formality chips → a lean template. The proposal swaps
-  into the sheet while the new pick composes; Save writes
-  a preference fact through the one write path
-  (factConflicts + deleteFacts + the standard doc shape),
-  and a rule that is already a fact is never re-proposed.
-  No thanks writes nothing — dismissing leaves no trace.
-  Because the server reads facts from Firestore itself,
-  a confirmed rule feeds the very next stylist call and
-  shows in Account's facts like any other. Helpers pinned
-  by tests/pc45-client.test.js. Founder phone validation
-  pending.
-
-### PC-46: Candidate-piece outfit previews inside shop check (M)
-
-- **Origin:** Alta teardown P3, saved by the founder
-  2026-10-24. Alta generates outfits including a not-yet-
-  owned wishlist piece.
-- **Problem:** PC-40's check judges a candidate in prose
-  only — "would work with your navy trousers" is a claim
-  the user cannot see.
-- **In scope:** the check result shows 1–2 concrete outfit
-  previews built around the candidate + owned pieces
-  (existing pick machinery, candidate slotted in), so the
-  verdict is visible, not just asserted.
-- **Out of scope:** retail feeds, links, prices (VISION's
-  no-commerce rule); candidates the user didn't supply.
-- **Acceptance:** check a candidate → the result includes
-  outfit previews naming real owned pieces; previews use
-  the same composer as Today picks.
-- **Lane:** Stylist. **Effort:** M.
-- **Status:** DONE 2026-10-24 (Sprint 22).
-
-### PC-47: Forgotten-pieces utilization surface (S/M)
-
-- **Origin:** Alta teardown P3, saved by the founder
-  2026-10-24. Alta sorts by most/least worn with a wear
-  calendar; its founding premise is people wear a small
-  fraction of their closet.
-- **Problem:** we store every wear event and expose no
-  aggregate view — the Loop lane has data with no surface.
-- **In scope:** a wardrobe view sorted by wear (most /
-  least / never), each neglected piece ending in an action
-  ("build a look around this") that routes to the stylist
-  with that piece pinned. Feeds the open exploration-vs-
-  exploitation question in PERSONALIZATION.md.
-- **Out of scope:** cost-per-wear (no price field exists),
-  guilt mechanics, streaks.
-- **Acceptance:** open the view → pieces order by real
-  wear counts; a never-worn piece can start a look in one
-  tap.
-- **Lane:** Loop + Personalization. **Effort:** S/M.
-- **Status:** DONE 2026-10-24 (Sprint 22).
 
 ### PC-48: Activity + luggage-aware trip planning (M/L)
 
@@ -1527,206 +935,6 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
   spike's design work actually calls for a rotatable 3D
   view.
 
-### PC-50: Link intake for shop check (S)
-
-- **Origin:** Founder, 2026-10-24, minutes after PC-44
-  shipped: link intake "should work for the shop check
-  feature as well — that's perhaps more relevant, with a
-  fallback to good old screenshot (what we already have)."
-- **Problem:** checking something you're eyeing online
-  starts from its product page, but the check demands a
-  photo — so the user screenshots or saves the image first,
-  pure friction at the exact decision moment. PC-44 proved
-  the fetch machinery; the check is its most natural home.
-- **In scope:** the shop-check sheet gains a link field +
-  Fetch (same pattern as the capture screen): fetchLinkItem
-  pulls the retail photo to Storage, and the check runs on
-  it directly — no upload step, no crop step (a clean
-  product shot needs neither). PC-40's context (trip tag +
-  question) composes unchanged. Photo/screenshot stays as
-  the fallback route, untouched, for in-store and for
-  stores that block fetching (the catalog's friendly error
-  already covers it). Retry on a link check re-runs the
-  analysis on the same stored photo.
-- **Out of scope:** bulk link checks, price extraction,
-  retailer-specific parsers.
-- **Acceptance:** paste a Uniqlo product link in the check
-  sheet → verdict renders with the retail photo, saves to
-  the shop list like any check; a blocked store shows the
-  friendly message and the photo route still works.
-- **Lane:** Stylist (shop). **Effort:** S.
-- **Status:** SHIPPED 2026-10-24 (founder pulled it the
-  same day it was filed), then REMOVED + PARKED the same
-  day on the founder's reliability call — see PC-44's
-  status for the reasoning and the 90%+ revisit trigger.
-  The shared snapshot helper it introduced stays (the
-  photo flow uses it).
-
-### PC-51: Paste a photo from the clipboard (S)
-
-- **Origin:** Founder, 2026-10-24: copied a product image
-  from a website on his laptop and instinctively hit paste
-  in the app — "there is no way to paste. that's a huge
-  miss lol." Every intake route today demands a saved file
-  or the camera; the clipboard — the natural desktop
-  gesture when browsing products — is unsupported. It is
-  also the escape hatch for stores whose pages expose no
-  fetchable photo (Amazon serves fetchers a script shell
-  with no image tags at all; verified 2026-10-24 on the
-  founder's own a.co link → LINK_NO_IMAGE).
-- **In scope:** a document-level paste handler that
-  snapshots image files off the clipboard event (the
-  FileList lesson: copy them out immediately) and routes
-  by what's open — shop-check sheet open → shop check via
-  the PC-42 cropper (first image); Add pieces open → the
-  ordinary capture ingest (all images); nothing relevant
-  open → a small chooser (Add to wardrobe / Shop check).
-  Text pastes are never hijacked: if the clipboard carries
-  text, text fields keep it (pasting a link into the link
-  field must work exactly as today); the handler only
-  claims an image-only paste, or an image paste whose
-  target isn't a text field.
-- **Out of scope:** an explicit "Paste" button via the
-  async Clipboard API (permission prompts; revisit if the
-  keyboard route proves undiscoverable), drag-and-drop
-  (file if wanted separately), paste on the piece page.
-- **Acceptance:** on desktop — copy a product image in the
-  browser → open a shop check → Cmd/Ctrl+V → the cropper
-  opens with that image; open Add pieces → paste → the
-  capture flow takes it; paste with nothing open → the
-  chooser appears; pasting a link into either link field
-  still pastes text, untouched.
-- **Lane:** Catalogue + Stylist (intake). **Effort:** S.
-- **Status:** SHIPPED 2026-10-24 — pulled by the founder
-  as the replacement path the same day link intake was
-  parked ("advise users to take screenshots / copy images
-  and paste them"). Awaiting founder phone/desktop
-  validation.
-
-### PC-52: The stylist may propose an attachment (S)
-
-- **Origin:** Founder, 2026-10-24, on the UX-18 build: "can
-  we educate user on attaching during conversation, or in
-  some cases attaching things on our [behalf] based on chat
-  context?" Decision 1 stands — nothing attaches silently,
-  ever. But the app may notice the conversation has turned
-  on something unattached and PROPOSE attaching it, exactly
-  the way pinned facts are proposed today (model proposes,
-  user taps, nothing happens without the tap). Education
-  shipped alongside the question: the context sheet now
-  also attaches (an Attach row for today's pick + the @
-  tip), and the empty state teaches both routes.
-- **In scope:** an `attachProposal` answer field alongside
-  `pinProposal` in the general conversation — the model
-  proposes attaching today's pick when the user's words
-  clearly turn on it ("make it warmer", "why did you pick
-  this?") and no pick is attached and the conversation has
-  no pick of its own. The client renders a proposal card
-  (Attach / Dismiss) mirroring the pin-proposal card;
-  Attach runs attachTodayPick(). The assembler states the
-  rule in the brief (propose only on a clear referent, at
-  most one per conversation unless the subject changes).
-- **Out of scope:** proposing pointers to pieces (the @
-  gesture is the user's; a future card may generalize),
-  any silent or timed auto-attach (barred by decision 1),
-  trip conversations.
-- **Acceptance:** in a fresh general conversation with a
-  pick on Today, "make this warmer" earns an Attach
-  proposal card; tapping Attach puts the pick in the
-  context line and the next message iterates from it;
-  Dismiss leaves the conversation pick-free and the model
-  does not re-propose on the next turn.
-- **Lane:** Stylist. **Effort:** S.
-- **Status:** DONE 2026-10-24 (Sprint 24). Built as
-  specced: an attachProposal field alongside pinProposal
-  (strict literal "todayPick"), the brief section present
-  only under the exact conditions (general chat, pick
-  available and unattached, none dismissed), a server
-  gate that drops out-of-turn proposals, and a client
-  proposal card mirroring the pin card — Attach runs
-  attachTodayPick(); Dismiss silences proposals for the
-  conversation (Start fresh re-arms). Deviation from the
-  brief text, recorded: the "at most once unless the
-  subject changes" nuance is enforced as once per
-  conversation by the client + server together — the
-  pick is the only attachable subject in scope, so a
-  subject change cannot occur. tests/pc52.test.js pins
-  the brief gating and parse strictness. Awaiting the
-  founder's phone validation.
-
-### PC-53: New-user empty states on every tab (S)
-
-- **Origin:** Founder, 2026-10-24, phone-testing as a new
-  user: the Start-here prompt belongs on every screen for
-  users with zero things (the tabs are otherwise empty real
-  estate), and users with few things get a designed "add
-  more" treatment (that tier delegated to Bramble). Full
-  design: `docs/proposals/NEW-USER-EMPTY-STATES.md`.
-- **In scope:** tier 0 (0 pieces) intro cards on Outfits,
-  Shop, Trips + the stylist empty state's extra line (Today
-  and Wardrobe already comply); tier 1 (below the existing
-  `todayThresholdMet()` bar: ≥4 pieces incl. top + bottom)
-  slim gap-naming banner on Wardrobe and Outfits (Today's
-  progress card is the same component); the shop list's
-  stale "tap Save" empty line replaced (checks auto-save).
-- **Out of scope:** banners on Shop/Trips at tier 1, any
-  stored dismissal state (graduation is count-derived),
-  a first-run wizard.
-- **Acceptance:** fresh account sees an intro treatment on
-  all five tabs; 2 tops-only pieces → the missing bottom is
-  named on Today/Wardrobe/Outfits; threshold crossed → no
-  intro UI anywhere.
-- **Lane:** Catalogue (onboarding surface). **Effort:** S.
-- **Status:** DONE 2026-10-24 (Sprint 24). Built to the
-  proposal doc as written: tier-0 intro cards on Outfits,
-  Shop and Trips; the tier-1 gap banner on Wardrobe and
-  Outfits sharing Today's component; the stylist's extra
-  line at zero pieces; the shop empty line's stale "tap
-  Save" copy corrected (checks auto-save). gapCopyFor is
-  pinned by tests/pc53-client.test.js. Awaiting the
-  founder's phone validation (his verdict is the gate).
-
-### PC-54: Paste intake on phones (S)
-
-- **Origin:** Founder, 2026-10-24, mid phone test of PC-51:
-  "how would pasting from clipboard work on a smartphone?"
-  It mostly wouldn't — PC-51 rides the keyboard paste event,
-  which phones don't have. Phones gate the clipboard behind
-  gestures and permissions; iOS Safari is the strictest (no
-  programmatic clipboard read at all).
-- **In scope:** a visible "Paste a photo" button in the shop
-  sheet and the capture screen that tries the async
-  clipboard read where the browser allows it (Android Chrome:
-  works with a permission prompt) and degrades honestly where
-  it doesn't (iOS: one line — "on iPhone, save the photo and
-  upload it, or share it here" once the share target exists).
-  Separately, the real phone answer: a Web Share Target so
-  the system share sheet can send a photo straight into the
-  app (manifest + service worker) — scope it in the walk.
-- **Out of scope:** hijacking long-press paste in text
-  fields (flaky, and text fields are for text).
-- **Acceptance:** on Android Chrome, copy a product photo,
-  tap Paste a photo in the shop sheet, land in the photo
-  step; on iPhone, the same tap gives the honest fallback,
-  never a silent nothing.
-- **Lane:** Catalogue. **Effort:** S (share target may split
-  out as its own card at the walk).
-- **Status:** DONE 2026-10-24 (Sprint 24). Built as specced:
-  a visible Paste a photo button on the capture screen and
-  in the shop sheet; the tap tries the async clipboard read
-  and routes any photo through PC-51's one routing (now a
-  shared routePastedImages) — shop sheet → the cropper,
-  capture → add. Every failure speaks: no read API (iOS)
-  → the save-and-upload line; permission denied → Upload
-  does the same job; clipboard holds no photo → copy one
-  first. The guide's clipboard path carries the phone
-  sentence too. pickClipboardImageType is pinned by
-  tests/pc54-client.test.js. The share target split out
-  as PC-55 during the build. Validation split: the
-  founder's iPhone can verify the honest fallback tap;
-  the Android read path needs an Android device — flagged,
-  not claimed.
-
 ### PC-55: Web Share Target — photos from the share sheet (M)
 
 - **Origin:** Split out of PC-54 during its Sprint 24 build
@@ -1758,74 +966,6 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
   upload is a recurring friction.
 - **Status:** Filed 2026-10-24 from the PC-54 split.
   Enters work only via a planning walk.
-
-### PC-61: Link-preview metadata (Open Graph) for the live app (S)
-
-- **Origin:** Founder, 2026-11-20 — filed from the Career thread,
-  founder-directed to start right away (not via a planning walk).
-- **Problem:** LinkedIn could not attach
-  https://closet-404e9.web.app anywhere on the founder's profile
-  (Projects media link, Featured) — LinkedIn must generate a link
-  preview before it saves a link, and it failed repeatedly
-  ("We couldn't generate a preview for this link"), 5+ tries.
-  The app itself loads fine; it is JS-rendered and serves no
-  preview metadata, so crawlers see nothing to build a preview
-  from. The same gap likely breaks previews anywhere the app
-  link is shared.
-- **In scope:** add standard link-preview metadata to the app
-  entry HTML — meta description, og:title, og:description,
-  og:type, og:url, og:image (a stable hosted image), and
-  twitter:card — then deploy through the normal hosting path.
-  Copy for title/description comes from PRODUCT.md's one-liner.
-- **Out of scope:** server-side rendering or prerendering;
-  any share-surface redesign.
-- **Acceptance:** the live HTML at closet-404e9.web.app serves
-  the OG/Twitter tags (verified by fetching the live page, not
-  just local source); a link-preview check for the URL
-  succeeds; the Career thread then attaches the URL on
-  LinkedIn (Closet Project media + Featured) and closes the
-  loop with the founder.
-- **Lane:** platform. **Effort:** S.
-- **Status:** SHIPPED 2026-11-20 (hosting release
-  1795197718752000) and verified against the live site: tags
-  served, og:image resolves, LinkedInBot-UA fetch sees the OG
-  set, independent preview parse (Microlink) succeeds. Guards in
-  tests/pc61-meta.test.js; entry in SHIPPED.md. Remaining: the
-  Career thread retries the LinkedIn attach (Project media +
-  Featured) — that closes the loop.
-- **Follow-up (2026-11-21):** og:image upgraded from the 512
-  icon to a designed 1200×630 card (founder-approved sample;
-  source scripts/build-og-card.py), twitter:card now
-  summary_large_image. Deployed (release 1795310458762000) and
-  verified live incl. Microlink parse of the new card.
-
-### PC-62: App shell under LinkedIn's 3MB scrape limit (S)
-
-- **Origin:** Founder via Career thread, 2026-11-21 — PC-61's
-  tags were correct, but LinkedIn's Post Inspector refused the
-  URL verbatim: "We did not scrape the content because it's size
-  was larger than our threshold. Maximum size for this input
-  stream is 3145728 bytes." The served page was 3,725,337 bytes.
-- **Problem:** 3,011,538 of those bytes were the four brand fonts
-  base64-inlined into the HTML. Any crawler with a size cap
-  (LinkedIn today, others tomorrow) bails before reading the
-  preview tags.
-- **Fix (shipped):** externalized the fonts — the same TTFs now
-  serve from /fonts/ with an immutable year-long cache header,
-  the two primary weights are preloaded, and the shell dropped
-  to ~713KB. No UA-sniffing, no cloaking: every visitor and every
-  crawler gets the same, lighter page. scripts/build-og-card.py
-  now reads the fonts from public/fonts/.
-- **Acceptance:** a LinkedInBot-UA fetch of the live URL returns
-  < 3,145,728 bytes WITH the full tag set; a link-preview check
-  succeeds. The Career thread then retries the LinkedIn attach.
-- **Lane:** platform. **Effort:** S.
-- **Status:** SHIPPED 2026-11-21 (hosting release
-  1795311120702000) and verified live: LinkedInBot fetch 714,828
-  bytes with all OG tags, fonts serving at exact sizes with the
-  immutable cache header, Microlink parse succeeds. Byte-budget
-  guard in tests/pc62-shell.test.js. Remaining: the Career
-  thread's LinkedIn retry + Post Inspector re-check.
 
 ### PC-63: Raw [iNN] handles never render in chat prose (S)
 
@@ -2028,3 +1168,108 @@ AI-written descriptions/attributes stay read-only through Sprint 3.
   stock phrase; a double-send produces one message.
 - **Lane:** Stylist. **Effort:** S (bundle of three).
 - **Status:** Filed 2026-11-21. Sprint 31 alternate.
+
+### PC-73: Outfit object + save-from-chat + history list (L)
+
+- **Origin:** Outfit-as-first-class-object epic, sliced at the Sprint 32
+  planning walk (2026-11-23).
+- **Problem:** recommendations are bare text — nothing persists as an
+  outfit, so there is no history, no worn tracking, no object to
+  favorite or search.
+- **In scope:** the Outfit object `{ items, source, occasion, weather,
+  createdAt }` (DATA_MODEL.md join key already decided); save a stylist
+  pick from chat; a history list of saved outfits.
+- **Out of scope:** worn flags/ratings (PC-74), manual builder (PC-75),
+  favorites/search/worn-calendar (PC-76).
+- **Done looks like:** a pick saved from chat appears as an Outfit in
+  the history list with its items, occasion, and weather.
+- **Lane:** Stylist + Outfits. **Effort:** L.
+- **Status:** Filed 2026-11-23. Parked — new-feature work waits for the
+  post-polish phase.
+
+### PC-74: Worn flags + two-sided ratings on outfits (M)
+
+- **Origin:** Same epic slice as PC-73.
+- **Problem:** the app never learns whether a pick was worn or liked;
+  the prediction-vs-outcome delta (the compounding asset for taste)
+  does not exist.
+- **In scope:** user flags worn / not worn on a saved outfit; user
+  rates 0–10 + a descriptive opinion; the app gives its own quality
+  score/suggestion on the same outfit; confidence at recommendation
+  time ("8/10 because…") vs reflection after the fact.
+- **Done looks like:** a worn outfit carries the user's rating +
+  opinion and the app's reflection; the delta is stored as a labeled
+  example.
+- **Effort:** M.
+- **Status:** Filed 2026-11-23. Parked — post-polish phase.
+
+### PC-75: Manual outfit builder (M)
+
+- **Origin:** Same epic slice as PC-73.
+- **Problem:** the user cannot combine items into an outfit by hand —
+  only the stylist can create outfits.
+- **In scope:** user picks items into an Outfit by hand, same object,
+  source=manual.
+- **Done looks like:** a hand-built outfit saves and appears in history
+  alongside stylist picks.
+- **Effort:** M.
+- **Status:** Filed 2026-11-23. Parked — post-polish phase.
+
+### PC-76: Outfit favorites, search, worn-calendar (M)
+
+- **Origin:** Same epic slice as PC-73.
+- **Problem:** once outfits exist, there is no way back to them — no
+  favorites, no search, no worn-on-which-day view.
+- **In scope:** favorite an outfit; search history; a worn-on-which-day
+  calendar/view.
+- **Depends on:** PC-73 (the object), PC-74 (worn flags).
+- **Effort:** M.
+- **Status:** Filed 2026-11-23. Parked — post-polish phase.
+
+### PC-77: First-paint layout shift — hero CTAs + Today flash (S)
+
+- **Origin:** UI-unslop round-2 findings, 2026-11-08.
+- **Problem:** hero CTAs render side-by-side then reflow to stacked;
+  the app briefly flashes the catalog hero before Today renders.
+- **Done looks like:** first paint matches the settled layout; no hero
+  flash on load.
+- **Effort:** S.
+- **Status:** Filed 2026-11-23.
+
+### PC-78: Empty-state card's blank sage-green panel (S)
+
+- **Origin:** Round-2 findings, 2026-11-08.
+- **Problem:** the empty-state card's left panel is a large blank
+  sage-green block with no illustration — reads like a missing image.
+- **Done looks like:** the panel carries an illustration, or the layout
+  no longer reads as a missing image.
+- **Effort:** S.
+- **Status:** Filed 2026-11-23.
+
+### PC-79: Modal title style split (S)
+
+- **Origin:** Round-2 findings, 2026-11-08.
+- **Problem:** big serif titles in modals vs small-caps sans titles in
+  bottom sheets — pick one.
+- **Done looks like:** one title style across modals and bottom sheets.
+- **Effort:** S.
+- **Status:** Filed 2026-11-23.
+
+### PC-80: Sample pick card — murky photo, ragged labels (S)
+
+- **Origin:** Round-2 findings, 2026-11-08.
+- **Problem:** the sample pick card's jeans photo is murky in dark mode
+  and blends into the card; photo labels wrap raggedly to two lines.
+- **Done looks like:** the photo reads in dark mode; labels sit on one
+  line.
+- **Effort:** S.
+- **Status:** Filed 2026-11-23.
+
+### PC-81: "Start fresh" and "Set location" icons sit high (S)
+
+- **Origin:** Round-2 findings, 2026-11-08.
+- **Problem:** the ↻ and pin icons sit a touch high (G1 .ic-sm vertical
+  alignment).
+- **Done looks like:** both icons align with their text.
+- **Effort:** S.
+- **Status:** Filed 2026-11-23.
