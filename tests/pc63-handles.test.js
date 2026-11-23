@@ -47,9 +47,17 @@ test("text without handles is untouched; non-handle brackets survive", () => {
 });
 
 test("the main chat renderer strips handles for model messages only", () => {
+  // PC-64: model prose now routes through renderModelProse — a handle
+  // becomes a chip when it maps, and falls back to the PC-63 strip
+  // (fallback text, handle dropped) when it doesn't. User text still
+  // renders untouched.
   assert.ok(
-    html.includes('t.textContent = m.role === "model" ? stripItemHandles(m.text) : m.text;'),
-    "renderChat does not route model text through stripItemHandles"
+    html.includes('if (m.role === "model") renderModelProse(t, m.text, m.wardrobeIds);'),
+    "renderChat does not route model text through renderModelProse"
+  );
+  assert.ok(
+    html.includes("else t.textContent = m.text;"),
+    "renderChat does not leave user text untouched"
   );
 });
 

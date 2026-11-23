@@ -74,3 +74,78 @@ describe("serializeMessages keeps the demo flag (UX-14a)", () => {
     assert.strictEqual(out[0].demo, undefined);
   });
 });
+
+describe("serializeMessages keeps the wardrobe snapshot (PC-64)", () => {
+  test("wardrobeIds round-trips on a model reply", () => {
+    const out = serializeMessages([
+      { role: "model", text: "Try this", at: 2, wardrobeIds: ["a", "b", "c"] },
+    ]);
+    assert.deepEqual(out[0].wardrobeIds, ["a", "b", "c"]);
+  });
+});
+
+const parseHandleSegments = extractClientFn("parseHandleSegments", "text");
+const itemFromWardrobeHandle = extractClientFn("itemFromWardrobeHandle", "index, wardrobeIds, byId");
+
+describe("parseHandleSegments (PC-64)", () => {
+  test("a bold unit '**Name [iN]**' becomes one handle segment", () => {
+    const segs = parseHandleSegments("Pair the **White Tee [i2]** with jeans.");
+    assert.deepEqual(segs, [
+      { type: "text", text: "Pair the " },
+      { type: "handle", index: 2, fallback: "**White Tee**" },
+      { type: "text", text: " with jeans." },
+    ]);
+  });
+
+  test("a handle outside the bold also becomes one segment", () => {
+    const segs = parseHandleSegments("Try the **White Tee** [i2] today.");
+    assert.deepEqual(segs, [
+      { type: "text", text: "Try the " },
+      { type: "handle", index: 2, fallback: "**White Tee**" },
+      { type: "text", text: " today." },
+    ]);
+  });
+
+  test("a bare handle becomes a segment with an empty fallback", () => {
+    const segs = parseHandleSegments("Go with [i3] and [i1].");
+    assert.deepEqual(segs, [
+      { type: "text", text: "Go with " },
+      { type: "handle", index: 3, fallback: "" },
+      { type: "text", text: " and " },
+      { type: "handle", index: 1, fallback: "" },
+      { type: "text", text: "." },
+    ]);
+  });
+
+  test("plain text with no handles is one text segment", () => {
+    assert.deepEqual(parseHandleSegments("No pieces named here."), [
+      { type: "text", text: "No pieces named here." },
+    ]);
+    assert.deepEqual(parseHandleSegments(""), []);
+  });
+
+  test("handles at the start and end are kept", () => {
+    const segs = parseHandleSegments("[i1] anchors it, and so does **Dark Jeans [i5]**");
+    assert.strictEqual(segs[0].type, "handle");
+    assert.strictEqual(segs[0].index, 1);
+    assert.strictEqual(segs[segs.length - 1].type, "handle");
+    assert.strictEqual(segs[segs.length - 1].index, 5);
+  });
+});
+
+describe("itemFromWardrobeHandle (PC-64)", () => {
+  const byId = (id) => ({ a: "Tee", b: "Jeans", c: "Shoes" })[id] || null;
+
+  test("maps 1-based handles against the snapshot, not the live list", () => {
+    assert.strictEqual(itemFromWardrobeHandle(1, ["a", "b", "c"], byId), "Tee");
+    assert.strictEqual(itemFromWardrobeHandle(3, ["a", "b", "c"], byId), "Shoes");
+  });
+
+  test("returns null for out-of-range handles, missing snapshots, and deleted items", () => {
+    assert.strictEqual(itemFromWardrobeHandle(4, ["a", "b", "c"], byId), null);
+    assert.strictEqual(itemFromWardrobeHandle(0, ["a", "b", "c"], byId), null);
+    assert.strictEqual(itemFromWardrobeHandle(1, undefined, byId), null);
+    assert.strictEqual(itemFromWardrobeHandle(1, null, byId), null);
+    assert.strictEqual(itemFromWardrobeHandle(2, ["a", "gone", "c"], byId), null);
+  });
+});

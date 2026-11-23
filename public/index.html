@@ -468,6 +468,10 @@
     .chat-msg-photos img { width: 74px; height: 74px; object-fit: cover; border-radius: var(--r-sm); display: block; }
     .chat-msg-photocount { font-size: 12.5px; opacity: .75; margin-bottom: 4px; }
     .chat-ref-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 4px 6px 4px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--ink); border: 1px solid var(--line); }
+    /* PC-64: tappable item chips in stylist prose — thumbnail + short name, inline. */
+    .chat-item-chip { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 13px; font-weight: 600; padding: 2px 10px 2px 2px; border-radius: 999px; background: var(--paper); color: var(--ink); border: 1px solid var(--line-strong); cursor: pointer; vertical-align: middle; margin: 1px 0; }
+    .chat-item-chip img { width: 26px; height: 26px; object-fit: cover; border-radius: 50%; display: block; }
+    .chat-item-chip:active { background: var(--accent-soft); }
     .chat-ref-chip button { border: none; background: transparent; color: var(--muted); cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px; }
     .chat-msg-refs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
     .chat-ref-chip.static { cursor: default; }
@@ -5565,6 +5569,10 @@
           // UX-14a: a demo reply stays marked demo across reloads,
           // so its outfit cards keep hiding Save / Wore-it.
           if (m.demo) o.demo = true;
+          // PC-64: the wardrobe snapshot the reply was answered
+          // from — its prose chips map against this, never the
+          // live list (which shifts as items are added).
+          if (m.wardrobeIds) o.wardrobeIds = m.wardrobeIds;
           return o;
         });
       }
@@ -5957,6 +5965,91 @@
         return leadHandle ? t.replace(/^\s+/, "") : t;
       }
 
+      // PC-64: pure (tested in tests/sprint32-client.test.js) —
+      // split model prose into text and handle segments. A bold
+      // unit "**Name [iN]**" (or "**Name** [iN]") becomes one
+      // handle segment — the chip carries the name, so the unit
+      // is replaced whole. A bare "[iN]" becomes one too.
+      // Fallback is what renders when the handle cannot be
+      // mapped: the PC-63 strip (name kept, handle dropped).
+      function parseHandleSegments(text) {
+        var t = String(text || "");
+        var out = [];
+        var re = /\*\*([^*]*?)\s*\[i(\d+)\]\*\*|\*\*([^*]+?)\*\*\s*\[i(\d+)\]|\[i(\d+)\]/gi;
+        var last = 0, m;
+        while ((m = re.exec(t))) {
+          if (m.index > last) out.push({ type: "text", text: t.slice(last, m.index) });
+          if (m[2]) {
+            var n1 = (m[1] || "").trim();
+            out.push({ type: "handle", index: Number(m[2]), fallback: n1 ? "**" + n1 + "**" : "" });
+          } else if (m[4]) {
+            var n2 = (m[3] || "").trim();
+            out.push({ type: "handle", index: Number(m[4]), fallback: n2 ? "**" + n2 + "**" : "" });
+          } else {
+            out.push({ type: "handle", index: Number(m[5]), fallback: "" });
+          }
+          last = m.index + m[0].length;
+        }
+        if (last < t.length) out.push({ type: "text", text: t.slice(last) });
+        return out;
+      }
+
+      // PC-64: pure (tested) — resolve a 1-based handle against the
+      // wardrobe snapshot the reply was answered from. Returns the
+      // item or null — never a guess. A deleted item, an out-of-range
+      // handle, or a reply with no snapshot all map to null.
+      function itemFromWardrobeHandle(index, wardrobeIds, byId) {
+        if (!index || !Array.isArray(wardrobeIds)) return null;
+        var id = wardrobeIds[index - 1];
+        if (!id || typeof byId !== "function") return null;
+        return byId(id) || null;
+      }
+
+      // PC-64: render model prose into the bubble — handles become
+      // tappable chips when they map, clean text otherwise.
+      function renderModelProse(el, text, wardrobeIds) {
+        var segs = parseHandleSegments(text);
+        segs.forEach(function (s) {
+          if (s.type === "text") {
+            if (s.text) el.appendChild(document.createTextNode(s.text));
+            return;
+          }
+          var item = itemFromWardrobeHandle(s.index, wardrobeIds, itemById);
+          if (!item) {
+            if (s.fallback) el.appendChild(document.createTextNode(s.fallback));
+            return;
+          }
+          el.appendChild(itemChipEl(item));
+        });
+      }
+
+      // PC-64: one chip — thumbnail + short name, tapping opens the
+      // item page. Demo pieces have no item page; say so plainly.
+      function itemChipEl(item) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "chat-item-chip";
+        var photos = itemPhotos(item);
+        if (photos.length && photos[0].url) {
+          var img = document.createElement("img");
+          showDisplayPhoto(img, item, "clean");
+          img.alt = "";
+          b.appendChild(img);
+        }
+        var nm = document.createElement("span");
+        nm.textContent = item.shortName || item.name || "Piece";
+        b.appendChild(nm);
+        b.addEventListener("click", function () {
+          if (String(item.id || "").indexOf("demo-") === 0) {
+            showToast("That's a demo piece — add your own to open it.");
+            return;
+          }
+          closeOverlay(chatOverlay);
+          openItem(item);
+        });
+        return b;
+      }
+
       // PC-65: an outfit's identity is its item set. Helper for
       // the render-time dedupe below — order-insensitive.
       function outfitSetKey(ids) {
@@ -6160,7 +6253,10 @@
           var t = document.createElement("span");
           // PC-63: model prose carries [iNN] handles — strip them
           // (user text is the user's own words, left untouched).
-          t.textContent = m.role === "model" ? stripItemHandles(m.text) : m.text;
+          // PC-64: a handle that maps to the snapshot the reply was
+          // answered from renders as a tappable chip instead.
+          if (m.role === "model") renderModelProse(t, m.text, m.wardrobeIds);
+          else t.textContent = m.text;
           div.appendChild(t);
           chatList.appendChild(div);
           // PC-12: structured outfit card under the reply, with a Save action.
@@ -8138,6 +8234,11 @@
           }
         };
         chatRefs = { articles: [], outfits: [] }; // per-message; PC-16 carries continuity
+        // PC-64: the wardrobe order this request was answered from —
+        // handles [iN] index THIS list. Stored on the reply when it
+        // lands, so chips map with certainty even after items are
+        // added or removed.
+        var sentWardrobeIds = payload.items.map(function (x) { return x.id; });
         if (sentPhotos.length) { chatRefPhotos = []; renderRefPhotoChips(); } // PC-38: the draft is spent
         if (!payload.vibe && vibeIntentWithoutMatch(text)) logVibeMiss(text);
         // Sprint 16 (TRIPCHAT-1): trip mode — the trip + current packing
@@ -8173,6 +8274,9 @@
         var sentThreadKey = activeThreadKey;
         callAskStylist(payload).then(function (res) {
           thinking.thinking = false;
+          // PC-64: the reply carries the wardrobe snapshot it was
+          // answered from — handles in its prose map against this.
+          thinking.wardrobeIds = sentWardrobeIds;
           var d = res.data || {};
           // UX-18 W1/W3: the assembler's manifest — the context line
           // renders it, so the display is the loader's own list.
