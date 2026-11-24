@@ -97,6 +97,17 @@ describe("truncateAtWord (PC-72a)", () => {
   test("never leaves a dangling separator", () => {
     assert.strictEqual(truncateAtWord("A · B · C"), "A · B …");
   });
+
+  test("PC-86: a trailing ellipsis is a separator, not a word", () => {
+    // A pin label like "I like timeless …" already ends in "…".
+    // The old code popped it and re-added it, so the step changed
+    // nothing and the trim loop spun to its guard with the full text.
+    assert.strictEqual(truncateAtWord("I like timeless …"), "I like …");
+    assert.strictEqual(
+      truncateAtWord("Today's pick · Estate Minimalist  ·  Mountain View  ·  I like timeless …"),
+      "Today's pick · Estate Minimalist  ·  Mountain View  ·  I like …"
+    );
+  });
 });
 
 describe("isDuplicateSend (PC-72c)", () => {

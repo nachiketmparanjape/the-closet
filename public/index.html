@@ -7564,11 +7564,18 @@
       // PC-72a: pure (tested in tests/sprint32-client.test.js) —
       // drop the last word of a context line (and any trailing
       // separator) and add the ellipsis. One step of the trim.
+      // PC-86: a trailing "…" is a separator, not a word — a pin
+      // label like "I like timeless …" already ends in one, and
+      // the old code popped it and re-added it, so the trim was a
+      // no-op and spun to its guard with the text unchanged.
       function truncateAtWord(text) {
         var words = String(text || "").split(" ");
-        while (words.length && words[words.length - 1] === "·") words.pop();
+        function dropSeparators() {
+          while (words.length && (words[words.length - 1] === "·" || words[words.length - 1] === "…" || words[words.length - 1] === "")) words.pop();
+        }
+        dropSeparators();
         words.pop();
-        while (words.length && words[words.length - 1] === "·") words.pop();
+        dropSeparators();
         return words.join(" ") + " …";
       }
 
@@ -7591,7 +7598,11 @@
         var base = el.textContent.slice(0, el.textContent.length - (suffix || "").length);
         var guard = 0;
         while (base.split(" ").length > 1 && el.scrollWidth > el.clientWidth && guard < 60) {
-          base = truncateAtWord(base);
+          // PC-86: stop on no progress — a step that changes nothing
+          // must never spin to the guard and leave the full text.
+          var next = truncateAtWord(base);
+          if (next === base) break;
+          base = next;
           el.textContent = base + (suffix || "");
           guard++;
         }
