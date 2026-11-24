@@ -165,7 +165,7 @@ restyle?). The last two came out of the unslop round-2 findings.
   redeployed. Tests: 9 new, suite 570 passing in `tests/` + 10
   in `functions/cutout-check.test.js`; `node --check` clean.
   Founder phone verification pending — see phone paths below.
-- **UX-16 — context-handoff audit.** Commit `60a2e5a` (2026-11-23).
+- **UX-16 — context-handoff audit.** Commit `4241999` (2026-11-23).
   Audit first, then fix what it finds. Every row verified. No
   fixes filed. Guard: 9 new tests pin every row. Built +
   deployed; CI Hosting deploy to verify; no server change, no
