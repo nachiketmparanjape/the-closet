@@ -1039,3 +1039,40 @@ Suite: 615 passing in `tests/` + 10 in
   renders after the overlay opens with a one-frame retry.
   The prompt bans the observed repeat phrases. Commit
   `333f71a`.
+
+## Sprint 34 — Close the loop, second pass (2026-11-23)
+
+QA Round 2 verified three Sprint 33 fixes and failed three
+(PC-84, the PC-72 regressions) plus one new P1 (PC-87). This
+sprint fixes all four, P0 first. Record:
+`docs/sprints/sprint-34/SPRINT.md`. The round that filed the
+cards is QA Round 2, 2026-11-23
+(`qa-rounds/2026-11-23-round2.md` in the studio goal
+workspace). Suite: 638 passing (628 in `tests/` + 10 in
+`functions/cutout-check.test.js`). Verification is QA Round 3
+(Fri Nov 27), except PC-86, which was verified live the same
+evening.
+
+- **PC-88 (P0) — three-outfit asks work.** The 2500-token cap
+  truncated a three-outfit JSON mid-object, so every
+  three-outfit ask died with `AI_BAD_RESPONSE`. The prompt now
+  contracts an `outfits` array (up to 3), bad entries drop
+  instead of failing the reply, and the cap rises to 6000 only
+  on multi-outfit turns. Commit `1cbbbae`.
+- **PC-84 — "More formal" keeps half the outfit.** The Sprint
+  33 prompt fix was live but uncountable; the model judged
+  every slot must change. The rule is now countable (AT LEAST
+  HALF) with server enforcement via `iterationKeepProblem`.
+  Commit `c41655c`.
+- **PC-87 — outfit Delete works.** The handler gated on native
+  `confirm()`, auto-dismissed without a dialog. It now uses
+  the in-app two-tap confirm, mirroring PC-82. Commit
+  `386f914`.
+- **PC-86 — context bar ends on a whole word.** The trim was a
+  no-op: the shown text ends in a pin label ("I like timeless
+  …") that already ends in "…", so `truncateAtWord` popped
+  the ellipsis and re-added it. A trailing "…" now counts as
+  a separator, and the loop breaks on no progress. Verified
+  live on the saved "Evening at The Battery" conversation:
+  "Today's pick · Estate Minimalist … · +2 more". Commit
+  `178fd5f`.

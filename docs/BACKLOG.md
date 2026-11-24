@@ -1371,7 +1371,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **Done looks like:** "More formal" keeps the outfit's core pieces
   and shifts formality; the reply names the pieces it changed.
 - **Effort:** M.
-- **Status:** In Sprint 33 — SHIPPED 2026-11-23; retest 2026-11-23 (Round 2): STILL FAILS — "More formal" replaced the outfit, 0 of 4 pieces kept. Fix did not land.
+- **Status:** In Sprint 34 — SHIPPED 2026-11-23 (built + deployed; awaiting QA Round 3 retest). Sprint 33 fix did not land because the rule was uncountable; Sprint 34 made it countable (AT LEAST HALF) with server enforcement (`iterationKeepProblem` repair trigger).
 
 ### PC-85: Reloads briefly show wrong empty states (M)
 
@@ -1401,7 +1401,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **Done looks like:** the context bar shows whole words only; no
   clipped word at the end.
 - **Effort:** S.
-- **Status:** In Sprint 34 — proposed (founder approved 2026-11-23).
+- **Status:** In Sprint 34 — SHIPPED 2026-11-23 and VERIFIED LIVE the same evening (signed-in browser, saved "Evening at The Battery" conversation): the bar reads "Today's pick · Estate Minimalist … · +2 more" — word boundary, no mid-word cut. Root cause: `truncateAtWord` no-op on the trailing "…" of the "I like timeless …" pin label. Issue #153 closed.
 
 ### PC-87: Outfit Delete arms but never deletes (M)
 
@@ -1417,7 +1417,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **Done looks like:** deleting an outfit removes it from Outfits and
   shows feedback.
 - **Effort:** M.
-- **Status:** In Sprint 34 — proposed (founder approved 2026-11-23).
+- **Status:** In Sprint 34 — SHIPPED 2026-11-23 (built + deployed; awaiting QA Round 3 retest). Root cause: the handler gated on native `window.confirm()`, auto-dismissed without showing; fixed with the in-app two-tap confirm (PC-82 idiom).
 
 ### PC-88: Three-outfit stylist request errors out every time (M)
 
@@ -1433,4 +1433,4 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **Done looks like:** asking for three outfits in one thread returns
   three outfits.
 - **Effort:** M.
-- **Status:** In Sprint 34 — proposed, card 1 (P0) (founder approved 2026-11-23).
+- **Status:** In Sprint 34 — SHIPPED 2026-11-23, card 1 (P0) (built + deployed; awaiting QA Round 3 retest). Root cause: `maxOutputTokens: 2500` truncated the three-outfit JSON mid-object (`AI_BAD_RESPONSE`); fixed with an `outfits` array contract, per-entry validation, and a 6000-token cap on multi-outfit turns only.

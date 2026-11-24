@@ -54,4 +54,61 @@ two guesses.
 
 ## Build results
 
-(To be filled as cards land.)
+All four cards built, deployed, committed 2026-11-23. Suite
+**638 passing** (628 in `tests/` + 10 in
+`functions/cutout-check.test.js`). Client syntax OK.
+
+- **PC-88 (#152, P0) — SHIPPED.** Cause proven from the error
+  refs: `maxOutputTokens: 2500` (with a 1024 thinking budget)
+  truncated a three-outfit JSON mid-object, so every
+  three-outfit ask died with `AI_BAD_RESPONSE`. Fix: an
+  `outfits` array contract in the prompt + `parseOneOutfit`
+  validation (bad entries drop instead of failing the reply),
+  and the token cap rises to 6000 only on multi-outfit turns.
+  Client renders the extras as cards. Commit `1cbbbae`;
+  hosting release `1795491241711000`.
+- **PC-84 (#150) — SHIPPED.** The Sprint 33 prompt fix WAS
+  live — the rule itself was the cause: "keep MOST / change
+  only the slots that must change" left "must change" to the
+  model's judgment, and for a casual-to-formal jump it judged
+  every slot must change. Fix: a countable rule (keeps AT
+  LEAST HALF of the previous pick) plus server enforcement —
+  `iterationKeepProblem` triggers the one-shot repair when
+  the floor is missed. Commit `c41655c`; `askStylist`
+  redeployed (server-only, no hosting deploy).
+- **PC-87 (#154) — SHIPPED.** Same failure class as PC-82:
+  the outfit delete handler gated on native `window.confirm()`,
+  which browsers auto-dismiss without showing it, so the
+  handler returned early on every tap. Fix: the in-app
+  two-tap confirm, mirroring PC-82. Commit `386f914`;
+  hosting release `1795491672252000`. Finding recorded in
+  the commit: 9 more native `confirm()` gates remain in the
+  client — same latent class, follow-up candidates.
+- **PC-86 (#153) — SHIPPED and VERIFIED LIVE.** The Sprint 33
+  trim logic was sound in isolation (a probe page with the
+  verbatim functions trimmed correctly) — the cause was
+  inside `truncateAtWord`: the shown text ends in a pin label
+  ("I like timeless …") that already ends in "…", so the
+  step popped the trailing "…" and re-added it — a no-op.
+  The loop spun its 60-step guard with the text unchanged
+  and the CSS ellipsis cut mid-word ("Mountain Vie…"). Fix:
+  a trailing "…" counts as a separator, and the loop breaks
+  on no progress (`tests/pc86-trim.test.js`, 3 tests, plus a
+  `truncateAtWord` regression). Commit `178fd5f`; hosting
+  release `1795492436055000` (probe page removed from the
+  live site in release `1795492532806000`). Live check
+  2026-11-23 ~19:54 PST, signed-in browser, saved "Evening
+  at The Battery" conversation: the bar reads "Today's pick
+  · Estate Minimalist … · +2 more" — word boundary, no
+  mid-word cut. Issue #153 closed with this verification.
+  The probe page (`public/trim-test.html`) was a one-off
+  diagnostic, deleted before this docs commit.
+
+## Retest
+
+QA Round 3 (Fri Nov 27, or earlier on the founder's order):
+re-test PC-84, PC-87, PC-88 (P0 first) + smoke pass. PC-86
+is already verified live (see above) and is re-tested only
+if the round's scope keeps it. Nov 27 falls in the
+Thanksgiving trip — the round records itself as skipped if
+the sign-in approval does not arrive.
