@@ -7495,14 +7495,40 @@
         if (!demoChat) entries.push({ type: "memory", label: tail.join(" · ") });
         return entries;
       }
+      // PC-72a: pure (tested in tests/sprint32-client.test.js) —
+      // drop the last word of a context line (and any trailing
+      // separator) and add the ellipsis. One step of the trim.
+      function truncateAtWord(text) {
+        var words = String(text || "").split(" ");
+        while (words.length && words[words.length - 1] === "·") words.pop();
+        words.pop();
+        while (words.length && words[words.length - 1] === "·") words.pop();
+        return words.join(" ") + " …";
+      }
+
+      // PC-72a: the bar truncates at a word boundary, never
+      // mid-word. Shrink word by word until the text fits its
+      // box; the "+N more" suffix stays. The context sheet
+      // holds the full text, one tap away.
+      function trimContextText(el, suffix) {
+        if (!el || el.scrollWidth <= el.clientWidth) return;
+        var base = el.textContent.slice(0, el.textContent.length - (suffix || "").length);
+        var guard = 0;
+        while (base.split(" ").length > 1 && el.scrollWidth > el.clientWidth && guard < 60) {
+          base = truncateAtWord(base);
+          el.textContent = base + (suffix || "");
+          guard++;
+        }
+      }
+
       function renderContextLine() {
         var el = document.getElementById("chatContextLine");
         if (!el) return;
         syncRefPhotoUi(); // PC-38: the attach door follows the active thread
         if (!currentUser) { el.hidden = true; var h0 = document.getElementById("chatContextHint"); if (h0) h0.hidden = true; return; }
         var labels = contextEntries().map(function (e) { return e.label; });
-        var text = labels.slice(0, 3).join("  ·  ");
-        if (labels.length > 3) text += "  ·  +" + (labels.length - 3) + " more";
+        var suffix = labels.length > 3 ? "  ·  +" + (labels.length - 3) + " more" : "";
+        var text = labels.slice(0, 3).join("  ·  ") + suffix;
         el.textContent = "";
         var txt = document.createElement("span");
         txt.className = "cl-text";
@@ -7513,6 +7539,7 @@
         chev.innerHTML = ICONS.chevRight;
         el.appendChild(chev);
         el.hidden = false;
+        trimContextText(txt, suffix);
         var hintEl = document.getElementById("chatContextHint");
         if (hintEl) hintEl.hidden = !(contextSheetSeenKnown && !contextSheetSeen);
       }
@@ -8110,6 +8137,21 @@
         }
       });
 
+      // PC-72c: pure (tested in tests/sprint32-client.test.js) —
+      // true when this text matches the most recent user message
+      // sent inside the window (10s). A re-send inside the
+      // window is a duplicate, not a new message.
+      function isDuplicateSend(text, list, now) {
+        if (!text) return false;
+        for (var i = (list || []).length - 1; i >= 0; i--) {
+          var m = list[i];
+          if (m.role === "user") {
+            return m.text === text && (now - (m.at || 0)) < 10000;
+          }
+        }
+        return false;
+      }
+
       async function sendChat(event) {
         event.preventDefault();
         if (chatBusy || !currentUser) return;
@@ -8121,6 +8163,17 @@
         // and braces.
         var sentPhotos = (!tripChat && activeThreadKey === "general") ? chatRefPhotos.slice() : [];
         if (!text && !sentPhotos.length) return;
+        // PC-72c: an identical message re-sent within a short
+        // window is a duplicate — block it and say so. The text
+        // already sits in the thread, so the input clears.
+        // A blocked chip tap must not poison the next send:
+        // its forced iteration base clears here too.
+        if (text && isDuplicateSend(text, stylistMessages, Date.now())) {
+          chatInput.value = "";
+          forcedPreviousPick = null;
+          showToast("That message already went through — not sent twice.");
+          return;
+        }
         if (!functions) { showToast("The stylist isn't ready yet — reload and try again."); return; }
         chatInput.value = "";
         // PC-22: keep the referenced labels on the message so the thread

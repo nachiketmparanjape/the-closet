@@ -85,6 +85,64 @@ describe("serializeMessages keeps the wardrobe snapshot (PC-64)", () => {
 });
 
 const parseHandleSegments = extractClientFn("parseHandleSegments", "text");
+const truncateAtWord = extractClientFn("truncateAtWord", "text");
+const isDuplicateSend = extractClientFn("isDuplicateSend", "text, list, now");
+
+describe("truncateAtWord (PC-72a)", () => {
+  test("drops the last word and adds the ellipsis", () => {
+    assert.strictEqual(truncateAtWord("Wardrobe · 12 pieces · Taste: streetwear"), "Wardrobe · 12 pieces · Taste: …");
+    assert.strictEqual(truncateAtWord("I like tailored fits"), "I like tailored …");
+  });
+
+  test("never leaves a dangling separator", () => {
+    assert.strictEqual(truncateAtWord("A · B · C"), "A · B …");
+  });
+});
+
+describe("isDuplicateSend (PC-72c)", () => {
+  const list = [
+    { role: "user", text: "add it", at: 1000 },
+    { role: "model", text: "Done.", at: 2000 },
+  ];
+
+  test("same text inside 10s is a duplicate", () => {
+    assert.strictEqual(isDuplicateSend("add it", list, 5000), true);
+    assert.strictEqual(isDuplicateSend("add it", list, 10999), true);
+  });
+
+  test("same text after the window is a new message", () => {
+    assert.strictEqual(isDuplicateSend("add it", list, 11000), false);
+  });
+
+  test("different text, empty text, and no prior user message are not duplicates", () => {
+    assert.strictEqual(isDuplicateSend("add this", list, 5000), false);
+    assert.strictEqual(isDuplicateSend("", list, 5000), false);
+    assert.strictEqual(isDuplicateSend("add it", [], 5000), false);
+    assert.strictEqual(isDuplicateSend("add it", [{ role: "model", text: "Hi", at: 1000 }], 5000), false);
+  });
+
+  test("only the most recent user message counts", () => {
+    const two = [
+      { role: "user", text: "add it", at: 1000 },
+      { role: "user", text: "warmer please", at: 9000 },
+    ];
+    assert.strictEqual(isDuplicateSend("add it", two, 9500), false);
+    assert.strictEqual(isDuplicateSend("warmer please", two, 9500), true);
+  });
+});
+
+describe("PC-72 wiring (source pins)", () => {
+  test("the context bar trims at a word boundary and keeps the full text in the sheet", () => {
+    assert.ok(html.includes("trimContextText(txt, suffix);"), "renderContextLine does not trim the bar text");
+    assert.ok(html.includes('var suffix = labels.length > 3 ? "  ·  +" + (labels.length - 3) + " more" : "";'), "the +N more suffix is not kept");
+  });
+
+  test("sendChat blocks an identical re-send inside the window", () => {
+    assert.ok(html.includes("if (text && isDuplicateSend(text, stylistMessages, Date.now())) {"), "no duplicate guard in sendChat");
+    assert.ok(html.includes('showToast("That message already went through — not sent twice.");'), "no duplicate confirmation");
+  });
+});
+
 const feedbackReasonLabel = extractClientFn("feedbackReasonLabel", "reason");
 const rejectedOutfitsFrom = extractClientFn("rejectedOutfitsFrom", "list");
 

@@ -157,3 +157,14 @@ describe("buildStylistRequest rejected outfits (PC-71)", () => {
     assert.ok(sys.includes("weigh the weather harder"));
   });
 });
+
+// PC-72b: prose variety — the card carries the answer, so the
+// prose stays short, fresh, and off stock phrases.
+describe("SYSTEM prose variety (PC-72b)", () => {
+  it("tells the model to keep prose short, fresh, and off stock phrases", () => {
+    const sys = brief(twelveItems(), false);
+    assert.ok(sys.includes("two sentences at most"));
+    assert.ok(sys.includes("fresh wording every reply"));
+    assert.ok(sys.includes("Never reuse a stock phrase"));
+  });
+});
