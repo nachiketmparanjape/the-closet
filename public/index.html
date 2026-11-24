@@ -1033,7 +1033,7 @@
 
       <div class="catalog-head">
         <h2>Every piece</h2>
-        <span class="count" id="itemCount">0 pieces</span>
+        <span class="count" id="itemCount">…</span>
         <label class="catalog-sort">Sort
           <select id="wardrobeSort" aria-label="Sort the wardrobe">
             <option value="browse">Browse</option>
@@ -1045,7 +1045,7 @@
       </div>
 
       <div class="gallery" id="gallery">
-        <div class="empty" id="emptyState">
+        <div class="empty" id="emptyState" hidden>
           <div class="empty-art" aria-hidden="true">
             <svg class="hanger" viewBox="0 0 260 180"><path d="M127 69c-8-2-13-8-13-16 0-10 7-18 17-18s18 8 18 18c0 7-4 12-10 16l-7 5"/><path d="M132 74 33 137c-8 5-5 15 4 15h190c9 0 12-10 4-15l-99-63Z"/><line x1="65" y1="131" x2="199" y2="131"/></svg>
           </div>
@@ -1065,7 +1065,7 @@
     <section aria-label="Outfits" id="outfitsView" hidden>
       <div class="catalog-head">
         <h2>Outfits</h2>
-        <span class="count" id="outfitCount">0 outfits</span>
+        <span class="count" id="outfitCount">…</span>
         <button class="secondary" id="addOutfitBtn" type="button" style="margin-left:auto">+ Add outfit</button>
         <input type="file" id="photoParseInput" accept="image/*" hidden>
         <input type="file" id="photoParseInputCamera" accept="image/*" capture="environment" hidden>
@@ -1086,7 +1086,7 @@
     <section aria-label="Shop list" id="shopListView" hidden>
       <div class="catalog-head">
         <h2>Shop list</h2>
-        <span class="count" id="shopCheckCount">0 saved</span>
+        <span class="count" id="shopCheckCount">…</span>
         <button class="primary" id="shopListAddBtn" type="button" style="margin-left:auto">+ Shop check</button>
       </div>
       <p class="hint">Things you're eyeing — each one checked against your wardrobe before you buy.</p>
@@ -4498,7 +4498,7 @@
             counting.style.gridColumn = "1 / -1";
             counting.innerHTML = "<h3>Counting wears…</h3><p>Reading your wear history.</p>";
             gallery.appendChild(counting);
-            itemCount.textContent = allItems.length + " pieces";
+            itemCount.textContent = itemsLoaded ? allItems.length + " pieces" : "…";
             return;
           }
           if (wardrobeSortMode === "never") {
@@ -4519,7 +4519,16 @@
           wBanner.style.gridColumn = "1 / -1";
           gallery.appendChild(wBanner);
         }
-        if (!currentUser || allItems.length === 0) {
+        // PC-85: before the first snapshot, leave the gallery
+        // blank — the skeleton is the loading state. The empty
+        // state is only real once the snapshot has landed and the
+        // wardrobe is actually empty. The static markup starts
+        // hidden for the same reason (first paint, before any
+        // script runs).
+        if (!itemsLoaded) {
+          // Loading: render nothing; the skeleton shows instead.
+        } else if (allItems.length === 0) {
+          emptyState.hidden = false;
           gallery.appendChild(emptyState);
         } else if (filter === "All" && !query && wardrobeSortMode === "browse") {
           gallery.appendChild(categoryWallEl());
@@ -4537,7 +4546,7 @@
         } else {
           visible.forEach(function (item) { gallery.appendChild(createItemCard(item)); });
         }
-        itemCount.textContent = visible.length + (visible.length === 1 ? " piece" : " pieces");
+        itemCount.textContent = itemsLoaded ? visible.length + (visible.length === 1 ? " piece" : " pieces") : "…";
         var hero = document.querySelector(".hero");
         if (hero) { hero.classList.toggle("hero-compact", allItems.length > 0); }
       }
@@ -4554,6 +4563,7 @@
             allItems = snapshot.docs.map(function (doc) {
               var data = doc.data(); data.id = doc.id; return data;
             });
+            itemsLoaded = true;
             loadingGrid.hidden = true;
             gallery.hidden = false;
             renderGallery();
@@ -4561,6 +4571,7 @@
             maybeRenderToday();
             maybeHealUnnamedItems();
           }, function (error) {
+            itemsLoaded = true;
             loadingGrid.hidden = true;
             gallery.hidden = false;
             showToast(friendlyError(error));
@@ -6093,7 +6104,15 @@
           empty.className = "chat-empty";
           var title = document.createElement("p");
           title.className = "chat-empty-title";
-          if (demoChat) {
+          if (!itemsLoaded && !demoChat) {
+            // PC-85: the wardrobe has not arrived yet — the empty
+            // chat must not claim it is empty ("add a few pieces",
+            // "Try the demo wardrobe") before the data is in.
+            title.appendChild(document.createTextNode("Loading your wardrobe…"));
+            empty.appendChild(title);
+            empty.appendChild(shopCheckEl("p", "chat-empty-hint",
+              "One moment — your pieces are on their way."));
+          } else if (demoChat) {
             // UX-14a: the demo empty state says what the demo IS —
             // sample pieces, nothing saved — before the first word.
             title.appendChild(document.createTextNode("Demo wardrobe — try the stylist on "));
@@ -6134,7 +6153,7 @@
         // said something here, the chat itself explains how
         // pieces get in and carries the one Add door. Render-
         // time only; nothing is saved to the thread.
-        if (!demoChat && !todayThresholdMet() &&
+        if (itemsLoaded && !demoChat && !todayThresholdMet() &&
             !stylistMessages.some(function (m) { return m.role === "user"; })) {
           var addInfo = document.createElement("div");
           addInfo.className = "chat-addinfo";
@@ -9699,6 +9718,11 @@
       // + DESIGN.md §4.10. Chat is an escape hatch only: Wear this /
       // Another call the proposal machinery (callAskStylist) directly.
       var todayDataSeen = false;
+      // PC-85: the first items snapshot has not arrived yet. Counts
+      // and empty states must say loading, never "0" or empty,
+      // until this flips — a reload used to flash "0 pieces", an
+      // empty stylist and "0 outfits" before any data arrived.
+      var itemsLoaded = false;
       var todayRoutedOnce = false;
       var todayState = { picks: [], idx: 0, generating: false, wornSet: {}, loaded: false, error: false, renderToken: 0, waitingSince: 0 };
       // Fix buffer 5: Today state is server-side (settings/app +
@@ -10727,8 +10751,11 @@
           list.length + (list.length === 1 ? " outfit" : " outfits");
         document.getElementById("outfitsHint").hidden = list.length > 0 || allItems.length === 0;
         // PC-53: tier 0 leads with the intro card; tier 1 with
-        // the gap banner. Both graduate on counts alone.
-        if (allItems.length === 0 && list.length === 0) {
+        // the gap banner. Both graduate on counts alone. PC-85:
+        // the intro card is only real once the wardrobe has
+        // arrived — before that, allItems is [] because nothing
+        // arrived yet.
+        if (itemsLoaded && allItems.length === 0 && list.length === 0) {
           gallery.appendChild(introCardEl("Outfits",
             "Outfits are combinations of your own pieces. Add a few pieces first — then the stylist can dress you, and the looks you save live here.",
             "+ Add your first pieces", function () { document.getElementById("addButton").click(); }));
@@ -13456,7 +13483,8 @@
           // intro card (checks work right away — the sheet is a
           // front door too). Otherwise the plain line, with the
           // stale "tap Save" copy corrected: checks auto-save.
-          if (allItems.length === 0) {
+          // PC-85: only once the wardrobe has arrived.
+          if (itemsLoaded && allItems.length === 0) {
             gallery.appendChild(introCardEl("Shop check",
               "Before you buy something, check it against your wardrobe and get a straight verdict. Checks work right away — and get sharper the more of your wardrobe is in.",
               "Check an item", function () { openShopCheckSheet(null); }));
