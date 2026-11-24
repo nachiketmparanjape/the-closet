@@ -252,6 +252,27 @@ function sanitizePreviousPick(value) {
   return { itemIds: ids };
 }
 
+// PC-71: outfits the user rejected ("Not for me"), with a reason.
+// The client builds the list from thread messages carrying
+// outfitFeedback; ids are re-validated against the wardrobe,
+// like previousPick. At most 8 ride one request.
+const REJECT_REASONS = ["too-plain", "wrong-vibe", "not-that-piece", "wrong-weather"];
+function sanitizeRejectedOutfits(value, items) {
+  if (!Array.isArray(value)) return null;
+  const valid = new Set((items || []).map((it) => it && it.id).filter(Boolean));
+  const out = [];
+  for (const r of value) {
+    if (!r || typeof r !== "object") continue;
+    if (REJECT_REASONS.indexOf(r.reason) === -1) continue;
+    const ids = Array.isArray(r.itemIds)
+      ? r.itemIds.filter((id) => typeof id === "string" && valid.has(id)).slice(0, 6)
+      : [];
+    if (!ids.length) continue;
+    out.push({ itemIds: ids, reason: r.reason });
+  }
+  return out.length ? out.slice(0, 8) : null;
+}
+
 // Founder bug (2026-10-24): today's home-screen pick is DISPLAYED
 // at the top of the stylist chat but was never SENT — questions
 // about it ("why this?", "make it warmer") arrived context-free
@@ -871,6 +892,7 @@ function buildManifest(input, activePins) {
       ? { attached: true, name: input.shopItem.name }
       : { attached: false, name: null },
     previousPick: { present: !!iter.base, fromToday: iter.isToday },
+    rejectedOutfits: input.rejectedOutfits && Array.isArray(input.rejectedOutfits) ? input.rejectedOutfits.length : 0,
     references: {
       articles: input.references && Array.isArray(input.references.articles) ? input.references.articles.length : 0,
       outfits: input.references && Array.isArray(input.references.outfits) ? input.references.outfits.length : 0,
@@ -900,13 +922,13 @@ function assembleContext(input) {
     input.references, input.weatherContext, input.vibe, input.vibeProfile,
     input.tripContext, input.pins, todayStr, input.todayPick, input.shopItem,
     input.mutedPinIds, input.attachCtx, input.steerCtx, input.refImages,
-    input.photoVerdicts, input.demoWardrobe
+    input.photoVerdicts, input.demoWardrobe, input.rejectedOutfits
   );
   const manifest = buildManifest(input, computeActivePins(input.pins, input.tripContext, todayStr, input.mutedPinIds));
   return { model: req.model, contents: req.contents, config: req.config, manifest: manifest };
 }
 
-function buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, todayPick, shopItem, mutedPinIds, attachCtx, steerCtx, refImages, photoVerdicts, demoWardrobe) {
+function buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, todayPick, shopItem, mutedPinIds, attachCtx, steerCtx, refImages, photoVerdicts, demoWardrobe, rejectedOutfits) {
   const model = process.env.GEMINI_MODEL || MODEL_VERSION;
   const wardrobe = items.map((it, i) => itemLine(it, i)).join("\n");
   let system = SYSTEM + "\n\n" + PRECEDENCE;
@@ -1046,6 +1068,33 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
       "- With no explicit vibe requested, gently favor items matching these tags.\n" +
       "- A bias, never a filter: a great non-matching outfit still beats a mediocre matching one.\n" +
       "- You may acknowledge it at most once per conversation; never lecture about it.";
+  }
+  // PC-71: outfits the user rejected ("Not for me") — a quiet
+  // signal, like the vibe profile. Never mention or apologize
+  // about it; just do not suggest these outfits again, and avoid
+  // what they disliked about them.
+  if (rejectedOutfits && rejectedOutfits.length) {
+    const lines = rejectedOutfits.map((r) => {
+      const handles = r.itemIds.map((id) => {
+        const idx = items.findIndex((it) => it && it.id === id);
+        if (idx === -1) return null;
+        return "[i" + (idx + 1) + '] "' + cleanText(items[idx].name, 60) + '"';
+      }).filter(Boolean);
+      if (!handles.length) return null;
+      const why = {
+        "too-plain": "too plain",
+        "wrong-vibe": "the wrong vibe",
+        "not-that-piece": "one piece in it was wrong",
+        "wrong-weather": "wrong for the weather",
+      }[r.reason] || "not right";
+      return handles.join(", ") + " — rejected as " + why;
+    }).filter(Boolean);
+    if (lines.length) {
+      system += "\n\nREJECTED OUTFITS — the user said \"not for me\" to these; do not suggest them again.\n" +
+        lines.map((l) => "- " + l + ".").join("\n") + "\n" +
+        "- Avoid the combination, and avoid what they disliked about it (too plain → livelier; wrong vibe → a different vibe; one piece wrong → change that slot; wrong for the weather → weigh the weather harder).\n" +
+        "- Never mention the rejection, apologize for it, or explain it. Just pick better.";
+    }
   }
   // Sprint 17 (CONTEXT PINS): the user's confirmed current facts.
   // Outrank the measured weather; conversation-stated weather still
@@ -1481,7 +1530,7 @@ function unwrapJsonReply(text) {
 }
 
 // here; the client re-validates on execute.
-async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, hooks, todayPick, shopItem, mutedPinIds, attachCtx, steerCtx, refImages, photoVerdicts, demoWardrobe) {
+async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, hooks, todayPick, shopItem, mutedPinIds, attachCtx, steerCtx, refImages, photoVerdicts, demoWardrobe, rejectedOutfits) {
   const todayStr = /^\d{4}-\d{2}-\d{2}$/.test(today || "")
     ? today
     : new Date().toISOString().slice(0, 10);
@@ -1494,7 +1543,7 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
     tripContext: tripContext, pins: pins, today: todayStr, todayPick: todayPick,
     shopItem: shopItem, mutedPinIds: mutedPinIds, attachCtx: attachCtx,
     steerCtx: steerCtx, refImages: refImages, photoVerdicts: photoVerdicts,
-    demoWardrobe: demoWardrobe,
+    demoWardrobe: demoWardrobe, rejectedOutfits: rejectedOutfits,
   });
   const { model, contents, config } = assembled;
   const manifest = assembled.manifest;
@@ -1630,4 +1679,4 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
   };
 }
 
-module.exports = { askStylist, buildStylistRequest, assembleContext, buildManifest, resolveIterBase, computeActivePins, PRECEDENCE, MAX_MESSAGES, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeTodayPick, sanitizeShopItem, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins, sanitizePinProposal, sanitizeTripProposal, sanitizeRefImages, sanitizePhotoVerdicts, extractToolCall, extractToolCalls, mapUpdateTripPacking, mapSuggestTripOutfits, handleIndex, unwrapJsonReply, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM, VIBE_TAGS };
+module.exports = { askStylist, buildStylistRequest, assembleContext, buildManifest, resolveIterBase, computeActivePins, PRECEDENCE, MAX_MESSAGES, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeRejectedOutfits, sanitizeTodayPick, sanitizeShopItem, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins, sanitizePinProposal, sanitizeTripProposal, sanitizeRefImages, sanitizePhotoVerdicts, extractToolCall, extractToolCalls, mapUpdateTripPacking, mapSuggestTripOutfits, handleIndex, unwrapJsonReply, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM, VIBE_TAGS };

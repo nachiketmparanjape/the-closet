@@ -85,6 +85,46 @@ describe("serializeMessages keeps the wardrobe snapshot (PC-64)", () => {
 });
 
 const parseHandleSegments = extractClientFn("parseHandleSegments", "text");
+const feedbackReasonLabel = extractClientFn("feedbackReasonLabel", "reason");
+const rejectedOutfitsFrom = extractClientFn("rejectedOutfitsFrom", "list");
+
+describe("feedbackReasonLabel + rejectedOutfitsFrom (PC-71)", () => {
+  test("every reason chip has a plain label", () => {
+    assert.strictEqual(feedbackReasonLabel("too-plain"), "Too plain");
+    assert.strictEqual(feedbackReasonLabel("wrong-vibe"), "Wrong vibe");
+    assert.strictEqual(feedbackReasonLabel("not-that-piece"), "Not that piece");
+    assert.strictEqual(feedbackReasonLabel("wrong-weather"), "Wrong for the weather");
+    assert.strictEqual(feedbackReasonLabel("bogus"), "Not for me");
+  });
+
+  test("rejected outfits come only from messages carrying feedback", () => {
+    const out = rejectedOutfitsFrom([
+      { role: "model", text: "Try this", outfit: { itemIds: ["a", "b"] }, outfitFeedback: { reason: "too-plain" } },
+      { role: "model", text: "Or this", outfit: { itemIds: ["c"] } },
+      { role: "model", text: "And this", outfit: { itemIds: ["d"] }, outfitFeedback: { reason: "bogus" } },
+      { role: "user", text: "warmer please" },
+    ]);
+    assert.deepEqual(out, [{ itemIds: ["a", "b"], reason: "too-plain" }]);
+  });
+
+  test("serializeMessages keeps the feedback on the thread", () => {
+    const out = serializeMessages([
+      { role: "model", text: "Try this", at: 2, outfit: { itemIds: ["a"] }, outfitFeedback: { reason: "wrong-vibe" } },
+    ]);
+    assert.deepEqual(out[0].outfitFeedback, { reason: "wrong-vibe" });
+  });
+});
+
+describe("PC-71 wiring (source pins)", () => {
+  test("the feedback row is chat-only, never on demo outfits, and rides the next request", () => {
+    assert.ok(html.includes("if (msg.chatActions && !msg.demo && sourceMsg)"), "feedback row is not gated");
+    assert.ok(html.includes('sourceMsg.outfitFeedback = { reason: pair[0] };'), "a reason tap does not store feedback");
+    assert.ok(html.includes("delete sourceMsg.outfitFeedback;"), "no undo path");
+    assert.ok(html.includes("payload.rejectedOutfits = rejected;"), "feedback does not ride the next request");
+    assert.ok(html.includes("undefined, m));"), "renderChat does not pass the source message");
+  });
+});
+
 const cardActionText = extractClientFn("cardActionText", "kind, pieceName");
 
 describe("cardActionText (PC-69)", () => {

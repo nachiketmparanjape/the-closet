@@ -17,7 +17,7 @@ const { initializeApp } = require("firebase-admin/app");
 const { getStorage } = require("firebase-admin/storage");
 const { getFirestore } = require("firebase-admin/firestore");
 const { describeImage } = require("./describe");
-const { askStylist, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeTodayPick, sanitizeShopItem, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins, sanitizeRefImages, sanitizePhotoVerdicts } = require("./stylist");
+const { askStylist, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeRejectedOutfits, sanitizeTodayPick, sanitizeShopItem, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins, sanitizeRefImages, sanitizePhotoVerdicts } = require("./stylist");
 const { reflectOutfit } = require("./reflect");
 const { critiqueOutfit } = require("./critique");
 const { parseOutfitPhoto } = require("./photo");
@@ -239,6 +239,9 @@ exports.askStylist = onCall(
       const items = sanitizeItems(data.items);
       const messages = sanitizeMessages(data.messages);
       const previousPick = sanitizePreviousPick(data.previousPick);
+      // PC-71: outfits the user rejected ("Not for me") with a
+      // reason — ids re-validated against the wardrobe here.
+      const rejectedOutfits = sanitizeRejectedOutfits(data.rejectedOutfits, items);
       const todayPick = sanitizeTodayPick(data.todayPick);
       const shopItem = sanitizeShopItem(data.shopItem);
       const references = sanitizeReferences(data.references, items);
@@ -340,7 +343,7 @@ exports.askStylist = onCall(
       // UX-14a: demo wardrobe — the client sends 10 sample pieces as
       // the wardrobe, flagged so the brief says they are samples.
       const demoWardrobe = data.demoWardrobe === true;
-      const result = await askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, stylistHooks, todayPick, shopItem, mutedPinIds, attachCtx, steerCtx, refImages, photoVerdicts, demoWardrobe);
+      const result = await askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, stylistHooks, todayPick, shopItem, mutedPinIds, attachCtx, steerCtx, refImages, photoVerdicts, demoWardrobe, rejectedOutfits);
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: true });
       return finish("askStylist", correlationId, uid, start, result);
     } catch (err) {

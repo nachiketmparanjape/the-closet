@@ -477,6 +477,8 @@
     .outfit-action-chip { font: inherit; font-size: 12.5px; font-weight: 600; padding: 6px 10px; border-radius: 999px; background: var(--paper-soft); color: var(--ink); border: 1px solid var(--line-strong); cursor: pointer; }
     .outfit-action-chip:active { background: var(--accent-soft); }
     .outfit-thumb[role="button"] { cursor: pointer; }
+    /* PC-71: the quiet "Not for me" row under a chat card. */
+    .outfit-feedback { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
     .chat-ref-chip button { border: none; background: transparent; color: var(--muted); cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px; }
     .chat-msg-refs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
     .chat-ref-chip.static { cursor: default; }
@@ -5578,6 +5580,9 @@
           // from — its prose chips map against this, never the
           // live list (which shifts as items are added).
           if (m.wardrobeIds) o.wardrobeIds = m.wardrobeIds;
+          // PC-71: the rejection signal persists on the thread, so
+          // it keeps riding future stylist context after a reload.
+          if (m.outfitFeedback) o.outfitFeedback = m.outfitFeedback;
           return o;
         });
       }
@@ -6288,7 +6293,7 @@
                 // PC-68: thread cards carry the Wore-it affordance
                 // (a shallow copy — the outfit object stays shared,
                 // so save/worn state lands on the real message).
-                chatList.appendChild(renderOutfitCard(Object.assign({}, m, { wearLoggable: true, chatActions: true })));
+                chatList.appendChild(renderOutfitCard(Object.assign({}, m, { wearLoggable: true, chatActions: true }), undefined, m));
                 if (midx !== lastCardIdx && m.cardExpanded) {
                   var lessRow = document.createElement("div");
                   lessRow.className = "chat-divider-action";
@@ -8256,6 +8261,10 @@
         // handles [iN] index THIS list. Stored on the reply when it
         // lands, so chips map with certainty even after items are
         // added or removed.
+        // PC-71: outfits the user rejected ride the next request
+        // as structured context — stated once, applied quietly.
+        var rejected = rejectedOutfitsFrom(stylistMessages);
+        if (rejected.length) payload.rejectedOutfits = rejected;
         var sentWardrobeIds = payload.items.map(function (x) { return x.id; });
         if (sentPhotos.length) { chatRefPhotos = []; renderRefPhotoChips(); } // PC-38: the draft is spent
         if (!payload.vibe && vibeIntentWithoutMatch(text)) logVibeMiss(text);
@@ -14648,7 +14657,32 @@
         sendChat({ preventDefault: function () {} });
       }
 
-      function renderOutfitCard(msg, onSaved) {
+      // PC-71: pure (tested in tests/sprint32-client.test.js) —
+      // the display label for a rejection reason.
+      function feedbackReasonLabel(reason) {
+        var labels = {
+          "too-plain": "Too plain",
+          "wrong-vibe": "Wrong vibe",
+          "not-that-piece": "Not that piece",
+          "wrong-weather": "Wrong for the weather"
+        };
+        return labels[reason] || "Not for me";
+      }
+
+      // PC-71: pure (tested) — the rejected outfits for the next
+      // request, built from thread messages carrying feedback.
+      function rejectedOutfitsFrom(list) {
+        var out = [];
+        (list || []).forEach(function (pm) {
+          if (!pm || !pm.outfit || !pm.outfitFeedback || !pm.outfit.itemIds) return;
+          var reason = pm.outfitFeedback.reason;
+          if (["too-plain", "wrong-vibe", "not-that-piece", "wrong-weather"].indexOf(reason) === -1) return;
+          out.push({ itemIds: pm.outfit.itemIds.slice(), reason: reason });
+        });
+        return out;
+      }
+
+      function renderOutfitCard(msg, onSaved, sourceMsg) {
         var o = msg.outfit;
         var card = document.createElement("div");
         card.className = "outfit-card";
@@ -14815,6 +14849,66 @@
           formal.addEventListener("click", function () { sendCardAction("formal", o); });
           acts.appendChild(formal);
           card.appendChild(acts);
+        }
+        // PC-71: a quiet "Not for me" — reason chips, stored on the
+        // source message, riding future stylist context. Chat only,
+        // and only where the source message is known (the strip's
+        // expanded card has none — the original card above holds
+        // it). Never on demo outfits: the pieces are not theirs.
+        if (msg.chatActions && !msg.demo && sourceMsg) {
+          var fbRow = document.createElement("div");
+          fbRow.className = "outfit-feedback";
+          var fb = sourceMsg.outfitFeedback;
+          if (fb && fb.reason) {
+            var noted = document.createElement("span");
+            noted.className = "hint";
+            noted.textContent = "Noted — " + feedbackReasonLabel(fb.reason) + ".";
+            fbRow.appendChild(noted);
+            var undo = document.createElement("button");
+            undo.type = "button";
+            undo.className = "link-button";
+            undo.textContent = "Undo";
+            undo.addEventListener("click", function () {
+              delete sourceMsg.outfitFeedback;
+              saveThread(activeThreadKey);
+              renderChat();
+            });
+            fbRow.appendChild(undo);
+          } else if (sourceMsg.feedbackOpen) {
+            [["too-plain", "Too plain"], ["wrong-vibe", "Wrong vibe"], ["not-that-piece", "Not that piece"], ["wrong-weather", "Wrong for the weather"]].forEach(function (pair) {
+              var chip = document.createElement("button");
+              chip.type = "button";
+              chip.className = "outfit-action-chip";
+              chip.textContent = pair[1];
+              chip.addEventListener("click", function () {
+                sourceMsg.outfitFeedback = { reason: pair[0] };
+                sourceMsg.feedbackOpen = false;
+                saveThread(activeThreadKey);
+                renderChat();
+              });
+              fbRow.appendChild(chip);
+            });
+            var cancel = document.createElement("button");
+            cancel.type = "button";
+            cancel.className = "link-button";
+            cancel.textContent = "Cancel";
+            cancel.addEventListener("click", function () {
+              sourceMsg.feedbackOpen = false;
+              renderChat();
+            });
+            fbRow.appendChild(cancel);
+          } else {
+            var notForMe = document.createElement("button");
+            notForMe.type = "button";
+            notForMe.className = "link-button";
+            notForMe.textContent = "Not for me";
+            notForMe.addEventListener("click", function () {
+              sourceMsg.feedbackOpen = true;
+              renderChat();
+            });
+            fbRow.appendChild(notForMe);
+          }
+          card.appendChild(fbRow);
         }
         return card;
       }

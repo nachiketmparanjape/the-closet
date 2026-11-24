@@ -93,3 +93,67 @@ describe("buildStylistRequest card-action follow-ups (PC-69)", () => {
     assert.ok(formal.includes("ITERATION"));
   });
 });
+
+// PC-71: "Not for me" — the signal rides the next request as
+// structured context, quiet like the vibe profile.
+const { sanitizeRejectedOutfits } = require("../functions/stylist.js");
+
+describe("sanitizeRejectedOutfits (PC-71)", () => {
+  const items = fiveItems();
+
+  it("keeps valid ids with a known reason", () => {
+    assert.deepEqual(
+      sanitizeRejectedOutfits([{ itemIds: ["a", "b"], reason: "too-plain" }], items),
+      [{ itemIds: ["a", "b"], reason: "too-plain" }]
+    );
+  });
+
+  it("drops unknown reasons, unknown ids, and empty entries", () => {
+    assert.strictEqual(sanitizeRejectedOutfits([{ itemIds: ["a"], reason: "bogus" }], items), null);
+    assert.strictEqual(sanitizeRejectedOutfits([{ itemIds: ["zzz"], reason: "too-plain" }], items), null);
+    assert.strictEqual(sanitizeRejectedOutfits([{ itemIds: [], reason: "too-plain" }], items), null);
+    assert.strictEqual(sanitizeRejectedOutfits("nope", items), null);
+    assert.strictEqual(sanitizeRejectedOutfits(null, items), null);
+  });
+
+  it("keeps the known ids of a mixed entry and caps the list at 8", () => {
+    const mixed = sanitizeRejectedOutfits([{ itemIds: ["a", "zzz", "b"], reason: "wrong-vibe" }], items);
+    assert.deepEqual(mixed, [{ itemIds: ["a", "b"], reason: "wrong-vibe" }]);
+    const many = Array.from({ length: 10 }, (_, i) => ({ itemIds: ["a"], reason: "too-plain" }));
+    assert.strictEqual(sanitizeRejectedOutfits(many, items).length, 8);
+  });
+});
+
+describe("buildStylistRequest rejected outfits (PC-71)", () => {
+  function briefWithRejected(rejected) {
+    const items = fiveItems();
+    const messages = [{ role: "user", text: "something else please" }];
+    const { config } = buildStylistRequest(
+      items, messages, [], null, null, null, null, null, null, [],
+      "2026-11-23", null, null, [], null, null, [], [], false, rejected
+    );
+    return config.systemInstruction;
+  }
+
+  it("lists the rejected outfit with handles and the reason, and forbids lecturing", () => {
+    const sys = briefWithRejected([{ itemIds: ["a", "b"], reason: "too-plain" }]);
+    assert.ok(sys.includes("REJECTED OUTFITS"));
+    assert.ok(sys.includes('[i1] "Navy Tee"'));
+    assert.ok(sys.includes('[i2] "Tan Shorts"'));
+    assert.ok(sys.includes("too plain"));
+    assert.ok(sys.includes("do not suggest them again"));
+    assert.ok(sys.includes("Never mention the rejection"));
+  });
+
+  it("says nothing when there is no rejection", () => {
+    const sys = briefWithRejected(null);
+    assert.ok(!sys.includes("REJECTED OUTFITS"));
+    assert.ok(!sys.includes("do not suggest them again"));
+  });
+
+  it("maps each reason to its own guidance", () => {
+    const sys = briefWithRejected([{ itemIds: ["a"], reason: "wrong-weather" }]);
+    assert.ok(sys.includes("wrong for the weather"));
+    assert.ok(sys.includes("weigh the weather harder"));
+  });
+});
