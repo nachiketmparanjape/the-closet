@@ -14712,7 +14712,8 @@
 
       // PC-69: pure (tested in tests/sprint32-client.test.js) —
       // the follow-up text a card action sends. Worded for the
-      // server's iteration rules ("swap the X", "warmer", "dressier").
+      // server's iteration rules (PC-84: "more formal" is now a
+      // named direction there, alongside "warmer" and "dressier").
       function cardActionText(kind, pieceName) {
         if (kind === "swap") return "Swap the " + (pieceName || "piece") + " for something else";
         if (kind === "warmer") return "Make this outfit warmer";

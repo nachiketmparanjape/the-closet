@@ -88,9 +88,10 @@ describe("buildStylistRequest card-action follow-ups (PC-69)", () => {
   it("Warmer / More formal chips adjust the same pick in that direction", () => {
     const warmer = briefWithPick("Make this outfit warmer", ["a", "b"]);
     assert.ok(warmer.includes("ITERATION"));
-    assert.ok(warmer.includes("something warmer/cooler/dressier"));
+    assert.ok(warmer.includes("something warmer/cooler/more formal/dressier"));
     const formal = briefWithPick("Make this outfit more formal", ["a", "b"]);
     assert.ok(formal.includes("ITERATION"));
+    assert.ok(formal.includes("more formal/dressier"));
   });
 });
 

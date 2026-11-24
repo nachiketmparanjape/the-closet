@@ -993,7 +993,8 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
       system += "\n\nITERATION — the user is refining " + (iterBaseIsToday ? "today's pick (above)" : "your previous pick") + ", not starting over.\n" +
         "Previous pick: " + prevHandles.join(", ") + ".\n" +
         "- \"swap/change the X\" → replace only that slot's item; keep the rest.\n" +
-        "- \"something warmer/cooler/dressier/…\" → adjust the pick in that direction, keeping what still works.\n" +
+        "- \"something warmer/cooler/more formal/dressier/…\" → adjust the pick in that direction, keeping what still works. A direction change keeps MOST of the previous pick — change only the slots that must change for the direction.\n" +
+        "- Describe the previous pick only from the handles above — never name a piece it does not contain.\n" +
         "- \"another option\" / \"try again\" → pick a fully different outfit; avoid reusing previous items unless the wardrobe gives no alternative.\n" +
         "- Always return the COMPLETE new outfit (all slots), scored fresh against the rubric.";
     }
