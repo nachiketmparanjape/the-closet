@@ -10882,6 +10882,10 @@
 
       function openOutfit(groupId) {
         activeOutfitGroup = groupId;
+        // PC-87: an armed delete never survives opening another
+        // outfit — reset the two-tap state, like openItem does.
+        var delBtn = document.getElementById("outfitDelete");
+        if (delBtn) { delete delBtn.dataset.confirm; delBtn.textContent = "Delete"; delBtn.disabled = false; }
         // PC-20: wear date defaults to today, capped at today.
         var wd = document.getElementById("outfitWearDate");
         if (wd) {
@@ -14166,22 +14170,34 @@
         if (!currentUser || !activeOutfitGroup) return;
         var versions = outfitVersions(activeOutfitGroup);
         if (!versions.length) return;
+        // PC-87: the delete used to gate on a native dialog,
+        // which the cloud browser auto-dismisses without ever showing
+        // it (proven in PC-82 for piece deletes) — the button sat red
+        // and the delete silently never ran, no toast, no error, no
+        // delete, across 7 taps. In-app two-tap confirm instead, the
+        // Start-fresh idiom. The worn-count pre-query goes with the
+        // dialog — the detail view already shows the wear history,
+        // and wear events stay either way.
+        var btn = document.getElementById("outfitDelete");
+        if (!btn.dataset.confirm) {
+          btn.dataset.confirm = "1";
+          btn.textContent = "Tap again to delete";
+          return;
+        }
+        delete btn.dataset.confirm;
+        btn.textContent = "Delete";
+        btn.disabled = true;
         var ids = versions.map(function (v) { return v.id; });
         var col = db.collection("users").doc(currentUser.uid);
-        col.collection("wear_events").where("outfitId", "in", ids.slice(0, 10)).get()
-          .then(function (snap) {
-            var worn = snap.size;
-            var msg = "Delete this outfit?";
-            if (worn) msg += " It has been worn " + worn + "× — the wear history stays, the outfit goes.";
-            if (!window.confirm(msg)) return null;
-            var batch = db.batch();
-            ids.forEach(function (id) { batch.delete(col.collection("outfits").doc(id)); });
-            return batch.commit();
-          })
-          .then(function (res) {
-            if (res) showToast("Outfit deleted.");
-          })
-          .catch(function (err) { showToast(friendlyError(err)); });
+        var batch = db.batch();
+        ids.forEach(function (id) { batch.delete(col.collection("outfits").doc(id)); });
+        batch.commit().then(function () {
+          btn.disabled = false;
+          showToast("Outfit deleted.");
+        }).catch(function (err) {
+          btn.disabled = false;
+          showToast(friendlyError(err));
+        });
       });
       // PC-20: wornAt honors the chosen date (default today); createdAt is
       // always the server timestamp. Chosen dates land at local noon to
