@@ -151,7 +151,13 @@ restyle?). The last two came out of the unslop round-2 findings.
   no function deploy. Tests: 8 new, suite 551 passing in `tests/`
   + 10 in `functions/cutout-check.test.js`; `node --check` clean.
   Founder phone verification pending — see phone paths below.
-- **PC-71 — "Not for me".** Not built yet.
+- **PC-71 — "Not for me".** Commit `c19123a` (2026-11-23).
+  A quiet "Not for me" link sits under each chat card. Four
+  reason chips follow. The signal rides future stylist context.
+  Built + deployed; CI Hosting deploy to verify; `askStylist`
+  redeployed. Tests: 15 new, suite 561 passing in `tests/` + 10
+  in `functions/cutout-check.test.js`; `node --check` clean.
+  Founder phone verification pending — see phone paths below.
 - **PC-72 — chat polish bundle.** Not built yet.
 - **UX-16 — context-handoff audit.** Not built yet.
 
@@ -182,3 +188,9 @@ his phone does it.
   in that direction, not a fresh outfit. (4) On a trip page or in
   the composer, tiles still tap to the item page but no action chips
   appear under the card.
+- **PC-71:** (1) on a chat outfit card, tap "Not for me" — four
+  reason chips appear. (2) Tap "Too plain" — the card shows
+  "Noted — Too plain." with Undo. (3) Ask for another outfit —
+  the model does not suggest the rejected outfit again. The model
+  never mentions the rejection. (4) Tap Undo — the note clears.
+  (5) Reload the thread — the "Noted" line is still there.

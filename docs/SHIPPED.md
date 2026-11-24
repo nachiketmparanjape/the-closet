@@ -943,3 +943,23 @@ Suite at sprint start: 529 passing in `tests/` + 10 in
   the PC-65 source pin on the same-outfit strip's expanded card
   (updated to the new call). Standards: coding-principles,
   code-style, testing. Founder phone verification pending.
+- **PC-71 — "Not for me".** A quiet "Not for me" link sits under
+  each chat outfit card. Tapping it shows four reason chips: Too
+  plain, Wrong vibe, Not that piece, Wrong for the weather.
+  Tapping a reason stores the signal on the message. The card then
+  shows "Noted — <reason>." with an Undo link. The signal rides
+  the next stylist request as `rejectedOutfits`. The server
+  sanitizes it like `previousPick`. The server re-validates the
+  ids against the wardrobe. The brief lists the rejected outfits
+  near the vibe profile. The brief tells the model not to suggest
+  them again. The model never mentions the rejection. The signal
+  persists on the thread across reloads. Demo outfits have no
+  "Not for me" row. The strip's expanded card has none either.
+  The original card above holds it. Verified: 7 new client tests
+  cover reason labels, the builder, persistence, and wiring pins.
+  8 new server tests cover the sanitizer and the brief block.
+  Suite: 561 passing in `tests/`, 10 in
+  `functions/cutout-check.test.js`. `node --check` is clean on the
+  client script and both function files. Doc-honesty check exits
+  0. Standards: coding-principles, code-style, testing.
+  Founder phone verification pending.

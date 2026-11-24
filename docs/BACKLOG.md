@@ -1157,7 +1157,10 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   shows the signal present in the next request's context;
   the founder can also undo it from the same spot.
 - **Lane:** Stylist. **Effort:** M.
-- **Status:** Filed 2026-11-21. Sprint 31 alternate.
+- **Status:** Filed 2026-11-21. Sprint 31 alternate. In Sprint 32 —
+  SHIPPED 2026-11-23 (built + deployed; awaiting founder phone
+  verification). The signal stores on the message and rides future
+  stylist context. The model never mentions it.
 
 ### PC-72: Chat polish bundle — context bar, reply variety, duplicate sends (S)
 
