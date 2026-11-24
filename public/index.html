@@ -7219,8 +7219,12 @@
         renderChat();
         renderTripChip();
         renderPinChip();
-        if (typeof renderContextLine === "function") renderContextLine();
         openOverlay(chatOverlay);
+        // PC-72a: the line renders AFTER the overlay opens — its
+        // trim measures live layout, and a hidden overlay measures
+        // zero width, so the trim bailed and CSS cut mid-word
+        // ("Trips ar…", "Mountain Vie…").
+        if (typeof renderContextLine === "function") renderContextLine();
         // Sprint 16 fix: no geolocation in trip mode — the browser would
         // prompt for *your* location, but the trip already has its own
         // destination and stored weather. The chip stays hidden.
@@ -7542,8 +7546,18 @@
       // mid-word. Shrink word by word until the text fits its
       // box; the "+N more" suffix stays. The context sheet
       // holds the full text, one tap away.
-      function trimContextText(el, suffix) {
-        if (!el || el.scrollWidth <= el.clientWidth) return;
+      function trimContextText(el, suffix, tried) {
+        if (!el) return;
+        // PC-72a: no layout yet (the overlay is still closed) —
+        // the widths read 0 and the old code bailed, leaving the
+        // CSS ellipsis to cut mid-word ("Trips ar…"). Retry once
+        // on the next frame; a second miss means the overlay
+        // never opened, and the text stays full.
+        if (el.clientWidth === 0) {
+          if (!tried) window.requestAnimationFrame(function () { trimContextText(el, suffix, true); });
+          return;
+        }
+        if (el.scrollWidth <= el.clientWidth) return;
         var base = el.textContent.slice(0, el.textContent.length - (suffix || "").length);
         var guard = 0;
         while (base.split(" ").length > 1 && el.scrollWidth > el.clientWidth && guard < 60) {
