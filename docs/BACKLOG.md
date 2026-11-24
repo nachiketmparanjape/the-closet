@@ -1312,3 +1312,74 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **Done looks like:** both icons align with their text.
 - **Effort:** S.
 - **Status:** Filed 2026-11-23.
+
+### PC-82: Delete does nothing for wardrobe pieces and wear entries (M)
+
+- **Origin:** Weekly QA round, 2026-11-23, scope Sprint 32 cards.
+- **Problem:** Delete is a silent no-op for wardrobe pieces and wear
+  entries. Four clicks on the QA test piece and three on a wear entry,
+  with reloads in between, produced no confirmation, no error, and no
+  toast. The piece stays in the wardrobe (71 pieces, still searchable).
+  The wear entry "Worn 1×, Nov 23" stays. A user cannot remove a
+  wrongly captured piece or undo a mis-logged wear.
+- **In scope:** Delete removes the piece and the wear entry; the UI
+  confirms the removal; the removal survives a reload.
+- **Out of scope:** delete feedback for trips and shop checks (parked
+  QA finding P2-9 — same area, separate item).
+- **Done looks like:** deleting a piece removes it from the wardrobe
+  and search; deleting a wear entry removes the "Worn 1×" line; both
+  show feedback.
+- **Effort:** M.
+- **Status:** Filed 2026-11-23.
+
+### PC-83: Stylist refuses to judge an attached shop item (M)
+
+- **Origin:** Weekly QA round, 2026-11-23, scope Sprint 32 cards
+  (UX-16 step 3).
+- **Problem:** "Ask the stylist about this" on a shop check attaches
+  the item ("Attached: Navy crew-neck t-shirt — ask away."), but the
+  stylist refuses: "I work strictly with the wardrobe you already own;
+  a Shop check is the right tool for making buying decisions." The
+  handoff attaches the item and then deflects. The check verdict was
+  4/10. Tested via "Keep chatting"; the Start-fresh path was not tried.
+- **In scope:** the stylist judges the attached shop item (fit with
+  the wardrobe, verdict, buy/pass) when the handoff attaches it; or
+  the "Ask the stylist about this" button does not appear when the
+  stylist cannot judge.
+- **Done looks like:** tapping "Ask the stylist about this" on a shop
+  check gets a judgment of that item, not a deflection.
+- **Effort:** M.
+- **Status:** Filed 2026-11-23.
+
+### PC-84: "More formal" returns a fresh outfit, not a revision (M)
+
+- **Origin:** Weekly QA round, 2026-11-23, scope Sprint 32 cards
+  (PC-69 step 3).
+- **Problem:** "More formal" on HIGHLAND ESTATE returned MONOCHROME
+  LEISURE — a fresh outfit sharing zero pieces with the outfit being
+  revised (and a repeat of a Sunday outfit). The reply misdescribes
+  the outfit being revised as having "rugged flannel", which Highland
+  Estate did not contain. "Warmer" passed (kept sweater and pants,
+  added the jacket).
+- **In scope:** "More formal" revises the same outfit in a more
+  formal direction (most pieces kept); the reply describes the outfit
+  it actually revised.
+- **Done looks like:** "More formal" keeps the outfit's core pieces
+  and shifts formality; the reply names the pieces it changed.
+- **Effort:** M.
+- **Status:** Filed 2026-11-23.
+
+### PC-85: Reloads briefly show wrong empty states (M)
+
+- **Origin:** Weekly QA round, 2026-11-23, scope Sprint 32 cards.
+- **Problem:** after every reload the app briefly shows "0 pieces"
+  with "Loading wardrobe", an empty stylist ("Tell me the occasion…",
+  "Try the demo wardrobe") and "0 outfits" before the real data
+  arrives. It reads as data loss. It is also the only way the demo
+  entry was reachable on this account.
+- **In scope:** loading states that say loading (skeleton or spinner),
+  never "0 pieces" or an empty stylist, until the data arrives.
+- **Done looks like:** a reload shows a loading state, not empty
+  states; the wardrobe count never reads 0 while data loads.
+- **Effort:** M.
+- **Status:** Filed 2026-11-23.

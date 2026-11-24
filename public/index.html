@@ -4275,6 +4275,8 @@
         renderStyleTagChecks(Array.isArray(existingTags) ? existingTags : []);
         itemSave.disabled = false;
         itemDelete.disabled = false;
+        delete itemDelete.dataset.confirm;
+        itemDelete.textContent = "Delete";
         renderItemWearStats(item); // PC-12: per-article wear stats
         openOverlay(itemOverlay);
       }
@@ -4337,7 +4339,18 @@
 
       itemDelete.addEventListener("click", function () {
         if (!activeItem || !currentUser) return;
-        if (!window.confirm("Delete " + (activeItem.name || "this piece") + "? This removes its photos too.")) return;
+        // PC-82: the delete used to gate on a native dialog, which
+        // some browsers auto-dismiss without ever showing it (proven
+        // in the cloud browser: it returns false and the delete
+        // silently never runs — no toast, no error, no delete).
+        // In-app two-tap confirm instead, the Start-fresh idiom.
+        if (!itemDelete.dataset.confirm) {
+          itemDelete.dataset.confirm = "1";
+          itemDelete.textContent = "Tap again to delete";
+          return;
+        }
+        delete itemDelete.dataset.confirm;
+        itemDelete.textContent = "Delete";
         itemDelete.disabled = true;
         var storagePaths = itemPhotos(activeItem).map(function (p) { return p.storagePath; }).filter(Boolean);
         itemDocRef().delete().then(function () {
@@ -14369,7 +14382,15 @@
               del.innerHTML = ICONS.close;
               del.setAttribute("aria-label", "Delete this wear entry");
               del.addEventListener("click", function () {
-                if (!confirm("Delete this wear entry?")) return;
+                // PC-82: same native-dialog failure as the piece
+                // delete — in-app two-tap confirm instead. The
+                // button is rebuilt on every wear-history render,
+                // so no reset is needed.
+                if (!del.dataset.confirm) {
+                  del.dataset.confirm = "1";
+                  del.textContent = "?";
+                  return;
+                }
                 db.collection("users").doc(currentUser.uid).collection("wear_events").doc(w._docId).delete()
                   .then(function () {
                     showToast("Wear entry deleted.");
