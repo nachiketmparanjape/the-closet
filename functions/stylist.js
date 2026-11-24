@@ -479,6 +479,24 @@ const SCORE_KEYS = ["color", "formality", "weather", "proportion", "occasion"];
 
 // Sub-scores 0-10. All five required — a partial scorecard is a malformed
 // response, not a low score.
+// PC-84: the keep floor — an iteration that is not an explicit
+// fresh pick must keep at least half of the iteration base's
+// pieces, counted, not judged. (Sprint 33 said only "keep MOST",
+// and the model judged every slot of a casual base "must change"
+// for formal — Round 2: 0 of 4 kept.) Returns the problem string
+// when the floor is missed, else null. "Another option" / "try
+// again" explicitly want a fresh pick, so the floor does not
+// apply to them. A base under 2 pieces has no meaningful floor.
+function iterationKeepProblem(mappedIds, baseIds, lastUserText) {
+  if (!Array.isArray(baseIds) || baseIds.length < 2) return null;
+  if (!Array.isArray(mappedIds) || !mappedIds.length) return null;
+  if (/\b(another option|try again|something else|different outfit|start over|start fresh)\b/i.test(String(lastUserText || ""))) return null;
+  const kept = mappedIds.filter((id) => baseIds.indexOf(id) !== -1).length;
+  const floor = Math.ceil(baseIds.length / 2);
+  if (kept >= floor) return null;
+  return "kept only " + kept + " of " + baseIds.length + " pieces from the previous pick — keep at least " + floor + " (change only the slots that must change for the direction)";
+}
+
 function parseScores(o) {
   if (!o || typeof o !== "object") return null;
   const out = {};
@@ -1015,7 +1033,7 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
       system += "\n\nITERATION — the user is refining " + (iterBaseIsToday ? "today's pick (above)" : "your previous pick") + ", not starting over.\n" +
         "Previous pick: " + prevHandles.join(", ") + ".\n" +
         "- \"swap/change the X\" → replace only that slot's item; keep the rest.\n" +
-        "- \"something warmer/cooler/more formal/dressier/…\" → adjust the pick in that direction, keeping what still works. A direction change keeps MOST of the previous pick — change only the slots that must change for the direction.\n" +
+        "- \"something warmer/cooler/more formal/dressier/…\" → adjust the pick in that direction, keeping what still works. A direction change keeps AT LEAST HALF of the previous pick's pieces — count them: with 4 pieces, at least 2 stay. Change only the slots that must change for the direction, and never swap a piece that already fits the direction.\n" +
         "- Describe the previous pick only from the handles above — never name a piece it does not contain.\n" +
         "- \"another option\" / \"try again\" → pick a fully different outfit; avoid reusing previous items unless the wardrobe gives no alternative.\n" +
         "- Always return the COMPLETE new outfit (all slots), scored fresh against the rubric.";
@@ -1662,23 +1680,46 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
   // its own answer plus what's wrong with it.
   let mapped = parsed.outfit ? mapHandlesToIds(parsed.outfit, items) : null;
   let problem = parsed.outfit ? validateSlots(mapped || [], items) : null;
+  // PC-84: the keep floor is a repair trigger, not a rejection —
+  // a short outfit gets one re-ask naming the count, and if the
+  // repair still misses the floor (or never runs), the best valid
+  // outfit stands rather than going text-only.
+  const iterBase = resolveIterBase(previousPick, todayPick).base;
+  let lastUserText = "";
+  for (let mi = messages.length - 1; mi >= 0; mi--) {
+    if (messages[mi] && messages[mi].role === "user") { lastUserText = String(messages[mi].text || messages[mi].content || ""); break; }
+  }
+  const isMulti = parsed.outfits && parsed.outfits.length > 1;
+  const keepProblem = (parsed.outfit && mapped && !isMulti)
+    ? iterationKeepProblem(mapped.map((m) => m.id), iterBase && iterBase.itemIds, lastUserText)
+    : null;
   // PC-88: the repair below is for a single bad outfit only. A
   // multi-outfit reply goes to the multi branch instead, where a
   // bad entry drops rather than re-asking the whole turn.
-  if (parsed.outfit && !(parsed.outfits && parsed.outfits.length > 1) && (problem || !mapped)) {
-    emitEvent(hooks, "self_heal", "slot_repair_attempt", { problem: problem || "handles_unmapped" });
+  if (parsed.outfit && !isMulti && (problem || !mapped || keepProblem)) {
+    emitEvent(hooks, "self_heal", "slot_repair_attempt", { problem: problem || keepProblem || "handles_unmapped" });
     const repairContents = contents.concat([
       { role: "model", parts: [{ text: JSON.stringify(parsed.outfit) }] },
-      { role: "user", parts: [{ text: "That outfit doesn't work: " + (problem || "the handles didn't match the wardrobe") + ". Choose again using only wardrobe handles, following all rules." }] },
+      { role: "user", parts: [{ text: "That outfit doesn't work: " + (problem || keepProblem || "the handles didn't match the wardrobe") + ". Choose again using only wardrobe handles, following all rules." }] },
     ]);
     try {
       parsed = await callStylistModel(ai, model, repairContents, config, "askStylist-repair", todayStr, hooks);
       mapped = parsed.outfit ? mapHandlesToIds(parsed.outfit, items) : null;
       problem = parsed.outfit ? validateSlots(mapped || [], items) : null;
+      const keepAfter = (parsed.outfit && mapped)
+        ? iterationKeepProblem(mapped.map((m) => m.id), iterBase && iterBase.itemIds, lastUserText)
+        : null;
+      if (keepAfter) emitEvent(hooks, "degraded", "iteration_keep_floor_missed", { problem: keepAfter });
     } catch (e) {
-      // Repair failed — fall through to text-only below.
+      // Repair failed — fall through to text-only below, UNLESS the
+      // repair was keep-only: the original outfit is slot-valid,
+      // so it stands rather than leaving the user with no card.
       emitEvent(hooks, "degraded", "slot_repair_failed", { key: (e && e.key) || null });
-      problem = problem || "repair failed";
+      if (!problem && keepProblem) {
+        emitEvent(hooks, "degraded", "iteration_keep_floor_missed", { problem: keepProblem });
+      } else {
+        problem = problem || "repair failed";
+      }
     }
   }
 
@@ -1741,4 +1782,4 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
   };
 }
 
-module.exports = { askStylist, buildStylistRequest, assembleContext, buildManifest, resolveIterBase, computeActivePins, PRECEDENCE, MAX_MESSAGES, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeRejectedOutfits, sanitizeTodayPick, sanitizeShopItem, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins, sanitizePinProposal, sanitizeTripProposal, sanitizeRefImages, sanitizePhotoVerdicts, extractToolCall, extractToolCalls, mapUpdateTripPacking, mapSuggestTripOutfits, handleIndex, unwrapJsonReply, mapHandlesToIds, validateSlots, parseScores, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM, VIBE_TAGS };
+module.exports = { askStylist, buildStylistRequest, assembleContext, buildManifest, resolveIterBase, computeActivePins, PRECEDENCE, MAX_MESSAGES, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeRejectedOutfits, sanitizeTodayPick, sanitizeShopItem, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins, sanitizePinProposal, sanitizeTripProposal, sanitizeRefImages, sanitizePhotoVerdicts, extractToolCall, extractToolCalls, mapUpdateTripPacking, mapSuggestTripOutfits, handleIndex, unwrapJsonReply, mapHandlesToIds, validateSlots, parseScores, iterationKeepProblem, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM, VIBE_TAGS };
