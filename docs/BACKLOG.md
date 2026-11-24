@@ -1334,7 +1334,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   and search; deleting a wear entry removes the "Worn 1×" line; both
   show feedback.
 - **Effort:** M.
-- **Status:** In Sprint 33 — SHIPPED 2026-11-23 (built + deployed; awaiting QA retest).
+- **Status:** In Sprint 33 — SHIPPED 2026-11-23; VERIFIED by QA Round 2 (2026-11-23).
 
 ### PC-83: Stylist refuses to judge an attached shop item (M)
 
@@ -1353,7 +1353,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **Done looks like:** tapping "Ask the stylist about this" on a shop
   check gets a judgment of that item, not a deflection.
 - **Effort:** M.
-- **Status:** In Sprint 33 — SHIPPED 2026-11-23 (built + deployed; awaiting QA retest).
+- **Status:** In Sprint 33 — SHIPPED 2026-11-23; VERIFIED by QA Round 2 (2026-11-23).
 
 ### PC-84: "More formal" returns a fresh outfit, not a revision (M)
 
@@ -1371,7 +1371,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **Done looks like:** "More formal" keeps the outfit's core pieces
   and shifts formality; the reply names the pieces it changed.
 - **Effort:** M.
-- **Status:** In Sprint 33 — SHIPPED 2026-11-23 (built + deployed; awaiting QA retest).
+- **Status:** In Sprint 33 — SHIPPED 2026-11-23; retest 2026-11-23 (Round 2): STILL FAILS — "More formal" replaced the outfit, 0 of 4 pieces kept. Fix did not land.
 
 ### PC-85: Reloads briefly show wrong empty states (M)
 
@@ -1386,4 +1386,51 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **Done looks like:** a reload shows a loading state, not empty
   states; the wardrobe count never reads 0 while data loads.
 - **Effort:** M.
-- **Status:** In Sprint 33 — SHIPPED 2026-11-23 (built + deployed; awaiting QA retest).
+- **Status:** In Sprint 33 — SHIPPED 2026-11-23; VERIFIED by QA Round 2 (2026-11-23).
+
+### PC-86: Context bar still truncates mid-word (S)
+
+- **Origin:** Weekly QA round, 2026-11-23 Round 2 (Sprint 33 retest),
+  scope PC-72 regressions. Round 1 parked this as P2-5; the regression
+  fix did not land, and Round 2 ranks it P1.
+- **Problem:** the context bar visibly ends mid-word: "Today's pick ·
+  Estate Minimalist · Mountain Vie…" ("View" cut to "Vie"). The full
+  string exists in the DOM; the rendering clips it.
+- **In scope:** the bar ends on a whole word, never mid-word, at every
+  width the app runs at.
+- **Done looks like:** the context bar shows whole words only; no
+  clipped word at the end.
+- **Effort:** S.
+- **Status:** Filed 2026-11-23.
+
+### PC-87: Outfit Delete arms but never deletes (M)
+
+- **Origin:** Weekly QA round, 2026-11-23 Round 2 (Sprint 33 retest),
+  scope smoke pass. New finding — piece delete works (PC-82), outfit
+  delete does not.
+- **Problem:** on the Heritage Crisp outfit, the Delete button armed
+  (turned red) but never deleted, across 7 taps in 4 attempts
+  (including two rapid taps and after removing the wear entry). No
+  error was shown. A user cannot remove a saved outfit.
+- **In scope:** Delete on an outfit removes the outfit and confirms
+  it; the removal survives a reload.
+- **Done looks like:** deleting an outfit removes it from Outfits and
+  shows feedback.
+- **Effort:** M.
+- **Status:** Filed 2026-11-23.
+
+### PC-88: Three-outfit stylist request errors out every time (M)
+
+- **Origin:** Weekly QA round, 2026-11-23 Round 2 (Sprint 33 retest),
+  scope PC-72 regressions. New finding, ranked P0.
+- **Problem:** asking for three outfits in one thread failed three
+  times with "Something went wrong on our end. Try again." (refs
+  req_6f7c, req_72b4, req_4f06), in two different phrasings, while
+  single-outfit requests worked in the same session. A core journey
+  (several options at once) is broken.
+- **In scope:** a three-outfit ask returns three outfits or a plain
+  explanation of why it cannot; the failure refs are logged.
+- **Done looks like:** asking for three outfits in one thread returns
+  three outfits.
+- **Effort:** M.
+- **Status:** Filed 2026-11-23.

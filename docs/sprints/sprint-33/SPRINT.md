@@ -127,6 +127,57 @@ until the retest passes.
 
 QA Round 2, run early at the founder's order ("make all the
 fixes and retest"). Scope: the four P1 fixes + the two PC-72
-regressions + the core-journey smoke pass. The round runs
-from the studio chat (weekly-qa loop) and reports to this
-chat. (Result to be recorded here.)
+regressions + the core-journey smoke pass. The round ran
+from the studio chat (weekly-qa loop) and reported to this
+chat. Full report:
+`qa-rounds/2026-11-23-round2.md` in the studio goal
+workspace.
+
+**Result: 3 verified, 3 failed.** The loop is NOT closed —
+the failures go to the next fix sprint (Sprint 34, proposed
+to the founder 2026-11-23).
+
+- **PASS — PC-82 (#148, closed).** Piece delete: two-tap,
+  "Piece deleted.", wardrobe back to 70 after reload, search
+  for "QA Test" returns 0. Wear entry: × → "?", second tap
+  deletes, gone after reload.
+- **PASS — PC-83 (#149, closed).** The stylist judged the
+  attached navy crew-neck shop item (pairs, duplicates,
+  buy/pass: "a clear pass… highly redundant") — no
+  deflection.
+- **PASS — PC-85 (#151, closed).** Four reloads: "Starting…",
+  "Every piece …", "Loading wardrobe" only. Never "0
+  pieces", an empty stylist, or "0 outfits".
+- **FAIL — PC-84 (#150, stays open).** "More formal" on
+  Estate Minimalist produced "Sleek Stripe" — 0 of the
+  original 4 pieces kept. The reply described only the new
+  pieces, so that half held. The fix did not land; the
+  cause is unknown and is Sprint 34's first investigation.
+- **FAIL — PC-72 regressions (PC-86, PC-88).** (a) The
+  context bar in the saved "Evening at The Battery" chat
+  still ends mid-word ("Mountain Vie…"; the full string
+  exists in the DOM, the rendering clips it). The fix did
+  not land — the saved-chat open path evidently does not
+  run the trim after the overlay opens. (b) Three-outfit
+  asks failed three times with "Something went wrong on
+  our end" (refs req_6f7c, req_72b4, req_4f06) while
+  single-outfit asks worked in the same session — new card
+  PC-88, P0. Stock phrases still repeat ("incredibly" 8×,
+  "timeless" 9× in the thread's visible text).
+- **FAIL (new) — PC-87 (P1).** Outfit Delete arms
+  but never deletes: the button turned red across 7 taps
+  in 4 attempts, never deleted, no error. The smoke pass's
+  "Heritage Crisp" outfit is stuck until this lands.
+- **Smoke pass — PASS.** Capture, stylist pick, wear log,
+  Today, trip. Cleanup done except the Heritage Crisp
+  outfit (PC-87).
+- **Parked P2s from Round 2:** dangling "Unknown item"
+  references after piece deletion; the stylist dialog's
+  "Today's pick" button is a no-op; duplicate-detection
+  false-positive recurs (navy tee flagged as the white
+  crew-neck).
+
+Next round: Fri Nov 27 (Thanksgiving trip — records itself
+as skipped if the sign-in approval does not arrive).
+Scope: re-test PC-84, PC-86, PC-87, PC-88 (P0 first) if
+shipped, plus the Today area in depth.
