@@ -1401,7 +1401,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **Done looks like:** the context bar shows whole words only; no
   clipped word at the end.
 - **Effort:** S.
-- **Status:** Filed 2026-11-23.
+- **Status:** In Sprint 34 — proposed (founder approved 2026-11-23).
 
 ### PC-87: Outfit Delete arms but never deletes (M)
 
@@ -1417,7 +1417,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **Done looks like:** deleting an outfit removes it from Outfits and
   shows feedback.
 - **Effort:** M.
-- **Status:** Filed 2026-11-23.
+- **Status:** In Sprint 34 — proposed (founder approved 2026-11-23).
 
 ### PC-88: Three-outfit stylist request errors out every time (M)
 
@@ -1433,4 +1433,4 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **Done looks like:** asking for three outfits in one thread returns
   three outfits.
 - **Effort:** M.
-- **Status:** Filed 2026-11-23.
+- **Status:** In Sprint 34 — proposed, card 1 (P0) (founder approved 2026-11-23).
