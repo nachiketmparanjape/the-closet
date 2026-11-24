@@ -165,7 +165,13 @@ restyle?). The last two came out of the unslop round-2 findings.
   redeployed. Tests: 9 new, suite 570 passing in `tests/` + 10
   in `functions/cutout-check.test.js`; `node --check` clean.
   Founder phone verification pending — see phone paths below.
-- **UX-16 — context-handoff audit.** Not built yet.
+- **UX-16 — context-handoff audit.** Commit `60a2e5a` (2026-11-23).
+  Audit first, then fix what it finds. Every row verified. No
+  fixes filed. Guard: 9 new tests pin every row. Built +
+  deployed; CI Hosting deploy to verify; no server change, no
+  function deploy. Tests: 9 new, suite 579 passing in `tests/`
+  + 10 in `functions/cutout-check.test.js`. Founder phone
+  verification pending — see phone paths below.
 
 ## Phone-test paths (founder — what still needs his phone)
 
@@ -207,3 +213,12 @@ his phone does it.
   stock phrase repeats near-verbatim. (c) Send "add it" twice
   in a row, fast — the thread shows it once, and a toast says
   it already went through.
+- **UX-16:** (1) on a never-worn piece in Wardrobe, tap "Build
+  a look around this" — the reply builds a look around that
+  piece, and the chat shows the piece chip above the input.
+  (2) On Today, tap "Ask the stylist" — the reply talks about
+  today's pick, not a generic outfit. (3) On a shop check,
+  tap "Ask the stylist about this" — the reply judges that
+  item. (4) Open the stylist from the Wardrobe tab with no
+  subject — the chat opens with no attachment and asks for
+  the occasion.

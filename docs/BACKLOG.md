@@ -869,7 +869,28 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   verified-carrying (with the payload field named), verified
   intentionally context-free, or filed as its own fix;
   results recorded on this card.
+- **Audit results (2026-11-23, Sprint 32):** every row verified.
+  No fixes filed. Carrying: Today Ask → `todayPick`; trip chat
+  → `tripContext`; @-references → `references`; gallery "Build
+  a look" and item-page Style button → `references`
+  (`articleIds`); shop detail Ask and follow-up "Open in
+  stylist chat" → `shopItem`; follow-up sheet Ask (direct
+  call) → `shopItem` + `tripContext`; demo chat → `items` +
+  `demoWardrobe`; "Not for me" → `rejectedOutfits`. Carrying
+  as message text: composer "Dress me" (occasion), Today
+  auto-compose (rejection reason), PC-66 add-flow follow-up
+  (new piece names). Intentionally context-free: Wardrobe
+  chat, chatFab, Stylist tab (generic room, no subject);
+  "Surprise me" (the request is the message). No outfit-card
+  Ask affordance exists. The Today header chip is navigation
+  to Today, not a chat door. One asymmetry, not a gap:
+  gallery "Build a look" starts a fresh thread (askDoor);
+  the item-page Style button resumes the current thread.
+  Guard: `tests/ux16-handoff.test.js` pins every row.
 - **Lane:** Stylist. **Effort:** S.
+- **Status:** Filed 2026-11-21. In Sprint 32 — AUDITED
+  2026-11-23 (built + deployed; awaiting founder phone
+  verification). All rows verified. No fixes needed.
 - **Status:** Filed 2026-10-24. Competes at the next
   planning walk; the Today instance is already fixed.
 

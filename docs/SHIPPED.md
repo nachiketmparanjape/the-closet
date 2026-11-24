@@ -985,3 +985,21 @@ Suite at sprint start: 529 passing in `tests/` + 10 in
   function file. Doc-honesty check exits 0. Standards:
   coding-principles, code-style, testing. Founder phone
   verification pending.
+- **UX-16 — context-handoff audit.** Every surface that opens
+  the stylist now has a verdict. No fixes were needed. Carrying:
+  Today Ask → `todayPick`; trip chat → `tripContext`;
+  @-references → `references`; gallery "Build a look" and the
+  item-page Style button → `references`; shop Ask doors →
+  `shopItem`; the follow-up sheet Ask → `shopItem` +
+  `tripContext`; demo chat → `items` + `demoWardrobe`; "Not
+  for me" → `rejectedOutfits`. Carrying as message text: the
+  composer occasion, the Today rejection reason, the add-flow
+  piece names. Intentionally context-free: the generic room
+  (Wardrobe chat, chatFab, Stylist tab) and "Surprise me". No
+  outfit-card Ask affordance exists. The Today header chip is
+  navigation to Today, not a chat door. Guard: 9 new tests in
+  `tests/ux16-handoff.test.js` pin every row, so a future cut
+  cannot drop a handoff in silence. Suite: 579 passing in
+  `tests/`, 10 in `functions/cutout-check.test.js`. Standards:
+  coding-principles, testing. Founder phone verification
+  pending.
