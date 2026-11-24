@@ -145,6 +145,7 @@ const SYSTEM = `You are a personal wardrobe stylist helping the user pick an out
 RULES — follow them strictly:
 - Recommend ONLY items from the list, referenced by their HANDLE ([i1], [i2], ...). Never invent, assume, or name an item that is not listed — not even "a plain white tee" unless it appears below.
 - Suggest one complete outfit per reply: exactly one top and exactly one bottom. Add shoes, outerwear, or accessories only where the wardrobe has them AND the occasion calls for them — never force shoes into an answer that didn't ask for them.
+- MORE THAN ONE (PC-88): if the user asks for more than one outfit ("three outfits", "a few options", "several looks"), return up to 3 in an "outfits" array — each with the same shape as "outfit" (reasoning, lookName, tagline, styleNote, items, scores) and a genuinely different combination, never the same set twice. Set "outfit" to null in that case.
 - Use the STYLING RUBRIC to judge the outfit. Write your reasoning FIRST (two sentences: what anchors the look, what ties the colors together), then score it.
 - Name the outfit like a magazine feature: a 2–4 word editorial title ("Lobby Handshake", "Harbour Luxe") plus a tagline of at most 7 words capturing its feel ("Soft center, sharp frame"). Evocative and specific to THIS outfit — never generic ("Nice Outfit"), never a list of the items.
 - Add a style note: ONE sentence on the look's character — who it reads as, what it signals ("Reads polished without trying — boardroom bones, weekend ease.").
@@ -171,7 +172,9 @@ OUTPUT FORMAT — respond with ONLY a JSON object, no markdown, no prose:
 }
 Set "outfit" to null when you did NOT recommend a specific combination
 (e.g. the wardrobe can't cover the occasion, or the user only asked a
-question). The "items" handles must be copied EXACTLY from the wardrobe
+question). When the user asked for more than one outfit, return them in
+"outfits": [ <same shape as "outfit", up to 3> ] and set "outfit" to
+null. Each outfit must be a genuinely different combination. The "items" handles must be copied EXACTLY from the wardrobe
 list ([i1], [i2], ...).`;
 
 function sanitizeItems(items) {
@@ -487,6 +490,25 @@ function parseScores(o) {
   return out;
 }
 
+// One outfit object from the JSON contract — validated the same way
+// for the single "outfit" field and for each entry of "outfits".
+// Returns null when the entry is malformed (no valid scores).
+function parseOneOutfit(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const scores = parseScores(raw.scores);
+  if (!scores) return null;
+  return {
+    items: Array.isArray(raw.items) ? raw.items : [],
+    reasoning: cleanText(raw.reasoning, 300),
+    // DESIGN-LOOK-1 (§10 A3): every pick is a named feature.
+    lookName: cleanText(raw.lookName, 48),
+    tagline: cleanText(raw.tagline, 80),
+    // DESIGN-NOTE-1 (§10 A4): the sheet's style-note card.
+    styleNote: cleanText(raw.styleNote, 140),
+    scores: scores,
+  };
+}
+
 function parseStylistJson(text, todayStr) {
   let obj = null;
   if (typeof text === "string") {
@@ -503,19 +525,19 @@ function parseStylistJson(text, todayStr) {
   const raw = obj.outfit && typeof obj.outfit === "object" ? obj.outfit : null;
   let outfit = null;
   if (raw) {
-    const scores = parseScores(raw.scores);
-    if (!scores) throw codedError("AI_BAD_RESPONSE", "askStylist: outfit missing valid scores");
-    outfit = {
-      items: Array.isArray(raw.items) ? raw.items : [],
-      reasoning: cleanText(raw.reasoning, 300),
-      // DESIGN-LOOK-1 (§10 A3): every pick is a named feature.
-      lookName: cleanText(raw.lookName, 48),
-      tagline: cleanText(raw.tagline, 80),
-      // DESIGN-NOTE-1 (§10 A4): the sheet's style-note card.
-      styleNote: cleanText(raw.styleNote, 140),
-      scores: scores,
-    };
+    outfit = parseOneOutfit(raw);
+    if (!outfit) throw codedError("AI_BAD_RESPONSE", "askStylist: outfit missing valid scores");
   }
+  // PC-88: a multi-outfit reply — each entry validated the same
+  // way; a malformed entry drops instead of failing the reply.
+  // "outfit" is the first entry, so single-outfit consumers keep
+  // working unchanged.
+  let outfits = null;
+  if (Array.isArray(obj.outfits)) {
+    outfits = obj.outfits.slice(0, 3).map(parseOneOutfit).filter(Boolean);
+    if (!outfits.length) outfits = null;
+  }
+  if (outfits && !outfit) outfit = outfits[0];
   // Sprint 17: optional pin proposal — the model may surface one durable
   // fact per message. Sanitized; the client confirms before saving.
   let proposal = sanitizePinProposal(obj.pinProposal, todayStr);
@@ -543,7 +565,7 @@ function parseStylistJson(text, todayStr) {
   if (tripProposal && proposal && (proposal.kind === "location" || proposal.kind === "weather")) {
     proposal = null;
   }
-  return { reply: reply, outfit: outfit, pinProposal: proposal, attachProposal: attachProposal, tripProposal: tripProposal, addProposal: addProposal, wornProposal: wornProposal };
+  return { reply: reply, outfit: outfit, outfits: outfits, pinProposal: proposal, attachProposal: attachProposal, tripProposal: tripProposal, addProposal: addProposal, wornProposal: wornProposal };
 }
 
 // PC-33: the trip-proposal sanitizer. Destination and a valid
@@ -1330,6 +1352,17 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
       "- ALWAYS include a short prose reply in the same response as any tool call — never send a tool call with no text. " +
       "Say what changed in one sentence; the client shows that line as your answer.";
   }
+  // PC-88: a multi-outfit reply is ~3x the JSON of a single pick,
+  // and the thinking budget draws from the same pool — a 2500 cap
+  // truncated every three-outfit ask mid-object (AI_BAD_RESPONSE,
+  // refs req_6f7c/req_72b4/req_4f06). The cap is a ceiling, not a
+  // charge, so it rises only on turns that ask for more than one.
+  var lastUserText = "";
+  for (var mi = messages.length - 1; mi >= 0; mi--) {
+    if (messages[mi] && messages[mi].role === "user") { lastUserText = String(messages[mi].text || messages[mi].content || ""); break; }
+  }
+  var wantsMultipleOutfits = /\b(three|3|a few|several|multiple|couple(?: of)?|some|different)\b[^.]{0,60}\b(outfits?|looks?|options|ideas)\b/i.test(lastUserText) ||
+    /\b(outfits?|looks?|options|ideas)\b[^.]{0,60}\b(three|3|a few|several|multiple)\b/i.test(lastUserText);
   const config = {
     systemInstruction: system,
     temperature: 0.3,
@@ -1337,7 +1370,7 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
     // output in the app; 2500 truncated tool calls (2026-10-19), and
     // 4000 still crowded a full re-plan over a 69-piece wardrobe
     // (2026-10-21) — the thinking budget draws from the same pool.
-    maxOutputTokens: tripContext ? 7000 : 2500,
+    maxOutputTokens: tripContext ? 7000 : (wantsMultipleOutfits ? 6000 : 2500),
     thinkingConfig: { thinkingBudget: 1024 },
   };
   if (tripContext) {
@@ -1531,6 +1564,22 @@ function unwrapJsonReply(text) {
 }
 
 // here; the client re-validates on execute.
+// PC-88: one parsed outfit + its mapped wardrobe ids → the
+// result shape the client renders. Shared by the single-outfit
+// return and the multi-outfit return below.
+function toOutfitResult(raw, mapped) {
+  return {
+    itemIds: mapped.map((m) => m.id),
+    itemNames: mapped.map((m) => m.name),
+    confidence: confidenceFromScores(raw.scores),
+    reasoning: raw.reasoning,
+    lookName: raw.lookName || null,
+    tagline: raw.tagline || null,
+    styleNote: raw.styleNote || null,
+    scores: raw.scores,
+  };
+}
+
 async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, hooks, todayPick, shopItem, mutedPinIds, attachCtx, steerCtx, refImages, photoVerdicts, demoWardrobe, rejectedOutfits) {
   const todayStr = /^\d{4}-\d{2}-\d{2}$/.test(today || "")
     ? today
@@ -1613,7 +1662,10 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
   // its own answer plus what's wrong with it.
   let mapped = parsed.outfit ? mapHandlesToIds(parsed.outfit, items) : null;
   let problem = parsed.outfit ? validateSlots(mapped || [], items) : null;
-  if (parsed.outfit && (problem || !mapped)) {
+  // PC-88: the repair below is for a single bad outfit only. A
+  // multi-outfit reply goes to the multi branch instead, where a
+  // bad entry drops rather than re-asking the whole turn.
+  if (parsed.outfit && !(parsed.outfits && parsed.outfits.length > 1) && (problem || !mapped)) {
     emitEvent(hooks, "self_heal", "slot_repair_attempt", { problem: problem || "handles_unmapped" });
     const repairContents = contents.concat([
       { role: "model", parts: [{ text: JSON.stringify(parsed.outfit) }] },
@@ -1655,6 +1707,24 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
   // definite to log.
   const wornProposal = (!tripContext && (previousPick || todayPick))
     ? (parsed.wornProposal || null) : null;
+  // PC-88: a multi-outfit reply — map + validate each entry; a
+  // bad entry drops (with a rejection event) instead of failing
+  // the whole reply. "outfit" stays the first, so single-outfit
+  // consumers (composer, Today, follow-up sheet) keep working.
+  const multiRaw = Array.isArray(parsed.outfits) ? parsed.outfits.slice(0, 3) : [];
+  if (multiRaw.length > 1) {
+    const multiOutfits = [];
+    for (const raw of multiRaw) {
+      const m = mapHandlesToIds(raw, items);
+      const p = m ? validateSlots(m, items) : "handles_unmapped";
+      if (m && !p) multiOutfits.push(toOutfitResult(raw, m));
+      else emitEvent(hooks, "rejection", "outfit_discarded", { problem: p });
+    }
+    if (!multiOutfits.length) {
+      return { reply: parsed.reply, outfit: null, outfits: [], pinProposal: parsed.pinProposal || null, attachProposal: attachProposal, tripProposal: tripProposal, addProposal: addProposal, wornProposal: wornProposal, manifest: manifest };
+    }
+    return { reply: parsed.reply, manifest: manifest, outfit: multiOutfits[0], outfits: multiOutfits, pinProposal: parsed.pinProposal || null, attachProposal: attachProposal, tripProposal: tripProposal, addProposal: addProposal, wornProposal: wornProposal };
+  }
   if (!parsed.outfit || !mapped || problem) {
     if (parsed.outfit) emitEvent(hooks, "rejection", "outfit_discarded", { problem: problem || "unmapped" });
     return { reply: parsed.reply, outfit: null, pinProposal: parsed.pinProposal || null, attachProposal: attachProposal, tripProposal: tripProposal, addProposal: addProposal, wornProposal: wornProposal, manifest: manifest };
@@ -1662,16 +1732,7 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
   return {
     reply: parsed.reply,
     manifest: manifest,
-    outfit: {
-      itemIds: mapped.map((m) => m.id),
-      itemNames: mapped.map((m) => m.name),
-      confidence: confidenceFromScores(parsed.outfit.scores),
-      reasoning: parsed.outfit.reasoning,
-      lookName: parsed.outfit.lookName || null,
-      tagline: parsed.outfit.tagline || null,
-      styleNote: parsed.outfit.styleNote || null,
-      scores: parsed.outfit.scores,
-    },
+    outfit: toOutfitResult(parsed.outfit, mapped),
     pinProposal: parsed.pinProposal || null,
     attachProposal: attachProposal,
     tripProposal: tripProposal,

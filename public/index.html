@@ -5564,6 +5564,9 @@
         return (list || []).filter(function (m) { return m && !m.thinking; }).map(function (m) {
           var o = { role: m.role, text: m.text || "", at: m.at || 0 };
           if (m.outfit) o.outfit = m.outfit;
+          // PC-88: the extra outfits of a multi-outfit reply persist
+          // with the message, so a reload keeps all three cards.
+          if (m.outfits) o.outfits = m.outfits;
           if (m.pinProposal) o.pinProposal = m.pinProposal;
           if (m.pinState) o.pinState = m.pinState;
           if (m.attachProposal) o.attachProposal = m.attachProposal;
@@ -6205,10 +6208,15 @@
         var seenSetsPre = {};
         var lastCardIdx = -1;
         stylistMessages.forEach(function (m, i) {
-          if (m.outfit && m.outfit.itemIds && m.outfit.itemIds.length >= 2) {
-            var pk = outfitSetKey(m.outfit.itemIds);
-            if (!seenSetsPre[pk]) { seenSetsPre[pk] = true; lastCardIdx = i; }
-          }
+          // PC-88: a multi-outfit reply's extras count as cards too.
+          var cardOutfits = m.outfit ? [m.outfit] : [];
+          if (Array.isArray(m.outfits)) cardOutfits = cardOutfits.concat(m.outfits);
+          cardOutfits.forEach(function (o) {
+            if (o && o.itemIds && o.itemIds.length >= 2) {
+              var pk = outfitSetKey(o.itemIds);
+              if (!seenSetsPre[pk]) { seenSetsPre[pk] = true; lastCardIdx = i; }
+            }
+          });
         });
         if (!stylistMessages.some(isSavedNotice)) noticeFreshArmed = false;
         stylistMessages.forEach(function (m, midx) {
@@ -6342,6 +6350,26 @@
                 }
               }
             }
+          }
+          // PC-88: the extra outfits of a multi-outfit reply render
+          // as cards of their own, with the same dedupe + collapse
+          // treatment as the first. The first is m.outfit above.
+          if (Array.isArray(m.outfits) && m.outfits.length >= 2) {
+            m.outfits.slice(1).forEach(function (extra) {
+              if (!extra || !extra.itemIds || extra.itemIds.length < 2) return;
+              var extraKey = outfitSetKey(extra.itemIds);
+              var extraFirst = seenOutfitSets[extraKey];
+              if (extraFirst && extraFirst !== extra) {
+                chatList.appendChild(renderSameOutfitStrip(m, extraFirst));
+              } else {
+                if (!extraFirst) seenOutfitSets[extraKey] = extra;
+                if (midx !== lastCardIdx && !m.cardExpanded) {
+                  chatList.appendChild(renderCollapsedOutfitCard(m, extra));
+                } else {
+                  chatList.appendChild(renderOutfitCard(Object.assign({}, m, { outfit: extra, wearLoggable: true, chatActions: true }), undefined, m));
+                }
+              }
+            });
           }
           // PC-37: trip outfit suggestions — one saveable card each.
           // The wrap's outfit IS the stored suggestion object, so the
@@ -6917,7 +6945,9 @@
           for (var i = stylistMessages.length - 1; i >= 0; i--) {
             var pm = stylistMessages[i];
             if (pm.outfit && pm.outfit.itemIds && pm.outfit.itemIds.length) {
-              previousPick = { itemIds: pm.outfit.itemIds.slice() };
+              // PC-88: a multi-outfit reply's latest pick is its last outfit.
+              var lastOutfit = (Array.isArray(pm.outfits) && pm.outfits.length) ? pm.outfits[pm.outfits.length - 1] : pm.outfit;
+              previousPick = { itemIds: lastOutfit.itemIds.slice() };
               break;
             }
           }
@@ -8258,7 +8288,9 @@
           for (var i = stylistMessages.length - 1; i >= 0; i--) {
             var pm = stylistMessages[i];
             if (pm.outfit && pm.outfit.itemIds && pm.outfit.itemIds.length) {
-              previousPick = { itemIds: pm.outfit.itemIds.slice() };
+              // PC-88: a multi-outfit reply's latest pick is its last outfit.
+              var lastOutfit = (Array.isArray(pm.outfits) && pm.outfits.length) ? pm.outfits[pm.outfits.length - 1] : pm.outfit;
+              previousPick = { itemIds: lastOutfit.itemIds.slice() };
               break;
             }
           }
@@ -8436,6 +8468,11 @@
             // PC-12: structured outfit attached for the saveable card.
             var outfit = d.outfit;
             thinking.outfit = (outfit && outfit.itemIds && outfit.itemIds.length >= 2) ? outfit : null;
+            // PC-88: a multi-outfit reply carries the extras here;
+            // the first is thinking.outfit, the rest render as
+            // extra cards. One valid outfit stays single-card.
+            var multiOutfits = (Array.isArray(d.outfits) ? d.outfits : []).filter(function (o) { return o && o.itemIds && o.itemIds.length >= 2; }).slice(0, 3);
+            thinking.outfits = multiOutfits.length >= 2 ? multiOutfits : null;
             // Sprint 17 (CONTEXT PINS): a proposal arrives as a pending
             // confirm card — never auto-saved.
             thinking.pinProposal = d.pinProposal || null;
@@ -14720,8 +14757,11 @@
       // PC-70: an older outfit card collapsed to one line — name,
       // confidence, mini thumbs — so a long thread stays scannable.
       // Expand restores the full card (runtime state only).
-      function renderCollapsedOutfitCard(m) {
-        var o = m.outfit;
+      // PC-88: an outfit override lets a multi-outfit reply
+      // collapse each extra on its own — the Expand button still
+      // sets cardExpanded on the real message, so it re-opens.
+      function renderCollapsedOutfitCard(m, outfitOverride) {
+        var o = outfitOverride || m.outfit;
         var strip = document.createElement("div");
         strip.className = "same-outfit-strip collapsed-outfit-strip";
         var thumbs = document.createElement("span");

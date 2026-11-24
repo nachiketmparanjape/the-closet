@@ -32,7 +32,7 @@ describe("PC-70b: older cards collapse", () => {
   });
 
   it("older cards render through the collapsed strip, expandable at runtime", () => {
-    assert.ok(html.includes("function renderCollapsedOutfitCard(m)"), "collapsed renderer missing");
+    assert.ok(html.includes("function renderCollapsedOutfitCard(m, outfitOverride)"), "collapsed renderer missing");
     assert.ok(html.includes("renderCollapsedOutfitCard(m)"), "renderChat does not use the collapsed renderer");
     assert.ok(html.includes("m.cardExpanded = true"), "expand toggle missing");
     assert.ok(html.includes("m.cardExpanded = false"), "show-less toggle missing");
