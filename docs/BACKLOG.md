@@ -1182,7 +1182,10 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   mid-word; a 3-reply scripted thread shows no repeated
   stock phrase; a double-send produces one message.
 - **Lane:** Stylist. **Effort:** S (bundle of three).
-- **Status:** Filed 2026-11-21. Sprint 31 alternate.
+- **Status:** Filed 2026-11-21. Sprint 31 alternate. In Sprint 32 —
+  SHIPPED 2026-11-23 (built + deployed; awaiting founder phone
+  verification). Bar trims at a word boundary. Prose stays short
+  and fresh. Identical re-sends within 10 seconds block once.
 
 ### PC-73: Outfit object + save-from-chat + history list (L)
 

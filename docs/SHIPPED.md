@@ -963,3 +963,25 @@ Suite at sprint start: 529 passing in `tests/` + 10 in
   client script and both function files. Doc-honesty check exits
   0. Standards: coding-principles, code-style, testing.
   Founder phone verification pending.
+- **PC-72 — chat polish bundle.** Three small thread fixes.
+  (a) The context bar truncates at a word boundary, never
+  mid-word. It shrinks word by word against live layout until
+  the text fits. It keeps the "+N more" suffix. The full text
+  stays one tap away in the context sheet. CSS ellipsis
+  remains as the last resort for a single long word.
+  (b) The SYSTEM prompt now tells the model the card carries
+  the answer. Prose stays short: two sentences at most. The
+  model uses fresh wording every reply. It never reuses a
+  stock phrase from an earlier reply in the conversation.
+  (c) `sendChat` blocks an identical message re-sent within
+  10 seconds. It confirms the block with a toast. The message
+  lands once, not twice. A blocked chip tap also clears its
+  forced iteration base. The base cannot poison the next
+  send. Verified: 8 new client tests cover the word trim,
+  the duplicate guard, and the wiring pins. 1 new server
+  test covers the prose-variety guidance. Suite: 570 passing
+  in `tests/`, 10 in `functions/cutout-check.test.js`.
+  `node --check` is clean on the client script and the
+  function file. Doc-honesty check exits 0. Standards:
+  coding-principles, code-style, testing. Founder phone
+  verification pending.

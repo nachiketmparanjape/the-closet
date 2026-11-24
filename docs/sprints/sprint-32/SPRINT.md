@@ -158,7 +158,13 @@ restyle?). The last two came out of the unslop round-2 findings.
   redeployed. Tests: 15 new, suite 561 passing in `tests/` + 10
   in `functions/cutout-check.test.js`; `node --check` clean.
   Founder phone verification pending — see phone paths below.
-- **PC-72 — chat polish bundle.** Not built yet.
+- **PC-72 — chat polish bundle.** Commit `eb331da` (2026-11-23).
+  Bar trims at a word boundary. Prose stays short and fresh.
+  Identical re-sends within 10 seconds block once. Built +
+  deployed; CI Hosting deploy to verify; `askStylist`
+  redeployed. Tests: 9 new, suite 570 passing in `tests/` + 10
+  in `functions/cutout-check.test.js`; `node --check` clean.
+  Founder phone verification pending — see phone paths below.
 - **UX-16 — context-handoff audit.** Not built yet.
 
 ## Phone-test paths (founder — what still needs his phone)
@@ -194,3 +200,10 @@ his phone does it.
   the model does not suggest the rejected outfit again. The model
   never mentions the rejection. (4) Tap Undo — the note clears.
   (5) Reload the thread — the "Noted" line is still there.
+- **PC-72:** (a) open a chat with a long preference tail in the
+  context bar — the bar ends on a whole word, never mid-word.
+  Tap the bar — the sheet shows the full text. (b) Ask for
+  three outfits in one thread — the prose stays short and no
+  stock phrase repeats near-verbatim. (c) Send "add it" twice
+  in a row, fast — the thread shows it once, and a toast says
+  it already went through.
