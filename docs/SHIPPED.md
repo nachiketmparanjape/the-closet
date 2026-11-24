@@ -1003,3 +1003,39 @@ Suite at sprint start: 529 passing in `tests/` + 10 in
   `tests/`, 10 in `functions/cutout-check.test.js`. Standards:
   coding-principles, testing. Founder phone verification
   pending.
+
+## Sprint 33 (2026-11-23) — Close the loop (QA Round 1 fix sprint)
+
+Built and deployed 2026-11-23, on the founder's direct order
+("make all the fixes and retest"). Weekly QA Round 1 tested
+the six Sprint 32 cards signed in on the live site; PC-71
+passed fully, the other five were partial, four P1 findings
+became cards (PC-82–PC-85), and two Sprint 32 acceptances
+failed in the round (PC-72a/b). This sprint fixes all six.
+Record: `docs/sprints/sprint-33/SPRINT.md`. The round that
+filed the cards is QA Round 1, 2026-11-23
+(`qa-rounds/2026-11-23.md` in the studio goal workspace).
+Suite: 615 passing in `tests/` + 10 in
+`functions/cutout-check.test.js`. Verification is QA Round 2
+(the retest), not the founder's phone this time.
+
+- **PC-82 — Delete works.** The cloud browser auto-dismisses
+  native `confirm()` without a dialog, so piece + wear-entry
+  deletes silently never ran. Both now use the in-app two-tap
+  confirm (the Start-fresh idiom). Commit `cb32b31`.
+- **PC-83 — stylist judges an attached shop item.** The SYSTEM
+  SCOPE rule outranked the shop-item brief; it now excepts
+  attached items. Commit `1672837`.
+- **PC-84 — "More formal" revises.** The ITERATION rules never
+  named "more formal" as a direction; they do now, with a
+  keep-most rule and a don't-invent rule. Commit `4f9b809`.
+- **PC-85 — reloads never flash empty states.** Counts paint
+  "…" and the empty state starts hidden; an `itemsLoaded`
+  flag gates every empty state until the first snapshot.
+  Commit `dc9609a`.
+- **PC-72 regressions — context bar + stock phrases.** The
+  context line rendered before its overlay opened, so the
+  trim measured zero width and CSS cut mid-word; it now
+  renders after the overlay opens with a one-frame retry.
+  The prompt bans the observed repeat phrases. Commit
+  `333f71a`.

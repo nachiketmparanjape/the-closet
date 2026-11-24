@@ -1207,6 +1207,10 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   SHIPPED 2026-11-23 (built + deployed; awaiting founder phone
   verification). Bar trims at a word boundary. Prose stays short
   and fresh. Identical re-sends within 10 seconds block once.
+  Regressions caught by QA Round 1 (2026-11-23): (a) the bar still
+  cut words mid-screen, (b) "incredibly" recurred in every reply.
+  Both fixed in Sprint 33 (commit 333f71a) — see
+  `docs/sprints/sprint-33/SPRINT.md`; awaiting QA retest.
 
 ### PC-73: Outfit object + save-from-chat + history list (L)
 
@@ -1330,7 +1334,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   and search; deleting a wear entry removes the "Worn 1×" line; both
   show feedback.
 - **Effort:** M.
-- **Status:** Filed 2026-11-23.
+- **Status:** In Sprint 33 — SHIPPED 2026-11-23 (built + deployed; awaiting QA retest).
 
 ### PC-83: Stylist refuses to judge an attached shop item (M)
 
@@ -1349,7 +1353,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **Done looks like:** tapping "Ask the stylist about this" on a shop
   check gets a judgment of that item, not a deflection.
 - **Effort:** M.
-- **Status:** Filed 2026-11-23.
+- **Status:** In Sprint 33 — SHIPPED 2026-11-23 (built + deployed; awaiting QA retest).
 
 ### PC-84: "More formal" returns a fresh outfit, not a revision (M)
 
@@ -1367,7 +1371,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **Done looks like:** "More formal" keeps the outfit's core pieces
   and shifts formality; the reply names the pieces it changed.
 - **Effort:** M.
-- **Status:** Filed 2026-11-23.
+- **Status:** In Sprint 33 — SHIPPED 2026-11-23 (built + deployed; awaiting QA retest).
 
 ### PC-85: Reloads briefly show wrong empty states (M)
 
@@ -1382,4 +1386,4 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **Done looks like:** a reload shows a loading state, not empty
   states; the wardrobe count never reads 0 while data loads.
 - **Effort:** M.
-- **Status:** Filed 2026-11-23.
+- **Status:** In Sprint 33 — SHIPPED 2026-11-23 (built + deployed; awaiting QA retest).
