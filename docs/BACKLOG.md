@@ -1434,3 +1434,71 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   three outfits.
 - **Effort:** M.
 - **Status:** In Sprint 34 — SHIPPED 2026-11-23, card 1 (P0) (built + deployed; awaiting QA Round 3 retest). Root cause: `maxOutputTokens: 2500` truncated the three-outfit JSON mid-object (`AI_BAD_RESPONSE`); fixed with an `outfits` array contract, per-entry validation, and a 6000-token cap on multi-outfit turns only.
+
+### PC-89: Blocked intents return action cards, never bare refusals (M)
+
+- **Origin:** Founder's own chat-thread review, 2026-11-21 (P1
+  cluster, "give the stylist hands"). PC-83 fixed one instance
+  (attached shop item judged instead of deflected); the general
+  rule was never filed.
+- **Problem:** when the stylist cannot do what was asked, it
+  answers with a bare refusal and the thread dead-ends. The
+  founder hit this twice in one thread ("add it to the wardrobe
+  and create outfit with that" → two refusals).
+- **In scope:** enumerate the blocked intents (no photo attached,
+  no matching piece, out-of-scope ask, …) and give each an
+  action card or deep link (attach a photo, open the capture
+  flow, open the relevant surface) instead of a refusal.
+- **Done looks like:** a blocked ask returns a card the user can
+  act on; no bare "I can't do that" ends a thread.
+- **Effort:** M.
+- **Status:** Filed 2026-11-25 (Sprint 35 walk, alternate #1).
+
+### PC-90: The nine remaining native confirm() gates (M)
+
+- **Origin:** PC-87 finding, recorded 2026-11-23: 9 more native
+  `confirm()` gates remain in the client after PC-82/PC-87 fixed
+  three (piece delete, wear-entry delete, outfit delete).
+- **Problem:** the same failure class as PC-82/PC-87 — a browser
+  that auto-dismisses native dialogs makes each of these actions
+  silently never run, with no error and no feedback. The nine:
+  guest wardrobe move, sign-out, clear taste, photo delete,
+  two dupe warnings, AI version generate, packing replace,
+  trip delete, draft discard.
+- **In scope:** every one converted to the in-app two-tap
+  confirm idiom (PC-82), armed state reset on open.
+- **Done looks like:** each of the nine actions confirms in-app
+  and runs on the second tap; no `window.confirm(` call
+  remains in the client.
+- **Effort:** M.
+- **Status:** Filed 2026-11-25 (Sprint 35 walk). In Sprint 35
+  (proposed).
+
+### PC-91: Today does not surface a wear logged today (S/M)
+
+- **Origin:** Weekly QA Round 1, 2026-11-23, parked as P2-7.
+  Round 3 (Fri Nov 27) probes the Today area in depth.
+- **Problem:** after logging Estate Minimalist as worn, Today
+  still showed "Saturday you wore: Matinee Utility" — the daily
+  screen does not reflect today's wear.
+- **In scope:** Today reads today's wear events and surfaces
+  the piece/outfit worn today.
+- **Done looks like:** logging a wear today updates Today's
+  "you wore" line the same day.
+- **Effort:** S/M.
+- **Status:** Filed 2026-11-25 (Sprint 35 walk, alternate).
+
+### PC-92: Today keeps orphan cards for deleted items (S/M)
+
+- **Origin:** Weekly QA Round 1, 2026-11-23, parked as P2-8.
+  Round 3 (Fri Nov 27) probes the Today area in depth.
+- **Problem:** a deleted QA trip and a deleted QA shop check
+  still showed on Today after deletion and reload — orphan
+  cards for things that no longer exist.
+- **In scope:** Today drops cards whose trip / shop check /
+  item no longer exists (or hides them until the source
+  returns).
+- **Done looks like:** deleting a trip or shop check removes
+  its Today card on the next render; no orphan cards.
+- **Effort:** S/M.
+- **Status:** Filed 2026-11-25 (Sprint 35 walk, alternate).
