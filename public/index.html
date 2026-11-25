@@ -549,6 +549,11 @@
     .today-pick-photos figure { margin: 0; width: 84px; }
     .today-pick-photos img { width: 84px; height: 105px; object-fit: cover; border-radius: var(--r-md); display: block; background: var(--paper-soft); }
     .today-pick-photos figcaption { font-size: 11px; color: var(--muted); margin-top: 5px; line-height: 1.3; }
+    /* #135: a pick piece is a control — it opens that item's detail
+       sheet. A missing piece is visibly unavailable, never a dead tap. */
+    .today-pick-photos .today-piece { cursor: pointer; }
+    .today-pick-photos .today-piece:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r-md); }
+    .today-pick-photos .today-piece-missing { opacity: .55; }
     .today-why { font-size: 15px; line-height: 1.55; margin: 14px 0 0; }
     /* DESIGN-LOOK-1 (§10 A2/A3): the named-look masthead voice. */
     .look-name { font-family: "Closet Serif", serif; font-size: 27px; font-weight: 500; line-height: 1.12; letter-spacing: .04em; text-transform: uppercase; margin: 0 0 2px; }
@@ -10403,6 +10408,46 @@
         refreshTodayWorn();
       }
 
+      // #135: each pick piece is tappable — it opens the existing
+      // item-detail sheet for that exact item (openItem), so two
+      // similar jeans open their own records and photos. Opening
+      // details changes nothing: no save, wear, regenerate, or
+      // chat attach — the Today view underneath is untouched, so
+      // closing the sheet returns to the same outfit and scroll
+      // position. A missing/deleted piece renders an unavailable
+      // state with no action.
+      function todayPickFigure(id) {
+        var it = itemById(id);
+        var ps = it ? itemPhotos(it) : [];
+        var fig = document.createElement("figure");
+        if (ps.length && ps[0].url) {
+          var img = document.createElement("img");
+          // #134: central resolver.
+          showDisplayPhoto(img, it, "clean");
+          resolveRenderUrl(it, img);
+          img.alt = it ? it.name : "item photo";
+          img.loading = "lazy";
+          fig.appendChild(img);
+        }
+        var cap = document.createElement("figcaption");
+        cap.textContent = it ? it.name : "Unknown item";
+        fig.appendChild(cap);
+        if (it) {
+          fig.tabIndex = 0;
+          fig.setAttribute("role", "button");
+          fig.setAttribute("aria-label", "View " + (it.shortName || it.name || "piece"));
+          fig.classList.add("today-piece");
+          fig.addEventListener("click", function () { openItem(it); });
+          fig.addEventListener("keydown", function (ev) {
+            if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); openItem(it); }
+          });
+        } else {
+          fig.classList.add("today-piece-missing");
+          fig.setAttribute("aria-label", "Unknown item — no longer in your wardrobe");
+        }
+        return fig;
+      }
+
       function renderTodaySlot(slot) {
         // Data not in yet — neutral composing card, never a wrong grade.
         if (!todayDataSeen && !allItems.length && !todayState.picks.length) {
@@ -10462,22 +10507,7 @@
         var photos = document.createElement("div");
         photos.className = "today-pick-photos";
         (o.itemIds || []).forEach(function (id) {
-          var it = itemById(id);
-          var ps = it ? itemPhotos(it) : [];
-          var fig = document.createElement("figure");
-          if (ps.length && ps[0].url) {
-            var img = document.createElement("img");
-            // #134: central resolver.
-            showDisplayPhoto(img, it, "clean");
-            resolveRenderUrl(it, img);
-            img.alt = it ? it.name : "item photo";
-            img.loading = "lazy";
-            fig.appendChild(img);
-          }
-          var cap = document.createElement("figcaption");
-          cap.textContent = it ? it.name : "Unknown item";
-          fig.appendChild(cap);
-          photos.appendChild(fig);
+          photos.appendChild(todayPickFigure(id));
         });
         card.appendChild(photos);
         if (wrap.note) card.appendChild(shopCheckEl("p", "today-why", cleanTodayNote(wrap.note)));
