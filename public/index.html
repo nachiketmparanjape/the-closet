@@ -9811,7 +9811,7 @@
       // empty stylist and "0 outfits" before any data arrived.
       var itemsLoaded = false;
       var todayRoutedOnce = false;
-      var todayState = { picks: [], idx: 0, generating: false, wornSet: {}, loaded: false, error: false, renderToken: 0, waitingSince: 0 };
+      var todayState = { picks: [], idx: 0, generating: false, wornSet: {}, loaded: false, error: false, renderToken: 0, waitingSince: 0, date: null };
       // Fix buffer 5: Today state is server-side (settings/app +
       // today_picks/{day}) — localStorage is only a first-paint mirror.
       var todayHomeCache = null;
@@ -9869,15 +9869,22 @@
             }
           }, function () {});
       }
+      var todayPicksUnsub = null;
       function watchTodayPicks(user) {
-        db.collection("users").doc(user.uid).collection("today_picks").doc(localTodayStr())
+        if (todayPicksUnsub) { todayPicksUnsub(); todayPicksUnsub = null; }
+        var subDate = localTodayStr();
+        todayPicksUnsub = db.collection("users").doc(user.uid).collection("today_picks").doc(subDate)
           .onSnapshot(function (snap) {
+            // #138: a listener from a previous day must never
+            // restore yesterday's pick after the date rolled.
+            if (subDate !== localTodayStr()) return;
             if (!snap.exists) return;
             var d = snap.data() || {};
             if (d.picks && d.picks.length) {
               todayState.picks = d.picks;
               todayState.idx = Math.min(d.idx || 0, d.picks.length - 1);
               todayState.loaded = true;
+              todayState.date = subDate;
               todayState.waitingSince = 0;
               maybeRenderToday();
               renderChatTodayStrip();
@@ -9902,19 +9909,56 @@
         return "closetTodayPicks:" + (currentUser ? currentUser.uid : "anon") + ":" + localTodayStr();
       }
       function persistToday() {
+        // #138: a prior day's state must never be written into
+        // today's record. Reconcile normally resets stale state
+        // first, but a daily action can reach here without a
+        // render in between — so the guard lives here too.
+        if (todayState.date && todayState.date !== localTodayStr()) return;
+        if (!todayState.date) todayState.date = localTodayStr();
         var clean = todayState.picks.map(function (w) { return { outfit: w.outfit, note: w.note || null }; });
         try {
           window.localStorage.setItem(todayCacheKey(), JSON.stringify({ picks: clean, idx: todayState.idx }));
         } catch (e) {}
         if (currentUser) {
-          db.collection("users").doc(currentUser.uid).collection("today_picks").doc(localTodayStr())
+          db.collection("users").doc(currentUser.uid).collection("today_picks").doc(todayState.date)
             .set({ picks: clean, idx: todayState.idx, composingAt: null, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true })
             .catch(function () {});
         }
       }
+      // #138: Today state owns an explicit local date. A session
+      // left open across midnight must never show, wear, or
+      // persist yesterday's pick as today's. Reconcile runs on
+      // every render, on tab resume, and at the top of every
+      // daily action (Wear this, Another, rejection, generation).
+      function resetTodayStateFor(date) {
+        todayState.picks = [];
+        todayState.idx = 0;
+        todayState.generating = false;
+        todayState.wornSet = {};
+        todayState.loaded = false;
+        todayState.error = false;
+        todayState.waitingSince = 0;
+        todayState.kickAt = 0;
+        todayState.date = date;
+        if (todayPicksUnsub) { todayPicksUnsub(); todayPicksUnsub = null; }
+        if (currentUser) watchTodayPicks(currentUser);
+      }
+      function reconcileTodayDate() {
+        var today = localTodayStr();
+        if (todayState.date && todayState.date !== today) resetTodayStateFor(today);
+        else if (!todayState.date) todayState.date = today;
+      }
       function restoreToday() {
+        if (todayState.date && todayState.date !== localTodayStr()) {
+          // The day rolled under an open session: drop
+          // yesterday's state instead of serving it as today's.
+          // (This is the path the seven-day diagnostic drives:
+          // restoreToday, as renderToday calls it.)
+          resetTodayStateFor(localTodayStr());
+        }
         if (todayState.loaded) return;
         todayState.loaded = true;
+        todayState.date = localTodayStr();
         try {
           var raw = window.localStorage.getItem(todayCacheKey());
           if (raw) {
@@ -10014,11 +10058,16 @@
       }
 
       function generateTodayPick(previousPick, reasonNote) {
+        reconcileTodayDate();
         if (todayState.generating || !currentUser || !functions) return;
         todayState.generating = true;
         todayState.error = false;
         renderToday();
-        var ref = db.collection("users").doc(currentUser.uid).collection("today_picks").doc(localTodayStr());
+        // #138: the generation owns its date. If the clock crosses
+        // midnight mid-flight, the result is dropped — never
+        // persisted as the new day's pick.
+        var genDate = localTodayStr();
+        var ref = db.collection("users").doc(currentUser.uid).collection("today_picks").doc(genDate);
         // Cross-device discipline: the first device of the day composes;
         // everyone else adopts that pick. Alternates (previousPick set)
         // skip adoption — they're this user's explicit "another".
@@ -10053,6 +10102,9 @@
               references: { articleIds: [], outfits: [] }
             });
           }).then(function (callRes) {
+            // #138: a generation that completes after midnight is
+            // dropped, never silently saved as the new day's pick.
+            if (genDate !== localTodayStr() || genDate !== todayState.date) return;
             var outfit = callRes.data && callRes.data.outfit;
             if (outfit && outfit.itemIds && outfit.itemIds.length >= 2) {
               var wrap = { outfit: outfit };
@@ -10073,6 +10125,13 @@
         });
       }
       function todayAnother() {
+        reconcileTodayDate();
+        if (!todayState.picks.length) {
+          // The day rolled under the open card: there is no
+          // "another" for yesterday — generate today's first pick.
+          generateTodayPick(null);
+          return;
+        }
         if (todayState.idx < todayState.picks.length - 1) {
           todayState.idx++;
           persistToday();
@@ -10180,6 +10239,10 @@
       }
       function closeRejectSheet() { closeOverlay(rejectSheet); }
       function submitRejection(withReason) {
+        // #138: reconcile first — after a rollover the current pick
+        // is gone, so the rejection generates today's first pick
+        // instead of varying yesterday's.
+        reconcileTodayDate();
         var cur = todayState.picks[todayState.idx];
         var prev = cur && cur.outfit ? { itemIds: cur.outfit.itemIds.slice() } : null;
         var reason = null;
@@ -10240,8 +10303,13 @@
         });
       });
       function todayWear() {
+        // #138: reconcile first — a Wear tap on yesterday's card
+        // must not persist yesterday's pick into today's record.
+        // After a reset there is no pick to wear; re-render so
+        // the user sees today's pick instead.
+        reconcileTodayDate();
         var wrap = todayState.picks[todayState.idx];
-        if (!wrap || !currentUser) return;
+        if (!wrap || !currentUser) { renderToday(); return; }
         var o = wrap.outfit;
         function finish(savedId) {
           var names = (o.itemIds || []).map(function (id) {
@@ -10381,6 +10449,7 @@
       function renderToday() {
         var root = document.getElementById("todayRoot");
         if (!root || !currentUser) return;
+        reconcileTodayDate();
         restoreToday();
         var token = ++todayState.renderToken;
         root.textContent = "";
@@ -10757,6 +10826,10 @@
         // is most likely ready — the advancer finished it
         // while the user was away.
         if (!document.hidden && !document.getElementById("outfitsView").hidden) refreshDrafts();
+        // #138: returning to a suspended tab after midnight must
+        // not keep yesterday's Today state — renderToday
+        // reconciles the date first.
+        if (!document.hidden && !document.getElementById("todayView").hidden) renderToday();
       });
 
       function itemById(id) {
