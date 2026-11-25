@@ -1076,3 +1076,32 @@ evening.
   live on the saved "Evening at The Battery" conversation:
   "Today's pick · Estate Minimalist … · +2 more". Commit
   `178fd5f`.
+
+## Sprint 35 — The daily surfaces work (2026-11-25)
+
+Six cards, all built + deployed the same day the founder
+approved the slate. Suite: 700 passing (690 in `tests/` + 10
+in `functions/cutout-check.test.js`). Verification is QA Round
+3 (Fri Nov 27), which probes Today in depth, plus the
+founder's phone checks below.
+
+- **#135 — tap a Today piece → its detail sheet.** Each pick
+  piece is a tappable control opening that exact item; a
+  missing piece shows as unavailable. Commit `59fa72a`.
+- **#136 — Home tab.** A labeled Home tab leads the bottom
+  bar and opens Today; it follows the Today-home setting.
+  Commit `6ad7357`.
+- **#137 — trip photos show the whole garment.** Packing
+  thumbs are 64px `contain` (was 52px cover); missing photos
+  leave an empty slot so rows stay aligned. Commit `d951394`.
+- **#138 — Today owns its date.** Daily state resets when
+  the local date changes; midnight-crossing generations are
+  dropped, never saved as the new day's pick. Commit `105f4d8`.
+- **#139 — Today stops repeating recent outfits.** The server
+  reads the last 7 days of wears + picks on Today generations
+  and repairs a repeat (same top + bottom = same outfit, even
+  under a new name or different shoes). Commit `ad587ce`.
+- **PC-90 — the last native confirm() gates.** Thirteen gates
+  found (not nine): ten two-tap via a shared helper, three
+  via one new in-app confirm sheet. Zero `window.confirm(`
+  remains in the client. Commit `6de5be2`.

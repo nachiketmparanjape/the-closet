@@ -1471,8 +1471,13 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   and runs on the second tap; no `window.confirm(` call
   remains in the client.
 - **Effort:** M.
-- **Status:** Filed 2026-11-25 (Sprint 35 walk). In Sprint 35
-  (proposed).
+- **Status:** Filed 2026-11-25 (Sprint 35 walk). In Sprint 35 —
+  SHIPPED 2026-11-25 (built + deployed; awaiting QA Round 3).
+  Build note: a grep found **13** gates, not 9 — the three
+  shop-check gates (delete saved check, clear all questions,
+  dupSlot "Save anyway?") were missed in the PC-87 note. All 13
+  converted; zero `window.confirm(` remains in the client.
+  Commit `6de5be2`.
 
 ### PC-91: Today does not surface a wear logged today (S/M)
 

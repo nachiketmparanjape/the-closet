@@ -1,11 +1,12 @@
-# Sprint 35 — The daily surfaces work (proposed)
+# Sprint 35 — The daily surfaces work (built — awaiting QA Round 3)
 
 **Theme:** Today is the home screen and the founder opens it
 every day — but it still repeats worn outfits, shows yesterday
 after midnight, hides which piece it picked, and has no way
 home. Plus the last proven silent-failure class in the client.
-**Status:** PROPOSED at the 2026-11-25 planning walk. Founder
-approval pending — build starts only on his go.
+**Status:** BUILT 2026-11-25 — all six cards shipped, deployed,
+committed; awaiting QA Round 3 (Fri Nov 27) + founder phone
+verification. Approved 2026-11-25 13:30 PST.
 
 ## Scope
 
@@ -16,7 +17,7 @@ approval pending — build starts only on his go.
 | Today #137 | #137 | S/M | Trip photos show the whole garment, no crop |
 | Today #138 | #138 | M | Reset daily state when the local date changes |
 | Today #139 | #139 | M | Today stops repeating recently worn outfits |
-| PC-90 | #155 | M | The nine remaining native confirm() gates → two-tap |
+| PC-90 | #155 | M | The thirteen native confirm() gates → two-tap / in-app sheet |
 
 **Retest:** QA Round 3 (Fri Nov 27) already has this scope in
 its sights — it re-tests the Sprint 34 fixes and probes Today
@@ -89,4 +90,83 @@ owns it); the three Round 2 parked P2s above; new features.
 
 ## Build results
 
-(To be filled as cards land.)
+All six cards built, deployed, committed 2026-11-25. Suite:
+**700 passing** (690 in `tests/` + 10 in
+`functions/cutout-check.test.js`), gated green before every
+deploy.
+
+- **#135 — tap a Today piece → its detail sheet.** New
+  `todayPickFigure(id)`: each pick piece is a keyboard-
+  accessible control (role=button, aria-label, Enter/Space +
+  click → `openItem` for that exact item); a missing/deleted
+  piece renders an unavailable state, no handler. Tests
+  `tests/today-135-tap.test.js` (5). Hosting release
+  `1795642356134000`. Commit `59fa72a`.
+- **#136 — Home tab.** A labeled Home tab is now the first
+  tab in the bottom bar (`data-view="today"`, `id="tabHome"`),
+  shown/hidden with the Today-home setting by `syncTodayChrome`
+  (setting off exposes no Home destination). Tests
+  `tests/today-136-home.test.js` (6). Hosting release
+  `1795642433398000`. Commit `6ad7357`. Open: a phone-width
+  browser check (bar at ~390px, tap Home) was started and its
+  result had not arrived when the sprint closed.
+- **#137 — trip photos show the whole garment.** `.pack-thumb`
+  is now 64×64, `object-fit: contain` on a paper-soft
+  background (was 52px cover, which cropped tall trousers and
+  wide tops). New `packingThumb(it)` central resolver; a
+  missing photo leaves a same-size empty slot so rows stay
+  aligned. Tests `tests/today-137-trip-thumbs.test.js` (5).
+  Hosting release `1795642520419000`. Commit `d951394`.
+- **#138 — Today owns its date.** `todayState.date` +
+  `reconcileTodayDate()` / `resetTodayStateFor(date)`;
+  reconcile runs on render, on resume, and at the top of
+  every daily action (wear, another, rejection, generate).
+  A rollover resets picks/idx/wornSet, rebinds the
+  `today_picks` listener, and drops midnight-crossing
+  generations. Tests `tests/today-138-rollover.test.js` (5:
+  seven-day walk Nov 2–8 incl. the DST change, stale
+  listener, stale persist, midnight crossing). Hosting
+  release `1795642762001000`. Commit `105f4d8`.
+- **#139 — Today stops repeating recent outfits.** The server
+  reads the last 7 local days of wear events + daily picks on
+  Today generations only (`todayGeneration: true` flag; the
+  client sends its local-midnight window). The brief names
+  worn vs suggested outfits by handle; the base rule is
+  spelled out (same top + bottom = same outfit, shoes do not
+  count). A repeat triggers the one-shot repair; a
+  one-top-one-bottom wardrobe is exempt. Another now states
+  the distinct-outfit intent outright. Tests
+  `tests/today-139-history.test.js` (18). `askStylist`
+  redeployed + hosting release `1795643204346000`. Commit
+  `ad587ce`. Fixes the reported example: Monday's worn Campus
+  Classic returned Wednesday as "Bay Breeze Classic".
+- **PC-90 — the last native confirm() gates.** A grep found
+  **13** gates, not the 9 recorded in the PC-87 note — the
+  three shop-check gates (delete saved check, clear all
+  questions, dupSlot "Save anyway?") were missed. Ten button
+  gates two-tap via the shared `armOrRun` helper; three flow
+  gates with no button (guest migration, two photo-dupe
+  warnings) share one new in-app confirm sheet
+  (`askConfirm`). Label resets clear the arm with them, so a
+  stale arm can never run silently. Sign-out two-taps for
+  guest only (the confirm was guest-only). Live-verified:
+  zero `window.confirm(` in the served client. Tests
+  `tests/pc90-confirm-gates.test.js` (23). Hosting release
+  `1795643568782000`. Commit `6de5be2`.
+
+Harness lesson (recorded in the #138 test): extracted client
+functions that call each other by bare name must be assigned
+onto `global` in the test, and a FakeDate must implement the
+Date methods the code under test uses (`toISOString`, the
+multi-arg constructor) — the #139 change broke the #138
+generation test until both were fixed. The product code was
+never broken; the harness was behind it.
+
+## Retest
+
+QA Round 3 (Fri Nov 27): re-tests the Sprint 34 fixes
+(PC-84, PC-88, PC-87) + probes Today in depth — which now
+covers the Sprint 35 Today fixes (#135–#139) fresh. Nov 27
+falls in the Thanksgiving trip (Nov 26–28); if the sign-in
+approval does not arrive, the round records itself as
+skipped and the sprint's QA phase moves to Fri Dec 4.
