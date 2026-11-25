@@ -107,9 +107,12 @@ deploy.
   shown/hidden with the Today-home setting by `syncTodayChrome`
   (setting off exposes no Home destination). Tests
   `tests/today-136-home.test.js` (6). Hosting release
-  `1795642433398000`. Commit `6ad7357`. Open: a phone-width
-  browser check (bar at ~390px, tap Home) was started and its
-  result had not arrived when the sprint closed.
+  `1795642433398000`. Commit `6ad7357`. Browser check
+  (2026-11-25, cloud browser): Home is present, first, and
+  selected at desktop width; tapping it opens Today and Home
+  stays selected. The ~390px label-fit check could not run —
+  the cloud window cannot be narrowed — so it stays a
+  founder phone check.
 - **#137 — trip photos show the whole garment.** `.pack-thumb`
   is now 64×64, `object-fit: contain` on a paper-soft
   background (was 52px cover, which cropped tall trousers and
