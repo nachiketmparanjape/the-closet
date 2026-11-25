@@ -17,7 +17,7 @@ const { initializeApp } = require("firebase-admin/app");
 const { getStorage } = require("firebase-admin/storage");
 const { getFirestore } = require("firebase-admin/firestore");
 const { describeImage } = require("./describe");
-const { askStylist, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeRejectedOutfits, sanitizeTodayPick, sanitizeShopItem, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins, sanitizeRefImages, sanitizePhotoVerdicts } = require("./stylist");
+const { askStylist, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeRejectedOutfits, sanitizeTodayPick, sanitizeShopItem, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins, sanitizeRefImages, sanitizePhotoVerdicts, sanitizeTodayWindow, loadTodayHistory } = require("./stylist");
 const { reflectOutfit } = require("./reflect");
 const { critiqueOutfit } = require("./critique");
 const { parseOutfitPhoto } = require("./photo");
@@ -308,6 +308,25 @@ exports.askStylist = onCall(
       // the model resolves relative dates against it, and pins expire
       // by it. Malformed → null (server falls back to its own clock).
       const today = /^\d{4}-\d{2}-\d{2}$/.test(data.today || "") ? data.today : null;
+      // #139: Today-generation history — the last 7 days of wear
+      // events + daily picks, read server-side so it works across
+      // devices and after a local clear. Best-effort like the vibe
+      // profile: a failed read never blocks the generation (the
+      // brief is absent and the repeat repair does not fire).
+      // Scoped to Today generations only — chat rewears and trip
+      // turns keep their own context rules.
+      let todayHistory = null;
+      if (data.todayGeneration === true && today) {
+        try {
+          todayHistory = await loadTodayHistory(
+            getFirestore(), uid, today, sanitizeTodayWindow(data.todayWindow, today));
+        } catch (e) {
+          logError("askStylist.todayHistory", e, { uid: uid, correlationId: correlationId });
+          logEvent("subcall_degraded", { fn: "askStylist.todayHistory", key: keyOf(e) });
+          recordErrorEvent({ kind: "degraded", fn: "askStylist.todayHistory", key: keyOf(e), correlationId: correlationId, uid: uid });
+          todayHistory = null;
+        }
+      }
       // OBS-2: the stylist's non-failure events (rejections,
       // self-heals) ride the same hooks object into the sink.
       const stylistHooks = Object.assign({}, aiTracker.hooks, {
@@ -343,7 +362,7 @@ exports.askStylist = onCall(
       // UX-14a: demo wardrobe — the client sends 10 sample pieces as
       // the wardrobe, flagged so the brief says they are samples.
       const demoWardrobe = data.demoWardrobe === true;
-      const result = await askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, stylistHooks, todayPick, shopItem, mutedPinIds, attachCtx, steerCtx, refImages, photoVerdicts, demoWardrobe, rejectedOutfits);
+      const result = await askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, stylistHooks, todayPick, shopItem, mutedPinIds, attachCtx, steerCtx, refImages, photoVerdicts, demoWardrobe, rejectedOutfits, todayHistory);
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: true });
       return finish("askStylist", correlationId, uid, start, result);
     } catch (err) {

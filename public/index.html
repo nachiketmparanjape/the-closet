@@ -10057,6 +10057,15 @@
         return b;
       }
 
+      // #139: the 7-local-day window the server reads wear + picks
+      // from. Local midnights, so the DST change is the user's
+      // own (a UTC window would shift wears near midnight).
+      function todayHistoryWindow() {
+        var d = new Date();
+        var start = new Date(d.getFullYear(), d.getMonth(), d.getDate() - 6, 0, 0, 0, 0);
+        var end = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, 0, 0, 0, 0);
+        return { start: start.toISOString(), end: end.toISOString() };
+      }
       function generateTodayPick(previousPick, reasonNote) {
         reconcileTodayDate();
         if (todayState.generating || !currentUser || !functions) return;
@@ -10094,11 +10103,20 @@
               // PC-45: a rejection reason steers THIS regeneration
               // (one-turn context, not learning — learning is the
               // confirmed rule, and only that).
-              messages: [{ role: "user", text: "Dress me for today. Pick one complete outfit from my wardrobe. Be decisive — this is the morning rush." + (reasonNote ? " I just rejected your last pick: " + reasonNote + " — do better on that." : "") }],
+              // #139: an explicit Today-generation intent. The
+              // server reads the last 7 days of wear + picks so
+              // the day's first pick — and every Another — avoids
+              // a recent base outfit. "Another" says so outright
+              // instead of relying on generic iteration prose.
+              messages: [{ role: "user", text: previousPick
+                ? "Give me another option for today — a different outfit from the last one. Change at least one of the top or bottom pieces." + (reasonNote ? " I just rejected your last pick: " + reasonNote + " — do better on that." : "")
+                : "Dress me for today. Pick one complete outfit from my wardrobe. Be decisive — this is the morning rush." }],
               previousPick: previousPick || null,
               vibe: detectVibeTag("dress me for today"),
               weatherContext: weather,
               today: localTodayStr(),
+              todayGeneration: true,
+              todayWindow: todayHistoryWindow(),
               references: { articleIds: [], outfits: [] }
             });
           }).then(function (callRes) {

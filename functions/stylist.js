@@ -497,6 +497,157 @@ function iterationKeepProblem(mappedIds, baseIds, lastUserText) {
   return "kept only " + kept + " of " + baseIds.length + " pieces from the previous pick — keep at least " + floor + " (change only the slots that must change for the direction)";
 }
 
+// #139: canonical outfit identity — the same combination under
+// a new name is still the same outfit. The exact set (order- and
+// duplicate-insensitive) and the base (top + bottom only):
+// changing only the shoes or accessories is not a new look
+// (tester clarification 2026-11-05).
+function canonicalOutfitKey(itemIds) {
+  if (!Array.isArray(itemIds)) return "";
+  return Array.from(new Set(itemIds.filter(Boolean))).sort().join("|");
+}
+function baseOutfitKey(itemIds, items) {
+  if (!Array.isArray(itemIds)) return "";
+  const byId = new Map((items || []).map((it) => [it.id, it]));
+  const core = itemIds.filter((id) => {
+    const c = (byId.get(id) || {}).category;
+    return c === "Tops" || c === "Bottoms";
+  });
+  return Array.from(new Set(core)).sort().join("|");
+}
+// #139: assemble the recent history a Today generation must not
+// repeat. wearEvents are the windowed wear records (articleIds
+// survive even if the saved outfit doc was deleted); dailyPicks
+// are the day's saved picks, oldest day first. Worn and suggested
+// stay distinct lists — a worn outfit outranks a merely suggested
+// one in the brief. Entries are { ids, key, baseKey, date, kind }.
+function assembleTodayHistory(wearEvents, dailyPicks) {
+  const worn = [];
+  const suggested = [];
+  const seenWorn = new Set();
+  (Array.isArray(wearEvents) ? wearEvents : []).forEach((w) => {
+    const ids = Array.isArray(w && w.articleIds) ? w.articleIds.filter(Boolean) : [];
+    if (ids.length < 2) return;
+    const key = canonicalOutfitKey(ids);
+    if (!key || seenWorn.has(key)) return;
+    seenWorn.add(key);
+    worn.push({ ids: Array.from(new Set(ids)).sort(), key: key, baseKey: "", date: w.date || null, kind: "worn" });
+  });
+  const seenSuggested = new Set();
+  (Array.isArray(dailyPicks) ? dailyPicks : []).forEach((day) => {
+    (Array.isArray(day && day.picks) ? day.picks : []).forEach((wrap) => {
+      const ids = wrap && wrap.outfit && Array.isArray(wrap.outfit.itemIds)
+        ? wrap.outfit.itemIds.filter(Boolean) : [];
+      if (ids.length < 2) return;
+      const key = canonicalOutfitKey(ids);
+      if (!key || seenSuggested.has(key)) return;
+      seenSuggested.add(key);
+      suggested.push({ ids: Array.from(new Set(ids)).sort(), key: key, baseKey: "", date: day.date || null, kind: "suggested" });
+    });
+  });
+  return { worn: worn, suggested: suggested };
+}
+// Fill a history's baseKeys once the wardrobe (with categories)
+// is known. Kept separate so assembleTodayHistory stays pure
+// over ids alone and testable without items.
+function withBaseKeys(history, items) {
+  if (!history) return history;
+  ["worn", "suggested"].forEach((list) => {
+    (history[list] || []).forEach((e) => { e.baseKey = baseOutfitKey(e.ids, items); });
+  });
+  return history;
+}
+// #139: does the wardrobe offer a different base outfit from the
+// one returned? A base is a top + bottom pair; another pair exists
+// exactly when there is another top or another bottom to swap in.
+// A one-top-one-bottom wardrobe has no alternative — the repeat is
+// allowed (bounded fallback, not a loop).
+function todayHasAlternative(items) {
+  const tops = (items || []).filter((it) => it && it.category === "Tops").length;
+  const bottoms = (items || []).filter((it) => it && it.category === "Bottoms").length;
+  return tops * bottoms > 1;
+}
+// #139: the repeat problem — a repair trigger, not a rejection.
+// An exact repeat, or the same top + bottom with different shoes
+// or accessories, is a repeat when a different base exists. Null
+// when there is no history, no repeat, or no alternative.
+function todayRepeatProblem(mappedIds, history, items) {
+  if (!history) return null;
+  const key = canonicalOutfitKey(mappedIds);
+  const baseKey = baseOutfitKey(mappedIds, items);
+  if (!key && !baseKey) return null;
+  if (!todayHasAlternative(items)) return null;
+  const all = (history.worn || []).concat(history.suggested || []);
+  for (const e of all) {
+    if (key && e.key === key) {
+      return "this exact outfit was " + (e.kind === "worn" ? "worn" : "suggested") + " recently — pick a different top or bottom, not a new name for the same outfit";
+    }
+  }
+  for (const e of all) {
+    if (baseKey && e.baseKey && e.baseKey === baseKey) {
+      return "this top + bottom pair was " + (e.kind === "worn" ? "worn" : "suggested") + " recently — changing only the shoes or accessories is not a new outfit; change at least one of the top or bottom";
+    }
+  }
+  return null;
+}
+// #139: the last N local dates (YYYY-MM-DD), newest first,
+// by pure calendar arithmetic on the date string — no clock,
+// no DST edge (a date is a date).
+function lastNDates(todayStr, n) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(todayStr || "");
+  if (!m) return [];
+  const base = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const d = new Date(base - i * 86400000);
+    const p = (x) => (x < 10 ? "0" : "") + x;
+    out.push(d.getUTCFullYear() + "-" + p(d.getUTCMonth() + 1) + "-" + p(d.getUTCDate()));
+  }
+  return out;
+}
+// #139: sanitize the client's 7-local-day window ({start, end}
+// ISO timestamps of local midnights). Malformed, reversed, or
+// wider than 8 days → a UTC window derived from the Today date,
+// so history still loads degraded rather than failing.
+function sanitizeTodayWindow(value, todayStr) {
+  const startMs = Date.parse(value && value.start);
+  const endMs = Date.parse(value && value.end);
+  if (Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs && endMs - startMs <= 8 * 86400000) {
+    return { start: new Date(startMs), end: new Date(endMs) };
+  }
+  const dates = lastNDates(todayStr, 7);
+  const first = dates.length ? dates[dates.length - 1] : todayStr;
+  return { start: new Date(first + "T00:00:00Z"), end: new Date(todayStr + "T00:00:00Z") };
+}
+// #139: load the history for a Today generation from Firestore
+// (server-side, so it works across devices and after a local
+// clear). db is the Firestore handle (injected for tests).
+// Wear events come from the windowed query; daily picks from the
+// per-day docs. A failed read throws — the caller treats it as
+// degraded and generates without history.
+async function loadTodayHistory(db, uid, todayStr, window) {
+  const dates = lastNDates(todayStr, 7);
+  const wearSnap = await db.collection("users").doc(uid).collection("wear_events")
+    .where("wornAt", ">=", window.start).where("wornAt", "<", window.end).limit(50).get();
+  const wearEvents = wearSnap.docs.map((d) => {
+    const w = d.data() || {};
+    // No per-event date: the window already bounds these to the
+    // last 7 local days, and the server has no timezone to turn
+    // a Timestamp into the user's local date (a UTC date here
+    // would mislabel wears near midnight). Daily picks carry
+    // exact local dates via their doc ids.
+    return { articleIds: Array.isArray(w.articleIds) ? w.articleIds : [], date: null };
+  });
+  const pickSnaps = await Promise.all(dates.map((date) =>
+    db.collection("users").doc(uid).collection("today_picks").doc(date).get()));
+  const dailyPicks = pickSnaps.map((snap, i) => {
+    if (!snap.exists) return null;
+    const d = snap.data() || {};
+    return { date: dates[i], picks: Array.isArray(d.picks) ? d.picks : [] };
+  }).filter(Boolean);
+  return assembleTodayHistory(wearEvents, dailyPicks);
+}
+
 function parseScores(o) {
   if (!o || typeof o !== "object") return null;
   const out = {};
@@ -962,13 +1113,13 @@ function assembleContext(input) {
     input.references, input.weatherContext, input.vibe, input.vibeProfile,
     input.tripContext, input.pins, todayStr, input.todayPick, input.shopItem,
     input.mutedPinIds, input.attachCtx, input.steerCtx, input.refImages,
-    input.photoVerdicts, input.demoWardrobe, input.rejectedOutfits
+    input.photoVerdicts, input.demoWardrobe, input.rejectedOutfits, input.todayHistory
   );
   const manifest = buildManifest(input, computeActivePins(input.pins, input.tripContext, todayStr, input.mutedPinIds));
   return { model: req.model, contents: req.contents, config: req.config, manifest: manifest };
 }
 
-function buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, todayPick, shopItem, mutedPinIds, attachCtx, steerCtx, refImages, photoVerdicts, demoWardrobe, rejectedOutfits) {
+function buildStylistRequest(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, todayPick, shopItem, mutedPinIds, attachCtx, steerCtx, refImages, photoVerdicts, demoWardrobe, rejectedOutfits, todayHistory) {
   const model = process.env.GEMINI_MODEL || MODEL_VERSION;
   const wardrobe = items.map((it, i) => itemLine(it, i)).join("\n");
   let system = SYSTEM + "\n\n" + PRECEDENCE;
@@ -1135,6 +1286,42 @@ function buildStylistRequest(items, messages, styleProfile, previousPick, refere
         lines.map((l) => "- " + l + ".").join("\n") + "\n" +
         "- Avoid the combination, and avoid what they disliked about it (too plain → livelier; wrong vibe → a different vibe; one piece wrong → change that slot; wrong for the weather → weigh the weather harder).\n" +
         "- Never mention the rejection, apologize for it, or explain it. Just pick better.";
+    }
+  }
+  // #139: recent history — what the user already wore or was
+  // already shown this week. Worn outranks suggested. An entry
+  // with no surviving top or bottom is skipped: it cannot be
+  // named, and the model cannot return it.
+  if (todayHistory && ((todayHistory.worn && todayHistory.worn.length) || (todayHistory.suggested && todayHistory.suggested.length))) {
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const shortDate = (ds) => {
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ds || "");
+      return m ? months[Number(m[2]) - 1] + " " + Number(m[3]) : null;
+    };
+    const histLines = [];
+    (todayHistory.worn || []).forEach((e) => {
+      const bk = e.baseKey || baseOutfitKey(e.ids, items);
+      if (!bk) return;
+      const handles = (e.ids || []).map((id) => {
+        const idx = items.findIndex((it) => it && it.id === id);
+        return idx === -1 ? null : "[i" + (idx + 1) + '] "' + cleanText(items[idx].name, 60) + '"';
+      }).filter(Boolean);
+      if (handles.length) histLines.push("- Worn recently: " + handles.join(" + ") + ".");
+    });
+    (todayHistory.suggested || []).forEach((e) => {
+      const bk = e.baseKey || baseOutfitKey(e.ids, items);
+      if (!bk) return;
+      const handles = (e.ids || []).map((id) => {
+        const idx = items.findIndex((it) => it && it.id === id);
+        return idx === -1 ? null : "[i" + (idx + 1) + '] "' + cleanText(items[idx].name, 60) + '"';
+      }).filter(Boolean);
+      if (handles.length) histLines.push("- Already suggested" + (shortDate(e.date) ? " (" + shortDate(e.date) + ")" : " this week") + ": " + handles.join(" + ") + ".");
+    });
+    if (histLines.length) {
+      system += "\n\nRECENT HISTORY — outfits from the last 7 days. Do not repeat them when another suitable combination exists.\n" +
+        histLines.join("\n") + "\n" +
+        "- A repeat is the same top + bottom pair, even with different shoes or accessories — changing only the shoes or accessories is not a new outfit. Reusing individual pieces in a different combination is fine.\n" +
+        "- A new name, tagline, or item order does not make an outfit different.";
     }
   }
   // Sprint 17 (CONTEXT PINS): the user's confirmed current facts.
@@ -1598,10 +1785,14 @@ function toOutfitResult(raw, mapped) {
   };
 }
 
-async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, hooks, todayPick, shopItem, mutedPinIds, attachCtx, steerCtx, refImages, photoVerdicts, demoWardrobe, rejectedOutfits) {
+async function askStylist(items, messages, styleProfile, previousPick, references, weatherContext, vibe, vibeProfile, tripContext, pins, today, hooks, todayPick, shopItem, mutedPinIds, attachCtx, steerCtx, refImages, photoVerdicts, demoWardrobe, rejectedOutfits, todayHistory) {
   const todayStr = /^\d{4}-\d{2}-\d{2}$/.test(today || "")
     ? today
     : new Date().toISOString().slice(0, 10);
+  // #139: fill the history's base keys against this wardrobe
+  // before assembling — the brief and the repair check both
+  // read them.
+  if (todayHistory) withBaseKeys(todayHistory, items);
   // UX-18 W1: every stylist call goes through the one assembler; the
   // manifest of what was loaded rides back with the answer.
   const assembled = assembleContext({
@@ -1611,7 +1802,7 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
     tripContext: tripContext, pins: pins, today: todayStr, todayPick: todayPick,
     shopItem: shopItem, mutedPinIds: mutedPinIds, attachCtx: attachCtx,
     steerCtx: steerCtx, refImages: refImages, photoVerdicts: photoVerdicts,
-    demoWardrobe: demoWardrobe, rejectedOutfits: rejectedOutfits,
+    demoWardrobe: demoWardrobe, rejectedOutfits: rejectedOutfits, todayHistory: todayHistory,
   });
   const { model, contents, config } = assembled;
   const manifest = assembled.manifest;
@@ -1693,14 +1884,21 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
   const keepProblem = (parsed.outfit && mapped && !isMulti)
     ? iterationKeepProblem(mapped.map((m) => m.id), iterBase && iterBase.itemIds, lastUserText)
     : null;
+  // #139: the repeat check — a Today generation that returns a
+  // recently worn or suggested base is re-asked once, like the
+  // keep floor. If the repair still repeats, the best valid
+  // outfit stands (degraded event) rather than going text-only.
+  const repeatProblem = (parsed.outfit && mapped && !problem && !isMulti)
+    ? todayRepeatProblem(mapped.map((m) => m.id), todayHistory, items)
+    : null;
   // PC-88: the repair below is for a single bad outfit only. A
   // multi-outfit reply goes to the multi branch instead, where a
   // bad entry drops rather than re-asking the whole turn.
-  if (parsed.outfit && !isMulti && (problem || !mapped || keepProblem)) {
-    emitEvent(hooks, "self_heal", "slot_repair_attempt", { problem: problem || keepProblem || "handles_unmapped" });
+  if (parsed.outfit && !isMulti && (problem || !mapped || keepProblem || repeatProblem)) {
+    emitEvent(hooks, "self_heal", "slot_repair_attempt", { problem: problem || keepProblem || repeatProblem || "handles_unmapped" });
     const repairContents = contents.concat([
       { role: "model", parts: [{ text: JSON.stringify(parsed.outfit) }] },
-      { role: "user", parts: [{ text: "That outfit doesn't work: " + (problem || keepProblem || "the handles didn't match the wardrobe") + ". Choose again using only wardrobe handles, following all rules." }] },
+      { role: "user", parts: [{ text: "That outfit doesn't work: " + (problem || keepProblem || repeatProblem || "the handles didn't match the wardrobe") + ". Choose again using only wardrobe handles, following all rules." }] },
     ]);
     try {
       parsed = await callStylistModel(ai, model, repairContents, config, "askStylist-repair", todayStr, hooks);
@@ -1710,6 +1908,10 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
         ? iterationKeepProblem(mapped.map((m) => m.id), iterBase && iterBase.itemIds, lastUserText)
         : null;
       if (keepAfter) emitEvent(hooks, "degraded", "iteration_keep_floor_missed", { problem: keepAfter });
+      const repeatAfter = (parsed.outfit && mapped && !problem)
+        ? todayRepeatProblem(mapped.map((m) => m.id), todayHistory, items)
+        : null;
+      if (repeatAfter) emitEvent(hooks, "degraded", "today_repeat_after_repair", { problem: repeatAfter });
     } catch (e) {
       // Repair failed — fall through to text-only below, UNLESS the
       // repair was keep-only: the original outfit is slot-valid,
@@ -1782,4 +1984,4 @@ async function askStylist(items, messages, styleProfile, previousPick, reference
   };
 }
 
-module.exports = { askStylist, buildStylistRequest, assembleContext, buildManifest, resolveIterBase, computeActivePins, PRECEDENCE, MAX_MESSAGES, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeRejectedOutfits, sanitizeTodayPick, sanitizeShopItem, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins, sanitizePinProposal, sanitizeTripProposal, sanitizeRefImages, sanitizePhotoVerdicts, extractToolCall, extractToolCalls, mapUpdateTripPacking, mapSuggestTripOutfits, handleIndex, unwrapJsonReply, mapHandlesToIds, validateSlots, parseScores, iterationKeepProblem, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM, VIBE_TAGS };
+module.exports = { askStylist, buildStylistRequest, assembleContext, buildManifest, resolveIterBase, computeActivePins, PRECEDENCE, MAX_MESSAGES, parseStylistJson, sanitizeItems, sanitizeMessages, sanitizePreviousPick, sanitizeRejectedOutfits, sanitizeTodayPick, sanitizeShopItem, sanitizeReferences, sanitizeStyleProfile, sanitizeVibe, sanitizeVibeProfile, sanitizeWeatherContext, sanitizeTripContext, sanitizePins, sanitizePinProposal, sanitizeTripProposal, sanitizeRefImages, sanitizePhotoVerdicts, extractToolCall, extractToolCalls, mapUpdateTripPacking, mapSuggestTripOutfits, handleIndex, unwrapJsonReply, mapHandlesToIds, validateSlots, parseScores, iterationKeepProblem, canonicalOutfitKey, baseOutfitKey, assembleTodayHistory, withBaseKeys, todayHasAlternative, todayRepeatProblem, lastNDates, sanitizeTodayWindow, loadTodayHistory, confidenceFromScores, describeColors, itemLine, cleanText, RUBRIC_VERSION, SYSTEM, VIBE_TAGS };

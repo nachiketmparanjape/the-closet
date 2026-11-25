@@ -25,11 +25,26 @@ function extractClientFn(name, args) {
 
 // --- Fake clock: local calendar parts, controllable per day. ---
 let fakeY = 2026, fakeM = 10, fakeD = 2, fakeNowMs = 1000;
-function FakeDate() {}
-FakeDate.prototype.getFullYear = function () { return fakeY; };
-FakeDate.prototype.getMonth = function () { return fakeM; };
-FakeDate.prototype.getDate = function () { return fakeD; };
-FakeDate.prototype.getHours = function () { return 9; };
+function FakeDate(y, mo, d, h, mi, s, ms) {
+  // No-arg: the fake "now". With args: a local date construction
+  // (todayHistoryWindow builds local midnights) — store the parts
+  // so toISOString works; the exact zone offset is irrelevant here.
+  this._y = y !== undefined ? y : fakeY;
+  this._mo = mo !== undefined ? mo : fakeM;
+  this._d = d !== undefined ? d : fakeD;
+  this._h = h !== undefined ? h : 9;
+  this._mi = mi !== undefined ? mi : 0;
+  this._s = s !== undefined ? s : 0;
+}
+FakeDate.prototype.getFullYear = function () { return this._y; };
+FakeDate.prototype.getMonth = function () { return this._mo; };
+FakeDate.prototype.getDate = function () { return this._d; };
+FakeDate.prototype.getHours = function () { return this._h; };
+FakeDate.prototype.toISOString = function () {
+  const p = (x) => (x < 10 ? "0" : "") + x;
+  return this._y + "-" + p(this._mo + 1) + "-" + p(this._d) + "T" +
+    p(this._h) + ":" + p(this._mi) + ":" + p(this._s) + ".000Z";
+};
 FakeDate.now = function () { return fakeNowMs; };
 global.Date = FakeDate;
 
@@ -40,6 +55,7 @@ function setDay(d) {
 
 const localTodayStr = extractClientFn("localTodayStr", "");
 const todayCacheKey = extractClientFn("todayCacheKey", "");
+const todayHistoryWindow = extractClientFn("todayHistoryWindow", "");
 const reconcileTodayDate = extractClientFn("reconcileTodayDate", "");
 const resetTodayStateFor = extractClientFn("resetTodayStateFor", "date");
 const restoreToday = extractClientFn("restoreToday", "");
@@ -51,6 +67,7 @@ const generateTodayPick = extractClientFn("generateTodayPick", "previousPick, re
 // must live on the global object (new Function bodies run there).
 global.localTodayStr = localTodayStr;
 global.todayCacheKey = todayCacheKey;
+global.todayHistoryWindow = todayHistoryWindow;
 global.reconcileTodayDate = reconcileTodayDate;
 global.resetTodayStateFor = resetTodayStateFor;
 global.restoreToday = restoreToday;
