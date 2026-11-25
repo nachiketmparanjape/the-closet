@@ -661,7 +661,7 @@
     .pack-list { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-md); padding: 2px 14px; }
     .pack-row { display: flex; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
     .pack-row:last-child { border-bottom: none; }
-    .pack-thumb { width: 52px; height: 52px; object-fit: cover; border-radius: var(--r-sm); flex: none; }
+    .pack-thumb { width: 64px; height: 64px; object-fit: contain; background: var(--paper-soft); border-radius: var(--r-sm); flex: none; }
     .pack-row { cursor: pointer; }
     .pack-check { width: 26px; height: 26px; flex: none; border-radius: 50%; border: 1.5px solid var(--line-strong); display: inline-flex; align-items: center; justify-content: center; font-size: 14px; color: var(--paper); transition: background 150ms ease, border-color 150ms ease; }
     .pack-row.packed .pack-check { background: var(--accent); border-color: var(--accent); }
@@ -1008,6 +1008,7 @@
     </section>
 
     <div class="tabs" role="tablist" aria-label="Views">
+      <button class="tab" type="button" data-view="today" role="tab" aria-selected="false" id="tabHome" hidden>Home</button>
       <button class="tab active" type="button" data-view="wardrobe" role="tab" aria-selected="true">Wardrobe</button>
       <button class="tab" type="button" data-view="outfits" role="tab" aria-selected="false">Outfits</button>
       <button class="tab" type="button" data-view="shoplist" role="tab" aria-selected="false">Shop list</button>
@@ -9163,6 +9164,27 @@
           });
       }
 
+      // #137: a trip thumb fits the WHOLE garment photo (the CSS
+      // is object-fit: contain on a neutral background) — the old
+      // 52px cover box cropped tall trousers and wide tops. No
+      // photo → a same-size empty slot, so rows stay aligned.
+      function packingThumb(it) {
+        var photos = itemPhotos(it);
+        if (photos.length && photos[0].url) {
+          var img = document.createElement("img");
+          // #134: central resolver.
+          showDisplayPhoto(img, it, "clean");
+          img.alt = it.name || "item photo";
+          img.loading = "lazy";
+          img.className = "pack-thumb";
+          return img;
+        }
+        var slot = document.createElement("div");
+        slot.className = "pack-thumb pack-thumb-empty";
+        slot.setAttribute("aria-hidden", "true");
+        return slot;
+      }
+
       function renderTripPacking(trip) {
         var el = document.getElementById("tripPacking");
         el.textContent = "";
@@ -9222,16 +9244,7 @@
           check.setAttribute("aria-hidden", "true");
           check.textContent = packedSet[id] ? "✓" : "";
           row.appendChild(check);
-          var photos = itemPhotos(it);
-          if (photos.length && photos[0].url) {
-            var img = document.createElement("img");
-            // #134: central resolver.
-            showDisplayPhoto(img, it, "clean");
-            img.alt = it.name || "item photo";
-            img.loading = "lazy";
-            img.className = "pack-thumb";
-            row.appendChild(img);
-          }
+          row.appendChild(packingThumb(it));
           var txt = document.createElement("div");
           var nm = document.createElement("div");
           nm.className = "pack-name";
@@ -9334,6 +9347,13 @@
             img.loading = "lazy";
             img.className = "pack-thumb";
             row.appendChild(img);
+          } else {
+            // #137: same-size empty slot as the packing rows, so
+            // rows without a photo keep their alignment.
+            var slot = document.createElement("div");
+            slot.className = "pack-thumb pack-thumb-empty";
+            slot.setAttribute("aria-hidden", "true");
+            row.appendChild(slot);
           }
           var txt = document.createElement("div");
           var nm = document.createElement("div");
@@ -9871,6 +9891,11 @@
         var on = todayHomeOn();
         var wm = document.getElementById("todayHomeBtn");
         if (wm) wm.hidden = !on;
+        // #136: the Home tab follows the same setting as the
+        // wordmark — when Today home is off, no Home destination
+        // is exposed at all.
+        var homeTab = document.getElementById("tabHome");
+        if (homeTab) homeTab.hidden = !on;
         if (!on && !document.getElementById("todayView").hidden) switchView("wardrobe");
       }
       function todayCacheKey() {
