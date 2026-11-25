@@ -786,6 +786,9 @@
     .thumb-strip .thumb-wrap img { width: 56px; height: 56px; object-fit: cover; border-radius: var(--r-sm); cursor: pointer; border: 2px solid transparent; display: block; }
     .thumb-strip .thumb-wrap img.active { border-color: var(--ink); }
     .thumb-del { position: absolute; top: -8px; right: -8px; width: 22px; height: 22px; border-radius: 50%; background: var(--danger); color: #fff; border: none; font-size: 14px; line-height: 1; cursor: pointer; padding: 0; }
+    /* PC-90: the delete-X button has no text to relabel, so the
+       armed state is a ring + a toast ("Tap again to delete"). */
+    .thumb-del.armed { box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--danger); }
     .photo-manage { margin: 0 0 16px; display: flex; gap: 8px; flex-wrap: wrap; }
 
     .utility { display: grid; grid-template-columns: minmax(210px, 1fr) auto; gap: 18px; align-items: center; padding: 20px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
@@ -1878,6 +1881,23 @@
     </section>
   </div>
 
+  <!-- PC-90: one shared in-app confirm sheet for the gates that
+       have no button to arm (a programmatic flow or a file-input
+       flow). A native dialog is auto-dismissed by some browsers
+       without ever showing (proven PC-82) — this one cannot be
+       dismissed without a tap, and a tap is always a real choice. -->
+  <div class="overlay sheet-overlay" id="confirmOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <section class="sheet">
+      <div class="sheet-head">
+        <h2 class="sheet-title" id="confirmTitle">Are you sure?</h2>
+        <button class="icon-button" id="confirmClose" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+      <p class="sheet-intro" id="confirmBody"></p>
+      <button class="primary" id="confirmGo" type="button" style="width:100%;">Confirm</button>
+      <button class="link-button" id="confirmCancel" type="button" style="margin-top:8px;">Cancel</button>
+    </section>
+  </div>
+
   <!-- PC-58: Just-in-time attribute collection (2026-11-01) -->
   <!-- Shown before AI generation if required attributes are missing. -->
   <div class="overlay sheet-overlay" id="attrSheet" hidden role="dialog" aria-modal="true" aria-labelledby="attrSheetTitle">
@@ -2603,13 +2623,47 @@
         });
       }
 
+      // PC-90: one shared in-app confirm sheet. opts: title, body,
+      // confirmLabel, onConfirm. Cancel / close drops the pending
+      // action. A second ask replaces the first (these flows are
+      // sequential, so nothing is ever asked twice at once).
+      var confirmPending = null;
+      function askConfirm(opts) {
+        document.getElementById("confirmTitle").textContent = opts.title || "Are you sure?";
+        document.getElementById("confirmBody").textContent = opts.body || "";
+        document.getElementById("confirmGo").textContent = opts.confirmLabel || "Confirm";
+        confirmPending = opts.onConfirm || null;
+        openOverlay(document.getElementById("confirmOverlay"));
+      }
+      document.getElementById("confirmGo").addEventListener("click", function () {
+        var fn = confirmPending; confirmPending = null;
+        closeOverlay(document.getElementById("confirmOverlay"));
+        if (fn) fn();
+      });
+      document.getElementById("confirmCancel").addEventListener("click", function () {
+        confirmPending = null;
+        closeOverlay(document.getElementById("confirmOverlay"));
+      });
+      document.getElementById("confirmClose").addEventListener("click", function () {
+        confirmPending = null;
+        closeOverlay(document.getElementById("confirmOverlay"));
+      });
+
       // One account per email: move a guest wardrobe into the account the
       // user just signed into. Copies every collection doc + the vibe
       // profile; the anonymous account is left orphaned (harmless).
       function offerMigration(anonUid) {
         if (!anonUid || !currentUser || anonUid === currentUser.uid) return;
-        if (!window.confirm("Move your guest wardrobe into this account?")) return;
-        var cols = ["items", "outfits", "wear_events", "ratings", "shopChecks"];
+        // PC-90: this is called from the auth flow, not a button —
+        // the shared sheet asks with real buttons instead.
+        askConfirm({
+          title: "Move your guest wardrobe?",
+          body: "Move your guest wardrobe into this account?",
+          confirmLabel: "Move wardrobe",
+          onConfirm: function () { doMigration(anonUid); }
+        });
+      }
+      function doMigration(anonUid) {
         var to = currentUser.uid;
         var chain = Promise.resolve();
         var moved = 0;
@@ -2651,9 +2705,14 @@
         }).catch(function (err) { showToast(friendlyError(err)); });
       }
 
-      function signOutAccount() {
+      function signOutAccount(btn) {
         if (isGuest()) {
-          if (!window.confirm("Sign out of guest mode? Your wardrobe on this browser will be lost.")) return;
+          // PC-90: the confirm existed only for guest mode (the
+          // wardrobe on this browser is lost), so only guest
+          // sign-out two-taps — a signed-in sign-out stays one tap,
+          // exactly as before. The button is rebuilt on every
+          // account-sheet open, so a stale arm cannot survive.
+          if (!armOrRun(btn, "Tap again to sign out")) return;
         }
         closeOverlay(document.getElementById("accountOverlay"));
         auth.signOut();
@@ -2835,7 +2894,7 @@
           var so = el("button", "secondary", "Sign out");
           so.type = "button";
           so.style.marginTop = "16px";
-          so.addEventListener("click", signOutAccount);
+          so.addEventListener("click", function () { signOutAccount(so); });
           body.appendChild(so);
         }
         // Sprint 18: feedback lives here now — the floating button was
@@ -2961,7 +3020,9 @@
         reset.type = "button";
         reset.style.marginTop = "10px";
         reset.addEventListener("click", function () {
-          if (!window.confirm("Clear what the app has learned about your taste?")) return;
+          // PC-90: two-tap; the button is rebuilt on every
+          // account-sheet open, so a stale arm cannot survive.
+          if (!armOrRun(reset, "Tap again to clear")) return;
           vibeProfileCache = null;
           db.collection("users").doc(currentUser.uid).set({
             vibeProfile: firebase.firestore.FieldValue.delete(),
@@ -3434,7 +3495,7 @@
             del.type = "button";
             del.innerHTML = ICONS.close;
             del.setAttribute("aria-label", "Delete photo " + (i + 1));
-            del.addEventListener("click", function () { deletePhoto(i); });
+            del.addEventListener("click", function () { deletePhoto(i, del); });
             wrap.appendChild(t);
             wrap.appendChild(del);
             thumbStrip.appendChild(wrap);
@@ -3460,14 +3521,26 @@
         });
       }
 
-      function deletePhoto(idx) {
+      function deletePhoto(idx, btn) {
         if (!activeItem) return;
         var photos = itemPhotos(activeItem).slice();
         if (photos.length <= 1) {
           showToast("A piece needs at least one photo — delete the piece to remove it.");
           return;
         }
-        if (!window.confirm("Delete this photo?")) return;
+        // PC-90: the delete-X has no text to relabel, so the arm
+        // is a ring on the button + a toast. The strip rebuilds
+        // on every render, so a stale arm cannot survive.
+        if (btn) {
+          if (!btn.dataset.confirm) {
+            btn.dataset.confirm = "1";
+            btn.classList.add("armed");
+            showToast("Tap again to delete this photo.");
+            return;
+          }
+          delete btn.dataset.confirm;
+          btn.classList.remove("armed");
+        }
         var removed = photos.splice(idx, 1)[0];
         persistPhotos(photos).then(function () {
           if (removed.storagePath) { storage.ref().child(removed.storagePath).delete().catch(function () {}); }
@@ -3543,7 +3616,17 @@
           }).catch(function () {});
         })).then(function () {
           var dupe = findPhotoDupe(files);
-          if (dupe && !window.confirm("This photo looks like one already on '" + dupe.itemName + "'. Add anyway?")) return;
+          // PC-90: this runs in a file-input flow, with no button
+          // to arm — the shared sheet asks the same question.
+          if (dupe) {
+            askConfirm({
+              title: "Photo already on file?",
+              body: "This photo looks like one already on '" + dupe.itemName + "'. Add it anyway?",
+              confirmLabel: "Add anyway",
+              onConfirm: beginAddPhotos
+            });
+            return;
+          }
           beginAddPhotos();
         });
 
@@ -3838,6 +3921,10 @@
         note.hidden = true;
         genBtn.hidden = true;
         genBtn.textContent = "Generate standardized view"; // reset from "Try again"
+        // PC-90: the label reset must clear the arm too, or a
+        // stale arm would generate on the next single tap.
+        delete genBtn.dataset.confirm;
+        delete genBtn.dataset.label;
         var reviewBoxReset = document.getElementById("stdReviewBox");
         if (reviewBoxReset) reviewBoxReset.hidden = true;
         // Store item ID on buttons for robust click handling (avoids stale activeItem)
@@ -4084,7 +4171,16 @@
         // PC-58 (2026-11-01): Just-in-time attribute collection.
         // If required attributes are missing, ask now — don't make the user hunt.
         var proceedWithGenerate = function (extraAttrs) {
-          if (!window.confirm("Generate an AI version of this piece? It costs about $0.03. It takes about a minute — you can close this and come back.")) return;
+          // PC-90: two-tap on the Generate button. The native
+          // dialog was also the only cost disclosure, so the arm
+          // carries it in a toast. The aiBadge door taps this
+          // button too — its first tap arms visibly, the second
+          // generates. renderStandardizationUI resets the label
+          // (and the arm) on every render.
+          if (!armOrRun(btn, "Tap again to generate")) {
+            showToast("An AI version costs about $0.03 and takes about a minute — tap again to generate.");
+            return;
+          }
           // Show processing state immediately (optimistic)
           if (activeItem && activeItem.id === itemId) {
             activeItem.standardization = { status: "processing" };
@@ -4342,6 +4438,25 @@
           showToast(friendlyError(error));
         });
       });
+
+      // PC-90: the shared two-tap idiom (PC-82). First tap arms
+      // the button — its label says what the second tap does —
+      // second tap runs the action. Returns true when the action
+      // may run. The original label is saved and restored, so a
+      // button whose label is reset elsewhere must also clear
+      // dataset.confirm there, or a stale arm would run silently.
+      function armOrRun(btn, armedLabel) {
+        if (!btn.dataset.confirm) {
+          btn.dataset.confirm = "1";
+          btn.dataset.label = btn.textContent;
+          btn.textContent = armedLabel;
+          return false;
+        }
+        delete btn.dataset.confirm;
+        btn.textContent = btn.dataset.label || btn.textContent;
+        delete btn.dataset.label;
+        return true;
+      }
 
       itemDelete.addEventListener("click", function () {
         if (!activeItem || !currentUser) return;
@@ -5082,8 +5197,21 @@
         }
         // PC-19: warn, don't block — same photo (or a resized copy) already on file.
         var dupe = findPhotoDupe(files);
-        if (dupe && !window.confirm("This photo looks like one already on '" + dupe.itemName + "'. Upload anyway?")) return;
+        // PC-90: this runs in a submit flow, with no button to
+        // arm — the shared sheet asks the same question, and the
+        // rest of the submit runs from proceedUpload.
+        if (dupe) {
+          askConfirm({
+            title: "Photo already on file?",
+            body: "This photo looks like one already on '" + dupe.itemName + "'. Upload it anyway?",
+            confirmLabel: "Upload anyway",
+            onConfirm: proceedUpload
+          });
+          return;
+        }
+        proceedUpload();
 
+        function proceedUpload() {
         var docRef = db.collection("users").doc(currentUser.uid).collection("items").doc();
         var bar = progress.querySelector("span");
         progress.hidden = false;
@@ -5186,6 +5314,7 @@
         }
 
         uploadOne(0);
+        } // end proceedUpload (PC-90 wrap)
       });
 
       // PC-9: bulk add — N photos become N items, one per photo.
@@ -9130,9 +9259,14 @@
         } else wEl.hidden = true;
         // Sprint 16: with a plan in place, iteration is conversational —
         // the button opens trip chat instead of blindly re-planning.
-        document.getElementById("tripPlanBtn").textContent =
+        var tpb = document.getElementById("tripPlanBtn");
+        tpb.textContent =
           (trip.packing && trip.packing.articleIds && trip.packing.articleIds.length)
             ? "Talk to me for changes" : "Plan packing";
+        // PC-90: the label reset must clear the arm too, or a
+        // stale arm would replace on the next single tap.
+        delete tpb.dataset.confirm;
+        delete tpb.dataset.label;
         renderTripPacking(trip);
         renderTripShopSection(trip);
       }
@@ -9429,8 +9563,11 @@
         if (!trip || !currentUser || !functions) return;
         var leg = (trip.legs && trip.legs[0]) || {};
         if (leg.lat == null) { showToast("This trip has no location."); return; }
-        if (trip.packing && !window.confirm("Replace the current packing plan?")) return;
-        var btn = document.getElementById("tripPlanBtn");
+        // PC-90: two-tap on the Plan button. The trip render
+        // resets the label (and the arm) on every render.
+        var planBtn = document.getElementById("tripPlanBtn");
+        if (trip.packing && !armOrRun(planBtn, "Tap again to replace")) return;
+        var btn = planBtn;
         btn.disabled = true;
         document.getElementById("tripPlanThinking").hidden = false;
         // One automatic retry: a brand-new function's cold start can fail
@@ -9526,7 +9663,10 @@
       document.getElementById("tripDeleteBtn").addEventListener("click", function () {
         var trip = tripById(activeTripId);
         if (!trip || !currentUser) return;
-        if (!window.confirm('Delete "' + (trip.name || "this trip") + '"?')) return;
+        // PC-90: two-tap; the button is static and its label is
+        // never reset elsewhere, so the armed label persists
+        // visibly until the second tap.
+        if (!armOrRun(document.getElementById("tripDeleteBtn"), "Tap again to delete")) return;
         db.collection("users").doc(currentUser.uid).collection("trips").doc(trip.id).delete()
           .then(function () {
             // UX-18 W4: a trip's thread retires with its trip.
@@ -11725,6 +11865,14 @@
         document.getElementById("outfitParseSaveWear").disabled = !canSave || !!st.saving;
         document.getElementById("outfitParseRetry").hidden = st.status !== "failed";
         document.getElementById("outfitParseDiscard").hidden = !st.parseId;
+        // PC-90: a state change resets the discard arm, or a
+        // stale arm would discard on the next single tap.
+        var ddBtn = document.getElementById("outfitParseDiscard");
+        ddBtn.textContent = "Discard draft";
+        // PC-90: a state change resets the discard arm, or a
+        // stale arm would discard on the next single tap.
+        delete ddBtn.dataset.confirm;
+        delete ddBtn.dataset.label;
         var hintEl = document.getElementById("outfitParseSaveHint");
         if (st.pollError) {
           hintEl.textContent = "";
@@ -11958,7 +12106,9 @@
             discard.className = "look-btn";
             discard.type = "button";
             discard.textContent = "Discard";
-            discard.addEventListener("click", function (ev) { ev.stopPropagation(); discardDraft(entry.parseId, false); });
+            // PC-90: two-tap; the card list rebuilds on every
+            // refresh, so a stale arm cannot survive.
+            discard.addEventListener("click", function (ev) { ev.stopPropagation(); if (!armOrRun(discard, "Tap again to discard")) return; discardDraft(entry.parseId, false); });
             details.appendChild(discard);
             card.appendChild(imageWrap);
             card.appendChild(details);
@@ -11978,7 +12128,6 @@
       function discardDraft(parseId, fromSheet) {
         if (!currentUser || !parseId) return;
         if (fromSheet && outfitParseState && outfitParseState.saving) return;
-        if (!window.confirm("Discard this draft? Its pieces and photo will be deleted.")) return;
         if (fromSheet) outfitParseStopPolling();
         functions.httpsCallable("discardOutfitParse")({ parseId: parseId }).then(function () {
           if (fromSheet) closeOutfitParse();
@@ -13939,7 +14088,9 @@
         var del = el("button", "danger", "Delete");
         del.type = "button";
         del.addEventListener("click", function () {
-          if (!window.confirm("Delete this saved check?")) return;
+          // PC-90: two-tap; the detail overlay rebuilds on every
+          // open, so a stale arm cannot survive.
+          if (!armOrRun(del, "Tap again to delete")) return;
           shopCheckDocRef(id).delete().then(function () {
             closeOverlay(document.getElementById("shopCheckDetailOverlay"));
             showToast("Deleted.");
@@ -14074,7 +14225,9 @@
         var clearBtn = shopCheckEl("button", "link-button danger-text", "Clear thread");
         clearBtn.type = "button";
         clearBtn.addEventListener("click", function () {
-          if (!window.confirm("Clear all questions on this check?")) return;
+          // PC-90: two-tap; the thread rebuilds on every render,
+          // so a stale arm cannot survive.
+          if (!armOrRun(clearBtn, "Tap again to clear")) return;
           shopCheckDocRef(c.id).update({
             followUps: [],
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -14201,6 +14354,10 @@
       });
       document.getElementById("outfitParseDiscard").addEventListener("click", function () {
         if (!outfitParseState || !outfitParseState.parseId) return;
+        // PC-90: two-tap; renderOutfitParse resets the label
+        // (and the arm) on every state change.
+        var btn = document.getElementById("outfitParseDiscard");
+        if (!armOrRun(btn, "Tap again to discard")) return;
         discardDraft(outfitParseState.parseId, true);
       });
       document.getElementById("outfitParseInput").addEventListener("change", function () {
@@ -14217,11 +14374,23 @@
       document.getElementById("builderSave").addEventListener("click", function () {
         if (builderSelection.length < 2) { showToast("Pick at least 2 pieces."); return; }
         var sel = builderSelection.slice();
+        var saveBtn = document.getElementById("builderSave");
         // Option 2: same slot twice is usually a mistake — warn, don't block.
         var dupSlot = builderDupSlot(sel);
-        if (dupSlot && !window.confirm(dupSlot + ". Save anyway?")) return;
+        if (dupSlot) {
+          // PC-90: two-tap; the toast carries the warning the
+          // native dialog used to show. A changed selection
+          // clears a stale arm on the next click.
+          if (!armOrRun(saveBtn, "Tap again to save")) {
+            showToast(dupSlot + " — tap again to save anyway.");
+            return;
+          }
+        } else {
+          delete saveBtn.dataset.confirm;
+          delete saveBtn.dataset.label;
+          saveBtn.textContent = "Save outfit";
+        }
         // PC-18: same dedup check as chat saves.
-        var saveBtn = document.getElementById("builderSave");
         saveBtn.disabled = true;
         saveBtn.textContent = "Saving…";
         findDuplicateOutfit(sel, "manual").then(function (dup) {
