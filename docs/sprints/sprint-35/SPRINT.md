@@ -167,9 +167,53 @@ never broken; the harness was behind it.
 
 ## Retest
 
-QA Round 3 (Fri Nov 27): re-tests the Sprint 34 fixes
-(PC-84, PC-88, PC-87) + probes Today in depth — which now
-covers the Sprint 35 Today fixes (#135–#139) fresh. Nov 27
-falls in the Thanksgiving trip (Nov 26–28); if the sign-in
-approval does not arrive, the round records itself as
-skipped and the sprint's QA phase moves to Fri Dec 4.
+QA Round 3 ran Wed Nov 25, 1:55–2:01 PM PST (5 min) —
+sprint-triggered, right after the sprint shipped, on the
+founder's order ("run the QA round right after sprint so my
+manual checks are after QA"). Signed in via the saved Google
+session; no phone approval needed. This round replaces the
+Fri Nov 27 weekly round. **Five of six cards pass; one P1.**
+- **#135 PASS.** Tapping the black polo in Today's feature
+  opened exactly that piece's detail sheet.
+- **#136 PASS on desktop.** Home tab first, selected; tapping
+  it from Outfits opened Today, Home stayed selected.
+  Phone-width label fit untested — founder phone check.
+- **#137 PASS in part.** All 9 packing photos in the Tahoe
+  trip showed the whole garment. Missing-photo empty slot
+  untested — every photo in the trip exists.
+- **#138 PASS in part.** Today shows "Wednesday, November
+  25" and today's picks. True midnight rollover untested live
+  (tests cover a seven-day walk incl. DST).
+- **#139 PASS.** First pick Morning Transit, second pick
+  Pacific Fog — neither repeats Matinee Utility (Nov 14).
+  After logging Pacific Fog as worn today, the next pick was
+  Shadow and Sand, "shifts away from the grey and off-white
+  tones of your last outfit." Caveat: exclusion was proven
+  against the wear logged during the pass, not a pre-existing
+  in-window wear.
+- **PC-90 PASS overall.** Five confirm flows exercised
+  (outfit delete, piece delete, trip delete, saved shop check
+  delete, clear-conversation "Start fresh") — every one armed
+  in-app as a two-tap. Zero native browser confirms. The
+  shop-check and conversation flows were armed only, not
+  confirmed (real data). P2 note (parked): the wear-entry
+  delete arms with no visible label change.
+- **PC-91 FAIL (P1).** Logged Pacific Fog as worn today:
+  detail "Worn 1× · Nov 25", feature "WORN ✓" — but Today's
+  wear card still read "Saturday you wore: Matinee Utility"
+  after reload. The card shows no date, so the Nov 14 wear
+  reads as this Saturday. Fix pass: Sprint 36 (proposed).
+- **PC-92 PASS.** Deleted the QA Test — Tahoe trip; Today
+  dropped its trip card immediately, still gone after reload.
+  No orphan cards. Close at the next planning walk unless
+  kept as regression cover.
+- Smoke pass: all passed.
+- P2s parked (no cards): PC-84 reply misattribution (above);
+  PC-90 wear-entry delete arm label; trip weather chip
+  mismatch (trip since deleted); saved shop check "Already in
+  your wardrobe" matched to a piece labeled "Unknown item".
+- Round 4 scope: retest the PC-91 fix if shipped, plus the
+  untested items above (#136 phone-width, #137 empty slot,
+  #138 rollover, #139 pre-existing in-window wear, shop-check
+  clear-questions control). Full report:
+  `qa-rounds/2026-11-25-round3.md`.

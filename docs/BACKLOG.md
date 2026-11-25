@@ -1371,7 +1371,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **Done looks like:** "More formal" keeps the outfit's core pieces
   and shifts formality; the reply names the pieces it changed.
 - **Effort:** M.
-- **Status:** In Sprint 34 — SHIPPED 2026-11-23 (built + deployed; awaiting QA Round 3 retest). Sprint 33 fix did not land because the rule was uncountable; Sprint 34 made it countable (AT LEAST HALF) with server enforcement (`iterationKeepProblem` repair trigger).
+- **Status:** In Sprint 34 — SHIPPED 2026-11-23, VERIFIED by QA Round 3 (2026-11-25): "More formal" kept 2 of 4 pieces (exactly half). Issue #150 closed. P2 note (parked): the reply misattributes the swap.
 
 ### PC-85: Reloads briefly show wrong empty states (M)
 
@@ -1417,7 +1417,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **Done looks like:** deleting an outfit removes it from Outfits and
   shows feedback.
 - **Effort:** M.
-- **Status:** In Sprint 34 — SHIPPED 2026-11-23 (built + deployed; awaiting QA Round 3 retest). Root cause: the handler gated on native `window.confirm()`, auto-dismissed without showing; fixed with the in-app two-tap confirm (PC-82 idiom).
+- **Status:** In Sprint 34 — SHIPPED 2026-11-23, VERIFIED by QA Round 3 (2026-11-25): "Heritage Crisp" deleted, outfits 11 → 10, still gone after reload. Issue #154 closed.
 
 ### PC-88: Three-outfit stylist request errors out every time (M)
 
@@ -1433,7 +1433,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **Done looks like:** asking for three outfits in one thread returns
   three outfits.
 - **Effort:** M.
-- **Status:** In Sprint 34 — SHIPPED 2026-11-23, card 1 (P0) (built + deployed; awaiting QA Round 3 retest). Root cause: `maxOutputTokens: 2500` truncated the three-outfit JSON mid-object (`AI_BAD_RESPONSE`); fixed with an `outfits` array contract, per-entry validation, and a 6000-token cap on multi-outfit turns only.
+- **Status:** In Sprint 34 — SHIPPED 2026-11-23, card 1 (P0), VERIFIED by QA Round 3 (2026-11-25): three outfits in one thread, no error. Issue #152 closed.
 
 ### PC-89: Blocked intents return action cards, never bare refusals (M)
 
@@ -1472,14 +1472,17 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   remains in the client.
 - **Effort:** M.
 - **Status:** Filed 2026-11-25 (Sprint 35 walk). In Sprint 35 —
-  SHIPPED 2026-11-25 (built + deployed; awaiting QA Round 3).
+  SHIPPED 2026-11-25, Round 3 (2026-11-25) PASS overall: five
+  confirm flows exercised, every one armed in-app as a two-tap;
+  zero native browser confirms. P2 note (parked): the wear-entry
+  delete arms with no visible label change.
   Build note: a grep found **13** gates, not 9 — the three
   shop-check gates (delete saved check, clear all questions,
   dupSlot "Save anyway?") were missed in the PC-87 note. All 13
   converted; zero `window.confirm(` remains in the client.
   Commit `6de5be2`.
 
-### PC-91: Today does not surface a wear logged today (S/M)
+### PC-91: Today does not surface a wear logged today (S/M) — issue #156
 
 - **Origin:** Weekly QA Round 1, 2026-11-23, parked as P2-7.
   Round 3 (Fri Nov 27) probes the Today area in depth.
@@ -1492,8 +1495,13 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   "you wore" line the same day.
 - **Effort:** S/M.
 - **Status:** Filed 2026-11-25 (Sprint 35 walk, alternate).
+  Retest 2026-11-25 (Round 3): STILL FAILS — logged Pacific Fog as
+  worn today (detail "Worn 1× · Nov 25", feature "WORN ✓"), but
+  Today's wear card still read "Saturday you wore: Matinee Utility"
+  after reload. The card shows no date, so the Nov 14 wear reads as
+  this Saturday. P1 — fix pass proposed as Sprint 36 (single card).
 
-### PC-92: Today keeps orphan cards for deleted items (S/M)
+### PC-92: Today keeps orphan cards for deleted items (S/M) — issue #157
 
 - **Origin:** Weekly QA Round 1, 2026-11-23, parked as P2-8.
   Round 3 (Fri Nov 27) probes the Today area in depth.
@@ -1507,3 +1515,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   its Today card on the next render; no orphan cards.
 - **Effort:** S/M.
 - **Status:** Filed 2026-11-25 (Sprint 35 walk, alternate).
+  Tested 2026-11-25 (Round 3): PASSES — deleted the QA Test — Tahoe
+  trip; Today dropped its trip card immediately, still gone after
+  reload. No orphan cards. Close at the next planning walk unless
+  kept as regression cover.

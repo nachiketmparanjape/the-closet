@@ -106,9 +106,31 @@ All four cards built, deployed, committed 2026-11-23. Suite
 
 ## Retest
 
-QA Round 3 (Fri Nov 27, or earlier on the founder's order):
-re-test PC-84, PC-87, PC-88 (P0 first) + smoke pass. PC-86
-is already verified live (see above) and is re-tested only
-if the round's scope keeps it. Nov 27 falls in the
-Thanksgiving trip — the round records itself as skipped if
-the sign-in approval does not arrive.
+QA Round 3 ran Wed Nov 25, 1:55–2:01 PM PST (5 min) — the
+founder ordered it right after Sprint 35 shipped, so his
+manual checks come after QA. Signed in via the saved Google
+session; no phone approval needed. **All three retests PASS;
+the loop is closed.**
+- **PC-88 (#152) PASS.** Three outfits in one thread (Bistro
+  Prep, Fireside Heritage, Coastal Minimalist). No error. The
+  P0 is fixed. Issue closed.
+- **PC-84 (#150) PASS.** "More formal" on Bistro Prep kept 2
+  of 4 pieces (olive utility jacket, white sneakers — exactly
+  half). The reply names only pieces in the revised card.
+  Issue closed. P2 note (parked, no card): the reply
+  misattributes the swap — it says it swapped "the rugged
+  brown corduroys" (the original had cream corduroy trousers;
+  brown corduroys belonged to Fireside Heritage) and says it
+  is "keeping the cozy grey knit" although the grey sweater
+  was newly introduced, not kept.
+- **PC-87 (#154) PASS.** "Heritage Crisp" deleted (two-tap
+  arm, "Outfit deleted." toast). Outfits 11 → 10, still gone
+  after reload. The Round 2 stuck outfit is gone. Issue
+  closed.
+- Smoke pass: all passed (capture, stylist pick, wear log,
+  Today, trip).
+- The same round tested the six Sprint 35 cards and found
+  one P1 (PC-91, Today wear card) — see Sprint 35's Retest
+  section. Full report:
+  `qa-rounds/2026-11-25-round3.md` in the studio goal
+  workspace.
