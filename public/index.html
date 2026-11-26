@@ -10893,29 +10893,31 @@
             cards++;
           }
         }
-        // Rate card — the latest worn outfit from before today (async).
+        // Rate card — today's wear first, else the latest worn
+        // outfit from before today (async). PC-91: a wear logged
+        // today must surface the same day.
         if (currentUser) {
           db.collection("users").doc(currentUser.uid).collection("wear_events")
             .orderBy("wornAt", "desc").limit(8).get()
             .then(function (snap) {
               if (token !== todayState.renderToken) return;
-              var found = null;
+              var wears = [];
               snap.forEach(function (d) {
-                if (found) return;
                 var w = d.data();
                 var t = w.wornAt && w.wornAt.toDate ? w.wornAt.toDate() : null;
-                if (!t) return;
-                var ds = t.getFullYear() + "-" + String(t.getMonth() + 1).padStart(2, "0") + "-" + String(t.getDate()).padStart(2, "0");
-                if (ds < todayStr && w.outfitId) found = { w: w, dateStr: ds };
+                if (!t || !w.outfitId) return;
+                wears.push({ dateStr: t.getFullYear() + "-" + String(t.getMonth() + 1).padStart(2, "0") + "-" + String(t.getDate()).padStart(2, "0"), outfitId: w.outfitId });
+              });
+              var found = pickWearCard(wears, todayStr, function (id) {
+                var hit = null;
+                allOutfits.forEach(function (o) { if (o.id === id) hit = o; });
+                return hit;
               });
               if (!found) return;
-              var outfit = null;
-              allOutfits.forEach(function (o) { if (o.id === found.w.outfitId) outfit = o; });
-              if (!outfit) return;
-              var whenLabel = found.dateStr === yesterdayStr() ? "Yesterday" : new Date(found.dateStr + "T12:00:00").toLocaleDateString(undefined, { weekday: "long" });
-              var card = threadCard(whenLabel + " you wore: " + (outfit.name || "an outfit"), "How was it? Tap to rate it.", function () {
+              var whenLabel = wearCardWhenLabel(found.dateStr, todayStr, yesterdayStr());
+              var card = threadCard(whenLabel + " you wore: " + (found.outfit.name || "an outfit"), "How was it? Tap to rate it.", function () {
                 switchView("outfits");
-                openOutfit(outfit.versionGroup || outfit.id);
+                openOutfit(found.outfit.versionGroup || found.outfit.id);
               });
               thread.insertBefore(card, thread.firstChild);
             }).catch(function () {});
@@ -10944,6 +10946,36 @@
         var d = new Date();
         d.setDate(d.getDate() - 1);
         return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+      }
+      // PC-91: which wear the Today wear card shows. Today's wear
+      // first (a wear logged today must surface the same day);
+      // otherwise the latest pre-today wear, so the card keeps its
+      // rating job. `wears` are {dateStr, outfitId} in
+      // most-recent-first order. A wear whose outfit is gone is
+      // skipped, never a dead end.
+      function pickWearCard(wears, todayStr, outfitById) {
+        var todayFound = null, pastFound = null;
+        for (var i = 0; i < wears.length; i++) {
+          var w = wears[i];
+          if (!w || !w.outfitId || !w.dateStr) continue;
+          var outfit = outfitById(w.outfitId);
+          if (!outfit) continue;
+          if (w.dateStr === todayStr) {
+            if (!todayFound) todayFound = { outfit: outfit, dateStr: w.dateStr };
+          } else if (w.dateStr < todayStr) {
+            if (!pastFound) pastFound = { outfit: outfit, dateStr: w.dateStr };
+          }
+          if (todayFound && pastFound) break;
+        }
+        return todayFound || pastFound;
+      }
+      // PC-91: the wear card always carries a date, so an old wear
+      // can never read as this week. Today / Yesterday / weekday +
+      // short date ("Saturday, Nov 14").
+      function wearCardWhenLabel(dateStr, todayStr, yesterdayStrVal) {
+        if (dateStr === todayStr) return "Today";
+        if (dateStr === yesterdayStrVal) return "Yesterday";
+        return new Date(dateStr + "T12:00:00").toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
       }
       document.getElementById("todayHomeBtn").addEventListener("click", function () { switchView("today"); });
       document.getElementById("tabChat").addEventListener("click", function () { renderChatTodayStrip(); });
