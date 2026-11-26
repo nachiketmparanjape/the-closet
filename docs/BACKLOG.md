@@ -1494,12 +1494,15 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **Done looks like:** logging a wear today updates Today's
   "you wore" line the same day.
 - **Effort:** S/M.
-- **Status:** Filed 2026-11-25 (Sprint 35 walk, alternate).
-  Retest 2026-11-25 (Round 3): STILL FAILS — logged Pacific Fog as
-  worn today (detail "Worn 1× · Nov 25", feature "WORN ✓"), but
-  Today's wear card still read "Saturday you wore: Matinee Utility"
-  after reload. The card shows no date, so the Nov 14 wear reads as
-  this Saturday. P1 — fix pass proposed as Sprint 36 (single card).
+- **Status:** Filed 2026-11-25 (Sprint 35 walk, alternate). In
+  Sprint 36 — SHIPPED 2026-11-25 (built + deployed; awaiting
+  QA Round 4 retest). Cause: the rate card took the first wear
+  with `ds < todayStr`, so today's wear was excluded by the
+  filter itself; fixed with `pickWearCard` (today's wear
+  first, else latest pre-today wear) + `wearCardWhenLabel`
+  (always carries a date). Commit `af0648c`. Round 3
+  (2026-11-25) repro: Pacific Fog logged today, card still
+  read "Saturday you wore: Matinee Utility" after reload.
 
 ### PC-92: Today keeps orphan cards for deleted items (S/M) — issue #157
 

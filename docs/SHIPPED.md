@@ -1081,9 +1081,11 @@ evening.
 
 Six cards, all built + deployed the same day the founder
 approved the slate. Suite: 700 passing (690 in `tests/` + 10
-in `functions/cutout-check.test.js`). Verification is QA Round
-3 (Fri Nov 27), which probes Today in depth, plus the
-founder's phone checks below.
+in `functions/cutout-check.test.js`). Verification: QA Round 3
+ran Wed Nov 25 (sprint-triggered, replacing Fri Nov 27) —
+five of six pass (#135, #136 desktop, #137 in part, #138 in
+part, #139, PC-90); the Today wear card failed (PC-91),
+fixed in Sprint 36. The founder's phone checks follow QA.
 
 - **#135 — tap a Today piece → its detail sheet.** Each pick
   piece is a tappable control opening that exact item; a
@@ -1105,3 +1107,19 @@ founder's phone checks below.
   found (not nine): ten two-tap via a shared helper, three
   via one new in-app confirm sheet. Zero `window.confirm(`
   remains in the client. Commit `6de5be2`.
+
+## Sprint 36 — Close the loop, third pass (2026-11-25)
+
+One card: the single P1 QA Round 3 found. Suite: 711 passing
+(701 in `tests/` + 10 in `functions/cutout-check.test.js`).
+Verification is QA Round 4, plus the founder's phone check
+below.
+
+- **PC-91 — Today shows a wear logged today, with a date.**
+  The wear card's selector took the first wear strictly
+  before today, so a wear logged today was excluded by the
+  filter itself — even a reload could not fix it. Now the
+  card shows today's wear first, else the latest pre-today
+  wear (the rating job stays), and the label always carries
+  a date: "Today" / "Yesterday" / "Saturday, Nov 14".
+  Commit `af0648c`.

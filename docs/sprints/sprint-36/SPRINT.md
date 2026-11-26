@@ -57,4 +57,44 @@ Fix (two layers, one card):
 
 ## Build results
 
-(To be filled as the card lands.)
+- **PC-91 (#156) — SHIPPED 2026-11-25.** Cause proven from
+  the code before the fix: the rate card's selector took the
+  first wear with `ds < todayStr`, so a wear logged today
+  was excluded by the filter itself — even a reload could not
+  fix it. The detail read the same `wear_events` without
+  that filter, which is why the detail said "Worn 1× ·
+  Nov 25" while the card said "Saturday you wore: Matinee
+  Utility". The label also carried no date, so the Nov 14
+  wear read as this Saturday.
+  - Fix: new `pickWearCard` helper — today's wear first,
+    else the latest pre-today wear (the rating job stays);
+    a wear whose outfit is gone is skipped, never a dead
+    end. New `wearCardWhenLabel` helper — "Today" /
+    "Yesterday" / weekday + short date ("Saturday, Nov 14").
+    `todayWear` already calls `renderToday()` after logging,
+    so the card updates immediately as well as after reload.
+  - One test-harness slip en route: the new test's `byId`
+    looked up outfits by key instead of by id, so every
+    lookup returned null. The product code was never broken;
+    the test was fixed. Suite **711 passing** (701 in
+    `tests/` incl. new `tests/pc91-wear-card.test.js` with 11
+    tests + 10 in `functions/cutout-check.test.js`), client
+    syntax OK, gate run before deploy.
+  - Hosting release `1795652844529000` (2026-11-26 00:27
+    UTC); live-verified (new helpers present, old filter
+    gone). Commit `af0648c`, pushed — the push first failed
+    (a config scrub had dropped the git credential helper);
+    restored with `gh auth setup-git` and pushed.
+  - Phone check for the founder: log a wear today → Today's
+    card reads "Today you wore: {name}" right away, and still
+    after reload; an older wear reads "Saturday, Nov 14 you
+    wore: …" with its date.
+
+## Retest
+
+QA Round 4: retests the PC-91 fix, plus the Round 3
+untested items (#136 phone-width label fit, #137
+missing-photo empty slot, #138 midnight rollover, #139
+exclusion against a pre-existing in-window wear, shop-check
+clear-questions control). The founder's manual checks come
+after QA.
