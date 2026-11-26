@@ -1495,14 +1495,19 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   "you wore" line the same day.
 - **Effort:** S/M.
 - **Status:** Filed 2026-11-25 (Sprint 35 walk, alternate). In
-  Sprint 36 — SHIPPED 2026-11-25 (built + deployed; awaiting
-  QA Round 4 retest). Cause: the rate card took the first wear
-  with `ds < todayStr`, so today's wear was excluded by the
-  filter itself; fixed with `pickWearCard` (today's wear
-  first, else latest pre-today wear) + `wearCardWhenLabel`
-  (always carries a date). Commit `af0648c`. Round 3
-  (2026-11-25) repro: Pacific Fog logged today, card still
-  read "Saturday you wore: Matinee Utility" after reload.
+  Sprint 36 — SHIPPED 2026-11-25, VERIFIED by QA Round 4
+  (2026-11-25): "Today you wore: Estate Minimalist"
+  immediately and after reload. Issue #156 closed. Cause was
+  the rate card's `ds < todayStr` filter, which excluded
+  today's wear; fixed with `pickWearCard` + `wearCardWhenLabel`
+  (commit `af0648c`). The older-wear date label ("Saturday,
+  Nov 14") is covered only by unit tests — the card never fell
+  back to it live, because the founder's own Nov 25 wear sits
+  in front.
+  Retest 2026-11-25 (Round 4): PASSES — logged Estate
+  Minimalist as worn today; Today's card read "Today you wore:
+  Estate Minimalist" immediately and after reload. Issue #156
+  closed with verification.
 
 ### PC-92: Today keeps orphan cards for deleted items (S/M) — issue #157
 

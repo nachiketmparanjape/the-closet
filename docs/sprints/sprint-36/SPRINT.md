@@ -92,9 +92,49 @@ Fix (two layers, one card):
 
 ## Retest
 
-QA Round 4: retests the PC-91 fix, plus the Round 3
-untested items (#136 phone-width label fit, #137
-missing-photo empty slot, #138 midnight rollover, #139
-exclusion against a pre-existing in-window wear, shop-check
-clear-questions control). The founder's manual checks come
-after QA.
+QA Round 4 ran Wed Nov 25, 4:29–4:38 PM PST (9 min) —
+sprint-triggered, right after the sprint shipped. Signed in
+via the saved Google session; no phone approval needed.
+**PC-91 PASSES; the loop is closed. No P0, no P1.**
+- **PC-91 (#156) PASS.** Logged "Estate Minimalist" as worn
+  today (Nov 25) from one of Today's picks. The Home card
+  immediately read "Today you wore: Estate Minimalist", and
+  the same after a full reload. Issue closed with a
+  verification comment.
+- **Older-wear date label — untested live.** The card never
+  fell back to the Nov 14 "Matinee Utility" wear, because
+  the founder's own Nov 25 wear sits in front of it and
+  deleting his real wear to expose the older label was not
+  permitted. After the test wear was removed, the card fell
+  back to "Today you wore: Burgundy yellow sweatshirt +
+  Brown corduroy five…". The "Today" label format is
+  confirmed working; the "Saturday, Nov 14" label is covered
+  only by the unit tests. Matinee Utility's dialog confirms
+  its wear is dated Nov 14.
+- **#139 exclusion — PASS.** With the Estate Minimalist wear
+  logged today, the fresh pick was "Monochrome Bistro" — a
+  different top+bottom pair, so not the same outfit.
+- **Shop-check clear-questions — PASS.** The saved navy
+  crew-neck check has its own "Clear thread" button,
+  distinct from "Start fresh". First tap arms it in place
+  (turns red, "Tap again to clear"); stopped at the arm
+  stage, the question stayed.
+- **#137 missing-photo slot — untested.** No such row can be
+  made through the app without deleting real data; stays a
+  founder phone check or a seeded row.
+- **#138 rollover — untested live** (tests cover the
+  seven-day walk incl. DST). **#136 phone-width — untested**
+  (cloud window cannot narrow); founder phone check.
+- Smoke pass: all passed.
+- P2s parked (no cards): fresh picks reuse the top worn
+  today (pair-level exclusion held — by design per #139's
+  base rule; a piece-level rule would be a design change for
+  a planning walk); saved shop check shows a stale "Unknown
+  item" for a deleted piece (recurs from Rounds 2 and 3);
+  trip weather never resolved ("Checking…" across two
+  views); packing-plan generation took ~75+ seconds (it
+  completed).
+- Full report: `qa-rounds/2026-11-25-round4.md`. Next Friday
+  round is Fri Dec 4 (Nov 27 stands down — Round 3 covered
+  that week). Round 5 scope: the untested items above, plus
+  the P2s if they become cards at a planning walk.

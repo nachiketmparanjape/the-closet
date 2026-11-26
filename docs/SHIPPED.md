@@ -1112,8 +1112,9 @@ fixed in Sprint 36. The founder's phone checks follow QA.
 
 One card: the single P1 QA Round 3 found. Suite: 711 passing
 (701 in `tests/` + 10 in `functions/cutout-check.test.js`).
-Verification is QA Round 4, plus the founder's phone check
-below.
+Verification: QA Round 4 ran Wed Nov 25 — PC-91 PASSES
+("Today you wore: Estate Minimalist" immediately and after
+reload), issue #156 closed. No P0, no P1.
 
 - **PC-91 — Today shows a wear logged today, with a date.**
   The wear card's selector took the first wear strictly
