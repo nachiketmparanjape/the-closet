@@ -2124,41 +2124,11 @@
       var thumbStrip = document.getElementById("thumbStrip");
       var itemOverlay = document.getElementById("itemOverlay");
       var itemPhoto = document.getElementById("itemPhoto");
-      // PC-103: a photo that fails to load once used to sit as a blank
-      // cream box forever — the dialog photo had no error recovery,
-      // while the tile (live snapshot) showed the cutout. Retry the
-      // same URL once (cache-busted, for transient blips), then fall
-      // back to the item's original photo, so the dialog always shows
-      // a real photo. A successful load resets the retry state; a
-      // snapshot refresh that sets a new URL resets it too (the
-      // retry counter is keyed to the base URL).
-      itemPhoto.addEventListener("error", function () {
-        if (typeof activeItem === "undefined" || !activeItem) return;
-        var src = itemPhoto.getAttribute("src") || "";
-        if (!src) return;
-        var base = src.split("?cb=")[0].split("&cb=")[0];
-        var fails = (itemPhoto.dataset.loadFailedFor === base)
-          ? (parseInt(itemPhoto.dataset.loadFails || "0", 10) || 0) : 0;
-        if (fails === 0) {
-          itemPhoto.dataset.loadFailedFor = base;
-          itemPhoto.dataset.loadFails = "1";
-          var sep = src.indexOf("?") === -1 ? "?" : "&";
-          itemPhoto.src = src + sep + "cb=" + Date.now();
-          return;
-        }
-        if (fails === 1) {
-          itemPhoto.dataset.loadFails = "2";
-          var orig = (activeItem.photos && activeItem.photos[0] && activeItem.photos[0].url) || "";
-          if (orig && orig !== src) { itemPhoto.src = orig; return; }
-        }
-        // Already retried and fallen back (or no original to fall
-        // back to): leave it — the snapshot refresh re-sets the URL
-        // when fresh data lands.
-      });
-      itemPhoto.addEventListener("load", function () {
-        delete itemPhoto.dataset.loadFailedFor;
-        delete itemPhoto.dataset.loadFails;
-      });
+      // PC-103 + PC-107: the dialog photo's error recovery lives in
+      // showDisplayPhoto now (handleDisplayPhotoError) — one rule for
+      // every display photo: retry once cache-busted, fall back to the
+      // original, then the named placeholder. The old itemPhoto-only
+      // listeners are gone; the behavior is the same, on every surface.
       var itemTitle = document.getElementById("itemTitle");
       var itemNameInput = document.getElementById("itemNameInput");
       var itemCategoryInput = document.getElementById("itemCategoryInput");
@@ -3239,7 +3209,14 @@
       function showDisplayPhoto(imgEl, item, view, fit45) {
         if (!imgEl) return;
         var resolved = resolveDisplayPhoto(item, view);
-        if (!resolved) { imgEl.removeAttribute("src"); imgEl.style.transform = ""; return; }
+        if (!resolved) {
+          // PC-107: no photo at all — a named placeholder, never a blank box.
+          imgEl.src = photoPlaceholderDataUri(item && (item.shortName || item.name));
+          imgEl.style.transform = "";
+          return;
+        }
+        imgEl.onerror = function () { handleDisplayPhotoError(imgEl, item); };
+        imgEl.onload = function () { handleDisplayPhotoLoad(imgEl); };
         imgEl.src = resolved.url;
         var t = "";
         if (resolved.rotationDeg) {
@@ -3247,6 +3224,64 @@
           if (fit45 && (resolved.rotationDeg === 90 || resolved.rotationDeg === 270)) t += " scale(0.8)";
         }
         imgEl.style.transform = t;
+      }
+
+      // PC-107: the placeholder for a photo that cannot load at all.
+      // A data-URI SVG (cream, dashed border, "Photo missing" + the
+      // item name) — a valid image source, so the <img> never shows
+      // a broken box and the alt text never spills. The name is
+      // truncated and XML-escaped; a missing name falls back to
+      // "This piece".
+      function photoPlaceholderDataUri(name) {
+        var label = (name || "This piece").toString().slice(0, 28)
+          .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+        var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect x="8" y="8" width="384" height="384" fill="#f5efe6" stroke="#b09a7a" stroke-width="2" stroke-dasharray="10 8" rx="16"/><text x="200" y="185" font-family="sans-serif" font-size="22" fill="#6b5d4f" text-anchor="middle">Photo missing</text><text x="200" y="220" font-family="sans-serif" font-size="16" fill="#8a7a68" text-anchor="middle">' + label + '</text></svg>';
+        return "data:image/svg+xml," + encodeURIComponent(svg);
+      }
+
+      // PC-103 + PC-107: one photo-error rule for every display photo
+      // (dialog, tiles, packing rows — all go through showDisplayPhoto).
+      // A failed load retries the same URL once (cache-busted, for
+      // transient blips), then falls back to the item's original photo,
+      // then to the placeholder — so a genuinely missing photo shows a
+      // named placeholder, never a blank box. A successful load resets
+      // the retry state; a new URL resets it too (the retry counter is
+      // keyed to the base URL).
+      function handleDisplayPhotoError(imgEl, item) {
+        if (!imgEl) return;
+        var src = imgEl.getAttribute("src") || "";
+        if (!src || src.indexOf("data:image/svg+xml") === 0) return;
+        var base = src.split("?cb=")[0].split("&cb=")[0];
+        var fails = (imgEl.dataset.loadFailedFor === base)
+          ? (parseInt(imgEl.dataset.loadFails || "0", 10) || 0) : 0;
+        if (fails === 0) {
+          imgEl.dataset.loadFailedFor = base;
+          imgEl.dataset.loadFails = "1";
+          var sep = src.indexOf("?") === -1 ? "?" : "&";
+          imgEl.src = src + sep + "cb=" + Date.now();
+          return;
+        }
+        if (fails === 1) {
+          imgEl.dataset.loadFails = "2";
+          var orig = (item && item.photos && item.photos[0] && item.photos[0].url) || "";
+          if (orig && orig !== src) {
+            // The fallback consumes the original's own retry: record
+            // the original as the failing base, so its next failure
+            // goes straight to the placeholder instead of looping
+            // retry → fallback → retry on the same dead URL.
+            imgEl.dataset.loadFailedFor = orig;
+            imgEl.src = orig;
+            return;
+          }
+        }
+        // Already retried and fallen back (or no original to fall
+        // back to): the photo is genuinely missing — show the placeholder.
+        imgEl.src = photoPlaceholderDataUri(item && (item.shortName || item.name));
+      }
+      function handleDisplayPhotoLoad(imgEl) {
+        if (!imgEl) return;
+        delete imgEl.dataset.loadFailedFor;
+        delete imgEl.dataset.loadFails;
       }
 
       // PC-34: display URL for a photo — the extracted clean render
@@ -4114,6 +4149,27 @@
         return label;
       }
 
+      // PC-102 (Sprint 39): one toast per standardization failure,
+      // from any path. The foreground catches and the snapshot
+      // listener can both see the same failure — the server writes
+      // "failed" before the callable returns the error — so they
+      // share this dedupe: the first to see a given (item, reason)
+      // toasts, the second stays quiet. Entries expire after
+      // 10 minutes, so a genuinely new failure (new reason) still
+      // announces itself.
+      var stdFailureToasted = {};
+      function toastStdFailureOnce(itemId, name, lastError, ref) {
+        if (!itemId) return;
+        var key = itemId + "|" + (lastError || "");
+        var now = Date.now();
+        for (var k in stdFailureToasted) {
+          if (now - stdFailureToasted[k] > 10 * 60 * 1000) delete stdFailureToasted[k];
+        }
+        if (stdFailureToasted[key]) return;
+        stdFailureToasted[key] = now;
+        showToast(standardizeFailureToast(name, ref ? { details: { ref: ref } } : null));
+      }
+
       // PC-58: call the standardizeItem callable.
       // opts: { feedback, force, acknowledgedWarning }
       function callStandardize(itemId, opts) {
@@ -4295,10 +4351,13 @@
           }).catch(function (err) {
             // PC-102: name the piece — this toast can fire while the
             // founder is on another screen, and a generic error then
-            // reads as the foreground action failing.
+            // reads as the foreground action failing. Shared dedupe
+            // with the snapshot listener (Sprint 39): the server
+            // writes "failed" before the callable returns, so the
+            // listener may already have toasted this failure.
             var failName = (item && (item.shortName || item.name)) ||
               (activeItem && (activeItem.shortName || activeItem.name)) || null;
-            showToast(standardizeFailureToast(failName, err));
+            toastStdFailureOnce(itemId, failName, (err && err.message) || "", err && err.details && err.details.ref);
             if (activeItem && activeItem.id === itemId) {
               // PC-103: carry the server's reason into the local
               // failed state, so the dialog shows the real note
@@ -4425,9 +4484,10 @@
           btn.disabled = false;
           // PC-102: name the piece — same fire-and-forget hazard as
           // the Generate path (this call can fail after the founder
-          // has moved on).
+          // has moved on). Shared dedupe with the snapshot listener
+          // (Sprint 39).
           var failName = (activeItem && (activeItem.shortName || activeItem.name)) || null;
-          showToast(standardizeFailureToast(failName, err));
+          toastStdFailureOnce(itemId, failName, (err && err.message) || "", err && err.details && err.details.ref);
         });
       });
 
@@ -4787,9 +4847,33 @@
         if (hero) { hero.classList.toggle("hero-compact", allItems.length > 0); }
       }
 
+      // PC-102 (Sprint 39): the snapshot listener is the only
+      // witness to a background standardization failure — the direct
+      // call and the sweeper have no catch site to toast from. This
+      // announces a failure the first time the snapshot shows it,
+      // once per (item, reason). Only recent failures announce
+      // (lastAttemptAt within 10 min), so an old failure is not
+      // re-announced on every reload; and never for the item whose
+      // dialog is open — its page already shows the PC-98 reason.
+      var prevStdStatus = {};
+      function toastNewStdFailures(items, activeItemId, nowMs) {
+        for (var i = 0; i < items.length; i++) {
+          var it = items[i];
+          var std = it.standardization || {};
+          var prev = prevStdStatus[it.id];
+          prevStdStatus[it.id] = std.status || null;
+          if (std.status !== "failed" || prev === "failed") continue;
+          if (activeItemId && activeItemId === it.id) continue;
+          var attemptedMs = std.lastAttemptAt ? Date.parse(std.lastAttemptAt) : NaN;
+          if (!Number.isFinite(attemptedMs) || nowMs - attemptedMs > 10 * 60 * 1000) continue;
+          toastStdFailureOnce(it.id, it.shortName || it.name || null, std.lastError || "", null);
+        }
+      }
+
       function watchItems(user) {
         if (unsubscribe) { unsubscribe(); unsubscribe = null; }
         allItems = [];
+        prevStdStatus = {};
         if (!user) { renderGallery(); return; }
         gallery.hidden = true;
         loadingGrid.hidden = false;
@@ -4806,6 +4890,7 @@
             todayDataSeen = true;
             maybeRenderToday();
             maybeHealUnnamedItems();
+            toastNewStdFailures(allItems, (typeof activeItem !== "undefined" && activeItem) ? activeItem.id : null, Date.now());
             // PC-103: refresh the open item dialog from the fresh
             // snapshot. The dialog holds a stale activeItem (set once
             // in openItem), so a cutout or a standardization result
@@ -5677,6 +5762,19 @@
         document.getElementById("bulkDupeBar").hidden = true;
       }
 
+      // PC-108: one rule for the bulk confirm button, used by every
+      // path that changes the queue — file selection, duplicate
+      // skip, and the finish. The label counts the queued jobs and
+      // the button enables only while there is something to add.
+      // bulkFinish used to never touch the button at all, so after
+      // a run it still read "Add 2 pieces" and stayed disabled
+      // while the items were already created in the background.
+      function syncBulkStartBtn() {
+        var n = bulkJobs.filter(function (j) { return j.status === "queued"; }).length;
+        bulkStartBtn.disabled = n === 0;
+        bulkStartBtn.textContent = n > 0 ? "Add " + n + " piece" + (n === 1 ? "" : "s") : "Add pieces";
+      }
+
       function startBulkRun() {
         hideBulkDupeBar();
         bulkRunning = true;
@@ -5692,6 +5790,7 @@
         bulkRunning = false;
         bulkInput.disabled = false;
         document.getElementById("bulkStop").hidden = true;
+        syncBulkStartBtn(); // PC-108: the run is over — reset the button to the idle state for the queue that remains.
         var done = bulkJobs.filter(function (j) { return j.status === "done"; }).length;
         var failed = bulkJobs.filter(function (j) { return j.status === "failed"; }).length;
         var stopped = bulkJobs.filter(function (j) { return j.status === "stopped"; }).length;
@@ -5756,9 +5855,7 @@
         });
         bulkJobs = append ? bulkJobs.concat(jobs).slice(0, BULK_MAX) : jobs;
         stashPHashes(bulkJobs.map(function (j) { return j.file; })); // PC-19
-        var n = bulkJobs.filter(function (j) { return j.status === "queued"; }).length;
-        bulkStartBtn.disabled = n === 0;
-        bulkStartBtn.textContent = n > 0 ? "Add " + n + " piece" + (n === 1 ? "" : "s") : "Add pieces";
+        syncBulkStartBtn();
         renderBulkList();
       }
 
@@ -5793,8 +5890,7 @@
           d.job.error = "Already in your wardrobe as “" + d.itemName + "”";
         });
         var n = bulkJobs.filter(function (j) { return j.status === "queued"; }).length;
-        bulkStartBtn.disabled = n === 0;
-        bulkStartBtn.textContent = n > 0 ? "Add " + n + " piece" + (n === 1 ? "" : "s") : "Add pieces";
+        syncBulkStartBtn();
         renderBulkList();
         if (!n) { showToast("Nothing left to add — every photo was a duplicate."); return; }
         startBulkRun();

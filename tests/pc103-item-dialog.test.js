@@ -64,22 +64,30 @@ describe("source pins", function () {
     );
   });
 
-  test("the dialog photo retries once, then falls back to the original", function () {
+  test("the dialog photo retries once, then falls back to the original (Sprint 39: the rule lives in showDisplayPhoto now)", function () {
     assert.ok(
-      html.includes('itemPhoto.addEventListener("error"'),
-      "itemPhoto needs an error handler"
+      html.includes("function handleDisplayPhotoError(imgEl, item)"),
+      "one photo-error rule for every display photo"
     );
     assert.ok(
-      html.includes('itemPhoto.src = src + sep + "cb=" + Date.now();'),
+      html.includes('imgEl.src = src + sep + "cb=" + Date.now();'),
       "first failure retries the same URL, cache-busted"
     );
     assert.ok(
-      html.includes('if (orig && orig !== src) { itemPhoto.src = orig; return; }'),
+      html.includes('imgEl.dataset.loadFailedFor = orig;'),
+      "the fallback consumes the original's own retry, so a dead original goes to the placeholder instead of looping"
+    );
+    assert.ok(
+      html.includes('if (orig && orig !== src) {'),
       "second failure falls back to the original photo"
     );
     assert.ok(
-      html.includes('itemPhoto.addEventListener("load"'),
+      html.includes("function handleDisplayPhotoLoad(imgEl)"),
       "a successful load must reset the retry state"
+    );
+    assert.ok(
+      html.includes('imgEl.onerror = function () { handleDisplayPhotoError(imgEl, item); };'),
+      "showDisplayPhoto wires the error handler on every photo it sets"
     );
   });
 

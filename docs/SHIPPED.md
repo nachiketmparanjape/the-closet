@@ -1229,3 +1229,30 @@ Suite 786 passing.
   The deployed trigger function is gone (GET 404).
 
 Verification is QA Round 6 (2026-11-26): PC-104/PC-105 PASS (manual generation inside budget); PC-106 PARTIAL FAIL (the direct call works, but the single-item run raced the cutout and FLUX drew three different outcomes from one photo — corrected: the already-clean check behaved per its rule; the race is PC-109); PC-102 FAIL (no toast on background failures); PC-103 FAIL on the photo half (the sweatshirt's files are gone from Storage — PC-107). New cards PC-107/108/109/110. Fix pass proposed as Sprint 39.
+
+## Sprint 39 — The cutout and the run must not silently drop work (2026-11-26)
+
+- **PC-109 (#174):** the pipeline input is live now — it waits
+  briefly for a fresh item's cutout before attempt 1 and re-checks
+  the doc before every later attempt, so a single-item add
+  standardizes from the cutout instead of the scene. inputKind is
+  persisted as soon as it is known.
+- **PC-110 (#175):** the server links the render it saves
+  (`linkRenderToItem`) and mints the download token at save time —
+  a timeout after the save can no longer orphan a cutout. Timeout
+  120s → 300s; `extractGarment` is now nodejs22.
+- **PC-102 (#167):** one toast per standardization failure from
+  any path — the snapshot listener announces background failures
+  the foreground catches never see.
+- **PC-108 (#173):** the bulk confirm button resets after a run
+  (`syncBulkStartBtn`, one rule for every path that changes the queue).
+- **PC-107 (#172):** a missing photo shows a named placeholder
+  instead of a blank box, on every display-photo surface; one
+  shared error rule replaces the dialog-only listeners. The
+  sweatshirt's photo restore itself still needs the founder's
+  re-upload.
+
+Suite 823 passing, 0 fail. Deployed: `standardizeItem` +
+`extractGarment` updated; hosting release `1795763213256000`.
+
+Verification is QA Round 7.

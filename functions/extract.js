@@ -114,11 +114,21 @@ async function extractGarmentPhoto(uid, storagePath, deps) {
   // Step 4: the render lands at its deterministic path regardless
   // of the gate — a rejected render is tuning evidence, and the
   // client never points at it (see the return contract below).
+  // PC-110: the save also mints the download token. The token used
+  // to come from the client's getDownloadURL() after a good return
+  // — so when the callable timed out after the save (the Black tee,
+  // 2026-11-26: render saved 02:56:40Z, call died at 02:58:21Z),
+  // the render was unreachable even though the file existed. The
+  // renderUrl is built from this token and written to the item doc
+  // by linkRenderToItem below, so the file is downloadable from the
+  // moment it is saved.
   const renderStoragePath = renderPathFor(uid, storagePath);
+  const downloadToken = crypto.randomUUID();
   await deps.bucket.file(renderStoragePath).save(png, {
     contentType: "image/png",
-    metadata: { cacheControl: "public, max-age=31536000" },
+    metadata: { cacheControl: "public, max-age=31536000", firebaseStorageDownloadTokens: downloadToken },
   });
+  const renderUrl = `https://firebasestorage.googleapis.com/v0/b/${deps.bucket.name}/o/${encodeURIComponent(renderStoragePath)}?alt=media&token=${downloadToken}`;
 
   // PC-56 (Sprint 29): garment embedding, computed once from the clean
   // render (background removed = the vector describes the garment, not
@@ -157,7 +167,7 @@ async function extractGarmentPhoto(uid, storagePath, deps) {
     tooSmall: frameShare < 0.25 || sourceLongEdge < 700,
   };
   if (!mask.pass) {
-    return {
+    const result = {
       renderStoragePath,
       uncertainty: null,
       provider: "birefnet",
@@ -166,6 +176,11 @@ async function extractGarmentPhoto(uid, storagePath, deps) {
       photoQuality,
       renderEmbedding,
     };
+    // PC-110: link the render server-side before returning (see
+    // linkRenderToItem) — a timeout after this point must not
+    // orphan it.
+    await linkRenderToItem(deps, uid, storagePath, result, renderUrl);
+    return result;
   }
 
   // Step 5, layer 2: the vision check. checkCutout never throws
@@ -189,7 +204,7 @@ async function extractGarmentPhoto(uid, storagePath, deps) {
     outcome: verdict.ok ? "success" : verdict.checkError ? "error:CHECK_UNAVAILABLE" : "gate_rejected",
   });
 
-  return {
+  const result = {
     renderStoragePath,
     uncertainty: null,
     provider: "birefnet",
@@ -198,6 +213,55 @@ async function extractGarmentPhoto(uid, storagePath, deps) {
     photoQuality,
     renderEmbedding,
   };
+  // PC-110: link the render server-side before returning.
+  await linkRenderToItem(deps, uid, storagePath, result, renderUrl);
+  return result;
+}
+
+// PC-110: write the render fields to the item doc server-side.
+// The client used to own this step (patchPhotos, after a good
+// return), so a callable timeout after the save orphaned the
+// render: the file existed, the photo entry carried no
+// renderStoragePath / renderUrl / renderStatus, and the app kept
+// showing the original — silently, by design. The server now links
+// it itself; the client's patch stays as an idempotent second write
+// (same values). Only item photo paths carry an item
+// (users/{uid}/items/{itemId}/...); parse flows (outfit-photos/)
+// have no item yet and are left alone. A rejected render writes
+// only renderStatus, mirroring the client — it changes nothing the
+// user sees. Best-effort: a link failure is logged, never allowed
+// to fail the extraction.
+async function linkRenderToItem(deps, uid, storagePath, result, renderUrl) {
+  if (!deps.db) return;
+  const m = storagePath.match(/^users\/[^/]+\/items\/([^/]+)\//);
+  if (!m) return;
+  const itemId = m[1];
+  try {
+    const itemRef = deps.db.collection("users").doc(uid).collection("items").doc(itemId);
+    const snap = await itemRef.get();
+    if (!snap.exists) return;
+    const item = snap.data() || {};
+    const photos = item.photos || [];
+    const idx = photos.findIndex((p) => p && p.storagePath === storagePath);
+    if (idx < 0) return;
+    const next = photos.slice();
+    if (result.gatePassed) {
+      next[idx] = Object.assign({}, next[idx], {
+        renderUrl,
+        renderStoragePath: result.renderStoragePath,
+        renderStatus: "passed",
+        renderUncertainty: result.uncertainty != null ? result.uncertainty : null,
+        photoQuality: result.photoQuality || null,
+        renderEmbedding: result.renderEmbedding || null,
+      });
+    } else {
+      next[idx] = Object.assign({}, next[idx], { renderStatus: "rejected" });
+    }
+    await itemRef.update({ photos: next });
+    console.log(`[extract] render linked to item ${itemId} (passed=${result.gatePassed})`);
+  } catch (e) {
+    console.log(`[extract] render link failed (non-fatal): ${e.message}`);
+  }
 }
 
 // The recorder is fail-safe by contract; this wrapper is belt and
@@ -221,4 +285,4 @@ async function emitUsage(deps, uid, storagePath, fields) {
   }
 }
 
-module.exports = { extractGarmentPhoto, renderPathFor, MAX_IMAGE_BYTES };
+module.exports = { extractGarmentPhoto, renderPathFor, linkRenderToItem, MAX_IMAGE_BYTES };

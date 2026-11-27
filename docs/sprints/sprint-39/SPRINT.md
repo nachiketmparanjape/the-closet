@@ -1,6 +1,6 @@
 # Sprint 39 — The cutout and the run must not silently drop work
 
-- **Status:** PROPOSED 2026-11-26 (awaiting the founder's yes).
+- **Status:** APPROVED by the founder 2026-11-26 ("Yes — open Sprint 39 for the five fixes").
 - **Theme:** QA Round 6 proved the delivery mechanism works
   (the direct call fires, manual generation finishes inside
   budget) — but the work it delivers still drops silently in
@@ -67,7 +67,79 @@ founder's phone check).
 
 ## Build results
 
-(TBD — filled as cards ship.)
+- **PC-109 (#174) — SHIPPED 2026-11-26.** The pipeline input is
+  now live, not snapshotted once. `resolvePipelineInput` (extracted
+  from the PC-94 inline code) resolves cutout-vs-original from one
+  photo entry; the pipeline calls it at start, waits briefly for the
+  render when the item is fresh (created <3 min ago, up to 60s,
+  5s polls, deadline-aware with a 120s reserve, skipped on force),
+  and re-checks the doc before every later attempt — if the cutout
+  landed, the input switches (buffer + color anchor reloaded, the
+  systematic-stop comparison reset, inputKind persisted). inputKind
+  is persisted best-effort as soon as it is known, so a failed run
+  leaves a trace (the Black tee's doc had none). 5 new tests in
+  `functions/standardize-pipeline.test.js` (grace wait finds the
+  cutout / gives up / skipped for old items; cutout lands before
+  attempt 2 and the stop resets; inputKind persisted on failure).
+  Two test-expectation fixes en route were the tests' own (positional
+  `db.updates[0]` after the new early persist; a get() fake that
+  returned the pre-cutout doc on its first call). Deployed:
+  `standardizeItem` updated (300s/1Gi).
+- **PC-110 (#175) — SHIPPED 2026-11-26.** The server owns the link
+  now. `extractGarmentPhoto` mints the download token at save time
+  (`firebaseStorageDownloadTokens` in the render's metadata) and
+  builds the renderUrl from it, so a saved render is reachable from
+  the moment it exists. New `linkRenderToItem` writes the render
+  fields to the item doc itself (photo entry matched by storagePath;
+  full set on a pass, only renderStatus "rejected" on a gate
+  rejection, mirroring the client) — best-effort, never failing the
+  extraction; parse-flow photos (no item yet) are left alone. The
+  client's patchPhotos stays as an idempotent second write. Timeout
+  120s → 300s (code + function-config.json; the Black tee's call
+  died at 123s). New `functions/extract.test.js` (5 tests: full pass
+  with token + link, mask rejection writes only status, parse photo
+  untouched, link patches the matching entry, no-op without a db).
+  Deployed: `extractGarment` updated (300s/1Gi, nodejs22 — the
+  fleet's nodejs20 count drops 15 → 14).
+- **PC-102 (#167) — SHIPPED 2026-11-26.** One toast per failure,
+  from any path. New `toastStdFailureOnce` (dedupe key item+reason,
+  10-min expiry) shared by the two foreground catches and the new
+  `toastNewStdFailures`, which the snapshot listener runs on every
+  update: a status→failed transition toasts once, only when recent
+  (lastAttemptAt within 10 min) and never for the open dialog's item
+  (its page already shows the PC-98 reason). `tests/pc102-standardize-toast.test.js`
+  now 16 tests (dedupe, expiry, ref, transition-once, old-failure
+  silence, open-item silence, processing silence).
+- **PC-108 (#173) — SHIPPED 2026-11-26.** One rule for the bulk
+  confirm button: new `syncBulkStartBtn` (label counts queued jobs,
+  enables only while something is queued), used by file selection,
+  the duplicate-skip path, and `bulkFinish` — which never touched
+  the button before. New `tests/pc108-bulk-button.test.js` (7 tests).
+- **PC-107 (#172) — SHIPPED 2026-11-26.** A missing photo shows a
+  named placeholder, never a blank box. New `photoPlaceholderDataUri`
+  (data-URI SVG: cream, dashed border, "Photo missing" + the item
+  name, truncated + XML-escaped); `showDisplayPhoto` uses it when an
+  item has no photos at all (it used to remove src). One photo-error
+  rule for every display photo: `handleDisplayPhotoError` (retry once
+  cache-busted, fall back to the original, then the placeholder) +
+  `handleDisplayPhotoLoad` (reset), wired by showDisplayPhoto on
+  every img it sets — replacing the itemPhoto-only listeners (same
+  behavior, every surface). One real bug caught by the tests en
+  route: the fallback did not consume the original's own retry, so a
+  dead original looped retry → fallback forever; the fallback now
+  records the original as the failing base. New
+  `tests/pc107-missing-photo.test.js` (11 tests); PC-103 pins updated
+  to the shared handler. The sweatshirt's photo restore itself is
+  still the founder's re-upload (no other copy exists).
+
+Suite: **823 passing, 0 fail** (full gate before deploy; was 786, +37).
+
+Deployed: `standardizeItem` + `extractGarment` updated;
+hosting release `1795763213256000` (2026-11-27T07:06:53Z); live HTML
+carries `toastStdFailureOnce` ×4, `syncBulkStartBtn` ×4,
+`photoPlaceholderDataUri` ×3, `handleDisplayPhotoError` ×3. Audit
+`scripts/verify-function-secrets.js`: 20 functions checked, secrets
++ config clean; only the 14 known nodejs20 runtimes remain (PC-99).
 
 ## Retest
 

@@ -108,7 +108,55 @@ async function saveRejectedRender(bucket, db, itemRef, uid, itemId, fluxBuffer, 
   }
 }
 
-async function runStandardizationPipeline({ db, bucket, uid, itemId, item, falApiKey, feedback = "", force = false, deadlineMs = PIPELINE_DEADLINE_MS }) {
+// PC-109: the pipeline input, resolved from one photo entry.
+// PC-94: standardize from the cutout, not the mirror photo. The
+// original photo of a worn garment includes the person, the room,
+// and the other pieces — FLUX renders from a scene, and the color
+// gate compares the scene median against the garment median, so it
+// can never pass (a perfect solid-burgundy render scored ΔE=49.9
+// against the founder's mirror photo). The cutout is garment-only:
+// FLUX sees the piece, and the gate measures the piece. Falls back
+// to the original photo when no passed render exists or its URL
+// cannot be minted (today's behavior).
+async function resolvePipelineInput(bucket, firstPhoto) {
+  if (firstPhoto.renderStoragePath && firstPhoto.renderStatus === "passed") {
+    try {
+      const imageUrl = await downloadUrlForPath(bucket, firstPhoto.renderStoragePath);
+      return { imageUrl, inputKind: "cutout" };
+    } catch (e) {
+      console.log(`[standardize-pipeline] cutout URL failed, using original: ${e.message}`);
+    }
+  }
+  return { imageUrl: firstPhoto.url, inputKind: "original" };
+}
+
+// PC-109: record which input a run uses, as soon as it is known.
+// The final transaction only writes inputKind on success; a failed
+// run left no trace of its input (the Black tee's doc had none).
+// Best-effort: never block the run.
+async function persistInputKind(itemRef, inputKind) {
+  try {
+    await itemRef.update({ "standardization.inputKind": inputKind });
+  } catch (e) {
+    console.log(`[standardize-pipeline] inputKind persist failed (non-fatal): ${e.message}`);
+  }
+}
+
+// PC-109: a fresh item's cutout is likely still in flight
+// (extractGarment takes ~2 min). createdAt is an ISO string; an
+// unparseable or missing value means "not fresh" — never wait on a
+// guess.
+const FRESH_ITEM_MS = 180 * 1000;
+const GRACE_WAIT_MS = 60 * 1000;
+const GRACE_POLL_MS = 5 * 1000;
+const GRACE_RESERVE_MS = 120 * 1000;
+function isFreshItem(item) {
+  const createdMs = item && item.createdAt ? Date.parse(item.createdAt) : NaN;
+  if (!Number.isFinite(createdMs)) return false;
+  return Date.now() - createdMs < FRESH_ITEM_MS;
+}
+
+async function runStandardizationPipeline({ db, bucket, uid, itemId, item, falApiKey, feedback = "", force = false, deadlineMs = PIPELINE_DEADLINE_MS, sleepMs = null }) {
   const photos = item.photos || [];
   if (!photos.length || !photos[0].url) {
     throw new Error("No photo URL on item");
@@ -116,33 +164,67 @@ async function runStandardizationPipeline({ db, bucket, uid, itemId, item, falAp
   if (!falApiKey) {
     throw new Error("FAL_API_KEY not configured");
   }
-  // PC-94: standardize from the cutout, not the mirror photo. The
-  // original photo of a worn garment includes the person, the room,
-  // and the other pieces — FLUX renders from a scene, and the color
-  // gate compares the scene median against the garment median, so it
-  // can never pass (a perfect solid-burgundy render scored ΔE=49.9
-  // against the founder's mirror photo). The cutout is garment-only:
-  // FLUX sees the piece, and the gate measures the piece. Falls back
-  // to the original photo when no passed render exists or its URL
-  // cannot be minted (today's behavior).
-  let imageUrl = photos[0].url;
-  let inputKind = "original";
-  const firstPhoto = photos[0];
-  if (firstPhoto.renderStoragePath && firstPhoto.renderStatus === "passed") {
-    try {
-      imageUrl = await downloadUrlForPath(bucket, firstPhoto.renderStoragePath);
-      inputKind = "cutout";
-    } catch (e) {
-      console.log(`[standardize-pipeline] cutout URL failed, using original: ${e.message}`);
-    }
-  }
+  // PC-109: the input is resolved per attempt, not once. The direct
+  // call fires at creation, but the cutout takes ~2 min (extractGarment)
+  // — resolving once at pipeline start snapshots "original" for a
+  // single-item add and standardizes the scene (the PC-94 defect, back
+  // through timing). So the input is a live value: resolve it now,
+  // wait briefly for the render when the item is fresh, and re-check
+  // the doc before every later attempt.
   const itemRef = db.collection("users").doc(uid).collection("items").doc(itemId);
   const pipelineStartedAt = Date.now();
+  const sleep = sleepMs || ((ms) => new Promise((r) => setTimeout(r, ms)));
+  let { imageUrl, inputKind } = await resolvePipelineInput(bucket, photos[0]);
+
+  // Grace wait (attempt 1 only, never on a forced run): the item was
+  // just created, so its cutout is likely in flight. Poll the doc for
+  // a passed render for up to 60s — bounded by the pipeline deadline
+  // (keep 120s in reserve for at least one FLUX attempt + SAM).
+  if (inputKind === "original" && !force && isFreshItem(item)) {
+    const waitEnd = pipelineStartedAt + GRACE_WAIT_MS;
+    while (Date.now() < waitEnd && Date.now() - pipelineStartedAt < deadlineMs - GRACE_RESERVE_MS) {
+      await sleep(GRACE_POLL_MS);
+      try {
+        const snap = await itemRef.get();
+        const fresh = snap && snap.exists ? (snap.data() || {}) : {};
+        const freshPhoto = (fresh.photos || [])[0] || {};
+        if (freshPhoto.renderStoragePath && freshPhoto.renderStatus === "passed") {
+          const resolved = await resolvePipelineInput(bucket, freshPhoto);
+          if (resolved.inputKind === "cutout") {
+            imageUrl = resolved.imageUrl;
+            inputKind = resolved.inputKind;
+            console.log(`[standardize-pipeline] cutout landed during grace wait, using it`);
+            break;
+          }
+        }
+      } catch (e) {
+        console.log(`[standardize-pipeline] grace-wait read failed (non-fatal): ${e.message}`);
+        break;
+      }
+    }
+  }
+  // Persist which input the run uses, as soon as it is known — the
+  // final transaction only writes it on success, and a failed run
+  // left no trace of its input (the Black tee's doc had no inputKind).
+  // Best-effort: never block the run.
+  await persistInputKind(itemRef, inputKind);
 
   // 1. FLUX standardization, with quality-gate retries.
   // Each attempt re-runs FLUX (fresh input, rebuilt prompt — no prior-render context).
-  // The input is fetched once: the anchor and the gates both read it.
-  const inputBuffer = Buffer.from(await (await fetch(imageUrl)).arrayBuffer());
+  // The input buffer and the anchor follow the live input: they are
+  // reloaded whenever the input switches to the cutout.
+  let inputBuffer = Buffer.from(await (await fetch(imageUrl)).arrayBuffer());
+  async function reloadInput(newImageUrl) {
+    imageUrl = newImageUrl;
+    inputBuffer = Buffer.from(await (await fetch(imageUrl)).arrayBuffer());
+    try {
+      const { dominantColor } = require("./standardize");
+      colorAnchor = await dominantColor(inputBuffer);
+    } catch (e) {
+      console.log(`[standardize-pipeline] color anchor failed (non-fatal): ${e.message}`);
+      colorAnchor = null;
+    }
+  }
   // PC-106: the already-clean check used to live only in the trigger
   // (now deleted). It answers "is the SOURCE photo already a studio
   // shot?" — so it reads the original photo, never the cutout: a cutout
@@ -191,6 +273,29 @@ async function runStandardizationPipeline({ db, bucket, uid, itemId, item, falAp
     if (attempt > 1 && Date.now() - pipelineStartedAt > deadlineMs) {
       await saveRejectedRender(bucket, db, itemRef, uid, itemId, fluxBuffer, lastGateReason);
       throw new Error(`standardization_timeout: ${lastGateReason}`);
+    }
+    // PC-109: re-check the doc before a later attempt — the cutout
+    // may have landed since attempt 1. If it did, switch the input
+    // and reset the systematic-stop comparison (a different input
+    // means the failure is not "the same failure").
+    if (attempt > 1 && inputKind === "original") {
+      try {
+        const snap = await itemRef.get();
+        const fresh = snap && snap.exists ? (snap.data() || {}) : {};
+        const freshPhoto = (fresh.photos || [])[0] || {};
+        if (freshPhoto.renderStoragePath && freshPhoto.renderStatus === "passed") {
+          const resolved = await resolvePipelineInput(bucket, freshPhoto);
+          if (resolved.inputKind === "cutout") {
+            await reloadInput(resolved.imageUrl);
+            inputKind = resolved.inputKind;
+            prevGateSignature = null;
+            await persistInputKind(itemRef, inputKind);
+            console.log(`[standardize-pipeline] cutout landed before attempt ${attempt}, switching input`);
+          }
+        }
+      } catch (e) {
+        console.log(`[standardize-pipeline] input re-check failed (non-fatal): ${e.message}`);
+      }
     }
     outputUrl = await runFluxStandardization(imageUrl, falApiKey, item, feedback, colorAnchor, {
       // PC-105: the poll shares the pipeline budget — stop inside
@@ -296,4 +401,4 @@ async function runStandardizationPipeline({ db, bucket, uid, itemId, item, falAp
   return { ready: false, pendingReview: true, standardizedUrl: stdUrl, inputKind };
 }
 
-module.exports = { runStandardizationPipeline, MAX_GATE_RETRIES, PIPELINE_DEADLINE_MS, downloadUrlForPath, gateSignature, saveRejectedRender };
+module.exports = { runStandardizationPipeline, MAX_GATE_RETRIES, PIPELINE_DEADLINE_MS, downloadUrlForPath, gateSignature, saveRejectedRender, resolvePipelineInput, persistInputKind, isFreshItem, GRACE_WAIT_MS, GRACE_POLL_MS, GRACE_RESERVE_MS, FRESH_ITEM_MS };

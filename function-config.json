@@ -11,7 +11,7 @@
   },
   "extractGarment": {
     "availableMemory": "1Gi",
-    "timeoutSeconds": 120
+    "timeoutSeconds": 300
   },
   "parseOutfitPhoto": {
     "availableMemory": "512Mi",

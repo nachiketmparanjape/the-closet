@@ -185,7 +185,12 @@ exports.describeItem = onCall(
 exports.extractGarment = onCall(
   {
     region: "us-central1",
-    timeoutSeconds: 120,
+    // PC-110: 120s → 300s. A large iPhone photo (4.3 MB in, 19.5 MB
+    // render out) overruns 120s in the embedding + vision check
+    // after the save — the Black tee's call died at 123s. The
+    // server-side link (linkRenderToItem) makes a timeout survivable,
+    // but the timeout itself should fit the work.
+    timeoutSeconds: 300,
     memory: "1GiB",
     maxInstances: 5,
     secrets: ["REPLICATE_API_TOKEN"],
@@ -204,6 +209,7 @@ exports.extractGarment = onCall(
       }
       const result = await extractGarmentPhoto(uid, data.storagePath, {
         bucket: getStorage().bucket(),
+        db: getFirestore(),
         apiKey: process.env.REPLICATE_API_TOKEN || null,
         correlationId,
         recordUsage: makeUsageRecorder(getFirestore()),

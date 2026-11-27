@@ -59,10 +59,16 @@ async function maskPng() {
 }
 
 // --- fakes -----------------------------------------------------------------
-function fakeDb() {
+function fakeDb(getData) {
   const updates = [];
   const txUpdates = [];
-  const itemRef = { update: async (data) => { updates.push(data); } };
+  const itemRef = {
+    update: async (data) => { updates.push(data); },
+    // PC-109: the pipeline re-reads the doc (grace wait + per-attempt
+    // re-check). getData supplies the current doc; without it the doc
+    // does not exist and the re-check finds nothing.
+    get: async () => (typeof getData === "function" ? getData() : { exists: false, data: () => null }),
+  };
   return {
     updates, txUpdates, itemRef,
     collection: () => ({ doc: () => ({ collection: () => ({ doc: () => itemRef }) }) }),
@@ -220,8 +226,12 @@ describe("PC-97: systematic retries stop, evidence is kept, time is budgeted", f
     assert.ok(rejected, "rejected render saved as evidence");
     assert.equal(rejected.contentType, "image/png");
     assert.ok(rejected.buffer.equals(fluxOutput), "the saved render is the failed FLUX output");
-    assert.equal(db.updates[0]["standardization.lastRejectedStoragePath"], "users/u1/items/it1/standardized-rejected.png");
-    assert.match(db.updates[0]["standardization.lastRejectedReason"], /color/);
+    // PC-109: the inputKind persist lands before the loop, so the
+    // rejected-render write is not updates[0] any more — find it.
+    const rejectedUpdate = db.updates.find((u) => u["standardization.lastRejectedStoragePath"]);
+    assert.ok(rejectedUpdate, "rejected render path recorded");
+    assert.equal(rejectedUpdate["standardization.lastRejectedStoragePath"], "users/u1/items/it1/standardized-rejected.png");
+    assert.match(rejectedUpdate["standardization.lastRejectedReason"], /color/);
   });
 
   it("never starts an attempt past its time budget", async function () {
@@ -352,8 +362,9 @@ describe("PC-106: already-clean check lives in the pipeline", function () {
     });
     assert.equal(res.skipped, true);
     assert.equal(fluxSubmits.length, 0, "no FLUX run for a studio shot");
-    assert.equal(db.updates[0]["standardization.status"], "already_clean");
-    assert.ok(db.updates[0]["standardization.reason"]);
+    const cleanUpdate = db.updates.find((u) => u["standardization.status"] === "already_clean");
+    assert.ok(cleanUpdate, "already_clean recorded");
+    assert.ok(cleanUpdate["standardization.reason"]);
   });
 
   it("force bypasses the clean check and runs FLUX", async function () {
@@ -409,5 +420,143 @@ describe("PC-106: already-clean check lives in the pipeline", function () {
     assert.equal(res.skipped, true);
     assert.equal(res.inputKind, "original");
     assert.equal(fluxSubmits.length, 0);
+  });
+});
+
+describe("PC-109: the pipeline input follows the cutout", function () {
+  function freshItemNoRender() {
+    return {
+      name: "Navy crew-neck t-shirt",
+      category: "Tops",
+      createdAt: new Date().toISOString(),
+      photos: [{ url: ORIGINAL_URL, storagePath: "users/u1/outfit-photos/x.jpg" }],
+    };
+  }
+  function oldItemNoRender() {
+    const item = freshItemNoRender();
+    item.createdAt = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    return item;
+  }
+  function withRender(item) {
+    const copy = JSON.parse(JSON.stringify(item));
+    copy.photos[0].renderStoragePath = "users/u1/renders/abc.png";
+    copy.photos[0].renderStatus = "passed";
+    return copy;
+  }
+  const CUTOUT_URL = "https://firebasestorage.googleapis.com/v0/b/test-bucket/o/users%2Fu1%2Frenders%2Fabc.png?alt=media&token=tok-1";
+
+  it("grace wait: a fresh item's cutout lands during the wait, attempt 1 uses it", async function () {
+    const cutoutBytes = await garmentCutout(BURGUNDY);
+    const originalBytes = await garmentOnRoom(BURGUNDY);
+    const fluxOutput = await garmentOnWhite(BURGUNDY);
+    const maskBytes = await maskPng();
+    const { fetch, fluxSubmits } = makeFetch({ fluxOutput, cutoutBytes, originalBytes, maskBytes });
+    global.fetch = fetch;
+    // The doc has no render at first; the first sleep (grace-wait
+    // poll) flips it to the rendered doc, as extractGarment landing.
+    const item = freshItemNoRender();
+    let doc = item;
+    const db = fakeDb(() => ({ exists: true, data: () => doc }));
+    const bucket = fakeBucket();
+    let sleeps = 0;
+    const sleepMs = async () => { sleeps++; doc = withRender(item); };
+    const res = await runStandardizationPipeline({
+      db, bucket, uid: "u1", itemId: "it1", item, falApiKey: "fake-key", sleepMs,
+    });
+    assert.ok(sleeps >= 1, "the grace wait polled");
+    assert.equal(res.pendingReview, true);
+    assert.equal(res.inputKind, "cutout");
+    assert.equal(fluxSubmits[0].image_url, CUTOUT_URL);
+    assert.ok(db.updates.some((u) => u["standardization.inputKind"] === "cutout"), "inputKind cutout persisted");
+  });
+
+  it("grace wait: no cutout appears, the run proceeds with the original", async function () {
+    const cutoutBytes = await garmentCutout(BURGUNDY);
+    const originalBytes = await garmentOnRoom(BURGUNDY);
+    const fluxOutput = await garmentOnWhite(BURGUNDY);
+    const maskBytes = await maskPng();
+    const { fetch, fluxSubmits } = makeFetch({ fluxOutput, cutoutBytes, originalBytes, maskBytes });
+    global.fetch = fetch;
+    const item = freshItemNoRender();
+    const db = fakeDb(() => ({ exists: true, data: () => item }));
+    const bucket = fakeBucket();
+    let sleeps = 0;
+    const sleepMs = async () => { sleeps++; }; // instant: the 60s wait spins 12 polls and gives up
+    const res = await runStandardizationPipeline({
+      db, bucket, uid: "u1", itemId: "it1", item, falApiKey: "fake-key", sleepMs,
+    });
+    assert.ok(sleeps >= 1, "the grace wait polled and gave up");
+    assert.equal(res.pendingReview, true);
+    assert.equal(res.inputKind, "original");
+    assert.equal(fluxSubmits[0].image_url, ORIGINAL_URL);
+  });
+
+  it("grace wait is skipped for an old item — the run starts at once", async function () {
+    const cutoutBytes = await garmentCutout(BURGUNDY);
+    const originalBytes = await garmentOnRoom(BURGUNDY);
+    const fluxOutput = await garmentOnWhite(BURGUNDY);
+    const maskBytes = await maskPng();
+    const { fetch } = makeFetch({ fluxOutput, cutoutBytes, originalBytes, maskBytes });
+    global.fetch = fetch;
+    const item = oldItemNoRender();
+    const db = fakeDb(() => ({ exists: true, data: () => item }));
+    const bucket = fakeBucket();
+    let sleeps = 0;
+    const sleepMs = async () => { sleeps++; };
+    const res = await runStandardizationPipeline({
+      db, bucket, uid: "u1", itemId: "it1", item, falApiKey: "fake-key", sleepMs,
+    });
+    assert.equal(sleeps, 0, "no grace wait for an old item");
+    assert.equal(res.inputKind, "original");
+  });
+
+  it("cutout lands before attempt 2: attempt 2 uses it and the stop comparison resets", async function () {
+    const cutoutBytes = await garmentCutout(BURGUNDY);
+    const originalBytes = await garmentOnRoom(BURGUNDY);
+    // FLUX draws GREEN for a burgundy input: every attempt fails the
+    // color gate. Attempt 1 runs on the original; the cutout lands
+    // before attempt 2, so attempt 2 runs on it — and because the
+    // input changed, the systematic stop must NOT fire on attempt 2
+    // (the failure is not "the same failure" on a new input).
+    const fluxOutput = await garmentOnWhite(GREEN);
+    const maskBytes = await maskPng();
+    const { fetch, fluxSubmits } = makeFetch({ fluxOutput, cutoutBytes, originalBytes, maskBytes });
+    global.fetch = fetch;
+    const item = oldItemNoRender();
+    // The re-check before attempt 2 is the first get() call — by then
+    // the cutout has landed, so the doc carries the render.
+    const db = fakeDb(() => ({ exists: true, data: () => withRender(item) }));
+    const bucket = fakeBucket();
+    await assert.rejects(
+      runStandardizationPipeline({
+        db, bucket, uid: "u1", itemId: "it1", item, falApiKey: "fake-key",
+        sleepMs: async () => {},
+      }),
+      /systematic_gate_failure: color/
+    );
+    assert.equal(fluxSubmits.length, 3, "attempt 2 must run on the new input, attempt 3 stops");
+    assert.equal(fluxSubmits[0].image_url, ORIGINAL_URL);
+    assert.equal(fluxSubmits[1].image_url, CUTOUT_URL);
+    assert.equal(fluxSubmits[2].image_url, CUTOUT_URL);
+    assert.ok(db.updates.some((u) => u["standardization.inputKind"] === "cutout"), "inputKind cutout persisted on switch");
+  });
+
+  it("inputKind is persisted even when the run fails", async function () {
+    const cutoutBytes = await garmentCutout(BURGUNDY);
+    const originalBytes = await garmentOnRoom(BURGUNDY);
+    const fluxOutput = await garmentOnWhite(GREEN);
+    const maskBytes = await maskPng();
+    const { fetch } = makeFetch({ fluxOutput, cutoutBytes, originalBytes, maskBytes });
+    global.fetch = fetch;
+    const db = fakeDb();
+    const bucket = fakeBucket();
+    await assert.rejects(
+      runStandardizationPipeline({
+        db, bucket, uid: "u1", itemId: "it1", item: itemWithRender(), falApiKey: "fake-key",
+        sleepMs: async () => {},
+      }),
+      /systematic_gate_failure/
+    );
+    assert.ok(db.updates.some((u) => u["standardization.inputKind"] === "cutout"), "a failed run still records its input");
   });
 });

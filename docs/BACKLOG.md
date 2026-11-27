@@ -1786,7 +1786,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **In scope:** a failure toast names the piece and action it belongs to ("The burgundy sweatshirt's AI version didn't come out right"), so it can never read as the foreground action failing; or the standardize failure is not toasted globally at all when the item page already carries the reason (PC-98 note). The upload flow itself needs no change — it already succeeds.
 - **Done looks like:** a background standardization failure never appears as an upload error; the upload screen shows only upload outcomes.
 - **Effort:** S/M.
-- **Status:** Filed 2026-11-26 (Round 5). Issue #167. Investigation complete the same day — cause proven, fix scoped. In Sprint 38 — **SHIPPED 2026-11-26** (new `standardizeFailureToast(name, err)`; both standardize catch sites toast the named failure; 7 tests; hosting release `1795749366797000`, live markers verified). Retest 2026-11-26 (Round 6): FAILS — two background standardization failures occurred (single-add "wrong shape", parse 2 "wrong color") and no toast naming the piece was observed in either window; the only toast was the duplicate-detection toast.
+- **Status:** Filed 2026-11-26 (Round 5). Issue #167. Investigation complete the same day — cause proven, fix scoped. In Sprint 38 — **SHIPPED 2026-11-26** (new `standardizeFailureToast(name, err)`; both standardize catch sites toast the named failure; 7 tests; hosting release `1795749366797000`, live markers verified). Retest 2026-11-26 (Round 6): FAILS — two background standardization failures occurred (single-add "wrong shape", parse 2 "wrong color") and no toast naming the piece was observed in either window; the only toast was the duplicate-detection toast. **SHIPPED 2026-11-26 (Sprint 39) — the background half.** One toast per failure from any path: `toastStdFailureOnce` (dedupe item+reason, 10-min expiry) shared by the two foreground catches and the new `toastNewStdFailures`, which the snapshot listener runs on every update (recent failures only, never the open dialog's item). 16 tests in `tests/pc102-standardize-toast.test.js`.
 
 ### PC-103: After a failed standardization the item page's main photo goes blank (S/M)
 
@@ -1848,7 +1848,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   packing rows all show a real photo; a missing photo shows a
   placeholder, never a blank box.
 - **Effort:** S/M.
-- **Status:** Filed 2026-11-26 (Round 6). Issue #172. Files confirmed deleted the same night (see above); repair is the founder re-adding the photo from his phone.
+- **Status:** Filed 2026-11-26 (Round 6). Issue #172. Files confirmed deleted the same night (see above); repair is the founder re-adding the photo from his phone. **SHIPPED 2026-11-26 (Sprint 39) — the code half.** A missing photo now shows a named placeholder (`photoPlaceholderDataUri`, data-URI SVG) instead of a blank box, on every display-photo surface; one shared error rule (`handleDisplayPhotoError`: retry once, fall back to the original, then the placeholder) replaces the itemPhoto-only listeners. The photo restore itself still needs the founder's re-upload.
 
 ### PC-108: Bulk add "Add N pieces" stays disabled after the files show Done (S)
 
@@ -1867,7 +1867,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   enables immediately; closing the dialog never orphans a
   stuck state.
 - **Effort:** S.
-- **Status:** Filed 2026-11-26 (Round 6). Issue #173. Cause proven the same night (see above).
+- **Status:** Filed 2026-11-26 (Round 6). Issue #173. Cause proven the same night (see above). **SHIPPED 2026-11-26 (Sprint 39).** One rule for the button (`syncBulkStartBtn`, used by file selection, duplicate-skip, and `bulkFinish`); 7 new tests.
 
 ### PC-109: The single-item direct call races the cutout — the pipeline standardizes the original photo (M)
 
@@ -1878,7 +1878,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **In scope:** the pipeline waits briefly for the render, or re-checks for the cutout on each retry attempt, or the client fires the direct call only after the cutout lands — whichever makes single-item adds standardize from the cutout. The sweeper persists `inputKind` on the runs it does.
 - **Done looks like:** a single-item add of a studio shot standardizes from the cutout (`standardization.inputKind === "cutout"` on the item); a run that started before the cutout existed picks it up on a later attempt instead of standardizing the original.
 - **Effort:** M.
-- **Status:** Filed 2026-11-26 (Round 6 investigation). Issue #174.
+- **Status:** Filed 2026-11-26 (Round 6 investigation). Issue #174. **SHIPPED 2026-11-26 (Sprint 39).** The input is live now: `resolvePipelineInput` resolves cutout-vs-original per attempt; a fresh item waits up to 60s for the render before attempt 1 (deadline-aware, skipped on force); the doc is re-checked before every later attempt (buffer + anchor reloaded, systematic-stop comparison reset on switch); inputKind is persisted as soon as it is known, so failed runs leave a trace. 5 new pipeline tests. Deployed in `standardizeItem`.
 
 ### PC-110: extractGarment overruns its timeout and orphans the render link — the cutout is made but never shows (M)
 
@@ -1889,4 +1889,4 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **In scope:** the server writes the render fields to the item doc itself (like the pipeline does), so a client timeout cannot orphan a render; and/or raise the 120s timeout; and/or the client retries the link step (re-fetch, or derive the deterministic render path and mint it as the PC-93 backfill does). The render should also be smaller/faster — the 19.5 MB full-resolution PNG is most of the cost.
 - **Done looks like:** a cutout that the server saved always shows on the item, even when the phone's call to the server times out; no item sits with a render file in Storage and no link in its photo entry.
 - **Effort:** M.
-- **Status:** Filed 2026-11-26. Issue #175. The Black tee's cutout was linked by hand the same night.
+- **Status:** Filed 2026-11-26. Issue #175. The Black tee's cutout was linked by hand the same night. **SHIPPED 2026-11-26 (Sprint 39).** The server owns the link now (`linkRenderToItem` writes the render fields to the item doc; the client's patch stays as an idempotent second write) and mints the download token at save time, so a saved render is reachable from the moment it exists. Timeout 120s → 300s (code + function-config.json). 5 new tests in `functions/extract.test.js`. Deployed in `extractGarment` (now nodejs22; fleet nodejs20 count 15 → 14).
