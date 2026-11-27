@@ -1708,3 +1708,31 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **Effort:** S.
 - **Status:** Filed 2026-11-26 (founder report). In Sprint 37 — Issue #163.
   proposed (direct founder order 2026-11-26).
+
+### PC-99: Most Cloud Functions still run retired nodejs20 and cannot be updated (S/M) — issue #164
+
+- **Origin:** PC-96 audit (`scripts/verify-function-secrets.js`),
+  2026-11-26. Google retired nodejs20: any update to a nodejs20
+  function fails with INVALID_ARGUMENT, including a secret bind.
+- **Problem:** 19 of 21 deployed functions still run nodejs20
+  (parseOutfitPhoto, shopCheck, standardizeItem, reflectOutfit,
+  advanceParsesHttp, approveStandardization, listOutfitParses,
+  discardOutfitParse, spikeRun, fetchLinkItem, extractGarment,
+  startOutfitParse, finishOutfitParse, retryOutfitGarment,
+  critiqueOutfit, describeItem, planPacking, pollOutfitParse,
+  rejectStandardization). The Nov 21 migration set nodejs22 in
+  `deploy-update.js`, but only functions redeployed since then
+  moved. The next fix to any of the 19 will fail at deploy time
+  until its runtime is bumped — the PC-96 trigger patch hit
+  exactly this wall and had to ride the bump in the same call.
+- **In scope:** redeploy each remaining function via
+  `deploy-update.js` (no code change; the script already PATCHes
+  `runtime: "nodejs22"`), verifying each lands ACTIVE on
+  nodejs22; re-run the audit to zero mismatches. The in-flow
+  functions (extractGarment, standardizeItem, parse functions)
+  bump inside Sprint 37's own deploys and do not wait for this
+  card.
+- **Done looks like:** the audit reports zero retired runtimes
+  across the fleet.
+- **Effort:** S/M.
+- **Status:** Filed 2026-11-26 (PC-96 audit). Next planning walk.
