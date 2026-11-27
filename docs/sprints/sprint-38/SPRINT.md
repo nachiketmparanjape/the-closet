@@ -77,8 +77,8 @@ shopCheck, autoStandardizeItem).
 
 ## Build results
 
-- **PC-101 (#166) — wiring rebuilt; live proof pending.** The
-  function was deleted and recreated with its Firestore trigger
+- **PC-101 (#166) — wiring rebuilt twice; live proof still failing.**
+  The function was deleted and recreated with its Firestore trigger
   (document `users/{uid}/items/{itemId}`, event
   `google.cloud.firestore.document.v1.created`, triggerRegion
   `nam5` — the (default) database lives in nam5, not
@@ -88,10 +88,29 @@ shopCheck, autoStandardizeItem).
   region must be the database's region; (3) the REST create
   grants nobody publisher on the trigger's Pub/Sub topic — its
   IAM was empty, so no event could publish; `roles/pubsub.publisher`
-  is now granted to both the Eventarc and the Firestore service
-  agents (verified by read-back). Live tests #1–#3 (fresh items,
-  donor photo) did NOT fire; test #4 is running after the grants
-  had time to settle. `deploy-create.js` now grants the topic
+  is now granted to all four plausible publishers (Eventarc,
+  Firestore, GCF admin robot, compute SA — verified by
+  read-back). Live tests #1–#5 did NOT fire. Test #6 ran after
+  the function + trigger were FULLY recreated via
+  `deploy-create.js` (new topic
+  `eventarc-nam5-autostandardizeitem-348874-892`) — still did
+  NOT fire. **Decisive correction (2026-11-26, log history): the
+  trigger NEVER fired, not once — Cloud Run logs Oct 28–Nov 27
+  show ZERO invocations, including the CLI era (Oct 28–Nov 5).
+  The "Nov 5 recreate unwired it" theory is wrong; the 55
+  already_clean marks came from manual callable runs, not the
+  trigger.** The trigger cannot be recreated through the
+  Eventarc API directly (proven by its own error: a
+  cloudFunction destination "is not supported on the Eventarc
+  API" — it must be set at function deploy). The source probe
+  (a Pub/Sub-destination trigger) could not run: Pub/Sub is not
+  a valid trigger destination, only a transport. Every
+  checkable resource is correct; the break is in the
+  Firestore→Eventarc source link, unobservable from this VM
+  (Monitoring hangs; pull is unsupported on the managed push
+  subscription). Next: Firebase Console inspection of the
+  trigger's delivery, or replace the trigger with a direct call
+  (founder decision). `deploy-create.js` now grants the topic
   publisher at create time for any future event-triggered
   function, and `scripts/verify-function-secrets.js` audits
   eventTrigger presence. `function-config.json` is the single

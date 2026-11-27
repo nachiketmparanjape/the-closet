@@ -1210,8 +1210,12 @@ and awaiting its live proof. Suite 770 passing.
   REST create grants nobody publisher on the trigger's Pub/Sub
   topic, so no event could publish. Both service agents are now
   publishers, and `deploy-create.js` grants the topic publisher
-  at create time for any future event function. Live proof
-  pending — three fresh-item tests did not fire; test #4 is
-  running.
+  at create time for any future event function. **Live proof
+  still failing after six fresh-item tests — and the log
+  history proves the trigger NEVER fired, not once, including
+  the CLI era (zero Cloud Run invocations Oct 28–Nov 27). The
+  Nov 5 theory is wrong; the break is in the Firestore→Eventarc
+  source link, unobservable from this VM. Next: console
+  inspection, or replace the trigger with a direct call.**
 
 Verification is QA Round 6 after the trigger proof lands.
