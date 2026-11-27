@@ -108,5 +108,43 @@ remain (PC-99).
 
 ## Retest
 
-(TBD — QA Round 10 after the build; the founder's manual
-checks after QA, per the loop design.)
+QA Round 10, Fri Nov 27 8:14–8:18 AM PST (4 min, signed in).
+No P0, no P1, three P2s parked. Full report:
+`~/workspace/goals/one-man-studio-operating-system/hidden_files/qa-rounds/2026-11-27-round10.md`.
+
+- **PC-102 (#167) — PASS.** The forced failure (blank photo +
+  manual Generate) toasted exactly once from the item page;
+  the retry toasted exactly once from the Wardrobe tab; a
+  toast fired for the max-attempts failure too. No duplicate
+  toasts in either location. Toast lifecycle timed: the
+  "Generating…" toast was gone within ~5 s (3 s auto-hide +
+  fade) — Round 9's ~5 min linger was the inline
+  "Standardizing…" status line, not the toast. The "Try
+  again" two-tap is the designed cost confirm, confirmed as
+  not a bug. VERIFIED.
+- **PC-111 (#176) — gate-error case NOT OBSERVED** again
+  (could not be forced through normal use). The forced gate
+  failure produced no render and nothing reached review,
+  which is consistent with the expectation.
+- **"Saturday, Nov 14" label — UNTESTED.** Not reachable
+  without deleting the real Nov 25 wear.
+- **P2s parked:** the name typed at upload does not become
+  the display name until a separate Save (recurs — the
+  failure toast then names the piece "Unidentified item");
+  the failure toast truncates the piece name at " — " (the
+  retry toast read "QA TEST R10" for "QA TEST R10 — Blank
+  white"); the edit dialog lingers briefly after the item is
+  deleted (cosmetic).
+
+Costs: ~$0.06 stated (two runs at ~$0.03; each run retries
+internally to max attempts, so the real backend cost may be
+higher, unitemized). Cleanup verified: the test item's state
+was established before delete (max-attempts failed, no
+render); wardrobe back to 72, outfits 10, trips 0. The Nov
+25 wear and the Olive joggers' pending render are untouched.
+
+This round does NOT cover a Friday weekly round (next Friday
+round Dec 11). Round 11 scope: the PC-111 gate-error case
+if it can be forced; the "Saturday, Nov 14" label via the
+founder's phone check; the P2s above if they become cards at
+a planning walk.

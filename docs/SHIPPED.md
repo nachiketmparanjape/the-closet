@@ -1270,3 +1270,5 @@ Verification is QA Round 9 (2026-11-27): the forced failure worked and the first
 ## Sprint 41 — A new failure must be heard, even from the same piece (2026-11-27)
 
 PC-102 (#167) follow-up. Suite 842 passing, 0 fail (was 839, +3). Deployed: hosting release 1795796038328000 (client only). The dedupe is per run now: a new run clears the toast entry (both foreground call sites + the snapshot listener on a processing transition), so a retry's failure toasts once and replaces the "Generating…" toast. Awaiting QA Round 10.
+
+Verification is QA Round 10 (2026-11-27): PC-102 PASS — exactly one failure toast per run, in both locations, including the max-attempts failure; the "Generating…" toast hides within ~5 s (Round 9's linger was the inline "Standardizing…" status line). The "Try again" two-tap is confirmed as the designed cost confirm. The PC-111 gate-error case still could not be forced live; the "Saturday, Nov 14" label is still untested.
