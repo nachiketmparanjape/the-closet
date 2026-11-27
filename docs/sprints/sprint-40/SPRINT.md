@@ -148,11 +148,58 @@ remain (PC-99).
 
 ## Retest
 
-(TBD — QA Round 8 after the build; the founder's manual checks
-after QA, per the loop design. Retest targets: a background
-failure toasts the piece by name once, from the item page and
-from elsewhere; a manual retry on a failed item reaches the
-server; a gate error never presents a render for approval; the
-sweatshirt's item page shows the named placeholder even while
-the wardrobe churns; #138 rollover; the "Saturday, Nov 14"
-label.)
+QA Round 8, Thu Nov 26 11:54 PM – Fri Nov 27 12:06 AM PST
+(11 min, signed in, spanning midnight). No P0, one P1 open
+(unverified), four P2s parked. Full report:
+`~/workspace/goals/one-man-studio-operating-system/hidden_files/qa-rounds/2026-11-26-round8.md`.
+
+- **PC-102 (#167) — UNVERIFIED.** No failure toast was observed
+  anywhere — because no run failed. Both photos that failed the
+  color gate in Round 7 passed this round (2 automatic runs + 1
+  manual retry, all succeeded). The manual-retry start and the
+  max-attempts toast remain untested. Note: this says nothing
+  about Sprint 40 changing gate behavior — the gates' thresholds
+  are untouched by Sprint 40 (only the error branches changed),
+  and FLUX is nondeterministic (proven Round 6: one photo, three
+  draws, three outcomes). The toast requirement is still open.
+  Round 9 plan: force a failure deterministically — add a blank
+  photo and tap Generate (force bypasses the already-clean
+  check); the color gate fails "no-garment-pixels" and the toast
+  must fire. If that still does not reproduce, the card stays
+  open until a real failure toasts (or does not) in normal use.
+  Open question from the round (unconfirmed, not a bug): the
+  bulk-added red tee showed a "Generate standardized view"
+  button and no pending render ~3 min after its bulk add
+  finished — its state was not established before deletion,
+  so if that run had failed, no toast was seen either. Round 9
+  must establish an item's state before deleting it.
+- **PC-107 (#172) — PASS.** The sweatshirt's dialog showed the
+  named placeholder at every snapshot through a bulk add of 2
+  pieces mid-run (00:02–00:04), and it stayed settled after the
+  churn stopped. No blank box, no flicker. Its attempts remain
+  at 6, untouched.
+- **PC-111 (#176) — PASS.** Pending render URLs are run-stamped
+  (`standardized-pending-<digits>.png`, two items verified);
+  after the second standardization landed, the first item's
+  review still showed its own render — no overwrite. The
+  gate-error case was not observed live (5 runs, none hit a
+  gate error).
+- **#138 — PASS.** The app was left open across midnight; Home
+  then read "Good morning." and "Friday, November 27".
+- **"Saturday, Nov 14" label — UNTESTED.** Not reachable
+  without deleting the real Nov 25 wear.
+- **P2s parked:** same red photo gets different colors/names in
+  the two add flows (single: "Dark brown", #221111; bulk: "Red");
+  the display name differs from the saved name (recurs); the
+  "Piece added" toast stays visible 4+ minutes (recurs); the
+  bulk red tee's unestablished state (above).
+
+Costs: $0.03 (one manual retry). Cleanup verified: 4 test
+items deleted; wardrobe back to 72, outfits 10, trips 0. The
+Nov 25 wear and the Olive joggers' pending render are
+untouched.
+
+This round does NOT cover a Friday weekly round (next Friday
+round Dec 11). Round 9 scope: retest PC-102 with the forced
+failure above; the PC-111 gate-error case if it can be forced;
+the "Saturday, Nov 14" label via the founder's phone check.
