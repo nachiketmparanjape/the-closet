@@ -984,7 +984,7 @@ exports.standardizeItem = onCall(
       let processingCompleted = false;
       try {
       // Sprint 28 Card 1: shared pipeline (FLUX -> gates -> SAM -> upload).
-      // Same code the autoStandardizeItem trigger runs. No duplication.
+      // Same code the direct call (PC-106) uses. No duplication.
       const falApiKey = process.env.FAL_API_KEY;
       if (!falApiKey) {
         throw new Error("FAL_API_KEY not configured");
@@ -993,7 +993,7 @@ exports.standardizeItem = onCall(
       let result;
       try {
         result = await runStandardizationPipeline({
-          db, bucket, uid, itemId, item, falApiKey, feedback,
+          db, bucket, uid, itemId, item, falApiKey, feedback, force,
         });
       } catch (pipeErr) {
         await itemRef.update({
@@ -1003,6 +1003,16 @@ exports.standardizeItem = onCall(
         throw pipeErr;
       }
       const stdUrl = result.standardizedUrl;
+      // PC-106: the pipeline marked the source photo already-clean
+      // (studio shot) and ran no FLUX. Same skipped shape as the
+      // status-based early return above — no usage to record.
+      if (result.skipped) {
+        processingCompleted = true;
+        return finish("standardizeItem", correlationId, uid, start, {
+          skipped: true,
+          reason: result.reason || "already_clean",
+        });
+      }
 
       await flushAiUsage(recordUsage, usageBase, aiTracker.calls, { ok: true });
       processingCompleted = true;
@@ -1137,80 +1147,3 @@ exports.spikeRun = onRequest(
   spikeRunHandler
 );
 
-// PC-58 completion (2026-11-04): Passive standardization trigger.
-// When an item is created, automatically standardize it in the background
-// unless it's already clean (studio shot or cutout). Fire-and-forget from
-// the user's perspective — item creation never blocks on this.
-// Cost: $0.03/item (FLUX $0.025 + SAM $0.005). Skipped for items that
-// already have a standardization status (backfills, manual triggers).
-const { onDocumentCreated } = require("firebase-functions/v2/firestore");
-exports.autoStandardizeItem = onDocumentCreated(
-  {
-    document: "users/{uid}/items/{itemId}",
-    region: "us-central1",
-    timeoutSeconds: 300,
-    memory: "1GiB",
-    maxInstances: 5,
-    secrets: ["FAL_API_KEY"],
-  },
-  async (event) => {
-    const snap = event.data;
-    if (!snap) return;
-    const item = snap.data() || {};
-    const uid = event.params.uid;
-    const itemId = event.params.itemId;
-    // Skip if already has a standardization status (backfill, manual, retry).
-    if (item.standardization && item.standardization.status) return;
-    // Skip if no photos.
-    const photos = Array.isArray(item.photos) ? item.photos : [];
-    if (!photos.length) return;
-    // Check if the first photo is already clean (studio shot / cutout).
-    try {
-      const firstPhoto = photos[0];
-      const url = firstPhoto.renderUrl || firstPhoto.url;
-      if (!url) return;
-      const res = await fetch(url);
-      if (!res.ok) return;
-      const buf = Buffer.from(await res.arrayBuffer());
-      const clean = await isAlreadyClean(buf);
-      if (clean.isClean) {
-        await getFirestore().collection("users").doc(uid).collection("items").doc(itemId).update({
-          "standardization.status": "already_clean",
-          "standardization.reason": clean.reason,
-        });
-        return;
-      }
-    } catch (e) {
-      // If the clean check fails, proceed to standardize (conservative).
-    }
-    // Not clean — run the full pipeline (same code as the manual Generate).
-    // Mark processing first so the UI reflects it, then run. On failure,
-    // mark failed with the error (never stuck in processing — the sweeper
-    // also catches anything older than 30 min).
-    const db = getFirestore();
-    const itemRef = db.collection("users").doc(uid).collection("items").doc(itemId);
-    const falApiKey = process.env.FAL_API_KEY;
-    if (!falApiKey) {
-      console.log("[autoStandardizeItem] FAL_API_KEY not configured, skipping");
-      return;
-    }
-    await itemRef.update({
-      "standardization.status": "processing",
-      "standardization.attempts": 1,
-      "standardization.lastAttemptAt": new Date().toISOString(),
-    });
-    try {
-      const bucket = getStorage().bucket();
-      await runStandardizationPipeline({
-        db, bucket, uid, itemId, item, falApiKey, feedback: "",
-      });
-      console.log(`[autoStandardizeItem] Standardized ${itemId} for ${uid}`);
-    } catch (pipeErr) {
-      console.log(`[autoStandardizeItem] Failed ${itemId}: ${pipeErr.message}`);
-      await itemRef.update({
-        "standardization.status": "failed",
-        "standardization.lastError": `${pipeErr.message.slice(0, 200)}`,
-      });
-    }
-  }
-);

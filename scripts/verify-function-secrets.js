@@ -3,8 +3,8 @@
 // Compares every deployed Cloud Function's bound secrets against
 // SECRETS_BY_FUNCTION in deploy-create.js, and flags any function
 // still on a retired runtime (nodejs20 — Google refuses all
-// updates to it, which is how the autoStandardizeItem fix was
-// blocked until the runtime was bumped in the same PATCH).
+// updates to it, which is how a fix was once blocked until the
+// runtime was bumped in the same PATCH).
 // A function born without its secret stays broken: deploy-update
 // only patches buildConfig, never serviceConfig.
 //
@@ -12,8 +12,10 @@
 // function-config.json — timeout, memory (the API reports "1GiB"
 // where the config writes "1Gi"; both spellings normalize the
 // same), and eventTrigger wiring for the functions that declare
-// one. The autoStandardizeItem trigger was lost in the Nov 5
-// REST recreate precisely because no audit checked wiring.
+// one. A trigger was once lost in a REST recreate precisely
+// because no audit checked wiring (PC-101); PC-106 deleted the
+// fleet's only event-triggered function, so the wiring check
+// currently has nothing to check — it stays for the next one.
 // Usage: node scripts/verify-function-secrets.js
 // Exit 0 when everything matches; exit 1 with a list otherwise.
 // Run after any function create/update, and in the monthly doc review.

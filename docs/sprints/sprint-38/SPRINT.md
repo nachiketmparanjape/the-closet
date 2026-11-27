@@ -51,20 +51,13 @@ The five cards, in fix order:
 
 | # | Card | Issue | Effort | Why it's in |
 |---|------|-------|--------|-------------|
-| 1 | PC-101: The auto trigger never fires — never wired | #166 | M | The core journey's automatic path has never run since Nov 5 |
+| 1 | PC-106: Replace the trigger with a direct call + sweeper | #171 | M | Replaces PC-101 (#166, superseded 2026-11-26): the automatic path has never run, and the trigger is deleted, not fixed |
 | 2 | PC-104: Deployed functions run at 60s timeouts the source never declared | #169 | M | A 3-attempt standardization cannot complete in 60s; the 240s deadline is dead code under it |
 | 3 | PC-105: The FLUX poll ignores the pipeline deadline | #170 | S/M | Fixing the timeout alone moves the kill from 60s to 300s on a slow fal day |
 | 4 | PC-102: A background failure's toast looks like the upload failed | #167 | S/M | The founder must never again be told an upload failed when it succeeded |
 | 5 | PC-103: Item page goes blank after a failed standardization | #168 | S/M | The item must never look photo-less on its own page |
 
-**Build order note:** PC-101 first (re-wire + live proof with a
-fresh item), then PC-104 (timeouts — unblocks the multi-attempt
-run), then PC-105 (poll deadline — the timeout's backstop), then
-PC-102 (toast scoping), then PC-103 (dialog refresh + photo
-recovery + note mapping). PC-104's deploy-script fixes cover
-the whole fleet; the live PATCHes cover the five mismatched
-functions (standardizeItem, planPacking, parseOutfitPhoto,
-shopCheck, autoStandardizeItem).
+**Build order note (amended 2026-11-26):** PC-101 was first (re-wire + live proof), then PC-104, PC-105, PC-102, PC-103 — all four shipped 2026-11-26. PC-101 is now **superseded by PC-106** (founder decision): the trigger is deleted and replaced with a direct call + sweeper, so PC-106 closes the sprint instead.
 
 **Explicitly not in scope:**
 - Any change to the FLUX prompt or the color gate — the gates
@@ -110,7 +103,7 @@ shopCheck, autoStandardizeItem).
   (Monitoring hangs; pull is unsupported on the managed push
   subscription). Next: Firebase Console inspection of the
   trigger's delivery, or replace the trigger with a direct call
-  (founder decision). `deploy-create.js` now grants the topic
+  (founder decision). **SUPERSEDED 2026-11-26 by PC-106 (#171): the founder chose the direct call — the trigger was deleted, not fixed.** `deploy-create.js` now grants the topic
   publisher at create time for any future event-triggered
   function, and `scripts/verify-function-secrets.js` audits
   eventTrigger presence. `function-config.json` is the single
@@ -156,13 +149,17 @@ shopCheck, autoStandardizeItem).
   state. 5 tests (`tests/pc103-item-dialog.test.js`). Same
   hosting release as PC-102; live markers verified.
 
-Suite: **770 passing, 0 fail** (full gate before deploy).
+- **PC-106 (#171) — SHIPPED 2026-11-26.** Replaces PC-101 (#166, superseded by founder decision): the trigger is deleted, not fixed. Client helper `requestStandardization(itemId)` — fire-and-forget call to the `standardizeItem` callable (no force) — invoked after every item creation: parse confirm (`applyParseGarmentDecisionsInner`, also serves chat add), both single-item add flows, shop-check one-tap add (4 call sites, pinned by test). The already-clean check moved into `runStandardizationPipeline` (it lived only in the trigger): it reads the ORIGINAL photo, never the cutout (a cutout is transparent by construction — checking it would skip every cutout-backed item's FLUX run); force bypasses it; the callable returns the skipped result. New `scripts/standardize-sweeper.js` (REST adapters shared in `scripts/rest-adapters.js`) + cron `closet-standardize-sweeper` every 30 min: items with NO standardization field older than 10 min, max 5 per user per run, pipeline run in-process. The deployed `autoStandardizeItem` function was DELETEd (GET 404 — trigger/topic/subscription gone with it); its code export, `function-config.json` entry, and `SECRETS_BY_FUNCTION` entry removed; audit clean except the 15 known nodejs20 (PC-99). Live proof: sweeper dry-run found 43 items with no status (112 checked); live run healed 8 (founder's Olive fleece joggers → pending_review; Teal Nike Tech Fleece joggers + Black tee with red back graphic → failed, systematic color ΔE=26.5 / 58.4, rejected renders saved; the other user's 5 → already_clean). Two adapter bugs found and fixed by the live run (array values in toValue; runTransaction must await collected updates). Deployed: `standardizeItem` (ACTIVE, nodejs22, 300s/1Gi, FAL_API_KEY bound, updateTime 2026-11-27T05:41:29Z); hosting release `1795758107348000` (live HTML carries all 4 call sites). 16 new tests (4 pipeline + 4 client + 8 sweeper).
+
+Suite: **786 passing, 0 fail** (full gate before deploy).
 
 ## Retest
 
 (TBD — QA Round 6 after the build; the founder's manual checks
-after QA, per the loop design. Retest target: a NEW item
-standardizes automatically within minutes of creation, or is
-marked already-clean; manual generation completes a 3-attempt
-run inside the budget; a background failure never reads as an
-upload error; a failed item's page shows a real photo.)
+after QA, per the loop design. Retest targets: a NEW item created
+in the app standardizes automatically within minutes, with no tap
+(PC-106 direct call); an item whose direct call never sent is
+healed by the sweeper within ~30 min (PC-106); manual generation
+completes a 3-attempt run inside the budget; a background failure
+never reads as an upload error; a failed item's page shows a real
+photo.)

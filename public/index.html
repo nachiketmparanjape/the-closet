@@ -4126,6 +4126,18 @@
           .then(function (res) { return res.data || {}; });
       }
 
+      // PC-106: the direct standardization call — replaces the deleted
+      // Firestore trigger. Fire-and-forget: the callable runs server-side
+      // to completion once sent, so the UI never waits on it. A send
+      // failure (offline, app closed) is caught by the standardize
+      // sweeper, which heals items with no standardization status.
+      function requestStandardization(itemId) {
+        if (!itemId) return;
+        callStandardize(itemId).catch(function () {
+          console.log("[standardize] direct call failed for " + itemId + " — sweeper will retry");
+        });
+      }
+
       // PC-58: Just-in-time attribute collection (2026-11-01)
       // Required attributes per subtype (from GARMENT-ATTRIBUTE-TAXONOMY.md).
       // Only shown if missing from item.ai — "omit rather than guess".
@@ -5404,6 +5416,8 @@
             showToast("Piece added to your wardrobe.");
             // PC-34 scope: first photo only (every surface shows photos[0]).
             if (photos.length) requestPhotoRender(docRef.id, photos[0].storagePath);
+            // PC-106: the item exists now — start its AI version.
+            requestStandardization(docRef.id);
             maybeNudgeUpgrade();
           }).catch(function (error) {
             cleanupUploads();
@@ -5583,7 +5597,7 @@
           // placeholder — flag it and the app re-describes on a
           // later load until it lands.
           if (!r.ai) doc.needsAi = true;
-          return docRef.set(doc).then(function () { requestPhotoRender(docRef.id, storagePath); });
+          return docRef.set(doc).then(function () { requestPhotoRender(docRef.id, storagePath); requestStandardization(docRef.id); });
         }).catch(function (err) {
           if (uploaded) { storage.ref().child(storagePath).delete().catch(function () {}); }
           throw err;
@@ -12588,6 +12602,8 @@
                 d.createdItemId = docRef.id;
                 sel.push(docRef.id);
                 names.push(name);
+                // PC-106: the item exists now — start its AI version.
+                requestStandardization(docRef.id);
               });
             });
           }
@@ -13696,7 +13712,7 @@
             styleTags: [],
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
           };
-          return docRef.set(doc).then(function () { return { created: docRef.id }; });
+          return docRef.set(doc).then(function () { requestStandardization(docRef.id); return { created: docRef.id }; });
         }).then(function (outcome) {
           // Record the check: bought via a saved entry, or auto-record the
           // ephemeral check as bought so the shop list keeps the history.

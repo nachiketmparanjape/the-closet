@@ -1176,8 +1176,10 @@ QA Round 5 found standardization broken end to end for new
 items — but the investigation proved the round's headline
 wrong in the interesting way: the navy tee's render had
 SUCCEEDED; the plumbing around it had failed. Five cards.
-Four shipped the same day; the fifth (the trigger) is wired
-and awaiting its live proof. Suite 770 passing.
+Four shipped the same day; the fifth (the trigger) never fired
+once in the project's history, and the founder chose a direct
+call instead — PC-106 replaces PC-101 and closes the sprint.
+Suite 786 passing.
 
 - **PC-104 (#169):** deployed functions ran at 60s timeouts the
   source never declared — the navy run died at exactly 59.99s.
@@ -1215,7 +1217,15 @@ and awaiting its live proof. Suite 770 passing.
   history proves the trigger NEVER fired, not once, including
   the CLI era (zero Cloud Run invocations Oct 28–Nov 27). The
   Nov 5 theory is wrong; the break is in the Firestore→Eventarc
-  source link, unobservable from this VM. Next: console
-  inspection, or replace the trigger with a direct call.**
+  source link, unobservable from this VM. SUPERSEDED 2026-11-26
+  by PC-106: the founder chose the direct call.**
+- **PC-106 (#171):** the trigger is deleted, not fixed. The app
+  now calls `standardizeItem` directly after every item creation
+  (parse, both single-item adds, shop-check add), and a sweeper
+  runs every 30 min for items whose call never sent. The
+  already-clean check moved into the pipeline (it reads the
+  original photo, never the cutout). Live run healed 8 items,
+  including the founder's Olive fleece joggers → pending_review.
+  The deployed trigger function is gone (GET 404).
 
-Verification is QA Round 6 after the trigger proof lands.
+Verification is QA Round 6.

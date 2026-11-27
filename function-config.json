@@ -3,34 +3,11 @@
     "Single source of truth for deployed function config. deploy-create.js reads this at create time; deploy-update.js applies it on update; the fleet audit checks it.",
     "Timeout rule: never shorten a timeout at deploy time \u2014 the value here is max(declared in functions/index.js, currently deployed). Three functions run LONGER than declared (startOutfitParse, retryOutfitGarment, pollOutfitParse: deployed 300s vs declared 120s) and keep 300s because the parse poll is load-bearing. Shortening them is a planning decision, not a deploy fix.",
     "Memory is the declared value where it differs from the 512Mi default. approveStandardization / rejectStandardization declare 256Mi but run at 512Mi \u2014 the deployed direction is harmless, so they are not listed and take the default.",
-    "autoStandardizeItem is the fleet's only event-triggered function. Its eventTrigger was lost in the Nov 5 REST recreate (PC-101) because deploy-create.js never sent one \u2014 the in-code onDocumentCreated is CLI metadata the REST API ignores."
+    "PC-106 (2026-11-26): the fleet has NO event-triggered function anymore \u2014 autoStandardizeItem was deleted (it never fired once; the Firestore trigger was replaced by a direct client call + sweeper). The eventTrigger audit stays: any future event-triggered function must declare its trigger here, because a REST create sends no trigger unless the create body carries one."
   ],
   "advanceParsesHttp": {
     "availableMemory": "1Gi",
     "timeoutSeconds": 540
-  },
-  "autoStandardizeItem": {
-    "availableMemory": "1Gi",
-    "eventTrigger": {
-      "eventFilters": [
-        {
-          "attribute": "database",
-          "value": "(default)"
-        },
-        {
-          "attribute": "namespace",
-          "value": "(default)"
-        },
-        {
-          "attribute": "document",
-          "value": "users/{uid}/items/{itemId}"
-        }
-      ],
-      "eventType": "google.cloud.firestore.document.v1.created",
-      "retryPolicy": "RETRY_POLICY_RETRY",
-      "triggerRegion": "nam5"
-    },
-    "timeoutSeconds": 300
   },
   "extractGarment": {
     "availableMemory": "1Gi",

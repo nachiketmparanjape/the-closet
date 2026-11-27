@@ -2,8 +2,10 @@
  * Sprint 28 Card 1: Shared standardization pipeline.
  *
  * Extracted from the `standardizeItem` callable (2026-11-04) so both the
- * manual Generate path and the `autoStandardizeItem` Firestore trigger run
- * the exact same code. No duplication, no drift.
+ * manual Generate path and the automatic path run the exact same code.
+ * No duplication, no drift. (PC-106, 2026-11-26: the automatic path is
+ * now a direct call from the client, not the deleted Firestore trigger;
+ * the already-clean check moved in here from the trigger.)
  *
  * Pipeline:
  *   1. FLUX Kontext Dev via fal.ai → complete + standardize the garment
@@ -17,7 +19,7 @@
  * processing/failed status bookkeeping around this call. This function
  * throws on failure; the caller decides how to record it.
  */
-const { runFluxStandardization, runQualityGates } = require("./standardize");
+const { runFluxStandardization, runQualityGates, isAlreadyClean } = require("./standardize");
 const {
   createFalSegmentation,
   getFalSegmentation,
@@ -62,8 +64,12 @@ async function downloadUrlForPath(bucket, storagePath) {
  * @param {object} opts.item - The Firestore item data (photos, ai, etc.)
  * @param {string} opts.falApiKey - fal.ai API key
  * @param {string} [opts.feedback] - Optional user feedback for the prompt
- * @returns {Promise<{ready: boolean, pendingReview: boolean, standardizedUrl: string}>}
+ * @param {boolean} [opts.force] - Manual Generate: skip the already-clean
+ *   check and run FLUX even on a studio shot.
+ * @returns {Promise<{ready: boolean, pendingReview: boolean, standardizedUrl: string, skipped?: boolean}>}
  *   ready is always false — the render waits in pending_review (#128).
+ *   skipped is true when the source photo was already clean: no FLUX
+ *   ran, the item is marked already_clean, standardizedUrl is null.
  * @throws on FLUX failure, gate failure after retries, or upload failure.
  */
 /**
@@ -102,7 +108,7 @@ async function saveRejectedRender(bucket, db, itemRef, uid, itemId, fluxBuffer, 
   }
 }
 
-async function runStandardizationPipeline({ db, bucket, uid, itemId, item, falApiKey, feedback = "", deadlineMs = PIPELINE_DEADLINE_MS }) {
+async function runStandardizationPipeline({ db, bucket, uid, itemId, item, falApiKey, feedback = "", force = false, deadlineMs = PIPELINE_DEADLINE_MS }) {
   const photos = item.photos || [];
   if (!photos.length || !photos[0].url) {
     throw new Error("No photo URL on item");
@@ -137,6 +143,31 @@ async function runStandardizationPipeline({ db, bucket, uid, itemId, item, falAp
   // Each attempt re-runs FLUX (fresh input, rebuilt prompt — no prior-render context).
   // The input is fetched once: the anchor and the gates both read it.
   const inputBuffer = Buffer.from(await (await fetch(imageUrl)).arrayBuffer());
+  // PC-106: the already-clean check used to live only in the trigger
+  // (now deleted). It answers "is the SOURCE photo already a studio
+  // shot?" — so it reads the original photo, never the cutout: a cutout
+  // is transparent by construction, so checking it would mark every
+  // cutout-backed item already-clean and skip the FLUX run PC-94 exists
+  // to do. Force bypasses it: a manual Generate means "run FLUX". A
+  // failed check never blocks standardization — proceed (the trigger's
+  // own rule).
+  if (!force) {
+    try {
+      const cleanBuffer = inputKind === "cutout"
+        ? Buffer.from(await (await fetch(photos[0].url)).arrayBuffer())
+        : inputBuffer;
+      const clean = await isAlreadyClean(cleanBuffer);
+      if (clean.isClean) {
+        await itemRef.update({
+          "standardization.status": "already_clean",
+          "standardization.reason": clean.reason,
+        });
+        return { ready: false, pendingReview: false, standardizedUrl: null, inputKind, skipped: true, reason: "already_clean" };
+      }
+    } catch (e) {
+      console.log(`[standardize-pipeline] clean check failed (non-fatal, proceeding): ${e.message}`);
+    }
+  }
   // PC-100: anchor FLUX to the input's measured dominant color (the
   // gate's own median). A render that matches the anchor passes the
   // color gate by construction. A null anchor (no garment pixels)
