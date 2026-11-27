@@ -1124,3 +1124,48 @@ reload), issue #156 closed. No P0, no P1.
   wear (the rating job stays), and the label always carries
   a date: "Today" / "Yesterday" / "Saturday, Nov 14".
   Commit `af0648c`.
+
+## Sprint 37 — Make the cutout + diffusion flow reliable (2026-11-26)
+
+Direct founder order: the article cutout and diffusion image
+creation were not reliable — a mirror outfit photo's new
+sweatshirt got no cutout and two diffusion attempts failed.
+Seven cards, all shipped the same day. Suite 752 passing.
+
+- **PC-96 (#161):** the auto-standardize trigger had no API key
+  (`secrets: []`) — the automatic path never ran. Live PATCH bound
+  `FAL_API_KEY` (with a nodejs22 bump in the same call); audit
+  script `scripts/verify-function-secrets.js` added; the
+  deploy-time secret check now follows requires transitively.
+  Commit `df0ce1e`.
+- **PC-93 (#158):** parse items never showed their cutout — the
+  render URL was minted in memory only and never saved. The
+  confirm flow now mints it (one retry, never blocks the save);
+  the backfill healed 3 items including the sweatshirt. Commit
+  `596e81c`.
+- **PC-95 (#160):** the geometry gate counted alpha only, so
+  every opaque FLUX render failed. It now measures whiteness and
+  passes real renders. Proven live on the sweatshirt.
+- **PC-94 (#159):** the pipeline fed FLUX the whole mirror photo
+  and the color gate compared the scene against the garment
+  (ΔE=49.9 for a perfect render). It now standardizes from the
+  cutout render, original as fallback. Proven live.
+- **PC-97 (#162):** identical retries burned 6 paid runs on a
+  deterministic failure and discarded the evidence. The loop now
+  stops when the same gates fail twice, saves the rejected render,
+  and never starts an attempt past a 240s budget. Proven live:
+  2 runs in 42s.
+- **PC-98 (#163):** the item page said only \"didn't come out
+  right\". It now names the reason in one plain sentence.
+- **PC-100 (#165):** the color gate still failed the sweatshirt
+  at ΔE≈20 on a real FLUX shift (dusty burgundy rendered redder).
+  An RGB color anchor in the prompt was built and tested — and
+  proven not to work live (ΔE=22.5/23.5). Verdict recorded: FLUX
+  cannot reproduce this color; the gate is right; the item keeps
+  its original.
+
+Live retests on the real sweatshirt (scripts/
+retest-sweatshirt.js): geometry passes, systematic stop works,
+color cannot be fixed by input or prompt. The remaining QA
+retest covers the app surfaces: cutout visible, failure sentence
+shown, trigger firing on the next new item.

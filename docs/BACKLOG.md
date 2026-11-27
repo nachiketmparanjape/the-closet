@@ -1556,7 +1556,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   original mirror photo. The sweatshirt shows its cutout without
   the founder re-doing anything.
 - **Effort:** S/M.
-- **Status:** Filed 2026-11-26 (founder report). In Sprint 37 — Issue #158.
+- **Status:** In Sprint 37 — SHIPPED 2026-11-26 (built + deployed; cutout now shows via minted renderUrl; backfill fixed 3 items incl. the sweatshirt). Awaiting QA retest.
   proposed (direct founder order 2026-11-26).
 
 ### PC-94: Diffusion standardizes the mirror photo, not the garment (M) — issue #159
@@ -1584,7 +1584,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   render saved as evidence — PC-97). A worn-photo item no longer
   fails the color gate by construction.
 - **Effort:** M.
-- **Status:** Filed 2026-11-26 (founder report). In Sprint 37 — Issue #159.
+- **Status:** In Sprint 37 — SHIPPED 2026-11-26 (built + deployed; pipeline standardizes from the cutout render, original as fallback). Proven live on the sweatshirt (input was the cutout). Awaiting QA retest.
   proposed (direct founder order 2026-11-26).
 
 ### PC-95: The geometry gate fails every FLUX output (S/M) — issue #160
@@ -1613,7 +1613,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   geometry gate; the sweatshirt's standardization is no longer
   blocked by `geometry`.
 - **Effort:** S/M.
-- **Status:** Filed 2026-11-26 (founder report). In Sprint 37 — Issue #160.
+- **Status:** In Sprint 37 — SHIPPED 2026-11-26 (built + deployed; gate measures whiteness, works on opaque renders and cutouts). Proven live: geometry passes on the sweatshirt. Awaiting QA retest.
   proposed (direct founder order 2026-11-26).
 
 ### PC-96: The auto-standardize trigger has no API key, so it silently skips every item (S) — issue #161
@@ -1645,7 +1645,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   a minute of creation, without any manual tap; the audit script
   reports zero missing bindings.
 - **Effort:** S.
-- **Status:** Filed 2026-11-26 (founder report). In Sprint 37 — Issue #161.
+- **Status:** In Sprint 37 — SHIPPED 2026-11-26 (live patch verified; trigger ACTIVE with FAL_API_KEY; audit script added).
   proposed (direct founder order 2026-11-26).
 
 ### PC-97: Identical retries burn runs on a failure that cannot pass (M) — issue #162
@@ -1679,7 +1679,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   a slow-FLUX run ends `failed` with a clear reason inside the
   timeout instead of stranding in `processing`.
 - **Effort:** M.
-- **Status:** Filed 2026-11-26 (founder report). In Sprint 37 — Issue #162.
+- **Status:** In Sprint 37 — SHIPPED 2026-11-26 (built + deployed; systematic stop + rejected render saved + 240s budget). Proven live: 2 runs in 42s. Awaiting QA retest.
   proposed (direct founder order 2026-11-26).
 
 ### PC-98: A failed standardization tells the founder nothing useful (S) — issue #163
@@ -1706,7 +1706,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   why it failed and what to do, in one sentence, without opening
   any log.
 - **Effort:** S.
-- **Status:** Filed 2026-11-26 (founder report). In Sprint 37 — Issue #163.
+- **Status:** In Sprint 37 — SHIPPED 2026-11-26 (built + deployed; item page names the reason in one plain sentence). Awaiting QA retest.
   proposed (direct founder order 2026-11-26).
 
 ### PC-99: Most Cloud Functions still run retired nodejs20 and cannot be updated (S/M) — issue #164
@@ -1731,8 +1731,41 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   nodejs22; re-run the audit to zero mismatches. The in-flow
   functions (extractGarment, standardizeItem, parse functions)
   bump inside Sprint 37's own deploys and do not wait for this
-  card.
+  card. (Update 2026-11-26: standardizeItem bumped in Sprint 37;
+  18 of 21 remain on nodejs20.)
 - **Done looks like:** the audit reports zero retired runtimes
   across the fleet.
 - **Effort:** S/M.
 - **Status:** Filed 2026-11-26 (PC-96 audit). Next planning walk.
+
+### PC-100: FLUX renders dusty burgundy too red — the color gate fails a real shift (M)
+
+- **Origin:** Sprint 37 live retest 2026-11-26 (scripts/
+  retest-sweatshirt.js) on the founder's sweatshirt
+  `FHMXDcg4NNpkdj8HsFMY`, after the PC-94 cutout input and PC-95
+  geometry fixes landed. Geometry now passes; the color gate
+  fails twice at ΔE=20.0 / 20.4 and the systematic stop fires
+  correctly.
+- **Problem:** the shift is real, not a metric artifact. Color
+  analysis of the cutout vs the saved rejected render
+  (`standardized-rejected.png`): cutout median rgb(111,61,67),
+  FLUX median rgb(107,21,33); dominant-vs-dominant ΔE=20.2, and
+  every cutout color cluster's nearest FLUX cluster is still
+  ΔE≈18–20 away. FLUX drops the green channel (~61 → ~21) and
+  renders a cleaner, redder burgundy than the dusty burgundy in
+  the input. The prompt already says "EXACT colors" — it is not
+  enough for this shade.
+- **In scope:** pass the input's dominant color into the FLUX
+  prompt as an explicit anchor — the gate's own median RGB,
+  computed from the cutout in the pipeline, in emphatic
+  CRITICAL/MUST wording (the pattern that works on this model
+  for sleeves). Re-measure ΔE on the sweatshirt with the anchor.
+  If the anchor does not bring ΔE under 15, the gate is right
+  and the card closes with that verdict: FLUX cannot reproduce
+  this color, the item keeps its original, and the failure
+  message says so instead of inviting the same retry.
+- **Done looks like:** the sweatshirt standardizes to
+  pending_review with ΔE under 15, or the anchor is proven not
+  to work and the verdict is recorded.
+- **Effort:** M.
+- **Status:** In Sprint 37 — SHIPPED 2026-11-26, VERDICT RECORDED: the RGB anchor does not work (live retest ΔE=22.5/23.5, worse than 20.0/20.4 without it). FLUX cannot reproduce this dusty burgundy; the gate is right and the item keeps its original.

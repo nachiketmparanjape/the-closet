@@ -4007,7 +4007,10 @@
           }
         } else if (status === "failed") {
           actionsBox.hidden = false;
-          note.textContent = "The AI version didn't come out right. You can try again.";
+          // PC-98: name the reason, in one plain sentence — the old
+          // text ("didn't come out right") told the founder nothing,
+          // and he retried the same failing input twice.
+          note.textContent = standardizationFailureNote(std.lastError);
           note.hidden = false;
           // If a standardized photo exists (previous success), offer Refresh.
           // If not (never succeeded), offer Generate — there's nothing to refresh.
@@ -4025,6 +4028,37 @@
           note.hidden = false;
           genBtn.hidden = false;
         }
+      }
+
+      // PC-98: translate the raw standardization lastError into one
+      // plain sentence naming the reason. The founder's two blind
+      // retries were the same systematic color failure — the message
+      // now says so, and says what would help (a clearer photo of
+      // the piece on its own) instead of inviting the same retry.
+      function standardizationFailureNote(lastError) {
+        var err = (lastError || "").toString();
+        var systematic = err.indexOf("systematic_gate_failure") === 0;
+        var color = err.indexOf("color") !== -1;
+        var geometry = err.indexOf("geometry") !== -1;
+        if (err.indexOf("standardization_timeout") === 0) return "The AI version took too long and timed out. Try again.";
+        if (err.indexOf("no_photo") === 0) return "This piece has no photo to work from.";
+        if (err.indexOf("FAL_API_KEY") !== -1 || err.indexOf("FLUX") === 0) return "The AI service had a problem. Try again later.";
+        if (color && geometry) {
+          return systematic
+            ? "The AI version kept coming out the wrong color and shape, so it stopped retrying — a daylight photo of the piece laid flat may work better."
+            : "The AI version came out the wrong color and shape. Try again — it may do better next time.";
+        }
+        if (color) {
+          return systematic
+            ? "The AI version kept coming out the wrong color, so it stopped retrying — a daylight photo of the piece laid flat may work better."
+            : "The AI version came out the wrong color. Try again — it may do better next time.";
+        }
+        if (geometry) {
+          return systematic
+            ? "The AI version kept coming out the wrong shape, so it stopped retrying — a daylight photo of the piece laid flat may work better."
+            : "The AI version came out the wrong shape. Try again — it may do better next time.";
+        }
+        return "The AI version didn't come out right. You can try again.";
       }
 
       // PC-58: call the standardizeItem callable.

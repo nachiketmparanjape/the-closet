@@ -35,7 +35,7 @@ const FLUX_PROMPT = 'Transform this garment photo into a professional e-commerce
  * @param {string} feedback - Optional user feedback
  * @returns {string} - The full prompt
  */
-function buildFluxPrompt(item, feedback = '') {
+function buildFluxPrompt(item, feedback = '', colorAnchor = null) {
   const parts = [FLUX_PROMPT];
   
   const ai = item.ai || {};
@@ -116,7 +116,20 @@ function buildFluxPrompt(item, feedback = '') {
   if (feedback) {
     parts.push(`Additional guidance: ${feedback}`);
   }
-  
+
+  // PC-100: color anchor. FLUX rendered the founder's dusty
+  // burgundy (median rgb 112,60,68) as a cleaner red (107,21,33) —
+  // ΔE=20.4, a real shift the gate rightly failed. "EXACT colors"
+  // in the base prompt was not enough. The anchor states the
+  // input's measured dominant color as numbers, in the emphatic
+  // CRITICAL/MUST wording this model obeys for sleeves. The anchor
+  // is the gate's own median, so a render that matches it passes
+  // the gate by construction.
+  if (colorAnchor && colorAnchor.length === 3) {
+    const [r, g, b] = colorAnchor;
+    parts.push(`CRITICAL: The garment's main color is RGB(${r}, ${g}, ${b}). Match this color EXACTLY — do not make it redder, brighter, or more saturated. The color in the input image is the truth; your output must measure the same.`);
+  }
+
   return parts.join(' ');
 }
 
@@ -177,8 +190,8 @@ async function isAlreadyClean(imageBuffer) {
  * @param {string} feedback - Optional user feedback to append to prompt
  * @returns {Promise<string>} - URL of the standardized image
  */
-async function runFluxStandardization(imageUrl, falApiKey, item = {}, feedback = '') {
-  const prompt = buildFluxPrompt(item, feedback);
+async function runFluxStandardization(imageUrl, falApiKey, item = {}, feedback = '', colorAnchor = null) {
+  const prompt = buildFluxPrompt(item, feedback, colorAnchor);
 
   const submitRes = await fetch('https://queue.fal.run/fal-ai/flux-kontext/dev', {
     method: 'POST',
@@ -234,36 +247,42 @@ async function runFluxStandardization(imageUrl, falApiKey, item = {}, feedback =
  * @param {Buffer} outputBuffer - Standardized output image
  * @returns {Promise<{pass: boolean, deltaE: number, reason: string}>}
  */
+/**
+ * The garment's dominant color: the per-channel median of the
+ * non-background pixels (not near-white, not transparent), downscaled
+ * to 64x64. Returns [r, g, b], or null when the image has no garment
+ * pixels. This is the same measure the color gate compares — so an
+ * anchor built from it is a color FLUX can actually be judged
+ * against (PC-100).
+ */
+async function dominantColor(buffer) {
+  const sharp = require("sharp");
+  const { data } = await sharp(buffer)
+    .resize(64, 64, { fit: "inside" })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const pixels = [];
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
+    if (a < 128) continue; // transparent = background
+    if (r > 240 && g > 240 && b > 240) continue; // near-white = background
+    pixels.push([r, g, b]);
+  }
+  if (!pixels.length) return null;
+  const med = (arr) => {
+    const s = arr.slice().sort((x, y) => x - y);
+    return s[Math.floor(s.length / 2)];
+  };
+  return [
+    med(pixels.map((p) => p[0])),
+    med(pixels.map((p) => p[1])),
+    med(pixels.map((p) => p[2])),
+  ];
+}
+
 async function gateColorFidelity(inputBuffer, outputBuffer) {
   try {
-    const sharp = require("sharp");
-    const dominant = async (buffer) => {
-      // Downscale to 64x64 for speed, get raw RGBA pixels.
-      const { data, info } = await sharp(buffer)
-        .resize(64, 64, { fit: "inside" })
-        .ensureAlpha()
-        .raw()
-        .toBuffer({ resolveWithObject: true });
-      // Collect non-background pixels (not near-white, not fully transparent).
-      const pixels = [];
-      for (let i = 0; i < data.length; i += 4) {
-        const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
-        if (a < 128) continue; // transparent = background
-        if (r > 240 && g > 240 && b > 240) continue; // near-white = background
-        pixels.push([r, g, b]);
-      }
-      if (!pixels.length) return null;
-      // Median per channel (robust to outliers).
-      const med = (arr) => {
-        const s = arr.slice().sort((x, y) => x - y);
-        return s[Math.floor(s.length / 2)];
-      };
-      return [
-        med(pixels.map((p) => p[0])),
-        med(pixels.map((p) => p[1])),
-        med(pixels.map((p) => p[2])),
-      ];
-    };
     const rgbToLab = (r, g, b) => {
       // sRGB -> XYZ -> LAB (D65).
       let [R, G, B] = [r / 255, g / 255, b / 255].map((c) =>
@@ -276,8 +295,8 @@ async function gateColorFidelity(inputBuffer, outputBuffer) {
       const fx = f(X), fy = f(Y), fz = f(Z);
       return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
     };
-    const inRgb = await dominant(inputBuffer);
-    const outRgb = await dominant(outputBuffer);
+    const inRgb = await dominantColor(inputBuffer);
+    const outRgb = await dominantColor(outputBuffer);
     if (!inRgb || !outRgb) {
       return { pass: false, deltaE: Infinity, reason: "no-garment-pixels" };
     }
@@ -297,8 +316,20 @@ async function gateColorFidelity(inputBuffer, outputBuffer) {
 
 /**
  * Quality gate: Geometry completeness.
- * Verifies the output contains a complete garment: non-trivial opaque
- * area, reasonable aspect ratio, and the garment isn't a thin sliver.
+ * Verifies the output contains a complete garment: non-trivial
+ * garment area, reasonable aspect ratio, and the garment isn't a
+ * thin sliver.
+ *
+ * PC-95 (2026-11-26): the old check counted alpha >= 128 as
+ * "garment", but the pipeline runs this gate on the raw FLUX
+ * output — before the SAM cutout — and a FLUX render has no alpha
+ * channel, so ensureAlpha() made every pixel opaque: coverage was
+ * 100%, always, and every render failed "no-background-detected".
+ * No item passed the real gates after they went live (Sprint 27).
+ * The gate now counts garment pixels as opaque AND not near-white:
+ * near-white is the studio background, transparent is the cutout
+ * background. One measure covers both the opaque FLUX output and a
+ * transparent cutout.
  *
  * @param {Buffer} outputBuffer - Standardized output image
  * @returns {Promise<{pass: boolean, reason: string}>}
@@ -311,22 +342,23 @@ async function gateGeometry(outputBuffer) {
       .ensureAlpha()
       .raw()
       .toBuffer({ resolveWithObject: true });
-    let opaque = 0;
+    let garment = 0;
     let minX = info.width, maxX = 0, minY = info.height, maxY = 0;
     for (let y = 0; y < info.height; y++) {
       for (let x = 0; x < info.width; x++) {
         const i = (y * info.width + x) * 4;
-        if (data[i + 3] >= 128) {
-          opaque++;
-          if (x < minX) minX = x;
-          if (x > maxX) maxX = x;
-          if (y < minY) minY = y;
-          if (y > maxY) maxY = y;
-        }
+        const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
+        if (a < 128) continue; // transparent = cutout background
+        if (r > 240 && g > 240 && b > 240) continue; // near-white = studio background
+        garment++;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
       }
     }
     const total = info.width * info.height;
-    const coverage = opaque / total;
+    const coverage = garment / total;
     // Garment should cover 10-95% of the frame (not empty, not full-bleed).
     if (coverage < 0.10) return { pass: false, reason: "garment-too-small" };
     if (coverage > 0.95) return { pass: false, reason: "no-background-detected" };
@@ -373,4 +405,5 @@ module.exports = {
   runQualityGates,
   gateColorFidelity,
   gateGeometry,
+  dominantColor,
 };
