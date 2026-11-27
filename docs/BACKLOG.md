@@ -1584,7 +1584,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   render saved as evidence — PC-97). A worn-photo item no longer
   fails the color gate by construction.
 - **Effort:** M.
-- **Status:** In Sprint 37 — SHIPPED 2026-11-26 (built + deployed; pipeline standardizes from the cutout render, original as fallback). Proven live on the sweatshirt (input was the cutout). Retest 2026-11-26 (Round 5) + Bramble investigation the same day: the cutout-input path WAS exercised — the navy tee's input dominant was navy rgb(27,33,53) (its cutout, created 01:26:54 UTC) and attempt 3 passed the gates and produced a correct navy render (orphaned standardized-pending.png, viewed). The visible failure was the 60s deployed timeout killing the HTTP response (PC-104) plus the final transaction failing because QA deleted the test item mid-run. The trigger never firing is PC-101, not this card.
+- **Status:** In Sprint 37 — SHIPPED 2026-11-26 (built + deployed; pipeline standardizes from the cutout render, original as fallback). Proven live on the sweatshirt (input was the cutout). Retest 2026-11-26 (Round 5) + Bramble investigation the same day: the cutout-input path WAS exercised — the navy tee's input dominant was navy rgb(27,33,53) (its cutout, created 01:26:54 UTC) and attempt 3 passed the gates and produced a correct navy render (orphaned standardized-pending.png, viewed). The visible failure was the 60s deployed timeout killing the HTTP response (PC-104) plus the final transaction failing because QA deleted the test item mid-run. The trigger never firing is PC-101, not this card. Round 6 (2026-11-26): the gates were right on all three draws (saved outputs analyzed — the geometry rejection was a full-bleed FLUX draw, 0% border-white; the color rejection was a proper bordered render; the pass was a post-SAM cutout). The cutout-input path works when the cutout exists at pipeline start; the single-item race where it does not is PC-109.
   proposed (direct founder order 2026-11-26).
 
 ### PC-95: The geometry gate fails every FLUX output (S/M) — issue #160
@@ -1613,7 +1613,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   geometry gate; the sweatshirt's standardization is no longer
   blocked by `geometry`.
 - **Effort:** S/M.
-- **Status:** In Sprint 37 — SHIPPED 2026-11-26 (built + deployed; gate measures whiteness, works on opaque renders and cutouts). Proven live: geometry passes on the sweatshirt. Retest 2026-11-26 (Round 5) + Bramble investigation: the navy run failed geometry on attempt 1, then passed it on attempts 2–3 (the gate-fail signatures differed, so no systematic stop — correct behavior). Attempt 3's render is a correct navy tee. The visible failure was the 60s deployed timeout (PC-104), not the gate.
+- **Status:** In Sprint 37 — SHIPPED 2026-11-26 (built + deployed; gate measures whiteness, works on opaque renders and cutouts). Proven live: geometry passes on the sweatshirt. Retest 2026-11-26 (Round 5) + Bramble investigation: the navy run failed geometry on attempt 1, then passed it on attempts 2–3 (the gate-fail signatures differed, so no systematic stop — correct behavior). Attempt 3's render is a correct navy tee. The visible failure was the 60s deployed timeout (PC-104), not the gate. Round 6 (2026-11-26): geometry behaved correctly on all three draws — it rejected a full-bleed FLUX output (0% border-white, 100% opaque) and passed a proper bordered render that then failed color.
   proposed (direct founder order 2026-11-26).
 
 ### PC-96: The auto-standardize trigger has no API key, so it silently skips every item (S) — issue #161
@@ -1679,7 +1679,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   a slow-FLUX run ends `failed` with a clear reason inside the
   timeout instead of stranding in `processing`.
 - **Effort:** M.
-- **Status:** In Sprint 37 — SHIPPED 2026-11-26 (built + deployed; systematic stop + rejected render saved + 240s budget). Proven live: 2 runs in 42s. Retest 2026-11-26 (Round 5) + Bramble investigation: the systematic stop correctly did NOT fire on the navy item — the two gate-fail signatures differed (color+geometry, then color), and attempt 3 passed. The visible failure was the 60s deployed timeout (PC-104): the HTTP response died at 59.99s while the pipeline kept running in the background. The 240s pipeline budget is dead code under a 60s function timeout (see PC-104/PC-105). No attempt count is surfaced in the UI (parked P2); the blank-photo claim is PC-103.
+- **Status:** In Sprint 37 — SHIPPED 2026-11-26 (built + deployed; systematic stop + rejected render saved + 240s budget). Proven live: 2 runs in 42s. Retest 2026-11-26 (Round 5) + Bramble investigation: the systematic stop correctly did NOT fire on the navy item — the two gate-fail signatures differed (color+geometry, then color), and attempt 3 passed. The visible failure was the 60s deployed timeout (PC-104): the HTTP response died at 59.99s while the pipeline kept running in the background. The 240s pipeline budget is dead code under a 60s function timeout (see PC-104/PC-105). No attempt count is surfaced in the UI (parked P2); the blank-photo claim is PC-103. Round 6 (2026-11-26): the systematic stop was not exercised — the three draws failed on different signatures (geometry, color, pass), so no same-signature stop was due; the gates were right in each case.
   proposed (direct founder order 2026-11-26).
 
 ### PC-98: A failed standardization tells the founder nothing useful (S) — issue #163
@@ -1786,7 +1786,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **In scope:** a failure toast names the piece and action it belongs to ("The burgundy sweatshirt's AI version didn't come out right"), so it can never read as the foreground action failing; or the standardize failure is not toasted globally at all when the item page already carries the reason (PC-98 note). The upload flow itself needs no change — it already succeeds.
 - **Done looks like:** a background standardization failure never appears as an upload error; the upload screen shows only upload outcomes.
 - **Effort:** S/M.
-- **Status:** Filed 2026-11-26 (Round 5). Issue #167. Investigation complete the same day — cause proven, fix scoped. In Sprint 38 — **SHIPPED 2026-11-26** (new `standardizeFailureToast(name, err)`; both standardize catch sites toast the named failure; 7 tests; hosting release `1795749366797000`, live markers verified).
+- **Status:** Filed 2026-11-26 (Round 5). Issue #167. Investigation complete the same day — cause proven, fix scoped. In Sprint 38 — **SHIPPED 2026-11-26** (new `standardizeFailureToast(name, err)`; both standardize catch sites toast the named failure; 7 tests; hosting release `1795749366797000`, live markers verified). Retest 2026-11-26 (Round 6): FAILS — two background standardization failures occurred (single-add "wrong shape", parse 2 "wrong color") and no toast naming the piece was observed in either window; the only toast was the duplicate-detection toast.
 
 ### PC-103: After a failed standardization the item page's main photo goes blank (S/M)
 
@@ -1795,7 +1795,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **In scope:** refresh the open item dialog from the snapshot listener (at least photos + standardization); add an `onerror` fallback on the item photo (retry once, then fall back to `photos[0].url`); carry `lastError` into the local failed state; map `processing_interrupted` (and any timeout-shaped error) to the timeout sentence in `standardizationFailureNote`.
 - **Done looks like:** a failed item's page shows a real photo (cutout or original) even when the dialog was opened before the cutout landed or a load failed once; the failure sentence names the timeout when the run was killed.
 - **Effort:** S/M.
-- **Status:** Filed 2026-11-26 (Round 5). Issue #168. Investigation complete the same day — attribution corrected, fix scoped. In Sprint 38 — **SHIPPED 2026-11-26** (dialog refresh from snapshot + photo retry/fallback + lastError carry + `processing_interrupted` → timeout sentence; 5 tests; hosting release `1795749366797000`, live markers verified).
+- **Status:** Filed 2026-11-26 (Round 5). Issue #168. Investigation complete the same day — attribution corrected, fix scoped. In Sprint 38 — **SHIPPED 2026-11-26** (dialog refresh from snapshot + photo retry/fallback + lastError carry + `processing_interrupted` → timeout sentence; 5 tests; hosting release `1795749366797000`, live markers verified). Retest 2026-11-26 (Round 6): FAIL on the photo half — the sweatshirt's item page still shows a blank cream box (photo never loads, confirmed after full reload; other items load fine); the Outfits-tab tile is also a broken-image thumbnail. The sentence passes verbatim. The stored photo appears broken/missing (see PC-107).
 
 
 ### PC-104: Deployed functions run at 60s timeouts the source never declared (M)
@@ -1805,7 +1805,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **In scope:** set the deployed timeouts/memories to the declared values (field-scoped PATCHes: `updateMask=serviceConfig.timeoutSeconds,serviceConfig.availableMemory` — never a full serviceConfig replace, which would strip secrets); fix `deploy-create.js` to take timeout/memory from the source (or a per-function map) instead of hardcoding 60s/512Mi; fix `deploy-update.js` to preserve/apply serviceConfig on update; extend the fleet audit to fail on timeout/memory drift.
 - **Done looks like:** every deployed function runs at its declared timeout/memory; a 3-attempt standardization completes inside the 300s budget; the audit passes.
 - **Effort:** M.
-- **Status:** Filed 2026-11-26 (Round 5 follow-up). Issue #169. In Sprint 38 — **SHIPPED 2026-11-26** (live PATCHes: standardizeItem 300s/1Gi, planPacking 300s, parseOutfitPhoto 120s, shopCheck 120s — all ACTIVE, three bumped to nodejs22; `function-config.json` is the config source of truth; `deploy-create.js` reads it at create, `deploy-update.js` applies serviceConfig after every PATCH, the audit checks config drift; audit after the PATCHes: secrets + config clean, only the 15 retired nodejs20 runtimes remain — PC-99).
+- **Status:** Filed 2026-11-26 (Round 5 follow-up). Issue #169. In Sprint 38 — **SHIPPED 2026-11-26** (live PATCHes: standardizeItem 300s/1Gi, planPacking 300s, parseOutfitPhoto 120s, shopCheck 120s — all ACTIVE, three bumped to nodejs22; `function-config.json` is the config source of truth; `deploy-create.js` reads it at create, `deploy-update.js` applies serviceConfig after every PATCH, the audit checks config drift; audit after the PATCHes: secrets + config clean, only the 15 retired nodejs20 runtimes remain — PC-99). Retest 2026-11-26 (Round 6): **VERIFIED** — manual generation on the White crew-neck t-shirt completed inside budget (started ~21:50–51, pending_review visible at 21:52, ~1.5–2 min, never stranded in "processing").
 
 ### PC-105: The FLUX poll ignores the pipeline deadline — a slow fal day eats the whole timeout (S/M)
 
@@ -1814,7 +1814,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **In scope:** pass `deadlineMs` into `runFluxStandardization` and stop polling past the budget (throw `standardization_timeout`); add an AbortSignal timeout to each status fetch (e.g. 30s) so a hung fetch cannot stall the loop; unit-test the poll against a fake clock/slow fetch.
 - **Done looks like:** a stalled FLUX poll ends with a timeout error inside the budget, never a function-level kill; the item shows the timeout sentence.
 - **Effort:** S/M.
-- **Status:** Filed 2026-11-26 (Round 5 follow-up). Issue #170. In Sprint 38 — **SHIPPED 2026-11-26** (`fetchWithTimeout` + poll deadline opts in `runFluxStandardization`, pipeline passes `deadlineAt`; 5 new poll tests + 1 pipeline wiring test; deployed to `standardizeItem` and `autoStandardizeItem` 2026-11-27T03:15Z — the trigger survived the update, verified by GET).
+- **Status:** Filed 2026-11-26 (Round 5 follow-up). Issue #170. In Sprint 38 — **SHIPPED 2026-11-26** (`fetchWithTimeout` + poll deadline opts in `runFluxStandardization`, pipeline passes `deadlineAt`; 5 new poll tests + 1 pipeline wiring test; deployed to `standardizeItem` and `autoStandardizeItem` 2026-11-27T03:15Z — the trigger survived the update, verified by GET). Retest 2026-11-26 (Round 6): **VERIFIED** — same run as PC-104 (manual generation completed inside budget, no poll overrun, no stranded "processing").
 
 ### PC-106: Replace the auto-standardize trigger with a direct call + sweeper (M)
 
@@ -1823,4 +1823,70 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **In scope:** (1) a client helper `requestStandardization(itemId)` that fire-and-forget calls the `standardizeItem` callable (no force) after every item creation — parse confirm (`applyParseGarmentDecisionsInner`), both single-item add flows, and the shop-check one-tap add; (2) hoist the already-clean check into `runStandardizationPipeline` (it lived only in the trigger — without it the direct call would burn FLUX runs on studio shots; force bypasses it; the callable returns the skipped result); (3) a new `scripts/standardize-sweeper.js` (VM script, REST adapters shared in `scripts/rest-adapters.js`) run every 30 min by cron: items with NO standardization field older than 10 min, max 5 per user per run, pipeline run in-process with the callable's bookkeeping; (4) delete the deployed `autoStandardizeItem` function (which deletes its trigger/topic/subscription) and remove its code export, its `function-config.json` entry, and its `SECRETS_BY_FUNCTION` entry; the fleet audit then has no event-triggered function to check.
 - **Done looks like:** a new item standardizes (or marks already-clean) within minutes of creation with no tap; an item whose direct call never sent is healed by the sweeper within ~30 min; the deployed `autoStandardizeItem` function is gone (GET 404); the audit passes with no eventTrigger entries; a fresh item created in the app standardizes end to end (QA Round 6).
 - **Effort:** M.
-- **Status:** Filed 2026-11-26. Issue #171. In Sprint 38 — replaces PC-101 by founder decision the same day. **SHIPPED 2026-11-26** (direct call at all 4 creation paths + clean-check hoist + sweeper script and 30-min cron + trigger function deleted, GET 404; live sweeper run healed 8, including the founder's Olive fleece joggers → pending_review; 16 new tests; suite 786; `standardizeItem` redeployed, hosting release `1795758107348000`).
+- **Status:** Filed 2026-11-26. Issue #171. In Sprint 38 — replaces PC-101 by founder decision the same day. **SHIPPED 2026-11-26** (direct call at all 4 creation paths + clean-check hoist + sweeper script and 30-min cron + trigger function deleted, GET 404; live sweeper run healed 8, including the founder's Olive fleece joggers → pending_review; 16 new tests; suite 786; `standardizeItem` redeployed, hosting release `1795758107348000`). Retest 2026-11-26 (Round 6): PARTIAL FAIL — the automatic call works (movement with no tap on all three new items), but the already-clean check fails on a studio shot: the single-item add ran FLUX and failed "wrong shape" instead of landing already_clean. The same photo produced three outcomes across three items (wrong shape / pending_review / wrong color) — generation is nondeterministic. Bulk add: "Add 2 pieces" stayed disabled ~2 min after Done (see PC-108). **Correction to the P0 as filed (2026-11-26, Bramble investigation): the already-clean check did not misfire on a white-background shot.** The navy photo is grey-background (Round 5's description), and the check's rule needs >90% near-white border or >5% transparency — a grey background correctly returns not-clean. The photo was deleted with the test items, so the check cannot be re-run on it. The proven failure is FLUX nondeterminism (one photo, three draws: full-bleed geometry reject / wrong-color reject / correct render — the saved outputs prove the gates were right in all three cases) plus the single-item cutout race (PC-109): the pipeline snapshots its input once at start, before the ~2 min cutout exists, and standardizes the original.
+
+### PC-107: The sweatshirt's stored photo is broken or missing — it loads nowhere (S/M)
+
+- **Origin:** QA round, 2026-11-26 (Round 6), scope Sprint 38
+  retest.
+- **Problem:** the Burgundy yellow sweatshirt's photo never loads
+  anywhere: the item page shows a blank cream box (confirmed
+  after a full reload, while other items' photos load fine);
+  its tile in the Outfits tab ("Burgundy yellow + Brown
+  corduroy") shows a broken-image thumbnail; the trip packing
+  row and outfit tile for the same piece are blank/broken too.
+  The PC-103 fallback (one cache-busted retry, then
+  `photos[0].url`) cannot recover it, which points at the
+  stored photo asset itself, not the dialog.
+- **Verified 2026-11-26 (Bramble, same night): both stored files are GONE from Storage.** The item's photo entry points at `outfit-photos/1795634499576-outfit-crop.jpg` (original) and `renders/cec2a33a585ef583e2b97cbe8c072e76.png` (cutout). Both URLs return 403, and the Storage metadata GET for both paths returns 404 "No such object" — confirmed also by a full bucket listing (the render is absent from all 155 renders; the crop is absent from `outfit-photos/`). The render was verified HTTP 200 (786,179 bytes, valid PNG) at ~17:00 the same day, so both files were deleted between ~17:00 and ~21:50. **Deletion cause unknown:** the Cloud Audit Log query for `storage.objects.delete` in that window returned no entries (data-access logs appear off). Scope is narrow, not a mass loss: spot-checks the same night show the Olive fleece joggers, Teal Nike Tech Fleece joggers and Black tee all return 200 for photo + render URLs. Two older stale render pointers were already known from the PC-93 backfill (Grey cat graphic crew-neck tee, Brown corduroy pants 2nd entry).
+- **Repair:** no other copy of the photo exists (the parse doc is gone; `outfit-photos/` holds only three October files). The founder re-adds the photo from his phone (Add photos on the item), which regenerates the cutout via `extractGarment`.
+- **In scope:** verify the sweatshirt's stored photo URLs
+  (renderUrl and `photos[0].url`) resolve; restore or re-mint
+  the photo if the asset is gone; make a genuinely missing
+  photo show a named placeholder rather than a blank box.
+- **Done looks like:** the sweatshirt's item page, tiles, and
+  packing rows all show a real photo; a missing photo shows a
+  placeholder, never a blank box.
+- **Effort:** S/M.
+- **Status:** Filed 2026-11-26 (Round 6). Issue #172. Files confirmed deleted the same night (see above); repair is the founder re-adding the photo from his phone.
+
+### PC-108: Bulk add "Add N pieces" stays disabled after the files show Done (S)
+
+- **Origin:** QA round, 2026-11-26 (Round 6), scope Sprint 38
+  retest.
+- **Problem:** after uploading two files through Bulk add, both
+  showed "Done", but the "Add 2 pieces" button stayed disabled
+  for ~2 minutes. The items were created in the background
+  anyway (wardrobe 73 → 75) — the button never enabling is a
+  stuck state even though creation worked.
+- **Cause proven 2026-11-26 (Bramble, code): `bulkFinish()` never touches `bulkStartBtn`.** `startBulkRun()` sets `bulkStartBtn.disabled = true` for the run; when the workers drain, `bulkFinish()` toasts and re-enables the file input — but it never resets the button's label or disabled state. The label ("Add 2 pieces") and enabled state are only set in `setBulkJobs()` (file selection) and the duplicate-bar path. So after a finished run the button still reads "Add 2 pieces" and stays disabled, and the only finish signal is the toast — if the user misses it, the sheet reads as stuck. Fix: in `bulkFinish()`, reset the button — label back to "Add pieces", `disabled` recomputed from the queued count.
+- **In scope:** the bulk-add confirm button enables when all
+  files are Done; if creation happens in the background, the
+  dialog says so and closes cleanly.
+- **Done looks like:** after all files show Done, the Add button
+  enables immediately; closing the dialog never orphans a
+  stuck state.
+- **Effort:** S.
+- **Status:** Filed 2026-11-26 (Round 6). Issue #173. Cause proven the same night (see above).
+
+### PC-109: The single-item direct call races the cutout — the pipeline standardizes the original photo (M)
+
+- **Origin:** Round 6 investigation, 2026-11-26 (sprint-triggered retest, Sprint 38). Root cause proven from the code + the saved Round 6 outputs.
+- **Problem:** on single-item adds, the direct call fires at creation — in the same `.then` as `requestPhotoRender` — but the cutout (`extractGarment` via BiRefNet) takes ~2 min. The pipeline fetches its input buffer once, before the retry loop (PC-100), and records `standardization.inputKind`. With no cutout yet, `inputKind` is "original" and the pipeline standardizes the whole scene — the PC-94 defect, back through timing. Parse uploads do not have this problem: their cutout is made before the item is saved, so it is ready when the run starts.
+- **Evidence:** Round 6's single-item add of the navy tee failed geometry on a full-bleed FLUX draw — the saved rejected render measures 0% border-white, 100% opaque (FLUX drew a full scene, consistent with standardizing a grey-background original) — while the two parse items (cutout ready at creation) produced a correct render (pending_review) and a color miss. The three draws also prove the gates were right in every case: the parse-2 rejection measures 100% border-white (a proper render, wrong color); the pending render is a post-SAM cutout (33% opaque). The already-clean check is NOT the failure here (see the PC-106 correction): the navy photo is grey-background, and the check correctly returns not-clean for it.
+- **Diagnostic gap:** the sweeper's bookkeeping does not persist `inputKind` (the Black tee's standardization doc has no `inputKind` field), so a raced run leaves no trace of which input it used. The fix should persist it.
+- **In scope:** the pipeline waits briefly for the render, or re-checks for the cutout on each retry attempt, or the client fires the direct call only after the cutout lands — whichever makes single-item adds standardize from the cutout. The sweeper persists `inputKind` on the runs it does.
+- **Done looks like:** a single-item add of a studio shot standardizes from the cutout (`standardization.inputKind === "cutout"` on the item); a run that started before the cutout existed picks it up on a later attempt instead of standardizing the original.
+- **Effort:** M.
+- **Status:** Filed 2026-11-26 (Round 6 investigation). Issue #174.
+
+### PC-110: extractGarment overruns its timeout and orphans the render link — the cutout is made but never shows (M)
+
+- **Origin:** Founder live report, 2026-11-26 ("Why does cropped version did not get created for this one", Black tee with red back graphic). Root cause proven the same night from live data.
+- **Problem:** the founder added the Black tee at 18:56 PST via single-item add (iPhone photo IMG_0419.jpeg, 4.27 MB). `requestPhotoRender` fired `extractGarment`; the server made the cutout and saved it — but the server took over two minutes, past its 120s deployed timeout, so the phone got `functions/internal` back instead of the result (client error logged 02:58:21Z, 123s after creation). The doc patch (`patchPhotos` in `requestPhotoRender`) runs CLIENT-side, only after the callable returns successfully — so it never ran, and the photo entry kept no `renderStoragePath` / `renderUrl` / `renderStatus`. The app kept showing the full photo. Doubly unreachable: the server never sets a `firebaseStorageDownloadTokens` metadata token on the render — the token comes from the client's `getDownloadURL()`, which runs after a good return and never ran here.
+- **Evidence:** render saved 02:56:40Z at `renders/7ef7906fa462ee9a76694611246971b1.png` (19,555,165 bytes, 4284x5712, 37.5% opaque — verified a real cutout by direct inspection). Deployed `extractGarment` timeout is 120s (nodejs20, 1Gi). The server does the save (extract.js step 4) and only then runs the embedding + mask heuristics + Gemini vision check before returning — the post-save work is what overruns.
+- **Repair done 2026-11-26 (same night):** token minted on the render object, cutout verified visually + by alpha stats, photo entry patched with renderUrl + renderStoragePath + renderStatus "passed" (verified by read-back). The embedding and photoQuality from the lost return were not recovered — the entry works without them (no duplicate proposal for this item).
+- **In scope:** the server writes the render fields to the item doc itself (like the pipeline does), so a client timeout cannot orphan a render; and/or raise the 120s timeout; and/or the client retries the link step (re-fetch, or derive the deterministic render path and mint it as the PC-93 backfill does). The render should also be smaller/faster — the 19.5 MB full-resolution PNG is most of the cost.
+- **Done looks like:** a cutout that the server saved always shows on the item, even when the phone's call to the server times out; no item sits with a render file in Storage and no link in its photo entry.
+- **Effort:** M.
+- **Status:** Filed 2026-11-26. Issue #175. The Black tee's cutout was linked by hand the same night.

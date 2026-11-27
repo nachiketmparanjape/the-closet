@@ -1228,4 +1228,4 @@ Suite 786 passing.
   including the founder's Olive fleece joggers → pending_review.
   The deployed trigger function is gone (GET 404).
 
-Verification is QA Round 6.
+Verification is QA Round 6 (2026-11-26): PC-104/PC-105 PASS (manual generation inside budget); PC-106 PARTIAL FAIL (the direct call works, but the single-item run raced the cutout and FLUX drew three different outcomes from one photo — corrected: the already-clean check behaved per its rule; the race is PC-109); PC-102 FAIL (no toast on background failures); PC-103 FAIL on the photo half (the sweatshirt's files are gone from Storage — PC-107). New cards PC-107/108/109/110. Fix pass proposed as Sprint 39.

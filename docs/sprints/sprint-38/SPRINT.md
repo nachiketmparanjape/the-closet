@@ -155,11 +155,61 @@ Suite: **786 passing, 0 fail** (full gate before deploy).
 
 ## Retest
 
-(TBD — QA Round 6 after the build; the founder's manual checks
-after QA, per the loop design. Retest targets: a NEW item created
-in the app standardizes automatically within minutes, with no tap
-(PC-106 direct call); an item whose direct call never sent is
-healed by the sweeper within ~30 min (PC-106); manual generation
-completes a 3-attempt run inside the budget; a background failure
-never reads as an upload error; a failed item's page shows a real
-photo.)
+QA Round 6 ran Thu Nov 26, 9:45–9:58 PM PST (13 min), signed in
+via the saved Google session. Full report:
+`qa-rounds/2026-11-26-round6.md`. Headline: **one P0, three P1s,
+five P2s.** This round covers the Fri Dec 4 weekly round.
+
+- **PC-106 — PARTIAL FAIL (P0 on the already-clean half).** The
+  automatic call works: all three new items moved with no tap.
+  But the single-item add ran FLUX and failed "wrong shape"
+  instead of landing already_clean, and the same photo produced
+  three different outcomes across the three items (wrong shape /
+  pending_review / wrong color) — generation is nondeterministic.
+  **Correction (Bramble investigation, same night): the
+  already-clean check did not misfire.** The navy photo is
+  grey-background (Round 5's description); the check needs >90%
+  near-white border or >5% transparency, so it correctly returns
+  not-clean. The saved Round 6 outputs prove the gates were right
+  in all three cases (geometry rejection: 0% border-white, 100%
+  opaque full-bleed draw; color rejection: 100% border-white
+  proper render; pass: post-SAM cutout). The proven failures are
+  FLUX nondeterminism and the single-item cutout race (PC-109):
+  the pipeline snapshots its input once at start, before the
+  ~2 min cutout exists.
+- **PC-104 / PC-105 — PASS.** Manual generation on the White
+  crew-neck t-shirt completed inside budget (~1.5–2 min,
+  pending_review at 21:52, never stranded in "processing").
+  Cost $0.03. Issues #169/#170 closed.
+- **PC-102 — FAIL.** Two background failures (single-add "wrong
+  shape", parse 2 "wrong color") and NO toast naming the piece
+  was observed. The Sprint 38 fix covered only the two
+  foreground catch sites; background failures have no toast path.
+- **PC-103 — FAIL on the photo half; sentence PASS.** The
+  sweatshirt's item page still shows a blank cream box (confirmed
+  after a full reload; other items load fine). The failure
+  sentence is present verbatim. Cause corrected the same night:
+  both stored files are GONE from Storage (404 "No such object";
+  the render was verified 200 at ~17:00) — see PC-107 (#172).
+- **New cards:** PC-107 (#172, sweatshirt's stored photo gone),
+  PC-108 (#173, bulk "Add 2 pieces" never resets — `bulkFinish()`
+  never touches the button), PC-109 (#174, single-item direct
+  call races the cutout), PC-110 (#175, `extractGarment` timeout
+  orphans the render link — proven on the founder's Black tee
+  the same night; the cutout was linked by hand).
+- **Round 4 leftovers:** #139 PASS (two Today picks avoid the
+  Nov 25 top+bottom; issue closed). "Yesterday" label confirmed.
+  "Saturday, Nov 14" label and #138 rollover still untested live.
+  #137 missing-photo slot: P2 (blank box, no placeholder).
+- **P2s parked:** false duplicate flag (navy vs white, recurs);
+  "Tap again to generate" double-confirm; transient "Untitled
+  piece" dialog; wardrobe-count discrepancy (live baseline is 72
+  pieces — the founder's Black tee, added Nov 26 — while the home
+  page reads 71, stale).
+- **Test data:** none left. All three QA test items + the test
+  trip deleted and verified. Wardrobe 72, outfits 10, trips 0.
+  Cost $0.03 (one manual generation).
+
+The founder's manual checks come after QA, per the loop design.
+Sprint 39 (fix pass for Round 6) is proposed next: PC-109 →
+PC-110 → PC-102 → PC-108 → PC-107.
