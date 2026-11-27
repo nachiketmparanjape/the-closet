@@ -11702,7 +11702,7 @@
 
       function outfitParsePhotoEntry(garment, ctx) {
         var st = ctx || outfitParseState;
-        return {
+        var entry = {
           url: st.photoUrl,
           storagePath: st.storagePath,
           renderStoragePath: garment.renderStoragePath,
@@ -11711,6 +11711,12 @@
           renderRotation: 0,
           source: "photo-parse"
         };
+        // PC-93: renderUrl is minted at confirm time (see
+        // mintParseRenderUrls) and stashed on the garment. Without it
+        // photoDisplayUrl falls back to the original photo, so the
+        // cutout — generated and passed — never shows.
+        if (garment.renderUrlForEntry) entry.renderUrl = garment.renderUrlForEntry;
+        return entry;
       }
 
       function renderOutfitParse() {
@@ -12306,7 +12312,36 @@
       // { parseId, photoUrl, storagePath, decisions, createdItemIds,
       // appendedItemIds } — outfitParseState is one ctx; the chat
       // card builds its own. Resolves { sel, names, appendErrors }.
+      // PC-93 (2026-11-26): mint the cutout download URL for each kept
+      // garment that has a passed render, so the saved photo entry
+      // carries renderUrl and resolveDisplayPhoto shows the cutout.
+      // The parse sheet mints these URLs in memory only (st.renderUrls);
+      // the saved item needs them persisted. A mint failure never
+      // blocks the save — the entry is written without renderUrl
+      // (today's behavior) and the backfill script
+      // (scripts/backfill-render-urls.js) heals it later. One retry.
+      function mintParseRenderUrls(kept) {
+        var jobs = kept.map(function (g) {
+          if (!g.renderStoragePath) return Promise.resolve();
+          function once() {
+            return storage.ref().child(g.renderStoragePath).getDownloadURL().then(function (url) {
+              g.renderUrlForEntry = url;
+            });
+          }
+          return once().catch(function () { return once().catch(function () {}); });
+        });
+        return Promise.all(jobs);
+      }
+
+      // PC-93: mint cutout URLs first; the save chain below reads them
+      // off the garments when it builds photo entries.
       function applyParseGarmentDecisions(ctx, kept) {
+        return mintParseRenderUrls(kept).then(function () {
+          return applyParseGarmentDecisionsInner(ctx, kept);
+        });
+      }
+
+      function applyParseGarmentDecisionsInner(ctx, kept) {
         var sel = [];
         var names = [];
         var chain = Promise.resolve();
