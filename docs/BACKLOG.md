@@ -1527,3 +1527,184 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   trip; Today dropped its trip card immediately, still gone after
   reload. No orphan cards. Close at the next planning walk unless
   kept as regression cover.
+
+### PC-93: A cutout made from a photo never shows on the saved item (S/M) — issue #158
+
+- **Origin:** Founder report 2026-11-26 (Thanksgiving Day): mirror
+  outfit photo uploaded; new sweatshirt's cutout "is not generated".
+  Investigation the same day proved the cutout exists and passed.
+- **Problem:** the outfit-parse flow cuts each garment with SAM-3 and
+  stores the render (`renders/<hash>.png`, `renderStatus: "passed"`).
+  The parse review sheet shows the cutout (it mints the download URL
+  in memory). But `outfitParsePhotoEntry` copies only
+  `renderStoragePath` + `renderStatus` onto the new item's photo
+  entry — it never mints `renderUrl`. `photoDisplayUrl` returns
+  `renderUrl || url`, so every display surface falls back to the
+  original mirror photo. `requestPhotoRender` (the BiRefNet path,
+  which does mint `renderUrl` on a gate pass) is never called on the
+  parse-confirm path — its call sites are only the single-item add
+  flows. Net: the cutout is generated, passed, stored — and invisible.
+  The founder saw it in review, then it vanished on the saved item.
+- **In scope:** mint the render download URL when a parse garment is
+  confirmed into an item (same pattern the review sheet already
+  uses), so the saved photo entry carries `renderUrl` and the
+  resolver shows the cutout. Backfill existing items whose photo
+  entry has `renderStatus: "passed"` but no `renderUrl` (the
+  sweatshirt `FHMXDcg4NNpkdj8HsFMY` first).
+- **Done looks like:** confirming a parsed garment shows the cutout
+  on the item page, wardrobe grid, and outfit cards — not the
+  original mirror photo. The sweatshirt shows its cutout without
+  the founder re-doing anything.
+- **Effort:** S/M.
+- **Status:** Filed 2026-11-26 (founder report). In Sprint 37 — Issue #158.
+  proposed (direct founder order 2026-11-26).
+
+### PC-94: Diffusion standardizes the mirror photo, not the garment (M) — issue #159
+
+- **Origin:** Founder report 2026-11-26: two manual Generate
+  attempts on the burgundy/yellow sweatshirt both failed.
+  `error_events` show `quality_gates_failed: color(ΔE=24.3),
+  geometry` (Nov 25) and `color(ΔE=28.0), geometry` (Nov 26).
+- **Problem:** `runStandardizationPipeline` feeds FLUX
+  `photos[0].url` — the original mirror photo (person + room +
+  pants). The color gate compares the median color of that whole
+  scene against the garment-only render. Reproduced with the real
+  photo: even a perfect solid-burgundy render scores ΔE=49.9
+  against the worn-photo input (bar is 15). The gate measures the
+  scene, not the garment, so it can never pass for a worn photo —
+  no matter how good FLUX is. The cutout render (garment-only,
+  already stored, already passed) is the input FLUX and the gate
+  should see.
+- **In scope:** when the item's first photo carries a passed cutout
+  render, the pipeline uses the render (signed URL) as the FLUX
+  input and as the color gate's input. No cutout → current behavior
+  (original), recorded as a known-weak case.
+- **Done looks like:** the sweatshirt's standardization passes the
+  color gate (or fails on a real FLUX color miss, with the rejected
+  render saved as evidence — PC-97). A worn-photo item no longer
+  fails the color gate by construction.
+- **Effort:** M.
+- **Status:** Filed 2026-11-26 (founder report). In Sprint 37 — Issue #159.
+  proposed (direct founder order 2026-11-26).
+
+### PC-95: The geometry gate fails every FLUX output (S/M) — issue #160
+
+- **Origin:** Founder report 2026-11-26 (same two failures as
+  PC-94: both list `geometry` alongside the color failure).
+- **Problem:** `gateGeometry` counts alpha ≥ 128 as opaque and
+  fails when coverage exceeds 95% ("no-background-detected").
+  But the pipeline runs the gates on the raw FLUX output, before
+  the SAM cutout — and a FLUX render has no alpha channel, so
+  `ensureAlpha()` makes every pixel opaque: coverage is 100%,
+  always. Reproduced with the real photo: the geometry gate fails
+  an opaque image by construction. No item has passed the real
+  gates since they went live (Sprint 27, ~Nov 4): all 11 "ready"
+  items completed Nov 1, before the gates. The gate measures a
+  property (transparency) that only exists after the step it
+  precedes. No test in `standardize.test.js` covers the geometry
+  gate at all — the gap that let this ship.
+- **In scope:** the pre-SAM geometry check measures background
+  whiteness instead of alpha (border pixels >90% near-white, like
+  `isAlreadyClean`; garment = non-white pixels; same 10–95%
+  coverage and 0.15–6 aspect bounds). Unit tests: opaque FLUX-like
+  output passes; empty/white image fails; sliver fails; a true
+  transparent cutout still passes.
+- **Done looks like:** a clean FLUX render on white passes the
+  geometry gate; the sweatshirt's standardization is no longer
+  blocked by `geometry`.
+- **Effort:** S/M.
+- **Status:** Filed 2026-11-26 (founder report). In Sprint 37 — Issue #160.
+  proposed (direct founder order 2026-11-26).
+
+### PC-96: The auto-standardize trigger has no API key, so it silently skips every item (S) — issue #161
+
+- **Origin:** Founder report 2026-11-26. The sweatshirt
+  (`FHMXDcg4NNpkdj8HsFMY`, created Nov 25 13:03 PST) has
+  `standardization.attempts: 2` — exactly the two manual taps,
+  zero automatic attempts.
+- **Problem:** `autoStandardizeItem` is ACTIVE but the Cloud
+  Functions API shows `secrets: []`. `deploy-create.js`
+  binds `FAL_API_KEY` only to `standardizeItem` — the trigger was
+  created without it. With no key the trigger logs "not
+  configured, skipping" and returns, so every new item that is
+  not already-clean never gets an automatic attempt. The clean
+  check runs before the key check, which is why 55 items still
+  read `already_clean` — the skip is invisible for the rest.
+  This is the documented failure class in `~/AGENTS.md` ("New
+  Cloud Functions need secrets bound at create"); the trigger
+  is a second instance of it.
+- **In scope:** bind `FAL_API_KEY` to the deployed trigger (live
+  patch via the Functions API, verified by read-back) AND add
+  `autoStandardizeItem: ["FAL_API_KEY"]` to
+  `SECRETS_BY_FUNCTION` in `deploy-create.js` so a future
+  recreate keeps it. Add a secrets audit script that lists
+  deployed functions and compares against `SECRETS_BY_FUNCTION`,
+  run it now, and record it as a step in the deploy checklist.
+- **Done looks like:** a new non-clean item gets
+  `standardization.status: "processing"` from the trigger within
+  a minute of creation, without any manual tap; the audit script
+  reports zero missing bindings.
+- **Effort:** S.
+- **Status:** Filed 2026-11-26 (founder report). In Sprint 37 — Issue #161.
+  proposed (direct founder order 2026-11-26).
+
+### PC-97: Identical retries burn runs on a failure that cannot pass (M) — issue #162
+
+- **Origin:** Founder report 2026-11-26. Two manual attempts =
+  six FLUX runs (3 gate retries each), all failed identically.
+  Cost $0.18, zero chance of passing.
+- **Problem:** the pipeline retries FLUX up to 3× on any gate
+  failure with the same input and the same prompt — "fresh input,
+  rebuilt prompt" rebuilds an identical prompt. For a systematic
+  failure (color drift on a two-tone garment, or a gate that
+  mis-measures by construction) the retries are deterministic:
+  same failure, 3× the cost. Two more holes in the same loop:
+  (a) a failed FLUX output is thrown away — no rejected render
+  is saved, so there is nothing to inspect and no way to tell a
+  FLUX miss from a gate miss (extract.js saves the render either
+  way as tuning evidence; this pipeline does not); (b) the FLUX
+  poll allows 200s per attempt, so 3 attempts can run 600s
+  against the 300s function/client timeout — a slow FLUX day
+  strands the item in "processing" until the 30-minute sweeper.
+- **In scope:** stop retrying when two consecutive attempts fail
+  with the same gate signature (same failing gate, ΔE in the same
+  band) — record `systematic_gate_failure` and stop. Save the
+  last FLUX output as a rejected render
+  (`standardized-rejected-<attempt>.png`, path recorded on the
+  item) before throwing. Budget the loop against the 300s
+  timeout: no new FLUX attempt starts unless ~90s remain for
+  SAM + upload.
+- **Done looks like:** a systematic gate failure costs one FLUX
+  run, not three; the rejected render is viewable on the item;
+  a slow-FLUX run ends `failed` with a clear reason inside the
+  timeout instead of stranding in `processing`.
+- **Effort:** M.
+- **Status:** Filed 2026-11-26 (founder report). In Sprint 37 — Issue #162.
+  proposed (direct founder order 2026-11-26).
+
+### PC-98: A failed standardization tells the founder nothing useful (S) — issue #163
+
+- **Origin:** Founder report 2026-11-26: "diffusion 2 attempts
+  did not work". The item page said only "The AI version didn't
+  come out right. You can try again." — no reason, no sense that
+  retrying the same way fails the same way.
+- **Problem:** `lastError` carries the real reason
+  (`quality_gates_failed: color(ΔE=28.0), geometry`) but the UI
+  never translates it. The founder burned a second attempt on a
+  failure that could not pass, because nothing told him the
+  colors were the problem. The error doctrine (one human
+  sentence, full detail to the ledger) is met on the ledger side
+  and empty on the human side.
+- **In scope:** the item page translates the last failure into
+  one plain sentence — color ("the AI render's colors came out
+  too far from the original"), geometry ("the AI render came out
+  incomplete"), FLUX/provider error ("the image service failed"),
+  timeout ("it took too long") — plus what helps (try again with
+  feedback, or keep the original). The Try again button stays
+  available; the message never promises a retry will work.
+- **Done looks like:** after a failed attempt the founder reads
+  why it failed and what to do, in one sentence, without opening
+  any log.
+- **Effort:** S.
+- **Status:** Filed 2026-11-26 (founder report). In Sprint 37 — Issue #163.
+  proposed (direct founder order 2026-11-26).
