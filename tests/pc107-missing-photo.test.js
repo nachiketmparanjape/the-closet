@@ -156,3 +156,45 @@ describe("source pins", function () {
     );
   });
 });
+
+describe("dialogPhotoNeedsRefresh (Sprint 40: the snapshot must not restart the error chain)", function () {
+  const dialogPhotoNeedsRefresh = extractClientFn("dialogPhotoNeedsRefresh", "currentSrc, freshUrl");
+
+  test("unchanged URL: no refresh — the error chain runs to the placeholder", function () {
+    assert.equal(dialogPhotoNeedsRefresh("https://example.com/dead.jpg", "https://example.com/dead.jpg"), false);
+  });
+
+  test("a cache-busted retry URL compares equal to its base", function () {
+    assert.equal(dialogPhotoNeedsRefresh("https://example.com/dead.jpg?cb=1730000000000", "https://example.com/dead.jpg"), false);
+    assert.equal(dialogPhotoNeedsRefresh("https://example.com/dead.jpg?alt=media&cb=1730000000000", "https://example.com/dead.jpg?alt=media"), false);
+  });
+
+  test("a changed URL refreshes — a cutout landing, or a standardization completing", function () {
+    assert.equal(dialogPhotoNeedsRefresh("https://example.com/original.jpg", "https://example.com/cutout.png"), true);
+    assert.equal(dialogPhotoNeedsRefresh("https://example.com/cutout.png", "https://example.com/standardized.png"), true);
+  });
+
+  test("the placeholder stays put while the photo is still missing", function () {
+    const placeholder = photoPlaceholderDataUri("Burgundy yellow sweatshirt");
+    assert.equal(dialogPhotoNeedsRefresh(placeholder, null), false);
+    assert.equal(dialogPhotoNeedsRefresh(placeholder, ""), false);
+  });
+
+  test("the placeholder refreshes when a real photo arrives (re-upload)", function () {
+    const placeholder = photoPlaceholderDataUri("Burgundy yellow sweatshirt");
+    assert.equal(dialogPhotoNeedsRefresh(placeholder, "https://example.com/readded.jpg"), true);
+  });
+
+  test("no current src always refreshes; no fresh URL refreshes so the placeholder is set", function () {
+    assert.equal(dialogPhotoNeedsRefresh("", "https://example.com/x.jpg"), true);
+    assert.equal(dialogPhotoNeedsRefresh(null, "https://example.com/x.jpg"), true);
+    assert.equal(dialogPhotoNeedsRefresh("https://example.com/dead.jpg", null), true);
+  });
+});
+
+describe("source pins (Sprint 40)", function () {
+  test("the snapshot refresh gates showDisplayPhoto on the display URL changing", function () {
+    assert.ok(/dialogPhotoNeedsRefresh\(itemPhoto && itemPhoto\.getAttribute\("src"\), freshPhoto && freshPhoto\.url\)/.test(html),
+      "watchItems must gate the dialog photo refresh on the URL changing");
+  });
+});

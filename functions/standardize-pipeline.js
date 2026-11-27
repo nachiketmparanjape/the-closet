@@ -95,6 +95,9 @@ function gateSignature(gates) {
  */
 async function saveRejectedRender(bucket, db, itemRef, uid, itemId, fluxBuffer, reason) {
   if (!fluxBuffer) return;
+  // PC-111: every pipeline log line carries the item id, so a run
+  // is attributable without timestamp correlation.
+  const tag = `[standardize-pipeline:${itemId}]`;
   const rejectedPath = `users/${uid}/items/${itemId}/standardized-rejected.png`;
   try {
     await bucket.file(rejectedPath).save(fluxBuffer, { contentType: "image/png" });
@@ -102,9 +105,9 @@ async function saveRejectedRender(bucket, db, itemRef, uid, itemId, fluxBuffer, 
       "standardization.lastRejectedStoragePath": rejectedPath,
       "standardization.lastRejectedReason": reason || null,
     });
-    console.log(`[standardize-pipeline] rejected render saved at ${rejectedPath}`);
+    console.log(`${tag} rejected render saved at ${rejectedPath}`);
   } catch (e) {
-    console.log(`[standardize-pipeline] rejected render save failed (non-fatal): ${e.message}`);
+    console.log(`${tag} rejected render save failed (non-fatal): ${e.message}`);
   }
 }
 
@@ -118,13 +121,14 @@ async function saveRejectedRender(bucket, db, itemRef, uid, itemId, fluxBuffer, 
 // FLUX sees the piece, and the gate measures the piece. Falls back
 // to the original photo when no passed render exists or its URL
 // cannot be minted (today's behavior).
-async function resolvePipelineInput(bucket, firstPhoto) {
+async function resolvePipelineInput(bucket, firstPhoto, itemId) {
+  const tag = `[standardize-pipeline:${itemId}]`;
   if (firstPhoto.renderStoragePath && firstPhoto.renderStatus === "passed") {
     try {
       const imageUrl = await downloadUrlForPath(bucket, firstPhoto.renderStoragePath);
       return { imageUrl, inputKind: "cutout" };
     } catch (e) {
-      console.log(`[standardize-pipeline] cutout URL failed, using original: ${e.message}`);
+      console.log(`${tag} cutout URL failed, using original: ${e.message}`);
     }
   }
   return { imageUrl: firstPhoto.url, inputKind: "original" };
@@ -134,11 +138,12 @@ async function resolvePipelineInput(bucket, firstPhoto) {
 // The final transaction only writes inputKind on success; a failed
 // run left no trace of its input (the Black tee's doc had none).
 // Best-effort: never block the run.
-async function persistInputKind(itemRef, inputKind) {
+async function persistInputKind(itemRef, inputKind, itemId) {
+  const tag = `[standardize-pipeline:${itemId}]`;
   try {
     await itemRef.update({ "standardization.inputKind": inputKind });
   } catch (e) {
-    console.log(`[standardize-pipeline] inputKind persist failed (non-fatal): ${e.message}`);
+    console.log(`${tag} inputKind persist failed (non-fatal): ${e.message}`);
   }
 }
 
@@ -173,8 +178,10 @@ async function runStandardizationPipeline({ db, bucket, uid, itemId, item, falAp
   // the doc before every later attempt.
   const itemRef = db.collection("users").doc(uid).collection("items").doc(itemId);
   const pipelineStartedAt = Date.now();
+  // PC-111: every pipeline log line carries the item id.
+  const tag = `[standardize-pipeline:${itemId}]`;
   const sleep = sleepMs || ((ms) => new Promise((r) => setTimeout(r, ms)));
-  let { imageUrl, inputKind } = await resolvePipelineInput(bucket, photos[0]);
+  let { imageUrl, inputKind } = await resolvePipelineInput(bucket, photos[0], itemId);
 
   // Grace wait (attempt 1 only, never on a forced run): the item was
   // just created, so its cutout is likely in flight. Poll the doc for
@@ -189,16 +196,16 @@ async function runStandardizationPipeline({ db, bucket, uid, itemId, item, falAp
         const fresh = snap && snap.exists ? (snap.data() || {}) : {};
         const freshPhoto = (fresh.photos || [])[0] || {};
         if (freshPhoto.renderStoragePath && freshPhoto.renderStatus === "passed") {
-          const resolved = await resolvePipelineInput(bucket, freshPhoto);
+          const resolved = await resolvePipelineInput(bucket, freshPhoto, itemId);
           if (resolved.inputKind === "cutout") {
             imageUrl = resolved.imageUrl;
             inputKind = resolved.inputKind;
-            console.log(`[standardize-pipeline] cutout landed during grace wait, using it`);
+            console.log(`${tag} cutout landed during grace wait, using it`);
             break;
           }
         }
       } catch (e) {
-        console.log(`[standardize-pipeline] grace-wait read failed (non-fatal): ${e.message}`);
+        console.log(`${tag} grace-wait read failed (non-fatal): ${e.message}`);
         break;
       }
     }
@@ -207,7 +214,7 @@ async function runStandardizationPipeline({ db, bucket, uid, itemId, item, falAp
   // final transaction only writes it on success, and a failed run
   // left no trace of its input (the Black tee's doc had no inputKind).
   // Best-effort: never block the run.
-  await persistInputKind(itemRef, inputKind);
+  await persistInputKind(itemRef, inputKind, itemId);
 
   // 1. FLUX standardization, with quality-gate retries.
   // Each attempt re-runs FLUX (fresh input, rebuilt prompt — no prior-render context).
@@ -221,7 +228,7 @@ async function runStandardizationPipeline({ db, bucket, uid, itemId, item, falAp
       const { dominantColor } = require("./standardize");
       colorAnchor = await dominantColor(inputBuffer);
     } catch (e) {
-      console.log(`[standardize-pipeline] color anchor failed (non-fatal): ${e.message}`);
+      console.log(`${tag} color anchor failed (non-fatal): ${e.message}`);
       colorAnchor = null;
     }
   }
@@ -247,7 +254,7 @@ async function runStandardizationPipeline({ db, bucket, uid, itemId, item, falAp
         return { ready: false, pendingReview: false, standardizedUrl: null, inputKind, skipped: true, reason: "already_clean" };
       }
     } catch (e) {
-      console.log(`[standardize-pipeline] clean check failed (non-fatal, proceeding): ${e.message}`);
+      console.log(`${tag} clean check failed (non-fatal, proceeding): ${e.message}`);
     }
   }
   // PC-100: anchor FLUX to the input's measured dominant color (the
@@ -259,7 +266,7 @@ async function runStandardizationPipeline({ db, bucket, uid, itemId, item, falAp
     const { dominantColor } = require("./standardize");
     colorAnchor = await dominantColor(inputBuffer);
   } catch (e) {
-    console.log(`[standardize-pipeline] color anchor failed (non-fatal): ${e.message}`);
+    console.log(`${tag} color anchor failed (non-fatal): ${e.message}`);
   }
   let outputUrl = null;
   let fluxBuffer = null;
@@ -284,17 +291,17 @@ async function runStandardizationPipeline({ db, bucket, uid, itemId, item, falAp
         const fresh = snap && snap.exists ? (snap.data() || {}) : {};
         const freshPhoto = (fresh.photos || [])[0] || {};
         if (freshPhoto.renderStoragePath && freshPhoto.renderStatus === "passed") {
-          const resolved = await resolvePipelineInput(bucket, freshPhoto);
+          const resolved = await resolvePipelineInput(bucket, freshPhoto, itemId);
           if (resolved.inputKind === "cutout") {
             await reloadInput(resolved.imageUrl);
             inputKind = resolved.inputKind;
             prevGateSignature = null;
-            await persistInputKind(itemRef, inputKind);
-            console.log(`[standardize-pipeline] cutout landed before attempt ${attempt}, switching input`);
+            await persistInputKind(itemRef, inputKind, itemId);
+            console.log(`${tag} cutout landed before attempt ${attempt}, switching input`);
           }
         }
       } catch (e) {
-        console.log(`[standardize-pipeline] input re-check failed (non-fatal): ${e.message}`);
+        console.log(`${tag} input re-check failed (non-fatal): ${e.message}`);
       }
     }
     outputUrl = await runFluxStandardization(imageUrl, falApiKey, item, feedback, colorAnchor, {
@@ -310,7 +317,7 @@ async function runStandardizationPipeline({ db, bucket, uid, itemId, item, falAp
     const gates = await runQualityGates(inputBuffer, fluxBuffer);
     if (gates.pass) break;
     lastGateReason = gates.reason;
-    console.log(`[standardize-pipeline] Gate fail (attempt ${attempt}/${MAX_GATE_RETRIES}): ${gates.reason}`);
+    console.log(`${tag} Gate fail (attempt ${attempt}/${MAX_GATE_RETRIES}): ${gates.reason}`);
     // PC-97: a systematic failure repeats identically — the same gates
     // fail the same way, run after run, because the input is wrong
     // (e.g. a mirror photo fed to a garment-color gate), not because
@@ -334,7 +341,7 @@ async function runStandardizationPipeline({ db, bucket, uid, itemId, item, falAp
   let standardizedBuffer = fluxBuffer;
   let cutoutNote = "";
   try {
-    console.log(`[standardize-pipeline] Running SAM 3 on FLUX output for transparency...`);
+    console.log(`${tag} Running SAM 3 on FLUX output for transparency...`);
     const seg = await createFalSegmentation({
       apiKey: falApiKey,
       imageBuffer: fluxBuffer,
@@ -364,15 +371,15 @@ async function runStandardizationPipeline({ db, bucket, uid, itemId, item, falAp
     if (maskUrl) {
       const maskBuffer = await fetchMaskBuffer({ url: maskUrl, fetchImpl: fetch });
       standardizedBuffer = await maskToCutout({ imageBuffer: fluxBuffer, maskBuffer });
-      console.log(`[standardize-pipeline] SAM 3 cutout done, ${standardizedBuffer.length} bytes`);
+      console.log(`${tag} SAM 3 cutout done, ${standardizedBuffer.length} bytes`);
     } else {
       cutoutNote = " (SAM 3 timed out, using white background)";
-      console.log(`[standardize-pipeline] SAM 3 timed out, falling back to white background`);
+      console.log(`${tag} SAM 3 timed out, falling back to white background`);
     }
   } catch (samErr) {
     // Non-fatal: fall back to the white-background FLUX output.
     cutoutNote = " (cutout failed, using white background)";
-    console.log(`[standardize-pipeline] SAM 3 failed: ${samErr.message}, using white background`);
+    console.log(`${tag} SAM 3 failed: ${samErr.message}, using white background`);
   }
 
   // 4. Upload + mark PENDING REVIEW (Sprint 28 Card 2, #128).
@@ -380,7 +387,13 @@ async function runStandardizationPipeline({ db, bucket, uid, itemId, item, falAp
   // founder's eyes (approve / regenerate / keep original). The original
   // photo is never replaced. The pending render is stored on the
   // standardization object; approve swaps it into photos[] as 'standardized'.
-  const stdPath = `users/${uid}/items/${itemId}/standardized-pending.png`;
+  // PC-111: the pending render is versioned per run (wall-clock
+  // stamp), so the comparison a user approves from is the render
+  // the gates actually judged. A fixed path let a re-run overwrite
+  // it in place, and a viewer or CDN cache could show a stale
+  // render at review time. approveStandardization reads
+  // pendingStoragePath, so the stamped path flows through.
+  const stdPath = `users/${uid}/items/${itemId}/standardized-pending-${Date.now()}.png`;
   await bucket.file(stdPath).save(standardizedBuffer, { contentType: "image/png" });
   await bucket.file(stdPath).makePublic();
   const stdUrl = `https://storage.googleapis.com/${bucket.name}/${stdPath}`;

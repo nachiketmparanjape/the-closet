@@ -27,7 +27,7 @@ function extractClientFn(name, args) {
 
 const standardizeFailureToast = extractClientFn("standardizeFailureToast", "name, err");
 const toastStdFailureOnce = extractClientFn("toastStdFailureOnce", "itemId, name, lastError, ref");
-const toastNewStdFailures = extractClientFn("toastNewStdFailures", "items, activeItemId, nowMs");
+const toastNewStdFailures = extractClientFn("toastNewStdFailures", "items, nowMs");
 
 function installFakes() {
   const toasts = [];
@@ -84,17 +84,19 @@ describe("toastStdFailureOnce (Sprint 39: one toast per failure, any path)", fun
     assert.doesNotMatch(toasts[0], /ΔE|systematic_gate_failure/);
   });
 
-  test("a different reason or a different item is a new failure and toasts", function () {
+  test("a different reason on the same item is the SAME failure (Sprint 40: the key is the item alone) — only a different item toasts again", function () {
     const toasts = installFakes();
     toastStdFailureOnce("it1", "Navy crew-neck tee", "systematic_gate_failure: color(ΔE=20.4)", null);
-    toastStdFailureOnce("it1", "Navy crew-neck tee", "systematic_gate_failure: color(ΔE=21.1)", null);
+    // The catch sees the catalog message, the snapshot sees the
+    // pipeline's lastError — different strings, one failure.
+    toastStdFailureOnce("it1", "Navy crew-neck tee", "Something went wrong. Try again.", null);
     toastStdFailureOnce("it2", "Black tee", "systematic_gate_failure: color(ΔE=20.4)", null);
-    assert.equal(toasts.length, 3);
+    assert.equal(toasts.length, 2);
   });
 
   test("after 10 minutes the same failure may announce itself again", function () {
     const toasts = installFakes();
-    global.stdFailureToasted = { "it1|systematic_gate_failure: color": Date.now() - 11 * 60 * 1000 };
+    global.stdFailureToasted = { "it1": Date.now() - 11 * 60 * 1000 };
     toastStdFailureOnce("it1", "Navy crew-neck tee", "systematic_gate_failure: color", null);
     assert.equal(toasts.length, 1);
   });
@@ -114,8 +116,8 @@ describe("toastNewStdFailures (Sprint 39: the snapshot is the witness)", functio
     const toasts = installFakes();
     const now = Date.now();
     const items = [failedItem("it1", "Navy crew-neck tee", new Date(now - 60 * 1000).toISOString())];
-    toastNewStdFailures(items, null, now);
-    toastNewStdFailures(items, null, now + 1000);
+    toastNewStdFailures(items, now);
+    toastNewStdFailures(items, now + 1000);
     assert.equal(toasts.length, 1);
     assert.match(toasts[0], /Navy crew-neck tee/);
   });
@@ -124,16 +126,17 @@ describe("toastNewStdFailures (Sprint 39: the snapshot is the witness)", functio
     const toasts = installFakes();
     const now = Date.now();
     const items = [failedItem("it1", "Navy crew-neck tee", new Date(now - 20 * 60 * 1000).toISOString())];
-    toastNewStdFailures(items, null, now);
+    toastNewStdFailures(items, now);
     assert.equal(toasts.length, 0);
   });
 
-  test("the open dialog's item never toasts — its page already shows the reason", function () {
+  test("the open dialog's item toasts too (Sprint 40: the skip is gone — the skip silenced the toast exactly when the user watched the item page)", function () {
     const toasts = installFakes();
     const now = Date.now();
     const items = [failedItem("it1", "Navy crew-neck tee", new Date(now - 60 * 1000).toISOString())];
-    toastNewStdFailures(items, "it1", now);
-    assert.equal(toasts.length, 0);
+    toastNewStdFailures(items, now);
+    assert.equal(toasts.length, 1);
+    assert.match(toasts[0], /Navy crew-neck tee/);
   });
 
   test("a processing item, and a failure with no attempt time, stay quiet", function () {
@@ -143,19 +146,37 @@ describe("toastNewStdFailures (Sprint 39: the snapshot is the witness)", functio
       { id: "it1", name: "Navy tee", standardization: { status: "processing" } },
       { id: "it2", name: "Black tee", standardization: { status: "failed", lastError: "x" } },
     ];
-    toastNewStdFailures(items, null, now);
+    toastNewStdFailures(items, now);
     assert.equal(toasts.length, 0);
   });
 });
 
 describe("source pins", function () {
-  test("both standardize catch sites toast the named failure, not the generic error", function () {
+  test("both standardize catch sites AND both .then sites toast the named failure (4 call sites: Generate catch + Refresh catch + two data.failed handlers)", function () {
     const calls = html.match(/toastStdFailureOnce\(itemId, failName,/g) || [];
-    assert.equal(calls.length, 2, "Generate catch + Refresh catch must both use the shared once-toast");
+    assert.equal(calls.length, 4, "Generate catch + Refresh catch + Generate .then + Refresh .then must all use the shared once-toast");
   });
 
   test("the snapshot listener announces background failures", function () {
     assert.ok(/toastNewStdFailures\(allItems,/.test(html), "watchItems must call toastNewStdFailures on every snapshot");
+  });
+
+  test("the snapshot listener no longer skips the open dialog's item", function () {
+    assert.doesNotMatch(html, /if \(activeItemId && activeItemId === it\.id\) continue;/);
+  });
+
+  test("the dedupe key is the item alone (Sprint 40: catch and snapshot see different reason strings for one failure)", function () {
+    assert.ok(/var key = itemId;/.test(html), "toastStdFailureOnce must key on the item alone");
+  });
+
+  test("the attribute sheet's Continue counts as the confirmation — proceedWithGenerate skips the arm from the sheet", function () {
+    assert.ok(/proceedWithGenerate\(selections, true\)/.test(html), "the sheet's onComplete must pass fromSheet=true");
+    assert.ok(/if \(!fromSheet && !armOrRun\(btn, "Tap again to generate"\)\)/.test(html), "proceedWithGenerate must skip the arm when it arrives from the sheet");
+  });
+
+  test("both .then handlers toast the server's silent { failed: true } return", function () {
+    const checks = html.match(/if \(data && data\.failed\) \{/g) || [];
+    assert.equal(checks.length, 2, "Generate .then + Refresh .then must both toast data.failed");
   });
 
   test("the Generate catch resolves the name from the item, then the open dialog", function () {

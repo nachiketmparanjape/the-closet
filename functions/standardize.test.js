@@ -9,6 +9,8 @@ const {
   FLUX_PROMPT,
   isAlreadyClean,
   gateGeometry,
+  gateColorFidelity,
+  runQualityGates,
 } = require('./standardize');
 
 describe('PC-58 standardization constants', () => {
@@ -117,5 +119,31 @@ describe('dominantColor + color anchor (PC-100)', () => {
   it('buildFluxPrompt is unchanged without an anchor', () => {
     const prompt = buildFluxPrompt({ name: 'Burgundy sweatshirt', category: 'Tops' }, '');
     assert.equal(prompt.includes('main color is RGB'), false);
+  });
+});
+
+describe('PC-111: gates fail CLOSED on error', () => {
+  // Round 7: a navy render reached review for a red tee — the gates
+  // had failed open on exception (pass:true, deltaE:0, silently).
+  // A gate that cannot measure must fail the run, visibly, instead
+  // of presenting an unjudged render.
+  const garbage = Buffer.from('not an image at all');
+
+  it('gateColorFidelity fails closed when the image cannot be read', async () => {
+    const res = await gateColorFidelity(garbage, garbage);
+    assert.equal(res.pass, false);
+    assert.match(res.reason, /^gate-error:/);
+  });
+
+  it('gateGeometry fails closed when the image cannot be read', async () => {
+    const res = await gateGeometry(garbage);
+    assert.equal(res.pass, false);
+    assert.match(res.reason, /^gate-error:/);
+  });
+
+  it('runQualityGates fails closed and names the broken gate', async () => {
+    const res = await runQualityGates(garbage, garbage);
+    assert.equal(res.pass, false);
+    assert.match(res.reason, /gate-error:/);
   });
 });

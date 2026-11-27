@@ -155,16 +155,19 @@ No P0, two P1s, four P2s. Full report:
   standardization then failed the color gate — the gate
   working, not the link.)
 - **PC-102 (#167) — FAIL (P1).** Zero toasts on either failure.
-  Cause proven the same night: the `standardizeItem` callable
-  swallows pipeline failures (outer catch returns nothing, so
-  the client gets success-with-null and both foreground catches
-  never fire on a gate failure), and the snapshot listener
-  skips the open dialog's item by design — QA watched the item
-  page during both failures. Separately, the manual Generate
-  QA tapped at ~23:16 never reached the server at all (no
-  request in the Cloud Run logs 07:14–07:18Z; no client_error
-  either) — the page kept showing the automatic run's failure
-  note. Where the tap dies is not yet established.
+  Cause proven the same night, corrected once: the callable
+  does NOT swallow failures — `boundary()` throws, so a gate
+  failure does reach the client's `.catch` (the earlier
+  'swallow' claim was inferred, not read, and is withdrawn).
+  The real silences are (a) the snapshot listener skips the
+  open dialog's item by design, and QA watched the item page
+  during both failures; and (b) the manual Generate never sent
+  a request — the attribute sheet's Continue ($0.03) is
+  consumed as the Generate button's FIRST (arming) tap, so the
+  generation never starts and the user must tap again with
+  only a transient toast saying so. The page kept showing the
+  automatic run's failure note, which QA read as 'failed
+  again'.
 - **PC-108 (#173) — PASS.** Bulk button reset to 'Add pieces'
   and disabled after both rows showed Done; wardrobe 75 → 77.
 - **PC-107 (#172) — PARTIAL.** Tile PASS (named placeholder),

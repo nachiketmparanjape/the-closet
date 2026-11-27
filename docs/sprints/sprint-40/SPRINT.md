@@ -1,6 +1,6 @@
 # Sprint 40 — The failure must be heard, and the review must show the truth
 
-- **Status:** PROPOSED 2026-11-26 (awaiting the founder's yes).
+- **Status:** APPROVED by the founder 2026-11-26 ("Yes — open Sprint 40 for the three fixes").
 - **Theme:** Sprint 39 closed the silent drops in the delivery
   mechanism — but QA Round 7 proved the failure path itself is
   still silent, and the review comparison can show the wrong
@@ -17,30 +17,40 @@
 
 ## The evidence (what Round 7 saw vs what the logs prove)
 
-- **PC-102 — the toast never fires, two independent silences.**
-  The large navy tee's automatic run failed the color gate
-  (systematic, ΔE=74.8 then 76.6) and its manual retry failed
-  again — zero toasts in either window, while QA watched the
-  item page. Proven from the code: (1) the `standardizeItem`
-  callable's outer catch (`functions/index.js`) calls
-  `flushAiUsage` + `boundary` and then returns nothing, so the
-  client gets success-with-null data and both foreground
-  `.catch` handlers — the only toast sites for a manual run —
-  never fire on a gate failure. They only ever fired on
-  transport errors, which is why Round 5's toast appeared (the
-  60s-timeout kill) and Rounds 6–7's never did. (2) The Sprint
-  39 snapshot listener skips the open dialog's item by design
-  (`toastNewStdFailures`: `if (activeItemId === it.id)
-  continue`) — QA watched the item page during both failures,
-  so the background path was silenced too. (3) The manual
-  Generate QA tapped at ~23:16 never reached the server at all:
-  Cloud Run logs show NO standardizeItem request 07:14–07:18Z
-  (5 requests in the whole round window: 3 single-auto + 2
-  bulk-auto), and no `client_errors` entry in the window — the
-  page kept showing the automatic run's failure note, which QA
-  read as "failed again". Where the tap dies (attribute sheet /
-  save path) is not yet established; the fix includes a live
-  repro of that tap.
+- **PC-102 — the toast never fires, two silences, one
+  correction.** The large navy tee's automatic run failed the
+  color gate (systematic, ΔE=74.8 then 76.6) and its manual
+  retry failed again — zero toasts in either window, while QA
+  watched the item page. CORRECTION to the Round 7 closeout:
+  the `standardizeItem` callable does NOT swallow pipeline
+  failures — its outer catch ends with `await boundary(...)`
+  and `boundary()` throws an HttpsError, so a gate failure
+  DOES reach the client's `.catch`. The 'swallow' claim was
+  inferred from the missing toast, not read from the code, and
+  is withdrawn; no server change is needed on that path. The
+  two real silences: (1) the Sprint 39 snapshot listener skips
+  the open dialog's item by design (`toastNewStdFailures`: `if
+  (activeItemId === it.id) continue`) — QA watched the item
+  page during both failures, so the background path was
+  silenced. (2) The manual Generate QA tapped at ~23:16 never
+  sent a request: Cloud Run logs show NO standardizeItem
+  request 07:14–07:18Z (5 requests in the whole round window:
+  3 single-auto + 2 bulk-auto), and no `client_errors` entry
+  in the window — the page kept showing the automatic run's
+  failure note, which QA read as "failed again". Cause proven
+  from the code: the Generate button is two-tap (`armOrRun`),
+  and the attribute sheet's Continue ($0.03) is consumed as
+  the FIRST (arming) tap — it arms the button and returns
+  without calling. The user must tap Generate again after the
+  sheet closes, with only a transient cost toast saying so.
+  A third, smaller silence: the callable's
+  `{ failed: true, reason: "max_attempts_reached" }` return
+  resolves successfully and neither `.then` handler toasts on
+  it. And a dedupe gap the fix must close: the catch toasts on
+  the catalog message while the snapshot toasts on the
+  pipeline's `lastError` — different keys, so removing the
+  skip alone would double-toast one failure; the dedupe key
+  becomes the item alone (10-min expiry).
 - **PC-107 item page — does not reproduce after the round.**
   QA saw an empty dashed box at 23:19, mid-round. A live
   browser repro at 23:32 (same item, same dialog) shows the
@@ -85,13 +95,56 @@
 
 | # | Card | Size | What ships |
 |---|------|------|-----------|
-| 1 | PC-102 (#167) | M | The callable re-throws after `boundary` so a pipeline failure reaches the client's `.catch` (foreground toast fires on a gate failure, not just on transport errors). The snapshot listener drops the open-dialog skip — the shared `toastStdFailureOnce` dedupe already guarantees at most one toast per (item, reason) across both paths. Live repro of the dead manual tap (attribute sheet / save path) and fix wherever it dies. |
+| 1 | PC-102 (#167) | M | Client only — no server change (the callable already throws via `boundary`). The snapshot listener drops the open-dialog skip — the shared `toastStdFailureOnce` dedupe (now keyed on the item alone, 10-min expiry, so the catch and the snapshot cannot double-toast one failure) already guarantees at most one toast per item per window. The attribute sheet's Continue counts as the confirmation: `proceedWithGenerate` skips the arm when it arrives from the sheet, so the generation starts instead of arming and dying. Both `.then` handlers toast when the server returns `{ failed: true }` (max attempts), which previously resolved silently. |
 | 2 | PC-111 (#176) | M | The gates fail CLOSED on exception (a gate error fails the run, logged, instead of passing silently). The pending render is versioned per run (attempt-stamped path or a token query param on the review URL), so the comparison a user approves from is the render the gates actually judged. The pipeline's log lines carry the item id. |
 | 3 | PC-107 (#172) | S | The snapshot photo refresh only re-sets the open dialog's photo when the fresh doc's display URL changed; an unchanged URL leaves the image (and its error chain) alone. |
 
 ## Build results
 
-(TBD — filled as cards ship.)
+- **PC-102 (#167) — client only, no server change.** The
+  correction first: the callable does NOT swallow failures —
+  `boundary()` throws, so a gate failure does reach the
+  client's `.catch` (the Round 7 'swallow' claim was inferred,
+  not read, and is withdrawn in the BACKLOG, the Sprint 39
+  Retest, and a correction comment on #167). What shipped:
+  the snapshot listener drops the open-dialog skip; the
+  dedupe key is the item alone (10-min expiry) so the catch
+  (catalog message) and the snapshot (pipeline lastError)
+  cannot double-toast one failure; the attribute sheet's
+  Continue counts as the confirmation (`proceedWithGenerate`
+  skips the arm when it arrives from the sheet, so the
+  generation starts instead of arming and dying — Round 7's
+  dead tap); both `.then` handlers toast the server's silent
+  `{ failed: true }` return. 20 tests in
+  `tests/pc102-standardize-toast.test.js` (4 new pins).
+- **PC-111 (#176) — server.** The gates fail closed:
+  `gateColorFidelity` / `gateGeometry` return `{ pass: false,
+  reason: "gate-error:..." }` on exception (was `pass: true`,
+  silently), and `runQualityGates` surfaces a gate-error
+  reason verbatim. The pending render is versioned per run
+  (`standardized-pending-<Date.now()>.png`); approve reads
+  `pendingStoragePath`, so the stamped path flows through.
+  Every pipeline log line carries the item id
+  (`[standardize-pipeline:<itemId>]`, threaded through
+  `resolvePipelineInput` / `persistInputKind` too). 3 new
+  gate tests in `functions/standardize.test.js`, 2 new
+  pipeline tests.
+- **PC-107 (#172) — client.** New `dialogPhotoNeedsRefresh`:
+  the snapshot refresh re-sets the open dialog's photo only
+  when the fresh doc's display URL changed (a cache-busted
+  retry URL compares equal to its base; a placeholder
+  refreshes only when a real photo landed). 7 new tests in
+  `tests/pc107-missing-photo.test.js`.
+
+Suite: **839 passing, 0 fail** (full gate before deploy; was 823, +16).
+
+Deployed: `standardizeItem` updated (nodejs22, 300s/1Gi,
+updateTime 2026-11-27T07:53:14Z); hosting release
+`1795766008245000` (2026-11-27T07:53:28Z); live HTML carries
+`dialogPhotoNeedsRefresh` ×2, `fromSheet` ×6. Audit
+`scripts/verify-function-secrets.js`: 20 functions checked,
+secrets + config clean; only the 14 known nodejs20 runtimes
+remain (PC-99).
 
 ## Retest
 

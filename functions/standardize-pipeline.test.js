@@ -560,3 +560,49 @@ describe("PC-109: the pipeline input follows the cutout", function () {
     assert.ok(db.updates.some((u) => u["standardization.inputKind"] === "cutout"), "a failed run still records its input");
   });
 });
+
+describe("PC-111: the review shows the render the gates judged", function () {
+  it("the pending render is versioned per run — no fixed path to overwrite", async function () {
+    const cutoutBytes = await garmentCutout(BURGUNDY);
+    const originalBytes = await garmentOnRoom(BURGUNDY);
+    const fluxOutput = await garmentOnWhite(BURGUNDY);
+    const maskBytes = await maskPng();
+    const { fetch } = makeFetch({ fluxOutput, cutoutBytes, originalBytes, maskBytes });
+    global.fetch = fetch;
+    const db = fakeDb();
+    const bucket = fakeBucket();
+    const res = await runStandardizationPipeline({
+      db, bucket, uid: "u1", itemId: "it1", item: itemWithRender(), falApiKey: "fake-key",
+    });
+    assert.equal(res.pendingReview, true);
+    const pendingPaths = Object.keys(bucket.saved).filter((p) => p.includes("standardized-pending"));
+    assert.equal(pendingPaths.length, 1, "exactly one pending file is saved");
+    assert.match(pendingPaths[0], /^users\/u1\/items\/it1\/standardized-pending-\d+\.png$/, "the path carries a run stamp, not a fixed name");
+    const pendingTx = db.txUpdates.find((u) => u["standardization.status"] === "pending_review");
+    assert.equal(pendingTx["standardization.pendingStoragePath"], pendingPaths[0], "the doc points at the stamped path");
+    assert.ok(pendingTx["standardization.pendingUrl"].includes(pendingPaths[0]), "the review URL is the stamped file");
+  });
+
+  it("pipeline log lines carry the item id", async function () {
+    const cutoutBytes = await garmentCutout(BURGUNDY);
+    const originalBytes = await garmentOnRoom(BURGUNDY);
+    const fluxOutput = await garmentOnWhite(BURGUNDY);
+    const maskBytes = await maskPng();
+    const { fetch } = makeFetch({ fluxOutput, cutoutBytes, originalBytes, maskBytes });
+    global.fetch = fetch;
+    const db = fakeDb();
+    const bucket = fakeBucket();
+    const lines = [];
+    const realLog = console.log;
+    console.log = (...a) => { lines.push(a.join(" ")); };
+    try {
+      await runStandardizationPipeline({
+        db, bucket, uid: "u1", itemId: "it1", item: itemWithRender(), falApiKey: "fake-key",
+      });
+    } finally {
+      console.log = realLog;
+    }
+    assert.ok(lines.length > 0, "the run logs something");
+    assert.ok(lines.every((l) => l.includes("[standardize-pipeline:it1]")), "every pipeline log line carries the item id, got: " + lines.join(" | "));
+  });
+});

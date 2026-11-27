@@ -3206,6 +3206,25 @@
       // Apply a resolved display photo to an <img> element in one call.
       // Replaces the old pattern of setting src + calling applyPhotoRotation
       // with (sometimes the wrong) photo object.
+      // PC-107 (Sprint 40): does the open dialog's photo need a
+      // re-set from the fresh snapshot? The PC-103 refresh re-set it
+      // on EVERY snapshot, restarting the missing-photo error chain
+      // (retry → fallback → placeholder) mid-flight whenever the
+      // wardrobe churned — during Round 7 the placeholder never
+      // settled and the item page read as a blank box. Only refresh
+      // when the display URL actually changed: a cutout landing, a
+      // standardization completing, or a photo arriving after a
+      // re-upload. A cache-busted retry URL compares equal to its
+      // base; a placeholder (data: URI) refreshes only when a real
+      // photo exists to show.
+      function dialogPhotoNeedsRefresh(currentSrc, freshUrl) {
+        if (!currentSrc) return true;
+        if (currentSrc.indexOf("data:") === 0) return !!freshUrl;
+        var base = currentSrc.split(/[?&]cb=/)[0];
+        if (!freshUrl) return true;
+        return base !== freshUrl;
+      }
+
       function showDisplayPhoto(imgEl, item, view, fit45) {
         if (!imgEl) return;
         var resolved = resolveDisplayPhoto(item, view);
@@ -4149,18 +4168,21 @@
         return label;
       }
 
-      // PC-102 (Sprint 39): one toast per standardization failure,
-      // from any path. The foreground catches and the snapshot
-      // listener can both see the same failure — the server writes
-      // "failed" before the callable returns the error — so they
-      // share this dedupe: the first to see a given (item, reason)
-      // toasts, the second stays quiet. Entries expire after
-      // 10 minutes, so a genuinely new failure (new reason) still
-      // announces itself.
+      // PC-102 (Sprint 39, key revised Sprint 40): one toast per
+      // standardization failure, from any path. The foreground
+      // catches and the snapshot listener can both see the same
+      // failure — the server writes "failed" before the callable
+      // returns the error — so they share this dedupe. The key is
+      // the item ALONE: the catch sees the catalog message while
+      // the listener sees the pipeline's lastError, so a
+      // (item, reason) key would double-toast one failure.
+      // Entries expire after 10 minutes, so a later failure on
+      // the same item still announces itself. The lastError
+      // argument is kept for the call sites' signatures.
       var stdFailureToasted = {};
       function toastStdFailureOnce(itemId, name, lastError, ref) {
         if (!itemId) return;
-        var key = itemId + "|" + (lastError || "");
+        var key = itemId;
         var now = Date.now();
         for (var k in stdFailureToasted) {
           if (now - stdFailureToasted[k] > 10 * 60 * 1000) delete stdFailureToasted[k];
@@ -4325,14 +4347,20 @@
         var item = (activeItem && activeItem.id === itemId) ? activeItem : null;
         // PC-58 (2026-11-01): Just-in-time attribute collection.
         // If required attributes are missing, ask now — don't make the user hunt.
-        var proceedWithGenerate = function (extraAttrs) {
+        var proceedWithGenerate = function (extraAttrs, fromSheet) {
           // PC-90: two-tap on the Generate button. The native
           // dialog was also the only cost disclosure, so the arm
           // carries it in a toast. The aiBadge door taps this
           // button too — its first tap arms visibly, the second
           // generates. renderStandardizationUI resets the label
           // (and the arm) on every render.
-          if (!armOrRun(btn, "Tap again to generate")) {
+          // PC-102 (Sprint 40): when the flow arrives here from
+          // the attribute sheet, the sheet's Continue ($0.03) IS
+          // the confirmation — the cost is on its button — so the
+          // arm must not eat it: arming here would return without
+          // calling, and the generation would never start (Round
+          // 7's dead tap). The direct path keeps the two-tap.
+          if (!fromSheet && !armOrRun(btn, "Tap again to generate")) {
             showToast("An AI version costs about $0.03 and takes about a minute — tap again to generate.");
             return;
           }
@@ -4342,21 +4370,29 @@
             renderStandardizationUI(activeItem);
           }
           showToast("Generating… this takes about a minute. You can close and come back.");
+          // PC-102: name the piece — the failure toast can fire
+          // while the founder is on another screen, and a generic
+          // error then reads as the foreground action failing.
+          // Shared dedupe with the snapshot listener (Sprint 39):
+          // the server writes "failed" before the callable
+          // returns, so the listener may already have toasted it.
+          var failName = (item && (item.shortName || item.name)) ||
+            (activeItem && (activeItem.shortName || activeItem.name)) || null;
           // Fire and forget — don't block UI on the backend
           callStandardize(itemId, { force: true }).then(function (data) {
+            // PC-102 (Sprint 40): the server's { failed: true }
+            // (max attempts) resolves successfully — toast it
+            // here, or the failure is silent (the snapshot
+            // listener cannot: the doc's status never changes).
+            if (data && data.failed) {
+              toastStdFailureOnce(itemId, failName, data.reason || "", null);
+              return;
+            }
             if (data.needsWarningAck) {
               openStdRefreshSheet(data);
               return;
             }
           }).catch(function (err) {
-            // PC-102: name the piece — this toast can fire while the
-            // founder is on another screen, and a generic error then
-            // reads as the foreground action failing. Shared dedupe
-            // with the snapshot listener (Sprint 39): the server
-            // writes "failed" before the callable returns, so the
-            // listener may already have toasted this failure.
-            var failName = (item && (item.shortName || item.name)) ||
-              (activeItem && (activeItem.shortName || activeItem.name)) || null;
             toastStdFailureOnce(itemId, failName, (err && err.message) || "", err && err.details && err.details.ref);
             if (activeItem && activeItem.id === itemId) {
               // PC-103: carry the server's reason into the local
@@ -4377,7 +4413,7 @@
             showAttrSheet(item, missing, function (selections) {
               if (selections === null) return; // user cancelled
               saveItemAttrs(itemId, selections).then(function () {
-                proceedWithGenerate(selections);
+                proceedWithGenerate(selections, true);
               });
             });
             return;
@@ -4472,6 +4508,14 @@
         callStandardize(itemId, opts).then(function (data) {
           btn.disabled = false;
           closeOverlay(stdRefreshSheet);
+          // PC-102 (Sprint 40): the server's { failed: true }
+          // (max attempts) resolves successfully — toast it here,
+          // or the failure is silent.
+          if (data && data.failed) {
+            var failName = (activeItem && (activeItem.shortName || activeItem.name)) || null;
+            toastStdFailureOnce(itemId, failName, data.reason || "", null);
+            return;
+          }
           if (data.needsWarningAck) {
             // Backend wants explicit ack — reopen with warning
             openStdRefreshSheet(data);
@@ -4853,17 +4897,19 @@
       // announces a failure the first time the snapshot shows it,
       // once per (item, reason). Only recent failures announce
       // (lastAttemptAt within 10 min), so an old failure is not
-      // re-announced on every reload; and never for the item whose
-      // dialog is open — its page already shows the PC-98 reason.
+      // re-announced on every reload. PC-102 (Sprint 40): the
+      // open dialog's item toasts too — the Sprint 39 skip
+      // ("its page already shows the reason") silenced the toast
+      // exactly when the user was watching the item page, and the
+      // shared dedupe already guarantees one toast per item.
       var prevStdStatus = {};
-      function toastNewStdFailures(items, activeItemId, nowMs) {
+      function toastNewStdFailures(items, nowMs) {
         for (var i = 0; i < items.length; i++) {
           var it = items[i];
           var std = it.standardization || {};
           var prev = prevStdStatus[it.id];
           prevStdStatus[it.id] = std.status || null;
           if (std.status !== "failed" || prev === "failed") continue;
-          if (activeItemId && activeItemId === it.id) continue;
           var attemptedMs = std.lastAttemptAt ? Date.parse(std.lastAttemptAt) : NaN;
           if (!Number.isFinite(attemptedMs) || nowMs - attemptedMs > 10 * 60 * 1000) continue;
           toastStdFailureOnce(it.id, it.shortName || it.name || null, std.lastError || "", null);
@@ -4890,7 +4936,7 @@
             todayDataSeen = true;
             maybeRenderToday();
             maybeHealUnnamedItems();
-            toastNewStdFailures(allItems, (typeof activeItem !== "undefined" && activeItem) ? activeItem.id : null, Date.now());
+            toastNewStdFailures(allItems, Date.now());
             // PC-103: refresh the open item dialog from the fresh
             // snapshot. The dialog holds a stale activeItem (set once
             // in openItem), so a cutout or a standardization result
@@ -4907,7 +4953,14 @@
               }
               if (fresh) {
                 activeItem = fresh;
-                showDisplayPhoto(itemPhoto, activeItem, (itemPhoto && itemPhoto.dataset.view) || "dots");
+                // PC-107 (Sprint 40): refresh the photo only when
+                // the fresh doc's display URL changed — re-setting
+                // it on every snapshot restarts the missing-photo
+                // error chain mid-flight while the wardrobe churns.
+                var freshPhoto = resolveDisplayPhoto(fresh, (itemPhoto && itemPhoto.dataset.view) || "dots");
+                if (dialogPhotoNeedsRefresh(itemPhoto && itemPhoto.getAttribute("src"), freshPhoto && freshPhoto.url)) {
+                  showDisplayPhoto(itemPhoto, activeItem, (itemPhoto && itemPhoto.dataset.view) || "dots");
+                }
                 renderStandardizationUI(activeItem);
               }
             }

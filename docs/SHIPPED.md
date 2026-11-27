@@ -1258,3 +1258,7 @@ Suite 823 passing, 0 fail. Deployed: `standardizeItem` +
 Verification is QA Round 7.
 
 Verification is QA Round 7 (2026-11-26): PC-109/PC-110/PC-108 PASS; PC-102 FAIL (no toast on either failure — the callable swallows pipeline failures and the snapshot listener skips the open dialog's item); PC-107 PARTIAL (tile + packing row pass, item page still a blank box); new card PC-111 (a wrong-color render reached review, then self-corrected — gates fail open on exception, pending URL unversioned). #139 PASS (outfit avoids the Nov 25 pair). Fix pass proposed as Sprint 40.
+
+## Sprint 40 — The failure must be heard, and the review must show the truth (2026-11-26)
+
+PC-102 (#167), PC-111 (#176), PC-107 (#172). Suite 839 passing, 0 fail (was 823, +16). Deployed: standardizeItem updated (nodejs22, 300s/1Gi); hosting release 1795766008245000. The toast path is client-only — the Round 7 'callable swallows failures' claim was withdrawn (boundary() throws; the real silences were the snapshot skip and the attribute sheet eating the Generate tap). The gates fail closed, the pending render is versioned per run, and the snapshot photo refresh only re-sets when the display URL changes. Awaiting QA Round 8.

@@ -355,8 +355,12 @@ async function gateColorFidelity(inputBuffer, outputBuffer) {
       reason: deltaE < DELTA_E_THRESHOLD ? "color-ok" : `color-shift(ΔE=${deltaE.toFixed(1)})`,
     };
   } catch (e) {
-    // Gate failure must not crash the pipeline — fail open with a flag.
-    return { pass: true, deltaE: 0, reason: "gate-error:" + (e.message || "unknown") };
+    // PC-111: a gate that cannot measure must not pass the render.
+    // Failing open let an unjudged render reach review (Round 7:
+    // a navy render shown for a red tee). Fail closed — the
+    // pipeline retries, and a persistent gate error fails the run
+    // with its reason, visibly, instead of presenting the render.
+    return { pass: false, deltaE: Infinity, reason: "gate-error:" + (e.message || "unknown") };
   }
 }
 
@@ -414,7 +418,8 @@ async function gateGeometry(outputBuffer) {
     if (aspect < 0.15 || aspect > 6) return { pass: false, reason: "garment-shape-degenerate" };
     return { pass: true, reason: "geometry-ok" };
   } catch (e) {
-    return { pass: true, reason: "gate-error:" + (e.message || "unknown") };
+    // PC-111: fail closed — see gateColorFidelity.
+    return { pass: false, reason: "gate-error:" + (e.message || "unknown") };
   }
 }
 
@@ -430,12 +435,18 @@ async function runQualityGates(inputBuffer, outputBuffer) {
   const geometry = await gateGeometry(outputBuffer);
 
   const pass = color.pass && geometry.pass;
+  // PC-111: a gate-error reason surfaces verbatim, so the failure
+  // note names the broken gate instead of a meaningless ΔE.
+  const colorPart = !color.pass
+    ? (color.reason && color.reason.startsWith("gate-error") ? color.reason : `color(ΔE=${color.deltaE.toFixed(1)})`)
+    : null;
+  const geometryPart = !geometry.pass
+    ? (geometry.reason && geometry.reason.startsWith("gate-error") ? geometry.reason : "geometry")
+    : null;
   return {
     pass,
     results: { color, geometry },
-    reason: pass ? 'all-gates-passed'
-      : [!color.pass && `color(ΔE=${color.deltaE.toFixed(1)})`,
-         !geometry.pass && 'geometry'].filter(Boolean).join(', '),
+    reason: pass ? 'all-gates-passed' : [colorPart, geometryPart].filter(Boolean).join(', '),
   };
 }
 
