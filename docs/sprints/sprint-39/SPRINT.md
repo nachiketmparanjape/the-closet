@@ -170,8 +170,13 @@ No P0, two P1s, four P2s. Full report:
 - **PC-107 (#172) — PARTIAL.** Tile PASS (named placeholder),
   packing row PASS (#137 — mini placeholder, no alt spill),
   item page FAIL (P2): the large photo area stays an empty
-  dashed box with no text or name. Cause not yet established
-  from code reading; live browser repro running to pin it down.
+  dashed box with no text or name — observed 23:19, mid-round.
+  A live browser repro at 23:32 does NOT reproduce it (the
+  item page shows the named placeholder, `itemPhoto.src` is
+  the data-URI SVG, 2 decoded, 0 pending): the likely cause is
+  the snapshot refresh resetting the dialog photo mid-chain
+  while the wardrobe churned during the round. Fix scoped for
+  Sprint 40 (refresh only when the display URL changes).
 - **PC-111 (#176) — NEW (P1).** A wrong-color render reached
   review: the red tee's comparison showed a NAVY render at
   23:14, correct dark brown by 23:22, no user action. Server
