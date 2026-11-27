@@ -27,6 +27,7 @@ function extractClientFn(name, args) {
 
 const standardizeFailureToast = extractClientFn("standardizeFailureToast", "name, err");
 const toastStdFailureOnce = extractClientFn("toastStdFailureOnce", "itemId, name, lastError, ref");
+const clearStdFailureToast = extractClientFn("clearStdFailureToast", "itemId");
 const toastNewStdFailures = extractClientFn("toastNewStdFailures", "items, nowMs");
 
 function installFakes() {
@@ -34,6 +35,7 @@ function installFakes() {
   global.showToast = function (m) { toasts.push(m); };
   global.standardizeFailureToast = standardizeFailureToast;
   global.toastStdFailureOnce = toastStdFailureOnce;
+  global.clearStdFailureToast = clearStdFailureToast;
   global.stdFailureToasted = {};
   global.prevStdStatus = {};
   return toasts;
@@ -106,6 +108,22 @@ describe("toastStdFailureOnce (Sprint 39: one toast per failure, any path)", fun
     toastStdFailureOnce("it1", "Navy crew-neck tee", "standardization_timeout: x", "req_9758");
     assert.match(toasts[0], /\(Ref: req_9758\)/);
   });
+
+  test("clearing the entry lets a new run's failure toast again (Sprint 41: dedupe is per run, not per item — Round 9's retry silence)", function () {
+    const toasts = installFakes();
+    toastStdFailureOnce("it1", "Navy crew-neck tee", "systematic_gate_failure: color(ΔE=20.4)", null);
+    // Same failure again stays quiet…
+    toastStdFailureOnce("it1", "Navy crew-neck tee", "systematic_gate_failure: color(ΔE=20.4)", null);
+    assert.equal(toasts.length, 1);
+    // …but a new run clears the entry, so its failure toasts.
+    clearStdFailureToast("it1");
+    toastStdFailureOnce("it1", "Navy crew-neck tee", "systematic_gate_failure: color(ΔE=20.4)", null);
+    assert.equal(toasts.length, 2);
+    // Clearing another item, or nothing at all, is a no-op.
+    clearStdFailureToast("it2");
+    clearStdFailureToast(null);
+    assert.equal(toasts.length, 2);
+  });
 });
 
 describe("toastNewStdFailures (Sprint 39: the snapshot is the witness)", function () {
@@ -149,6 +167,25 @@ describe("toastNewStdFailures (Sprint 39: the snapshot is the witness)", functio
     toastNewStdFailures(items, now);
     assert.equal(toasts.length, 0);
   });
+
+  test("a processing snapshot clears the entry, so the next failure toasts again (Sprint 41 — Round 9: the retry's failure was suppressed on every path)", function () {
+    const toasts = installFakes();
+    const now = Date.now();
+    const failed1 = [failedItem("it1", "Navy crew-neck tee", new Date(now - 5 * 60 * 1000).toISOString())];
+    toastNewStdFailures(failed1, now);
+    assert.equal(toasts.length, 1);
+    // A new run starts: the processing snapshot clears the entry.
+    const processing = [{ id: "it1", name: "Navy crew-neck tee", standardization: { status: "processing" } }];
+    toastNewStdFailures(processing, now + 1000);
+    assert.equal(toasts.length, 1);
+    // The new run fails: a fresh lastAttemptAt, a fresh toast.
+    const failed2 = [failedItem("it1", "Navy crew-neck tee", new Date(now + 60 * 1000).toISOString())];
+    toastNewStdFailures(failed2, now + 61 * 1000);
+    assert.equal(toasts.length, 2);
+    // And the re-announced failure after that stays quiet.
+    toastNewStdFailures(failed2, now + 62 * 1000);
+    assert.equal(toasts.length, 2);
+  });
 });
 
 describe("source pins", function () {
@@ -184,5 +221,15 @@ describe("source pins", function () {
       /var failName = \(item && \(item\.shortName \|\| item\.name\)\)/.test(html),
       "Generate catch must name the item it is generating for"
     );
+  });
+
+  test("a new run clears the dedupe entry on every path (Sprint 41: the retry's failure must toast)", function () {
+    assert.ok(/function clearStdFailureToast\(itemId\)/.test(html), "clearStdFailureToast must exist");
+    assert.ok(
+      /if \(std\.status === "processing" && prev !== "processing"\) clearStdFailureToast\(it\.id\);/.test(html),
+      "the snapshot listener must clear the entry when a new run starts"
+    );
+    const clears = html.match(/clearStdFailureToast\(itemId\);/g) || [];
+    assert.equal(clears.length, 2, "both foreground call sites (Generate + Refresh) must clear the entry before calling");
   });
 });

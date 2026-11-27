@@ -4168,18 +4168,26 @@
         return label;
       }
 
-      // PC-102 (Sprint 39, key revised Sprint 40): one toast per
-      // standardization failure, from any path. The foreground
-      // catches and the snapshot listener can both see the same
-      // failure — the server writes "failed" before the callable
-      // returns the error — so they share this dedupe. The key is
-      // the item ALONE: the catch sees the catalog message while
-      // the listener sees the pipeline's lastError, so a
-      // (item, reason) key would double-toast one failure.
-      // Entries expire after 10 minutes, so a later failure on
-      // the same item still announces itself. The lastError
+      // PC-102 (Sprint 39, key revised Sprint 40, cleared per run
+      // Sprint 41): one toast per standardization failure, from
+      // any path. The foreground catches and the snapshot listener
+      // can both see the same failure — the server writes "failed"
+      // before the callable returns the error — so they share this
+      // dedupe. The key is the item ALONE: the catch sees the
+      // catalog message while the listener sees the pipeline's
+      // lastError, so a (item, reason) key would double-toast one
+      // failure. But the key must NOT outlive the run: Sprint 40's
+      // item-alone key silenced a RETRY's failure (Round 9) — the
+      // second failure hit the same key within 10 minutes and was
+      // suppressed on every path, while the stale "Generating…"
+      // toast stayed on screen. So a new run clears the entry
+      // (clearStdFailureToast, called at run start on every path),
+      // and entries still expire after 10 minutes. The lastError
       // argument is kept for the call sites' signatures.
       var stdFailureToasted = {};
+      function clearStdFailureToast(itemId) {
+        if (itemId) delete stdFailureToasted[itemId];
+      }
       function toastStdFailureOnce(itemId, name, lastError, ref) {
         if (!itemId) return;
         var key = itemId;
@@ -4378,6 +4386,10 @@
           // returns, so the listener may already have toasted it.
           var failName = (item && (item.shortName || item.name)) ||
             (activeItem && (activeItem.shortName || activeItem.name)) || null;
+          // PC-102 (Sprint 41): a new run clears the dedupe entry,
+          // so this run's failure toasts even when the previous
+          // run's failure toasted minutes ago (Round 9).
+          clearStdFailureToast(itemId);
           // Fire and forget — don't block UI on the backend
           callStandardize(itemId, { force: true }).then(function (data) {
             // PC-102 (Sprint 40): the server's { failed: true }
@@ -4505,6 +4517,10 @@
         var opts = { force: true };
         if (feedback) opts.feedback = feedback;
         if (ackWarning) opts.acknowledgedWarning = true;
+        // PC-102 (Sprint 41): a new run clears the dedupe entry,
+        // so this run's failure toasts even when the previous
+        // run's failure toasted minutes ago (Round 9).
+        clearStdFailureToast(itemId);
         callStandardize(itemId, opts).then(function (data) {
           btn.disabled = false;
           closeOverlay(stdRefreshSheet);
@@ -4909,6 +4925,14 @@
           var std = it.standardization || {};
           var prev = prevStdStatus[it.id];
           prevStdStatus[it.id] = std.status || null;
+          // PC-102 (Sprint 41): a new run clears the dedupe entry
+          // for this item, so its failure toasts even when the
+          // previous run's failure toasted minutes ago (Round 9:
+          // the retry's failure was suppressed on every path
+          // because the Sprint 40 item-alone key was still set).
+          // This also covers runs started anywhere else — the
+          // direct call, the sweeper, another tab or device.
+          if (std.status === "processing" && prev !== "processing") clearStdFailureToast(it.id);
           if (std.status !== "failed" || prev === "failed") continue;
           var attemptedMs = std.lastAttemptAt ? Date.parse(std.lastAttemptAt) : NaN;
           if (!Number.isFinite(attemptedMs) || nowMs - attemptedMs > 10 * 60 * 1000) continue;

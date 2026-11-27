@@ -1266,3 +1266,7 @@ PC-102 (#167), PC-111 (#176), PC-107 (#172). Suite 839 passing, 0 fail (was 823,
 Verification is QA Round 8 (2026-11-26/27): PC-107 PASS (placeholder settled through a bulk add mid-run); PC-111 PASS (run-stamped pending URLs, no overwrite — the gate-error case was not observed live); PC-102 UNVERIFIED (no run failed, so the toast could not be exercised — the manual-retry start and max-attempts toast remain untested; Round 9 forces a failure with a blank photo + manual Generate). #138 PASS (midnight rollover verified live). The "Saturday, Nov 14" label is still untested.
 
 Verification is QA Round 9 (2026-11-27): the forced failure worked and the first failure toasted exactly once from the item page — but the retry failure toasted zero times from the Wardrobe tab (the Sprint 40 dedupe keys on the item alone and suppresses a new run's failure), and the stale "Generating…" toast lingered ~5 min after the failure. PC-102 stays open; Sprint 41 proposed for the per-run dedupe. The "Try again" two-tap is the designed cost confirm, not the Round 7 sheet bug — one-tap vs two-tap is the founder's call.
+
+## Sprint 41 — A new failure must be heard, even from the same piece (2026-11-27)
+
+PC-102 (#167) follow-up. Suite 842 passing, 0 fail (was 839, +3). Deployed: hosting release 1795796038328000 (client only). The dedupe is per run now: a new run clears the toast entry (both foreground call sites + the snapshot listener on a processing transition), so a retry's failure toasts once and replaces the "Generating…" toast. Awaiting QA Round 10.

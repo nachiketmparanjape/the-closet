@@ -1,6 +1,6 @@
 # Sprint 41 — A new failure must be heard, even from the same piece
 
-- **Status:** PROPOSED 2026-11-27 (awaiting the founder's yes).
+- **Status:** APPROVED by the founder 2026-11-27 ("Yes — open Sprint 41 for the toast fix").
 - **Theme:** Round 9 forced a failure on purpose and the first
   failure toasted exactly once — but the retry's failure toasted
   zero times, and the stale "Generating…" toast stayed on screen
@@ -75,7 +75,36 @@
 
 ## Build results
 
-(TBD — filled as the card ships.)
+- **PC-102 (#167) — client only, no server change.** The
+  dedupe is per run now, not per item. New
+  `clearStdFailureToast(itemId)` deletes the entry; it runs
+  in three places: both foreground call sites clear it just
+  before `callStandardize` (Generate + Refresh), and the
+  snapshot listener clears it when a run starts
+  (`toastNewStdFailures`: status "processing" with prev not
+  "processing" — this covers runs started anywhere else: the
+  direct call, the sweeper, another tab or device). A
+  re-announced old failure still stays quiet (the snapshot
+  path's `prev === "failed"` check is untouched, and the
+  10-min expiry stands). A fired failure toast replaces the
+  "Generating…" toast via `showToast`, as before. Note on the
+  stale-toast question: the code auto-hides toasts after 3 s
+  (`showToast` sets a 3 s timer), which conflicts with Round
+  9's observed ~5 min linger — the likeliest read is that QA
+  watched the inline "Standardizing…" status line, not the
+  toast; Round 10 will check the toast lifecycle explicitly.
+  3 new tests in `tests/pc102-standardize-toast.test.js`
+  (23 passing there, was 20).
+
+Suite: **842 passing, 0 fail** (full gate before deploy; was 839, +3).
+
+Deployed: hosting release `1795796038328000`
+(2026-11-27T16:13:58Z); live HTML carries
+`clearStdFailureToast` ×5 (1 definition + 3 call sites + 1
+comment). No function deploy (client only). Audit
+`scripts/verify-function-secrets.js`: 20 functions checked,
+secrets + config clean; only the 14 known nodejs20 runtimes
+remain (PC-99).
 
 ## Retest
 
