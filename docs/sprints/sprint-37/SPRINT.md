@@ -151,11 +151,31 @@ the callable's force path against the real item):**
   23.5; same stop, same evidence. Item: failed, attempts 4.
   Verdict: FLUX cannot reproduce this color; the gate is right.
 
-**QA round (studio chat) still to run:** the sweatshirt's
-cutout visible in the app; the item page shows the plain
-failure sentence; a NEW parse item gets its cutout shown and
-the trigger fires (or marks already_clean from the cutout);
-the next new item standardizes end to end. The founder's
-manual checks come after QA, per the loop design. The
-sweatshirt itself cannot reach pending_review — that is the
-recorded verdict, not a failure to test.
+**QA Round 5 (studio chat, Thu Nov 26, 5:25–5:36 PM PST;
+full report at qa-rounds/2026-11-26-round5.md). One P0, two
+P1s. This round covers the Fri Dec 4 weekly round.**
+- PC-93 PASS — the sweatshirt's cutout is visible; a fresh
+  parse's cutout appeared ~2 min after upload. Issue #158
+  closed.
+- PC-98 PASS — the exact sentence verified on the sweatshirt's
+  item page. Issue #163 closed.
+- PC-96: the secret IS bound — this card's fix holds. The
+  trigger never firing is a different defect (PC-101). Issue
+  #161 closed with that note.
+- PC-100: verdict stands (anchor does not work). Issue #165
+  closed with the verdict.
+- PC-94 + PC-95 NOT PROVEN as the round framed them — Bramble's
+  same-day investigation proved the navy tee's attempt 3 passed
+  both gates and produced a correct render; the visible failure
+  was the 60s deployed timeout (PC-104) plus the final
+  transaction failing on the test item QA deleted mid-run.
+- PC-97 PARTIAL as framed — the systematic stop correctly did
+  not fire (signatures differed); the visible failure was the
+  60s timeout. The 240s budget is dead code under it (PC-104).
+- P0 PC-101 (trigger never wired), P1 PC-102 (toast
+  misattribution), P1 PC-103 (blank item photo) filed; PC-104
+  (deployed timeouts) and PC-105 (FLUX poll deadline) filed
+  from the investigation. Sprint 38 proposed; the founder's
+  manual checks come after QA Round 6, per the loop design.
+  The sweatshirt itself cannot reach pending_review — that is
+  the recorded PC-100 verdict, not a failure to test.

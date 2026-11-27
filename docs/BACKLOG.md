@@ -1584,7 +1584,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   render saved as evidence — PC-97). A worn-photo item no longer
   fails the color gate by construction.
 - **Effort:** M.
-- **Status:** In Sprint 37 — SHIPPED 2026-11-26 (built + deployed; pipeline standardizes from the cutout render, original as fallback). Proven live on the sweatshirt (input was the cutout). Awaiting QA retest.
+- **Status:** In Sprint 37 — SHIPPED 2026-11-26 (built + deployed; pipeline standardizes from the cutout render, original as fallback). Proven live on the sweatshirt (input was the cutout). Retest 2026-11-26 (Round 5) + Bramble investigation the same day: the cutout-input path WAS exercised — the navy tee's input dominant was navy rgb(27,33,53) (its cutout, created 01:26:54 UTC) and attempt 3 passed the gates and produced a correct navy render (orphaned standardized-pending.png, viewed). The visible failure was the 60s deployed timeout killing the HTTP response (PC-104) plus the final transaction failing because QA deleted the test item mid-run. The trigger never firing is PC-101, not this card.
   proposed (direct founder order 2026-11-26).
 
 ### PC-95: The geometry gate fails every FLUX output (S/M) — issue #160
@@ -1613,7 +1613,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   geometry gate; the sweatshirt's standardization is no longer
   blocked by `geometry`.
 - **Effort:** S/M.
-- **Status:** In Sprint 37 — SHIPPED 2026-11-26 (built + deployed; gate measures whiteness, works on opaque renders and cutouts). Proven live: geometry passes on the sweatshirt. Awaiting QA retest.
+- **Status:** In Sprint 37 — SHIPPED 2026-11-26 (built + deployed; gate measures whiteness, works on opaque renders and cutouts). Proven live: geometry passes on the sweatshirt. Retest 2026-11-26 (Round 5) + Bramble investigation: the navy run failed geometry on attempt 1, then passed it on attempts 2–3 (the gate-fail signatures differed, so no systematic stop — correct behavior). Attempt 3's render is a correct navy tee. The visible failure was the 60s deployed timeout (PC-104), not the gate.
   proposed (direct founder order 2026-11-26).
 
 ### PC-96: The auto-standardize trigger has no API key, so it silently skips every item (S) — issue #161
@@ -1645,7 +1645,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   a minute of creation, without any manual tap; the audit script
   reports zero missing bindings.
 - **Effort:** S.
-- **Status:** In Sprint 37 — SHIPPED 2026-11-26 (live patch verified; trigger ACTIVE with FAL_API_KEY; audit script added).
+- **Status:** In Sprint 37 — SHIPPED 2026-11-26 (live patch verified; trigger ACTIVE with FAL_API_KEY; audit script added). Retest 2026-11-26 (Round 5) + Bramble investigation: the secret IS bound (verified by read-back) — this card's fix holds. The trigger never fires for a different reason: the deployed function has NO eventTrigger at all (PC-101 — the Nov 5 REST create never wired one). The upload-error theory is disproven (req_9758 was the sweatshirt's own failure, PC-102).
   proposed (direct founder order 2026-11-26).
 
 ### PC-97: Identical retries burn runs on a failure that cannot pass (M) — issue #162
@@ -1679,7 +1679,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   a slow-FLUX run ends `failed` with a clear reason inside the
   timeout instead of stranding in `processing`.
 - **Effort:** M.
-- **Status:** In Sprint 37 — SHIPPED 2026-11-26 (built + deployed; systematic stop + rejected render saved + 240s budget). Proven live: 2 runs in 42s. Awaiting QA retest.
+- **Status:** In Sprint 37 — SHIPPED 2026-11-26 (built + deployed; systematic stop + rejected render saved + 240s budget). Proven live: 2 runs in 42s. Retest 2026-11-26 (Round 5) + Bramble investigation: the systematic stop correctly did NOT fire on the navy item — the two gate-fail signatures differed (color+geometry, then color), and attempt 3 passed. The visible failure was the 60s deployed timeout (PC-104): the HTTP response died at 59.99s while the pipeline kept running in the background. The 240s pipeline budget is dead code under a 60s function timeout (see PC-104/PC-105). No attempt count is surfaced in the UI (parked P2); the blank-photo claim is PC-103.
   proposed (direct founder order 2026-11-26).
 
 ### PC-98: A failed standardization tells the founder nothing useful (S) — issue #163
@@ -1769,3 +1769,49 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   to work and the verdict is recorded.
 - **Effort:** M.
 - **Status:** In Sprint 37 — SHIPPED 2026-11-26, VERDICT RECORDED: the RGB anchor does not work (live retest ΔE=22.5/23.5, worse than 20.0/20.4 without it). FLUX cannot reproduce this dusty burgundy; the gate is right and the item keeps its original.
+
+### PC-101: The auto-standardize trigger never fires — it was never wired (M)
+
+- **Origin:** QA round, 2026-11-26 (Round 5), scope Sprint 37 retest. Root cause proven by Bramble the same day.
+- **Problem:** the automatic standardization trigger never fires on a new item (created 5:26 PM, re-checked 5:31 and 5:33 PM — no "Standardizing…" state, no render, no already-clean mark). The deployed `autoStandardizeItem` function has **no `eventTrigger` at all** (verified by reading the deployed function resource: `eventTrigger: undefined`, state ACTIVE, updateTime 2026-11-27T01:22:35Z) and zero executions in 24h of Cloud Run logs — only deployment rollouts. Cause: `deploy-create.js` creates functions via the raw REST API and its create body contains NO `eventTrigger` — the in-code `onDocumentCreated({...})` definition is only metadata for the Firebase CLI, which the REST create ignores. The Nov 5 recreate via that script silently unwired a trigger that had worked before (55 items carry `already_clean` marks from the earlier wiring). The missing FAL_API_KEY (PC-96) was a second, independent defect — now fixed, but irrelevant while the handler can never run. `autoStandardizeItem` is the only event-triggered function in the fleet (everything else is onCall/onRequest), so the wiring gap hits exactly one function.
+- **In scope:** re-wire the trigger on the deployed function (PATCH with the Firestore document-created eventTrigger, or delete + recreate via a fixed deploy-create.js) and verify live with a fresh item (it standardizes or marks already-clean within minutes). Fix `deploy-create.js` so future event-triggered functions get their trigger in the create body. Extend `scripts/verify-function-secrets.js` (or the fleet audit) to check eventTrigger wiring, so a triggerless function is caught at deploy time, not by QA.
+- **Done looks like:** a new item standardizes automatically within minutes of creation, or is marked already-clean; the deployed function resource shows its eventTrigger; the audit passes.
+- **Effort:** M.
+- **Status:** Filed 2026-11-26 (Round 5). Issue #166. Investigation complete the same day — cause proven, fix scoped. In Sprint 38 (proposed).
+
+### PC-102: A background failure's error toast looks like the upload failed (S/M)
+
+- **Origin:** QA round, 2026-11-26 (Round 5), scope Sprint 37 retest. Root cause proven by Bramble the same day.
+- **Problem:** on "Upload piece" the app showed "Something went wrong on our end. Try again. (Ref: req_9758)" and the Upload button was disabled — yet the piece was created and the cutout appeared. **req_9758 was not the upload's error at all:** it is the sweatshirt's `standardizeItem` failure (systematic color ΔE=20.6, 2026-11-27T01:26:39Z) — the only error_events doc in the round window with that ref. The upload itself succeeded: describeItem failures are swallowed by design (`.catch → null`), the doc was created, `requestPhotoRender` ran and the cutout appeared ~2 min later. The toast belonged to the sweatshirt's generation (tapped a minute earlier) and surfaced over the upload screen because error toasts are global and unscoped; the disabled button was normal in-flight state. The upload did NOT break the trigger chain — the trigger was never wired (PC-101).
+- **In scope:** a failure toast names the piece and action it belongs to ("The burgundy sweatshirt's AI version didn't come out right"), so it can never read as the foreground action failing; or the standardize failure is not toasted globally at all when the item page already carries the reason (PC-98 note). The upload flow itself needs no change — it already succeeds.
+- **Done looks like:** a background standardization failure never appears as an upload error; the upload screen shows only upload outcomes.
+- **Effort:** S/M.
+- **Status:** Filed 2026-11-26 (Round 5). Issue #167. Investigation complete the same day — cause proven, fix scoped. In Sprint 38 (proposed).
+
+### PC-103: After a failed standardization the item page's main photo goes blank (S/M)
+
+- **Origin:** QA round, 2026-11-26 (Round 5), scope Sprint 37 retest. Investigated by Bramble the same day.
+- **Problem:** after a failed standardization, the item dialog's photo area becomes an empty cream box while the wardrobe tile still shows the cutout. The round's attribution — "the rejected render is the displayed image" — is **disproven**: no client code reads `standardization.lastRejectedStoragePath` / `lastRejectedReason` (grep over `public/index.html`), and the dialog photo resolves through the same `photoDisplayUrl` (renderUrl || url) as the tile. The exact blanking mechanism could not be reproduced after the fact (the test item was deleted during the round's cleanup). Three real defects ARE proven and explain the class: (1) the open dialog holds a stale `activeItem` — set once in `openItem`, never refreshed from the live snapshot — while the tile re-renders from the listener; (2) `itemPhoto` has no `onerror` recovery, so one failed image load stays blank forever; (3) the generate flow's local `.catch` writes `activeItem.standardization = {status: "failed"}` WITHOUT `lastError`, so the dialog shows the default note even when the server knows the reason — and the server's own value after a killed run, `processing_interrupted`, matches no branch in `standardizationFailureNote` (the timeout branch only matches `standardization_timeout`).
+- **In scope:** refresh the open item dialog from the snapshot listener (at least photos + standardization); add an `onerror` fallback on the item photo (retry once, then fall back to `photos[0].url`); carry `lastError` into the local failed state; map `processing_interrupted` (and any timeout-shaped error) to the timeout sentence in `standardizationFailureNote`.
+- **Done looks like:** a failed item's page shows a real photo (cutout or original) even when the dialog was opened before the cutout landed or a load failed once; the failure sentence names the timeout when the run was killed.
+- **Effort:** S/M.
+- **Status:** Filed 2026-11-26 (Round 5). Issue #168. Investigation complete the same day — attribution corrected, fix scoped. In Sprint 38 (proposed).
+
+
+### PC-104: Deployed functions run at 60s timeouts the source never declared (M)
+
+- **Origin:** Bramble investigation, 2026-11-26 (Round 5 follow-up). Root cause proven from the deployed function resources + Cloud Run logs.
+- **Problem:** `deploy-create.js` hardcodes `serviceConfig: {timeoutSeconds: 60, availableMemory: "512Mi"}` in its REST create body, and `deploy-update.js` only ever PATCHes `buildConfig` — so a function's declared timeout/memory in the source is silently ignored forever. Fleet audit (2026-11-26, 21 functions): `standardizeItem` deployed 60s/512Mi vs declared 300s/1GiB; `planPacking` 60s vs 300s; `parseOutfitPhoto` 60s vs 120s; `shopCheck` 60s vs 120s. Proven live: the navy tee's manual generation died with Cloud Run 504 "maximum request timeout" at exactly 59.99s latency — the pipeline needs ~2.5 min for a 3-attempt run + SAM, so no multi-attempt standardization can ever complete under 60s. The PC-97 240s pipeline deadline is dead code under a 60s cap. (Round 4's "packing-plan generation took ~75+ seconds" is the same class on `planPacking`.)
+- **In scope:** set the deployed timeouts/memories to the declared values (field-scoped PATCHes: `updateMask=serviceConfig.timeoutSeconds,serviceConfig.availableMemory` — never a full serviceConfig replace, which would strip secrets); fix `deploy-create.js` to take timeout/memory from the source (or a per-function map) instead of hardcoding 60s/512Mi; fix `deploy-update.js` to preserve/apply serviceConfig on update; extend the fleet audit to fail on timeout/memory drift.
+- **Done looks like:** every deployed function runs at its declared timeout/memory; a 3-attempt standardization completes inside the 300s budget; the audit passes.
+- **Effort:** M.
+- **Status:** Filed 2026-11-26 (Round 5 follow-up). Issue #169. In Sprint 38 (proposed).
+
+### PC-105: The FLUX poll ignores the pipeline deadline — a slow fal day eats the whole timeout (S/M)
+
+- **Origin:** Bramble investigation, 2026-11-26 (Round 5 follow-up).
+- **Problem:** `runFluxStandardization` polls fal 40 times × 5s with no deadline parameter and no per-fetch timeout (a bare `fetch` has no timeout in Node). The pipeline's PC-97 deadline is checked only *between* attempts and inside the SAM poll — never inside the FLUX poll. So one slow FLUX attempt can consume the entire function budget by itself: under the correct 300s timeout, attempt 1's poll can run ~200s+, attempt 2 starts (elapsed < 240s) and its poll runs past the cap, and the function is killed mid-poll with the item left to the `processing_interrupted` fallback. The 60s cap (PC-104) hid this — every slow run died at 60s before the poll's own shape mattered — but fixing PC-104 without this card just moves the failure to 300s.
+- **In scope:** pass `deadlineMs` into `runFluxStandardization` and stop polling past the budget (throw `standardization_timeout`); add an AbortSignal timeout to each status fetch (e.g. 30s) so a hung fetch cannot stall the loop; unit-test the poll against a fake clock/slow fetch.
+- **Done looks like:** a stalled FLUX poll ends with a timeout error inside the budget, never a function-level kill; the item shows the timeout sentence.
+- **Effort:** S/M.
+- **Status:** Filed 2026-11-26 (Round 5 follow-up). Issue #170. In Sprint 38 (proposed).
