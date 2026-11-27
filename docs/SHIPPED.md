@@ -1169,3 +1169,49 @@ retest-sweatshirt.js): geometry passes, systematic stop works,
 color cannot be fixed by input or prompt. The remaining QA
 retest covers the app surfaces: cutout visible, failure sentence
 shown, trigger firing on the next new item.
+
+## Sprint 38 — Standardization actually runs (2026-11-26)
+
+QA Round 5 found standardization broken end to end for new
+items — but the investigation proved the round's headline
+wrong in the interesting way: the navy tee's render had
+SUCCEEDED; the plumbing around it had failed. Five cards.
+Four shipped the same day; the fifth (the trigger) is wired
+and awaiting its live proof. Suite 770 passing.
+
+- **PC-104 (#169):** deployed functions ran at 60s timeouts the
+  source never declared — the navy run died at exactly 59.99s.
+  Live PATCHes to the declared values (standardizeItem 300s/1Gi,
+  planPacking 300s, parseOutfitPhoto 120s, shopCheck 120s);
+  `function-config.json` is now the single source of truth for
+  deployed config, read by `deploy-create.js` at create and
+  applied by `deploy-update.js` after every PATCH; the audit
+  checks config drift. Audit after the PATCHes: secrets +
+  config clean.
+- **PC-105 (#170):** the FLUX poll ignored the pipeline
+  deadline — one slow attempt could eat the whole timeout.
+  The poll now takes a deadline and per-fetch timeouts (30s),
+  and throws a timeout error inside the budget. Deployed to
+  `standardizeItem` and `autoStandardizeItem`.
+- **PC-102 (#167):** a background failure's toast read as the
+  upload failing ("Something went wrong on our end…
+  (Ref: req_9758)") — the ref was the sweatshirt's own
+  generation failure. Failure toasts now name the piece.
+- **PC-103 (#168):** after a failed run the item page went blank
+  while the tile showed the cutout. The open dialog now
+  refreshes from the live snapshot, the photo retries once then
+  falls back to the original, the local failed state carries the
+  server's reason, and `processing_interrupted` maps to the
+  timeout sentence.
+- **PC-101 (#166):** the trigger was never wired — the Nov 5
+  REST create sent no eventTrigger. The function was deleted
+  and recreated with its Firestore trigger (nam5), and the
+  investigation found a third cause after the first two: the
+  REST create grants nobody publisher on the trigger's Pub/Sub
+  topic, so no event could publish. Both service agents are now
+  publishers, and `deploy-create.js` grants the topic publisher
+  at create time for any future event function. Live proof
+  pending — three fresh-item tests did not fire; test #4 is
+  running.
+
+Verification is QA Round 6 after the trigger proof lands.

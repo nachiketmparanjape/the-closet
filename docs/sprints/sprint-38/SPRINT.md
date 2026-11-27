@@ -1,6 +1,6 @@
 # Sprint 38 — Standardization actually runs
 
-- **Status:** PROPOSED (Round 5 retest, 2026-11-26; founder's go pending).
+- **Status:** APPROVED by the founder 2026-11-26 ("Yes — open Sprint 38 for the five fixes").
 - **Theme:** QA Round 5 found standardization broken end to end
   for new items — but the investigation proved the round's
   headline ("manual generation fails on a plain navy tee") wrong
@@ -77,7 +77,67 @@ shopCheck, autoStandardizeItem).
 
 ## Build results
 
-(TBD — filled per card as it ships.)
+- **PC-101 (#166) — wiring rebuilt; live proof pending.** The
+  function was deleted and recreated with its Firestore trigger
+  (document `users/{uid}/items/{itemId}`, event
+  `google.cloud.firestore.document.v1.created`, triggerRegion
+  `nam5` — the (default) database lives in nam5, not
+  us-central1). Three causes found in sequence: (1) the Nov 5
+  REST create never sent an eventTrigger, and an HTTP function
+  cannot be PATCHed into an event-triggered one; (2) the trigger
+  region must be the database's region; (3) the REST create
+  grants nobody publisher on the trigger's Pub/Sub topic — its
+  IAM was empty, so no event could publish; `roles/pubsub.publisher`
+  is now granted to both the Eventarc and the Firestore service
+  agents (verified by read-back). Live tests #1–#3 (fresh items,
+  donor photo) did NOT fire; test #4 is running after the grants
+  had time to settle. `deploy-create.js` now grants the topic
+  publisher at create time for any future event-triggered
+  function, and `scripts/verify-function-secrets.js` audits
+  eventTrigger presence. `function-config.json` is the single
+  source of truth for deployed function config (timeout/memory/
+  trigger) — committable, no secrets.
+- **PC-104 (#169) — SHIPPED 2026-11-26.** Live PATCHes: standardizeItem
+  → 300s/1Gi, planPacking → 300s, parseOutfitPhoto → 120s,
+  shopCheck → 120s (all ACTIVE; planPacking/parseOutfitPhoto/
+  shopCheck also bumped nodejs20 → nodejs22; fleet nodejs20:
+  15 of 21 left, PC-99). `deploy-create.js` reads timeout/memory/
+  eventTrigger from `function-config.json` at create;
+  `deploy-update.js` applies serviceConfig after every
+  buildConfig PATCH; the audit script checks secrets + runtime +
+  config drift. Audit after the PATCHes: secrets clean, config
+  clean — the only remaining mismatches are the 15 retired
+  nodejs20 runtimes (PC-99).
+- **PC-105 (#170) — SHIPPED 2026-11-26.** `fetchWithTimeout`
+  (AbortController, 30s default) + poll opts
+  (`deadlineAt`/`fetchTimeoutMs`/`pollIntervalMs`) in
+  `runFluxStandardization`; the deadline is checked at the top
+  of every poll iteration; the pipeline passes `deadlineAt`.
+  5 new poll tests + 1 pipeline wiring test (28 passing across
+  the standardize files). Deployed to `standardizeItem` AND
+  `autoStandardizeItem` (both redeployed 2026-11-27T03:15Z);
+  the trigger survived the update (verified by GET).
+- **PC-102 (#167) — SHIPPED 2026-11-26.** New
+  `standardizeFailureToast(name, err)` beside
+  `standardizationFailureNote`; the Generate catch and the
+  Refresh-Go catch both toast the named failure ("The burgundy
+  sweatshirt's AI version didn't come out right. (Ref:
+  req_9758)") — never the generic text that reads as the
+  foreground action failing. 7 tests
+  (`tests/pc102-standardize-toast.test.js`). Hosting release
+  `1795749366797000`; live markers verified.
+- **PC-103 (#168) — SHIPPED 2026-11-26.** Four fixes in
+  `public/index.html`: `standardizationFailureNote` maps
+  `processing_interrupted` to the timeout sentence; the
+  `watchItems` snapshot refreshes the open dialog's photo +
+  standardization UI from the fresh doc (never the name/title
+  fields); `itemPhoto` error/load listeners — one cache-busted
+  retry per base URL, then fall back to `photos[0].url`; the
+  Generate catch carries `lastError` into the local failed
+  state. 5 tests (`tests/pc103-item-dialog.test.js`). Same
+  hosting release as PC-102; live markers verified.
+
+Suite: **770 passing, 0 fail** (full gate before deploy).
 
 ## Retest
 

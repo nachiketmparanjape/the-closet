@@ -182,18 +182,58 @@ async function isAlreadyClean(imageBuffer) {
 }
 
 /**
+ * Fetch with a hard timeout. A bare fetch() has no timeout in Node —
+ * a hung request stalls the caller forever, and the pipeline's
+ * deadline is only checked between attempts, never inside a call.
+ *
+ * PC-105 (2026-11-26): every fal API call in the FLUX poll goes
+ * through here (30s default). An aborted fetch throws a plain
+ * Error naming the timeout, so the pipeline's error handling sees
+ * a timeout, not a raw AbortError.
+ */
+async function fetchWithTimeout(url, options = {}, timeoutMs = 30000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (e) {
+    if (e && e.name === "AbortError") {
+      throw new Error(`FLUX request timed out after ${timeoutMs}ms: ${url}`);
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
  * Run FLUX Kontext Dev on a garment image via fal.ai.
+ *
+ * PC-105 (2026-11-26): the poll used to run 40 x 5s with no
+ * deadline and no per-fetch timeout — one slow fal day could eat
+ * the whole function budget from inside a single attempt, and the
+ * pipeline's 240s deadline (checked only between attempts and
+ * inside the SAM poll) never saw it. The poll now takes
+ * opts.deadlineAt (epoch ms — the pipeline's budget) and stops
+ * with a standardization_timeout instead of running past it, and
+ * every fal call carries a per-fetch timeout. opts.pollIntervalMs
+ * exists for tests (default 5000 — production behavior unchanged).
  *
  * @param {string} imageUrl - Public URL of the input image
  * @param {string} falApiKey - fal.ai API key
  * @param {object} item - The Firestore item (for prompt attributes)
  * @param {string} feedback - Optional user feedback to append to prompt
+ * @param {array|null} colorAnchor - PC-100 dominant-color anchor
+ * @param {object} opts - { deadlineAt, fetchTimeoutMs, pollIntervalMs }
  * @returns {Promise<string>} - URL of the standardized image
  */
-async function runFluxStandardization(imageUrl, falApiKey, item = {}, feedback = '', colorAnchor = null) {
+async function runFluxStandardization(imageUrl, falApiKey, item = {}, feedback = '', colorAnchor = null, opts = {}) {
   const prompt = buildFluxPrompt(item, feedback, colorAnchor);
+  const fetchTimeoutMs = opts.fetchTimeoutMs || 30000;
+  const pollIntervalMs = opts.pollIntervalMs || 5000;
+  const deadlineAt = opts.deadlineAt || null;
 
-  const submitRes = await fetch('https://queue.fal.run/fal-ai/flux-kontext/dev', {
+  const submitRes = await fetchWithTimeout('https://queue.fal.run/fal-ai/flux-kontext/dev', {
     method: 'POST',
     headers: {
       'Authorization': `Key ${falApiKey}`,
@@ -205,7 +245,7 @@ async function runFluxStandardization(imageUrl, falApiKey, item = {}, feedback =
       guidance_scale: 2.5,
       num_inference_steps: 30,
     }),
-  });
+  }, fetchTimeoutMs);
 
   const sub = await submitRes.json();
   if (!sub.request_id) {
@@ -214,16 +254,22 @@ async function runFluxStandardization(imageUrl, falApiKey, item = {}, feedback =
 
   // Poll for completion
   for (let i = 0; i < 40; i++) {
-    await new Promise(r => setTimeout(r, 5000));
-    const statusRes = await fetch(sub.status_url, {
+    // PC-105: stop polling past the pipeline budget — a slow fal day
+    // must end in a timeout error inside the budget, never a
+    // function-level kill mid-poll.
+    if (deadlineAt && Date.now() > deadlineAt) {
+      throw new Error('standardization_timeout: FLUX poll exceeded the pipeline budget');
+    }
+    await new Promise(r => setTimeout(r, pollIntervalMs));
+    const statusRes = await fetchWithTimeout(sub.status_url, {
       headers: { 'Authorization': `Key ${falApiKey}` },
-    });
+    }, fetchTimeoutMs);
     const status = await statusRes.json();
 
     if (status.status === 'COMPLETED') {
-      const resultRes = await fetch(status.response_url, {
+      const resultRes = await fetchWithTimeout(status.response_url, {
         headers: { 'Authorization': `Key ${falApiKey}` },
-      });
+      }, fetchTimeoutMs);
       const result = await resultRes.json();
       if (result.images && result.images[0]) {
         return result.images[0].url;
@@ -234,7 +280,7 @@ async function runFluxStandardization(imageUrl, falApiKey, item = {}, feedback =
       throw new Error(`FLUX failed: ${JSON.stringify(status).slice(0, 300)}`);
     }
   }
-  throw new Error('FLUX timed out after 200s');
+  throw new Error(`FLUX timed out after ${(40 * pollIntervalMs / 1000).toFixed(0)}s of polling`);
 }
 
 /**

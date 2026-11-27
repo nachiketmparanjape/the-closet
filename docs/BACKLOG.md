@@ -1777,7 +1777,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **In scope:** re-wire the trigger on the deployed function (PATCH with the Firestore document-created eventTrigger, or delete + recreate via a fixed deploy-create.js) and verify live with a fresh item (it standardizes or marks already-clean within minutes). Fix `deploy-create.js` so future event-triggered functions get their trigger in the create body. Extend `scripts/verify-function-secrets.js` (or the fleet audit) to check eventTrigger wiring, so a triggerless function is caught at deploy time, not by QA.
 - **Done looks like:** a new item standardizes automatically within minutes of creation, or is marked already-clean; the deployed function resource shows its eventTrigger; the audit passes.
 - **Effort:** M.
-- **Status:** Filed 2026-11-26 (Round 5). Issue #166. Investigation complete the same day — cause proven, fix scoped. In Sprint 38 (proposed).
+- **Status:** Filed 2026-11-26 (Round 5). Issue #166. Investigation complete the same day — cause proven, fix scoped. In Sprint 38 — approved 2026-11-26, building. **Wiring rebuilt 2026-11-26:** function deleted + recreated with its eventTrigger (nam5), FAL_API_KEY bound, 300s/1Gi, public invoker binding set; topic publisher granted to both the Eventarc and Firestore service agents (the REST create grants nobody — that was the third cause found, after the missing trigger and the wrong region). `deploy-create.js` now grants the topic publisher at create time; the audit checks eventTrigger presence. Live tests #1–#3 did NOT fire; **live test #4 running** (started after the grants had time to settle). Live proof still owed — the card is not SHIPPED until a fresh item fires the trigger.
 
 ### PC-102: A background failure's error toast looks like the upload failed (S/M)
 
@@ -1786,7 +1786,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **In scope:** a failure toast names the piece and action it belongs to ("The burgundy sweatshirt's AI version didn't come out right"), so it can never read as the foreground action failing; or the standardize failure is not toasted globally at all when the item page already carries the reason (PC-98 note). The upload flow itself needs no change — it already succeeds.
 - **Done looks like:** a background standardization failure never appears as an upload error; the upload screen shows only upload outcomes.
 - **Effort:** S/M.
-- **Status:** Filed 2026-11-26 (Round 5). Issue #167. Investigation complete the same day — cause proven, fix scoped. In Sprint 38 (proposed).
+- **Status:** Filed 2026-11-26 (Round 5). Issue #167. Investigation complete the same day — cause proven, fix scoped. In Sprint 38 — **SHIPPED 2026-11-26** (new `standardizeFailureToast(name, err)`; both standardize catch sites toast the named failure; 7 tests; hosting release `1795749366797000`, live markers verified).
 
 ### PC-103: After a failed standardization the item page's main photo goes blank (S/M)
 
@@ -1795,7 +1795,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **In scope:** refresh the open item dialog from the snapshot listener (at least photos + standardization); add an `onerror` fallback on the item photo (retry once, then fall back to `photos[0].url`); carry `lastError` into the local failed state; map `processing_interrupted` (and any timeout-shaped error) to the timeout sentence in `standardizationFailureNote`.
 - **Done looks like:** a failed item's page shows a real photo (cutout or original) even when the dialog was opened before the cutout landed or a load failed once; the failure sentence names the timeout when the run was killed.
 - **Effort:** S/M.
-- **Status:** Filed 2026-11-26 (Round 5). Issue #168. Investigation complete the same day — attribution corrected, fix scoped. In Sprint 38 (proposed).
+- **Status:** Filed 2026-11-26 (Round 5). Issue #168. Investigation complete the same day — attribution corrected, fix scoped. In Sprint 38 — **SHIPPED 2026-11-26** (dialog refresh from snapshot + photo retry/fallback + lastError carry + `processing_interrupted` → timeout sentence; 5 tests; hosting release `1795749366797000`, live markers verified).
 
 
 ### PC-104: Deployed functions run at 60s timeouts the source never declared (M)
@@ -1805,7 +1805,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **In scope:** set the deployed timeouts/memories to the declared values (field-scoped PATCHes: `updateMask=serviceConfig.timeoutSeconds,serviceConfig.availableMemory` — never a full serviceConfig replace, which would strip secrets); fix `deploy-create.js` to take timeout/memory from the source (or a per-function map) instead of hardcoding 60s/512Mi; fix `deploy-update.js` to preserve/apply serviceConfig on update; extend the fleet audit to fail on timeout/memory drift.
 - **Done looks like:** every deployed function runs at its declared timeout/memory; a 3-attempt standardization completes inside the 300s budget; the audit passes.
 - **Effort:** M.
-- **Status:** Filed 2026-11-26 (Round 5 follow-up). Issue #169. In Sprint 38 (proposed).
+- **Status:** Filed 2026-11-26 (Round 5 follow-up). Issue #169. In Sprint 38 — **SHIPPED 2026-11-26** (live PATCHes: standardizeItem 300s/1Gi, planPacking 300s, parseOutfitPhoto 120s, shopCheck 120s — all ACTIVE, three bumped to nodejs22; `function-config.json` is the config source of truth; `deploy-create.js` reads it at create, `deploy-update.js` applies serviceConfig after every PATCH, the audit checks config drift; audit after the PATCHes: secrets + config clean, only the 15 retired nodejs20 runtimes remain — PC-99).
 
 ### PC-105: The FLUX poll ignores the pipeline deadline — a slow fal day eats the whole timeout (S/M)
 
@@ -1814,4 +1814,4 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **In scope:** pass `deadlineMs` into `runFluxStandardization` and stop polling past the budget (throw `standardization_timeout`); add an AbortSignal timeout to each status fetch (e.g. 30s) so a hung fetch cannot stall the loop; unit-test the poll against a fake clock/slow fetch.
 - **Done looks like:** a stalled FLUX poll ends with a timeout error inside the budget, never a function-level kill; the item shows the timeout sentence.
 - **Effort:** S/M.
-- **Status:** Filed 2026-11-26 (Round 5 follow-up). Issue #170. In Sprint 38 (proposed).
+- **Status:** Filed 2026-11-26 (Round 5 follow-up). Issue #170. In Sprint 38 — **SHIPPED 2026-11-26** (`fetchWithTimeout` + poll deadline opts in `runFluxStandardization`, pipeline passes `deadlineAt`; 5 new poll tests + 1 pipeline wiring test; deployed to `standardizeItem` and `autoStandardizeItem` 2026-11-27T03:15Z — the trigger survived the update, verified by GET).

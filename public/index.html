@@ -2124,6 +2124,41 @@
       var thumbStrip = document.getElementById("thumbStrip");
       var itemOverlay = document.getElementById("itemOverlay");
       var itemPhoto = document.getElementById("itemPhoto");
+      // PC-103: a photo that fails to load once used to sit as a blank
+      // cream box forever — the dialog photo had no error recovery,
+      // while the tile (live snapshot) showed the cutout. Retry the
+      // same URL once (cache-busted, for transient blips), then fall
+      // back to the item's original photo, so the dialog always shows
+      // a real photo. A successful load resets the retry state; a
+      // snapshot refresh that sets a new URL resets it too (the
+      // retry counter is keyed to the base URL).
+      itemPhoto.addEventListener("error", function () {
+        if (typeof activeItem === "undefined" || !activeItem) return;
+        var src = itemPhoto.getAttribute("src") || "";
+        if (!src) return;
+        var base = src.split("?cb=")[0].split("&cb=")[0];
+        var fails = (itemPhoto.dataset.loadFailedFor === base)
+          ? (parseInt(itemPhoto.dataset.loadFails || "0", 10) || 0) : 0;
+        if (fails === 0) {
+          itemPhoto.dataset.loadFailedFor = base;
+          itemPhoto.dataset.loadFails = "1";
+          var sep = src.indexOf("?") === -1 ? "?" : "&";
+          itemPhoto.src = src + sep + "cb=" + Date.now();
+          return;
+        }
+        if (fails === 1) {
+          itemPhoto.dataset.loadFails = "2";
+          var orig = (activeItem.photos && activeItem.photos[0] && activeItem.photos[0].url) || "";
+          if (orig && orig !== src) { itemPhoto.src = orig; return; }
+        }
+        // Already retried and fallen back (or no original to fall
+        // back to): leave it — the snapshot refresh re-sets the URL
+        // when fresh data lands.
+      });
+      itemPhoto.addEventListener("load", function () {
+        delete itemPhoto.dataset.loadFailedFor;
+        delete itemPhoto.dataset.loadFails;
+      });
       var itemTitle = document.getElementById("itemTitle");
       var itemNameInput = document.getElementById("itemNameInput");
       var itemCategoryInput = document.getElementById("itemCategoryInput");
@@ -4040,7 +4075,7 @@
         var systematic = err.indexOf("systematic_gate_failure") === 0;
         var color = err.indexOf("color") !== -1;
         var geometry = err.indexOf("geometry") !== -1;
-        if (err.indexOf("standardization_timeout") === 0) return "The AI version took too long and timed out. Try again.";
+        if (err.indexOf("standardization_timeout") === 0 || err.indexOf("processing_interrupted") === 0) return "The AI version took too long and timed out. Try again.";
         if (err.indexOf("no_photo") === 0) return "This piece has no photo to work from.";
         if (err.indexOf("FAL_API_KEY") !== -1 || err.indexOf("FLUX") === 0) return "The AI service had a problem. Try again later.";
         if (color && geometry) {
@@ -4059,6 +4094,24 @@
             : "The AI version came out the wrong shape. Try again — it may do better next time.";
         }
         return "The AI version didn't come out right. You can try again.";
+      }
+
+      // PC-102: name the piece in a standardization failure toast.
+      // The generation call is fire-and-forget, so its failure can
+      // surface while the founder is on another screen — Round 5:
+      // the sweatshirt's generation failed mid-upload, and the
+      // generic toast ("Something went wrong on our end. Try again.
+      // (Ref: req_9758)") read as the upload failing. The toast now
+      // names the piece and the action, so it can never be mistaken
+      // for the foreground action. The item page itself carries the
+      // plain reason (PC-98 note); the toast is only the alert.
+      function standardizeFailureToast(name, err) {
+        var label = name
+          ? "The " + name + "'s AI version didn't come out right."
+          : "The AI version didn't come out right.";
+        var ref = err && err.details && err.details.ref;
+        if (typeof ref === "string" && ref) label += " (Ref: " + ref + ")";
+        return label;
       }
 
       // PC-58: call the standardizeItem callable.
@@ -4228,9 +4281,21 @@
               return;
             }
           }).catch(function (err) {
-            showToast(friendlyError(err));
+            // PC-102: name the piece — this toast can fire while the
+            // founder is on another screen, and a generic error then
+            // reads as the foreground action failing.
+            var failName = (item && (item.shortName || item.name)) ||
+              (activeItem && (activeItem.shortName || activeItem.name)) || null;
+            showToast(standardizeFailureToast(failName, err));
             if (activeItem && activeItem.id === itemId) {
-              activeItem.standardization = { status: "failed" };
+              // PC-103: carry the server's reason into the local
+              // failed state, so the dialog shows the real note
+              // (not the default) even before the snapshot listener
+              // refreshes it with the authoritative value.
+              activeItem.standardization = {
+                status: "failed",
+                lastError: (err && err.message) || ""
+              };
               renderStandardizationUI(activeItem);
             }
           });
@@ -4346,7 +4411,11 @@
           renderStandardizationUI(activeItem);
         }).catch(function (err) {
           btn.disabled = false;
-          showToast(friendlyError(err));
+          // PC-102: name the piece — same fire-and-forget hazard as
+          // the Generate path (this call can fail after the founder
+          // has moved on).
+          var failName = (activeItem && (activeItem.shortName || activeItem.name)) || null;
+          showToast(standardizeFailureToast(failName, err));
         });
       });
 
@@ -4725,6 +4794,26 @@
             todayDataSeen = true;
             maybeRenderToday();
             maybeHealUnnamedItems();
+            // PC-103: refresh the open item dialog from the fresh
+            // snapshot. The dialog holds a stale activeItem (set once
+            // in openItem), so a cutout or a standardization result
+            // that lands while it is open shows only after a
+            // close/reopen. Only the photo + standardization UI
+            // refresh — the title/name fields are left alone, so an
+            // in-progress edit is never clobbered. The Generate arm
+            // clears on a re-render (PC-90 behavior: an arm must
+            // never survive a re-render and run silently).
+            if (typeof activeItem !== "undefined" && activeItem) {
+              var fresh = null;
+              for (var fi = 0; fi < allItems.length; fi++) {
+                if (allItems[fi].id === activeItem.id) { fresh = allItems[fi]; break; }
+              }
+              if (fresh) {
+                activeItem = fresh;
+                showDisplayPhoto(itemPhoto, activeItem, (itemPhoto && itemPhoto.dataset.view) || "dots");
+                renderStandardizationUI(activeItem);
+              }
+            }
           }, function (error) {
             itemsLoaded = true;
             loadingGrid.hidden = true;

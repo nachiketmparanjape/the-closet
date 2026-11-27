@@ -161,7 +161,13 @@ async function runStandardizationPipeline({ db, bucket, uid, itemId, item, falAp
       await saveRejectedRender(bucket, db, itemRef, uid, itemId, fluxBuffer, lastGateReason);
       throw new Error(`standardization_timeout: ${lastGateReason}`);
     }
-    outputUrl = await runFluxStandardization(imageUrl, falApiKey, item, feedback, colorAnchor);
+    outputUrl = await runFluxStandardization(imageUrl, falApiKey, item, feedback, colorAnchor, {
+      // PC-105: the poll shares the pipeline budget — stop inside
+      // it, with a timeout error, instead of dying mid-poll at the
+      // function cap. Per-fetch timeout 30s.
+      deadlineAt: pipelineStartedAt + deadlineMs,
+      fetchTimeoutMs: 30000,
+    });
     fluxBuffer = Buffer.from(await (await fetch(outputUrl)).arrayBuffer());
 
     // 2. Quality gates (Sprint 27: now real, not stubs).

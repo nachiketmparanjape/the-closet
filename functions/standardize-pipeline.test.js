@@ -74,7 +74,7 @@ function fakeBucket({ token = "tok-1" } = {}) {
   };
 }
 
-function makeFetch({ fluxOutput, cutoutBytes, originalBytes, maskBytes }) {
+function makeFetch({ fluxOutput, cutoutBytes, originalBytes, maskBytes, fluxNeverCompletes = false }) {
   const fluxSubmits = [];
   const fetched = [];
   const json = (o) => ({ ok: true, status: 200, json: async () => o, arrayBuffer: async () => Buffer.from(JSON.stringify(o)) });
@@ -85,7 +85,10 @@ function makeFetch({ fluxOutput, cutoutBytes, originalBytes, maskBytes }) {
       fluxSubmits.push(JSON.parse(opts.body));
       return json({ request_id: "req-1", status_url: "https://fal/status/flux", response_url: "https://fal/response/flux" });
     }
-    if (url === "https://fal/status/flux") return json({ status: "COMPLETED", response_url: "https://fal/response/flux" });
+    if (url === "https://fal/status/flux") {
+      if (fluxNeverCompletes) return json({ status: "IN_QUEUE" });
+      return json({ status: "COMPLETED", response_url: "https://fal/response/flux" });
+    }
     if (url === "https://fal/response/flux") return json({ images: [{ url: FLUX_OUT_URL }] });
     if (url === FLUX_OUT_URL) return bytes(fluxOutput);
     if (url.includes("renders")) return bytes(cutoutBytes); // encoded path: users%2Fu1%2Frenders%2Fabc.png
@@ -224,9 +227,34 @@ describe("PC-97: systematic retries stop, evidence is kept, time is budgeted", f
         db, bucket, uid: "u1", itemId: "it1", item: itemWithRender(), falApiKey: "fake-key",
         deadlineMs: 1, // budget already spent: attempt 2 must not start
       }),
-      /standardization_timeout: color/
+      // PC-105: with a 1ms budget the FLUX poll itself refuses to
+      // start (its deadline check fires before the first poll), so
+      // the timeout names the poll, not the gate. Either way the
+      // run ends in a timeout and no second FLUX run starts.
+      /standardization_timeout/
     );
     assert.equal(fluxSubmits.length, 1, "no second FLUX run past the budget");
+  });
+
+  it("PC-105: a slow FLUX poll ends inside the budget, not at the function cap", async function () {
+    const cutoutBytes = await garmentCutout(BURGUNDY);
+    const originalBytes = await garmentOnWhite(BURGUNDY);
+    const fluxOutput = await garmentOnWhite(BURGUNDY);
+    const maskBytes = await maskPng();
+    const { fetch, fluxSubmits } = makeFetch({ fluxOutput, cutoutBytes, originalBytes, maskBytes, fluxNeverCompletes: true });
+    global.fetch = fetch;
+    const db = fakeDb();
+    const bucket = fakeBucket();
+    // The poll's own 40 x 5s cap is 200s; a 60ms pipeline budget must
+    // end the run in ~one poll interval, with a timeout error.
+    await assert.rejects(
+      runStandardizationPipeline({
+        db, bucket, uid: "u1", itemId: "it1", item: itemWithRender(), falApiKey: "fake-key",
+        deadlineMs: 60,
+      }),
+      /standardization_timeout: FLUX poll exceeded the pipeline budget/
+    );
+    assert.equal(fluxSubmits.length, 1, "one FLUX submit, then the poll stops");
   });
 });
 

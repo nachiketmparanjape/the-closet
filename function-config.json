@@ -1,0 +1,71 @@
+{
+  "_notes": [
+    "Single source of truth for deployed function config. deploy-create.js reads this at create time; deploy-update.js applies it on update; the fleet audit checks it.",
+    "Timeout rule: never shorten a timeout at deploy time \u2014 the value here is max(declared in functions/index.js, currently deployed). Three functions run LONGER than declared (startOutfitParse, retryOutfitGarment, pollOutfitParse: deployed 300s vs declared 120s) and keep 300s because the parse poll is load-bearing. Shortening them is a planning decision, not a deploy fix.",
+    "Memory is the declared value where it differs from the 512Mi default. approveStandardization / rejectStandardization declare 256Mi but run at 512Mi \u2014 the deployed direction is harmless, so they are not listed and take the default.",
+    "autoStandardizeItem is the fleet's only event-triggered function. Its eventTrigger was lost in the Nov 5 REST recreate (PC-101) because deploy-create.js never sent one \u2014 the in-code onDocumentCreated is CLI metadata the REST API ignores."
+  ],
+  "advanceParsesHttp": {
+    "availableMemory": "1Gi",
+    "timeoutSeconds": 540
+  },
+  "autoStandardizeItem": {
+    "availableMemory": "1Gi",
+    "eventTrigger": {
+      "eventFilters": [
+        {
+          "attribute": "database",
+          "value": "(default)"
+        },
+        {
+          "attribute": "namespace",
+          "value": "(default)"
+        },
+        {
+          "attribute": "document",
+          "value": "users/{uid}/items/{itemId}"
+        }
+      ],
+      "eventType": "google.cloud.firestore.document.v1.created",
+      "retryPolicy": "RETRY_POLICY_RETRY",
+      "triggerRegion": "nam5"
+    },
+    "timeoutSeconds": 300
+  },
+  "extractGarment": {
+    "availableMemory": "1Gi",
+    "timeoutSeconds": 120
+  },
+  "parseOutfitPhoto": {
+    "availableMemory": "512Mi",
+    "timeoutSeconds": 120
+  },
+  "planPacking": {
+    "availableMemory": "512Mi",
+    "timeoutSeconds": 300
+  },
+  "pollOutfitParse": {
+    "availableMemory": "1Gi",
+    "timeoutSeconds": 300
+  },
+  "retryOutfitGarment": {
+    "availableMemory": "1Gi",
+    "timeoutSeconds": 300
+  },
+  "shopCheck": {
+    "availableMemory": "512Mi",
+    "timeoutSeconds": 120
+  },
+  "spikeRun": {
+    "availableMemory": "512Mi",
+    "timeoutSeconds": 300
+  },
+  "standardizeItem": {
+    "availableMemory": "1Gi",
+    "timeoutSeconds": 300
+  },
+  "startOutfitParse": {
+    "availableMemory": "1Gi",
+    "timeoutSeconds": 300
+  }
+}
