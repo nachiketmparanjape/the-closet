@@ -203,3 +203,63 @@ This round does NOT cover a Friday weekly round (next Friday
 round Dec 11). Round 9 scope: retest PC-102 with the forced
 failure above; the PC-111 gate-error case if it can be forced;
 the "Saturday, Nov 14" label via the founder's phone check.
+
+## Retest — Round 9 (2026-11-27, 7:52–7:59 AM PST)
+
+Focused retest for PC-102, founder-approved. Full report:
+`~/workspace/goals/one-man-studio-operating-system/hidden_files/qa-rounds/2026-11-27-round9.md`.
+
+- **PC-102 (#167) — FAIL, two findings.** The forced failure
+  worked (blank photo + manual Generate; the color gate fails
+  "no-garment-pixels"). The FIRST failure toasted exactly once
+  from the item page. But (a) the RETRY failure toasted ZERO
+  times from the Wardrobe tab, and the stale "Generating…"
+  toast stayed on screen ~5 min after the run had already
+  failed into the max-attempts state — the user is actively
+  misled into thinking it is still generating. Cause proven
+  from the code: the Sprint 40 dedupe keys
+  `toastStdFailureOnce` on the item alone (10-min expiry) —
+  Run 1's failure toasted at ~7:54, Run 2's failure ~7:58 hit
+  the same key and was suppressed on EVERY path (the snapshot
+  listener detects the new processing→failed transition but
+  the dedupe kills the toast; the foreground catch/then hit
+  the same key). The "Generating…" toast is never dismissed
+  on failure; it only disappears when another toast replaces
+  it. Fix (Sprint 41, proposed): dedupe per run, not per item
+  — clear the entry when a new run starts, so a new failure
+  always toasts once and replaces the generating toast.
+  (b) "Try again" arms first ("Tap again to generate" +
+  cost toast) and only the second tap starts the run. That is
+  the designed `armOrRun` cost confirm (line 4363; the
+  Sprint 40 sheet fix only skips the arm when the attribute
+  sheet is the confirmation, and no sheet appears on this
+  path), NOT the Round 7 sheet bug. The round's FAIL on this
+  point was measured against a criterion the delegation set,
+  which conflated the two. Whether Try again stays two-tap or
+  goes one-tap is a founder decision for Sprint 41.
+- **PC-111 (#176) — gate-error case NOT OBSERVED** as a
+  distinct state (no separate gate-error UI in either forced
+  failure). But in both failures no render reached review:
+  the item kept showing only the original photo, with no AI
+  render and no approve/reject prompt.
+- **"Saturday, Nov 14" label — UNTESTED.** Not reachable
+  without deleting the real Nov 25 wear.
+- **P2s parked:** the toast names the piece by its
+  AI-suggested name ("Unidentified item"), not the user's
+  name (recurs); the automatic-run skip on upload is silent
+  (no "already clean" message anywhere); the live flow has no
+  attribute picker / Continue step on this path (the blank
+  item had no missing attributes, so no sheet appeared — the
+  round's description did not match the build).
+
+Costs: $0.06 (two generations). Cleanup verified: the test
+piece's state was established before delete (max-attempts
+failure, no render); wardrobe back to 72, outfits 10, trips
+0. The Nov 25 wear and the Olive joggers' pending render are
+untouched.
+
+Round 10 scope: retest PC-102's retry/max-attempts toast and
+the retry start if shipped (note the flow caveat: the live
+build's two-tap confirm vs the sheet's Continue); the PC-111
+gate-error case if it can be forced; the "Saturday, Nov 14"
+label via the founder's phone check.
