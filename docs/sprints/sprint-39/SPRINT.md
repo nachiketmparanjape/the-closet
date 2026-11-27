@@ -143,8 +143,60 @@ carries `toastStdFailureOnce` ×4, `syncBulkStartBtn` ×4,
 
 ## Retest
 
-(TBD — QA Round 7 after the build; the founder's manual checks
-after QA, per the loop design. Retest targets: a single-item add
-standardizes from the cutout; a cutout that outruns its timeout
-still shows; a background failure toasts the piece by name; the
-bulk button resets after a run; the sweatshirt's photo is back.)
+QA Round 7, Thu Nov 26, 11:08–11:23 PM PST (14 min, signed in).
+No P0, two P1s, four P2s. Full report:
+`~/workspace/goals/one-man-studio-operating-system/hidden_files/qa-rounds/2026-11-26-round7.md`.
+
+- **PC-109 (#174) — PASS.** Single-add navy tee standardized
+  from the cutout; render in pending_review in ~1–1.5 min,
+  correct color. Generate never tapped.
+- **PC-110 (#175) — PASS.** 7.3 MB iPhone photo's cutout on
+  both tile and item page ~1 min after upload. (Its automatic
+  standardization then failed the color gate — the gate
+  working, not the link.)
+- **PC-102 (#167) — FAIL (P1).** Zero toasts on either failure.
+  Cause proven the same night: the `standardizeItem` callable
+  swallows pipeline failures (outer catch returns nothing, so
+  the client gets success-with-null and both foreground catches
+  never fire on a gate failure), and the snapshot listener
+  skips the open dialog's item by design — QA watched the item
+  page during both failures. Separately, the manual Generate
+  QA tapped at ~23:16 never reached the server at all (no
+  request in the Cloud Run logs 07:14–07:18Z; no client_error
+  either) — the page kept showing the automatic run's failure
+  note. Where the tap dies is not yet established.
+- **PC-108 (#173) — PASS.** Bulk button reset to 'Add pieces'
+  and disabled after both rows showed Done; wardrobe 75 → 77.
+- **PC-107 (#172) — PARTIAL.** Tile PASS (named placeholder),
+  packing row PASS (#137 — mini placeholder, no alt spill),
+  item page FAIL (P2): the large photo area stays an empty
+  dashed box with no text or name. Cause not yet established
+  from code reading; live browser repro running to pin it down.
+- **PC-111 (#176) — NEW (P1).** A wrong-color render reached
+  review: the red tee's comparison showed a NAVY render at
+  23:14, correct dark brown by 23:22, no user action. Server
+  logs prove the gates caught the bad draw (attempt 1 color
+  ΔE=31.0 fail, cutout landed, attempt 2 passed) — the navy
+  image itself is unexplained and unrecoverable (item deleted
+  at cleanup). Live defects in the symptom class: the gates
+  fail OPEN on exception (pass:true, deltaE:0, silently), and
+  the pending render sits at a fixed public URL with no
+  versioning.
+- **#139 — PASS.** The stylist's outfit for tomorrow avoided
+  the Nov 25 top+bottom pair.
+- **Still untested:** #138 rollover, the "Saturday, Nov 14"
+  label (needs the founder's phone; cannot be reached without
+  deleting the real Nov 25 wear).
+- **P2s parked:** tile shows an auto-derived label instead of
+  the typed name (recurs); bulk duplicate guard false-positive
+  (navy matched to red); trip save with an unrecognized
+  destination silently does nothing.
+
+Costs: $0.18 (6 attempts). Cleanup verified: 5 test items + test
+trip deleted; wardrobe back to 72, outfits 10, trips 0. The Nov 25
+wear and the Olive joggers' pending render are untouched.
+
+Fix pass proposed as Sprint 40: PC-102 (re-throw after boundary;
+drop the open-dialog skip; repro the dead manual tap), PC-107
+item page, PC-111 (gates fail closed; version the pending URL;
+itemId in pipeline logs).

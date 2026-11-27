@@ -1256,3 +1256,5 @@ Suite 823 passing, 0 fail. Deployed: `standardizeItem` +
 `extractGarment` updated; hosting release `1795763213256000`.
 
 Verification is QA Round 7.
+
+Verification is QA Round 7 (2026-11-26): PC-109/PC-110/PC-108 PASS; PC-102 FAIL (no toast on either failure — the callable swallows pipeline failures and the snapshot listener skips the open dialog's item); PC-107 PARTIAL (tile + packing row pass, item page still a blank box); new card PC-111 (a wrong-color render reached review, then self-corrected — gates fail open on exception, pending URL unversioned). #139 PASS (outfit avoids the Nov 25 pair). Fix pass proposed as Sprint 40.

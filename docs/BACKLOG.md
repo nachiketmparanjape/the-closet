@@ -1786,7 +1786,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **In scope:** a failure toast names the piece and action it belongs to ("The burgundy sweatshirt's AI version didn't come out right"), so it can never read as the foreground action failing; or the standardize failure is not toasted globally at all when the item page already carries the reason (PC-98 note). The upload flow itself needs no change — it already succeeds.
 - **Done looks like:** a background standardization failure never appears as an upload error; the upload screen shows only upload outcomes.
 - **Effort:** S/M.
-- **Status:** Filed 2026-11-26 (Round 5). Issue #167. Investigation complete the same day — cause proven, fix scoped. In Sprint 38 — **SHIPPED 2026-11-26** (new `standardizeFailureToast(name, err)`; both standardize catch sites toast the named failure; 7 tests; hosting release `1795749366797000`, live markers verified). Retest 2026-11-26 (Round 6): FAILS — two background standardization failures occurred (single-add "wrong shape", parse 2 "wrong color") and no toast naming the piece was observed in either window; the only toast was the duplicate-detection toast. **SHIPPED 2026-11-26 (Sprint 39) — the background half.** One toast per failure from any path: `toastStdFailureOnce` (dedupe item+reason, 10-min expiry) shared by the two foreground catches and the new `toastNewStdFailures`, which the snapshot listener runs on every update (recent failures only, never the open dialog's item). 16 tests in `tests/pc102-standardize-toast.test.js`.
+- **Status:** Filed 2026-11-26 (Round 5). Issue #167. Investigation complete the same day — cause proven, fix scoped. In Sprint 38 — **SHIPPED 2026-11-26** (new `standardizeFailureToast(name, err)`; both standardize catch sites toast the named failure; 7 tests; hosting release `1795749366797000`, live markers verified). Retest 2026-11-26 (Round 6): FAILS — two background standardization failures occurred (single-add "wrong shape", parse 2 "wrong color") and no toast naming the piece was observed in either window; the only toast was the duplicate-detection toast. **SHIPPED 2026-11-26 (Sprint 39) — the background half.** One toast per failure from any path: `toastStdFailureOnce` (dedupe item+reason, 10-min expiry) shared by the two foreground catches and the new `toastNewStdFailures`, which the snapshot listener runs on every update (recent failures only, never the open dialog's item). 16 tests in `tests/pc102-standardize-toast.test.js`. Retest 2026-11-26 (Round 7): FAILS — a failed standardization never toasts at all: the large navy tee's automatic run failed (inline message only, no toast while watched 23:11–23:12) and one manual Generate on the same item failed again with ZERO toasts in a ~60s window (expected exactly one, naming the piece). The generic "Something went wrong on our end" never appeared either. Investigation complete the same night — cause proven, two independent silences: (1) the `standardizeItem` callable SWALLOWS pipeline failures — its outer catch (`functions/index.js`) calls `flushAiUsage` + `boundary` and returns nothing, so the client gets success-with-null and both foreground `.catch` handlers (the only toast sites for a manual run) never fire on a gate failure; they only ever fired on transport errors, which is why Round 5's toast appeared (60s-timeout kill) and Rounds 6–7's never did. (2) the Sprint 39 snapshot listener skips the open dialog's item by design (`toastNewStdFailures`: `if (activeItemId === it.id) continue`) — QA watched the item page during both failures, so the background path was silenced too. (3) The manual Generate QA tapped at ~23:16 never reached the server at all — Cloud Run logs show NO standardizeItem request 07:14–07:18Z (5 requests in the whole round window: 3 single-auto + 2 bulk-auto), and no client_error in the window — the page kept showing the automatic run's failure note, which QA read as 'failed again'. Where the tap dies (attribute sheet / save path) is not yet established; needs a live repro.
 
 ### PC-103: After a failed standardization the item page's main photo goes blank (S/M)
 
@@ -1848,7 +1848,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   packing rows all show a real photo; a missing photo shows a
   placeholder, never a blank box.
 - **Effort:** S/M.
-- **Status:** Filed 2026-11-26 (Round 6). Issue #172. Files confirmed deleted the same night (see above); repair is the founder re-adding the photo from his phone. **SHIPPED 2026-11-26 (Sprint 39) — the code half.** A missing photo now shows a named placeholder (`photoPlaceholderDataUri`, data-URI SVG) instead of a blank box, on every display-photo surface; one shared error rule (`handleDisplayPhotoError`: retry once, fall back to the original, then the placeholder) replaces the itemPhoto-only listeners. The photo restore itself still needs the founder's re-upload.
+- **Status:** Filed 2026-11-26 (Round 6). Issue #172. Files confirmed deleted the same night (see above); repair is the founder re-adding the photo from his phone. **SHIPPED 2026-11-26 (Sprint 39) — the code half.** A missing photo now shows a named placeholder (`photoPlaceholderDataUri`, data-URI SVG) instead of a blank box, on every display-photo surface; one shared error rule (`handleDisplayPhotoError`: retry once, fall back to the original, then the placeholder) replaces the itemPhoto-only listeners. The photo restore itself still needs the founder's re-upload. Retest 2026-11-26 (Round 7): PARTIAL — the tile shows the named "Photo missing" placeholder and the packing row shows the mini placeholder (#137 PASS), but the item page still shows an empty dashed box with no placeholder text or name. Cause not yet established from code reading (the shared error handler's chain ends at the placeholder on paper; the dialog's direct `itemPhoto.src` assignments bypass `showDisplayPhoto` on view switches but do not remove its error handler) — live browser repro running to pin it down before the fix is scoped.
 
 ### PC-108: Bulk add "Add N pieces" stays disabled after the files show Done (S)
 
@@ -1867,7 +1867,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
   enables immediately; closing the dialog never orphans a
   stuck state.
 - **Effort:** S.
-- **Status:** Filed 2026-11-26 (Round 6). Issue #173. Cause proven the same night (see above). **SHIPPED 2026-11-26 (Sprint 39).** One rule for the button (`syncBulkStartBtn`, used by file selection, duplicate-skip, and `bulkFinish`); 7 new tests.
+- **Status:** Filed 2026-11-26 (Round 6). Issue #173. Cause proven the same night (see above). **SHIPPED 2026-11-26 (Sprint 39).** One rule for the button (`syncBulkStartBtn`, used by file selection, duplicate-skip, and `bulkFinish`); 7 new tests. Retest 2026-11-26 (Round 7): **PASS** — after both bulk rows showed Done, the button reset to 'Add pieces' and disabled (nothing left to add), toast 'Bulk add finished: 2 added.', wardrobe 75 → 77.
 
 ### PC-109: The single-item direct call races the cutout — the pipeline standardizes the original photo (M)
 
@@ -1878,7 +1878,7 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **In scope:** the pipeline waits briefly for the render, or re-checks for the cutout on each retry attempt, or the client fires the direct call only after the cutout lands — whichever makes single-item adds standardize from the cutout. The sweeper persists `inputKind` on the runs it does.
 - **Done looks like:** a single-item add of a studio shot standardizes from the cutout (`standardization.inputKind === "cutout"` on the item); a run that started before the cutout existed picks it up on a later attempt instead of standardizing the original.
 - **Effort:** M.
-- **Status:** Filed 2026-11-26 (Round 6 investigation). Issue #174. **SHIPPED 2026-11-26 (Sprint 39).** The input is live now: `resolvePipelineInput` resolves cutout-vs-original per attempt; a fresh item waits up to 60s for the render before attempt 1 (deadline-aware, skipped on force); the doc is re-checked before every later attempt (buffer + anchor reloaded, systematic-stop comparison reset on switch); inputKind is persisted as soon as it is known, so failed runs leave a trace. 5 new pipeline tests. Deployed in `standardizeItem`.
+- **Status:** Filed 2026-11-26 (Round 6 investigation). Issue #174. **SHIPPED 2026-11-26 (Sprint 39).** The input is live now: `resolvePipelineInput` resolves cutout-vs-original per attempt; a fresh item waits up to 60s for the render before attempt 1 (deadline-aware, skipped on force); the doc is re-checked before every later attempt (buffer + anchor reloaded, systematic-stop comparison reset on switch); inputKind is persisted as soon as it is known, so failed runs leave a trace. 5 new pipeline tests. Deployed in `standardizeItem`. Retest 2026-11-26 (Round 7): **PASS** — a single-add navy tee standardized from the cutout (tile first showed the grey scene, item page showed the cutout, render landed in pending_review in ~1–1.5 min with the correct color; Generate never tapped).
 
 ### PC-110: extractGarment overruns its timeout and orphans the render link — the cutout is made but never shows (M)
 
@@ -1889,4 +1889,32 @@ Theme: the v1 core loop, complete. Full cards in `sprints/sprint-03/PLAN.md`.
 - **In scope:** the server writes the render fields to the item doc itself (like the pipeline does), so a client timeout cannot orphan a render; and/or raise the 120s timeout; and/or the client retries the link step (re-fetch, or derive the deterministic render path and mint it as the PC-93 backfill does). The render should also be smaller/faster — the 19.5 MB full-resolution PNG is most of the cost.
 - **Done looks like:** a cutout that the server saved always shows on the item, even when the phone's call to the server times out; no item sits with a render file in Storage and no link in its photo entry.
 - **Effort:** M.
-- **Status:** Filed 2026-11-26. Issue #175. The Black tee's cutout was linked by hand the same night. **SHIPPED 2026-11-26 (Sprint 39).** The server owns the link now (`linkRenderToItem` writes the render fields to the item doc; the client's patch stays as an idempotent second write) and mints the download token at save time, so a saved render is reachable from the moment it exists. Timeout 120s → 300s (code + function-config.json). 5 new tests in `functions/extract.test.js`. Deployed in `extractGarment` (now nodejs22; fleet nodejs20 count 15 → 14).
+- **Status:** Filed 2026-11-26. Issue #175. The Black tee's cutout was linked by hand the same night. **SHIPPED 2026-11-26 (Sprint 39).** The server owns the link now (`linkRenderToItem` writes the render fields to the item doc; the client's patch stays as an idempotent second write) and mints the download token at save time, so a saved render is reachable from the moment it exists. Timeout 120s → 300s (code + function-config.json). 5 new tests in `functions/extract.test.js`. Deployed in `extractGarment` (now nodejs22; fleet nodejs20 count 15 → 14). Retest 2026-11-26 (Round 7): **PASS** — a 7.3 MB iPhone photo's cutout appeared on both the tile and the item page ~1 min after upload (the automatic standardization itself then failed the color gate, which is the gate working, not the link).
+
+### PC-111: A wrong-color render reached review for approval (M)
+
+- **Origin:** QA round, 2026-11-26 (Round 7), scope Sprint 39
+  retest.
+- **Problem:** the red tee's automatic run did not fail; at 23:14
+  its pending_review comparison showed "Original" =
+  dark-brown/maroon tee on the grey scene, "AI render" = a NAVY
+  BLUE tee on cream — verified by enlarged inspection,
+  unambiguously navy. The color gate did not catch it at
+  presentation, and "Approve this render" was available, so a
+  user could have approved a render that misrepresents the
+  garment. By 23:22, on re-check with no user action, the
+  displayed render had become dark brown (correct) — it
+  self-corrected. The bulk re-add of the same red photo, by
+  contrast, failed the gates outright ("The AI version came out
+  the wrong color and shape."), so gate behavior for the same
+  photo was inconsistent between the single and bulk runs.
+- **In scope:** find why the presented render was navy
+  (stale/wrong render shown at review time?) and why it
+  self-corrected; make the review comparison show the render
+  the gates actually judged; make gate behavior consistent
+  between single and bulk runs of the same photo.
+- **Done looks like:** a render presented for approval matches
+  the garment's color within the gate; the same photo never
+  passes review on one path and fails the gates on another.
+- **Effort:** M.
+- **Status:** Filed 2026-11-26 (Round 7). Issue #176.
